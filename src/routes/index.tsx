@@ -30,15 +30,18 @@ function Index() {
   return (
     <div className="min-h-screen bg-background text-foreground font-sans">
       <Nav />
-      <Hero />
-      <ProblemSolution />
-      <LeavePreview />
-      <Roadmap />
-      <DemoForm />
+      <main>
+        <Hero />
+        <ProblemSolution />
+        <LeavePreview />
+        <Roadmap />
+        <DemoForm />
+      </main>
       <Footer />
     </div>
   );
 }
+
 
 function Nav() {
   return (

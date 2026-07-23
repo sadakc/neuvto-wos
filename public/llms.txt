@@ -1,0 +1,12 @@
+# Neuvto WOS
+
+> Mobile-first Workforce Operating System. Launching with Leave Management, expanding to attendance, payroll, performance, and learning.
+
+Neuvto WOS replaces the legacy HRMS employees ignore with a mobile-first
+platform designed for the whole workforce. The MVP module — Leave
+Management — ships one-tap requests, multi-level approvals, real-time
+balances, a team calendar, and a configurable policy engine.
+
+## Pages
+
+- [Home](/): Product vision, Leave Management preview, roadmap, and demo request form.
