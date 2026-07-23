@@ -77,6 +77,16 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { title: "Neuvto WOS" },
+      { property: "og:title", content: "Neuvto WOS" },
+      { name: "twitter:title", content: "Neuvto WOS" },
+      { name: "description", content: "Neuvto WOS is a SaaS platform for managing employee leave requests and approvals." },
+      { property: "og:description", content: "Neuvto WOS is a SaaS platform for managing employee leave requests and approvals." },
+      { name: "twitter:description", content: "Neuvto WOS is a SaaS platform for managing employee leave requests and approvals." },
+      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2738ba3e-7fcb-4e41-b990-1d3ddb5a1733/id-preview-b316bebf--c74d04ee-25dd-4be1-a46e-f8973fe8c5d4.lovable.app-1784785091719.png" },
+      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2738ba3e-7fcb-4e41-b990-1d3ddb5a1733/id-preview-b316bebf--c74d04ee-25dd-4be1-a46e-f8973fe8c5d4.lovable.app-1784785091719.png" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { property: "og:type", content: "website" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
