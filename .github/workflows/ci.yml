@@ -1,0 +1,155 @@
+name: CI
+
+# Build step 0. Every push and every pull request runs the same four checks the
+# release-gate agent runs locally, so a regression cannot reach the app unnoticed.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  code:
+    name: Lint · Types · Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Unit tests
+        run: bun run test
+
+  database:
+    name: Migrations · Tenant isolation · Data integrity
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      # Starts the full local Supabase stack. Needed rather than a bare Postgres
+      # container because the harness impersonates authenticated roles and relies
+      # on the auth schema and pgcrypto.
+      - name: Start Supabase
+        run: supabase start
+
+      # Applies every migration in order against a clean database. A migration
+      # that only works when applied on top of existing data fails here, which is
+      # the point.
+      - name: Apply migrations from scratch
+        run: supabase db reset --no-seed
+
+      - name: Run harness
+        run: bash scripts/harness.sh
+        env:
+          DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:54322/postgres
+
+      # Surfaces missing RLS, permissive policies and unindexed foreign keys that
+      # the harness would not catch because no test happens to exercise them.
+      - name: Supabase advisors
+        run: supabase inspect db outliers || true
+
+      - name: Stop Supabase
+        if: always()
+        run: supabase stop --no-backup
+
+  guardrails:
+    name: Architecture guardrails
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history — the migration check diffs against origin/main.
+          fetch-depth: 0
+
+      # Cheap greps for the violations that are easy to introduce during a hurried
+      # fix and expensive to find later. Each mirrors a rule in
+      # standards/NEUVTO_CODING_STANDARDS.md.
+      - name: Platform must not import modules
+        run: |
+          if grep -rEn "from ['\"][^'\"]*modules/" src/platform 2>/dev/null; then
+            echo "::error::src/platform imports from src/modules — the platform must not depend on any module."
+            exit 1
+          fi
+
+      - name: Modules must not import each other
+        run: |
+          fail=0
+          for dir in src/modules/*/; do
+            [ -d "$dir" ] || continue
+            mod=$(basename "$dir")
+            # -P only: the negative lookahead is PCRE, and -E cannot be combined with -P.
+            if grep -rPn "from ['\"][^'\"]*modules/(?!${mod}\b)" "$dir" 2>/dev/null; then
+              echo "::error::$mod imports another module directly. Cross-module data goes through a published interface."
+              fail=1
+            fi
+          done
+          exit $fail
+
+      # The Lovable quarantine is enforced by ESLint (no-restricted-imports) in the
+      # `code` job, not here. A grep cannot see an `eslint-disable` exemption, so the
+      # two checks disagreed: ESLint allowed the one documented exception in
+      # src/routes/auth.tsx and this job failed it. Two enforcement mechanisms that
+      # disagree are worse than one that is precise — so this check was removed
+      # rather than taught to parse comments.
+
+      - name: No raw colour values in product code
+        run: |
+          if grep -rEn "(#[0-9a-fA-F]{3,8}\b|bg-\[#|text-\[#|border-\[#)" \
+               src/modules src/components/shared 2>/dev/null; then
+            echo "::error::Raw colour value found. Use semantic tokens — see NEUVTO_DESIGN_SYSTEM.md §1."
+            exit 1
+          fi
+
+      # Lovable commits .env with the *publishable* Supabase keys, which are designed
+      # to ship in the browser and are protected by RLS. That is fine. What must never
+      # land there is a real secret, because git history is permanent.
+      - name: No real secrets in .env
+        run: |
+          if [ -f .env ]; then
+            if grep -nE '(service_role|SERVICE_ROLE|sk_live|sk_test|re_[A-Za-z0-9]{16,}|SECRET|PRIVATE_KEY|-----BEGIN)' .env; then
+              echo "::error file=.env::A real secret appears to be in .env, which is committed. Move it to GitHub Actions secrets, Supabase Edge Function secrets, or Lovable's secret manager. Publishable/anon keys are fine here; service_role keys and API keys are not."
+              exit 1
+            fi
+          fi
+
+      - name: RLS policies must use (select auth.uid())
+        run: |
+          if grep -rEn "auth\.uid\(\)" supabase/migrations 2>/dev/null \
+             | grep -v "select auth.uid()" | grep -v "SELECT auth.uid()"; then
+            echo "::error::Bare auth.uid() in a policy — it is re-evaluated per row. Wrap as (select auth.uid())."
+            exit 1
+          fi
+
+      - name: Every new table enables RLS
+        run: |
+          fail=0
+          for f in $(git diff --name-only origin/main...HEAD -- 'supabase/migrations/*.sql' 2>/dev/null || true); do
+            [ -f "$f" ] || continue
+            for t in $(grep -oiP 'create table (if not exists )?\K(public\.)?\w+' "$f" | sed 's/public\.//'); do
+              if ! grep -qi "alter table.*$t.*enable row level security" "$f"; then
+                echo "::error file=$f::Table '$t' is created without RLS enabled in the same migration."
+                fail=1
+              fi
+            done
+          done
+          exit $fail

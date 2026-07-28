@@ -1,0 +1,36 @@
+stateDiagram-v2
+    direction LR
+
+    [*] --> draft
+
+    draft --> pending_approval : submitted, days reserved
+
+    state resolve <<choice>>
+    pending_approval --> resolve : engine reads approval_chains
+
+    resolve --> level_1 : always
+    resolve --> unresolved : no valid approver
+
+    state level_1 {
+        [*] --> awaiting_l1
+        awaiting_l1 --> skip_l1 : approver is the requester
+        skip_l1 --> [*]
+        awaiting_l1 --> [*] : decided
+    }
+
+    state needs_l2 <<choice>>
+    level_1 --> needs_l2 : approved at L1
+    needs_l2 --> level_2 : condition matches
+    needs_l2 --> approved : condition does not match
+
+    level_2 --> approved : approved at L2
+    level_2 --> rejected : rejected at L2
+    level_1 --> rejected : rejected at L1
+
+    pending_approval --> cancelled : cancelled before start
+    approved --> cancelled : cancelled before start
+
+    unresolved --> [*] : APPROVER_UNRESOLVED
+    approved --> [*]
+    rejected --> [*] : reservation released
+    cancelled --> [*] : days returned

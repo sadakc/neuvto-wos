@@ -30,11 +30,39 @@ export default tseslint.config(
                 "TanStack Start does not use the Next.js `server-only` package. Rename the module to `*.server.ts` or mark it with `@tanstack/react-start/server-only`.",
             },
           ],
+          patterns: [
+            {
+              // NEUVTO_CODING_STANDARDS.md §1 — modules are imported by their root,
+              // never by reaching into their internals.
+              group: ["**/modules/*/handlers/*", "**/modules/*/contracts/*"],
+              message: "Import a module by its root (e.g. @/modules/leave), not its internals.",
+            },
+            {
+              // NEUVTO_CODING_STANDARDS.md §9 — the portability contract. Lovable's
+              // proprietary APIs stay reachable from one directory only.
+              group: ["**/integrations/lovable", "**/integrations/lovable/*"],
+              message:
+                "Lovable APIs are quarantined. Go through the wrapper in src/platform/auth/ — see NEUVTO_CODING_STANDARDS.md §9.",
+            },
+          ],
         },
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
-      "@typescript-eslint/no-unused-vars": "off",
+      // Standards §3 — unused code accumulates invisibly when this is off.
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        { argsIgnorePattern: "^_", varsIgnorePattern: "^_", caughtErrorsIgnorePattern: "^_" },
+      ],
+      // Standards §3 — `any` defeats the type system it is embedded in.
+      "@typescript-eslint/no-explicit-any": "error",
     },
   },
+
+  // The quarantine itself, and generated files, are exempt from their own rules.
+  {
+    files: ["src/integrations/lovable/**", "src/integrations/supabase/types.ts"],
+    rules: { "no-restricted-imports": "off", "@typescript-eslint/no-explicit-any": "off" },
+  },
+
   eslintPluginPrettier,
 );

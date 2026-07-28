@@ -6,3 +6,12 @@ pnpm-lock.yaml
 package-lock.json
 bun.lock
 routeTree.gen.ts
+
+# Tool-managed and generated — reformatting these creates churn and can
+# confuse the tools that own them.
+.lovable/
+src/integrations/supabase/types.ts
+AGENTS.md
+
+# SQL harness is formatted for readability by hand
+neuvto-harness/

@@ -10,7 +10,11 @@ export default defineTool({
     if (!ctx.isAuthenticated()) {
       return { content: [{ type: "text", text: "Not authenticated" }], isError: true };
     }
-    const info = { userId: ctx.getUserId(), email: ctx.getUserEmail(), clientId: ctx.getClientId() };
+    const info = {
+      userId: ctx.getUserId(),
+      email: ctx.getUserEmail(),
+      clientId: ctx.getClientId(),
+    };
     return {
       content: [{ type: "text", text: JSON.stringify(info) }],
       structuredContent: info,

@@ -1,0 +1,898 @@
+<title>Neuvto WOS — Platform Architecture</title>
+
+<style>
+  :root {
+    --paper:      #F7F9FA;
+    --surface:    #FFFFFF;
+    --ink:        #0F1922;
+    --ink-soft:   #3D5262;
+    --muted:      #5E7484;
+    --rule:       #DCE5EA;
+    --rule-soft:  #EAF0F3;
+    --accent:     #0284C7;
+    --accent-dim: #E0F2FE;
+
+    --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace;
+
+    /* Plates hold their own world in both themes — see note in the colophon. */
+    --plate-bg:     #0B1720;
+    --plate-edge:   #223A48;
+    --plate-bar:    #101F2A;
+    --plate-ink:    #DCE9F0;
+    --plate-muted:  #7C9BAD;
+    --plate-accent: #38BDF8;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --paper:      #0B141B;
+      --surface:    #101E28;
+      --ink:        #E8F1F6;
+      --ink-soft:   #B4C9D6;
+      --muted:      #86A0B0;
+      --rule:       #22333F;
+      --rule-soft:  #182831;
+      --accent:     #38BDF8;
+      --accent-dim: #102E3F;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --paper:      #0B141B;
+    --surface:    #101E28;
+    --ink:        #E8F1F6;
+    --ink-soft:   #B4C9D6;
+    --muted:      #86A0B0;
+    --rule:       #22333F;
+    --rule-soft:  #182831;
+    --accent:     #38BDF8;
+    --accent-dim: #102E3F;
+  }
+
+  :root[data-theme="light"] {
+    --paper:      #F7F9FA;
+    --surface:    #FFFFFF;
+    --ink:        #0F1922;
+    --ink-soft:   #3D5262;
+    --muted:      #5E7484;
+    --rule:       #DCE5EA;
+    --rule-soft:  #EAF0F3;
+    --accent:     #0284C7;
+    --accent-dim: #E0F2FE;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.65;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .sheet {
+    max-width: 1160px;
+    margin: 0 auto;
+    padding: clamp(1.5rem, 4vw, 4rem) clamp(1.1rem, 4vw, 3rem) 5rem;
+  }
+
+  /* ---------- masthead ---------- */
+
+  .masthead {
+    display: flex;
+    flex-direction: column;
+    gap: 1.25rem;
+    padding-bottom: 2rem;
+    border-bottom: 2px solid var(--ink);
+  }
+
+  .stamp {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: clamp(1.9rem, 5.2vw, 3.1rem);
+    font-weight: 600;
+    letter-spacing: -0.035em;
+    line-height: 1.05;
+    text-wrap: balance;
+  }
+
+  .standfirst {
+    margin: 0;
+    max-width: 64ch;
+    font-size: clamp(1rem, 2.4vw, 1.15rem);
+    color: var(--ink-soft);
+  }
+
+  .specs {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0 2.25rem;
+    font-family: var(--font-mono);
+    font-size: 0.72rem;
+    letter-spacing: 0.06em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  .specs b { color: var(--ink); font-weight: 600; }
+
+  /* ---------- notice ---------- */
+
+  .notice {
+    margin: 2.25rem 0 0;
+    padding: 1rem 1.25rem;
+    background: var(--accent-dim);
+    border-left: 3px solid var(--accent);
+    font-size: 0.93rem;
+    color: var(--ink-soft);
+    max-width: 72ch;
+  }
+
+  .notice strong { color: var(--ink); }
+
+  /* ---------- parts ---------- */
+
+  .part {
+    display: flex;
+    align-items: baseline;
+    gap: 1rem;
+    margin: 4.5rem 0 0;
+    padding-bottom: 0.7rem;
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .part-no {
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.16em;
+    color: var(--accent);
+    text-transform: uppercase;
+    white-space: nowrap;
+  }
+
+  .part h2 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: clamp(1.05rem, 2.6vw, 1.3rem);
+    font-weight: 600;
+    letter-spacing: -0.02em;
+  }
+
+  .part-note {
+    margin: 0.9rem 0 0;
+    max-width: 70ch;
+    color: var(--muted);
+    font-size: 0.95rem;
+  }
+
+  /* ---------- plates ---------- */
+
+  .plate {
+    margin: 2.75rem 0 0;
+    display: grid;
+    grid-template-columns: 3.25rem minmax(0, 1fr);
+    column-gap: 1.25rem;
+  }
+
+  .plate-no {
+    font-family: var(--font-mono);
+    font-size: 1.5rem;
+    font-weight: 600;
+    line-height: 1.15;
+    color: var(--rule);
+    letter-spacing: -0.05em;
+    font-variant-numeric: tabular-nums;
+    padding-top: 0.1rem;
+  }
+
+  .plate-main { min-width: 0; }
+
+  .plate h3 {
+    margin: 0;
+    font-family: var(--font-mono);
+    font-size: 1.12rem;
+    font-weight: 600;
+    letter-spacing: -0.02em;
+    line-height: 1.3;
+  }
+
+  .claim {
+    margin: 0.55rem 0 1.1rem;
+    max-width: 68ch;
+    color: var(--ink-soft);
+    font-size: 0.96rem;
+  }
+
+  .claim em {
+    font-style: normal;
+    color: var(--accent);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    display: block;
+    margin-bottom: 0.2rem;
+  }
+
+  .plate-body {
+    background: var(--plate-bg);
+    border: 1px solid var(--plate-edge);
+    border-radius: 3px;
+    overflow-x: auto;
+    padding: 1.5rem 1.25rem;
+  }
+
+  .plate-body .mermaid {
+    margin: 0;
+    min-width: 0;
+    text-align: center;
+  }
+
+  .plate-foot {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem 1.5rem;
+    margin-top: 0.6rem;
+    font-family: var(--font-mono);
+    font-size: 0.68rem;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    text-transform: uppercase;
+  }
+
+  /* ---------- colophon ---------- */
+
+  .colophon {
+    margin-top: 5rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--rule);
+    display: grid;
+    gap: 1.4rem;
+    grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  }
+
+  .colophon h4 {
+    margin: 0 0 0.4rem;
+    font-family: var(--font-mono);
+    font-size: 0.7rem;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    color: var(--accent);
+    font-weight: 600;
+  }
+
+  .colophon p {
+    margin: 0;
+    font-size: 0.87rem;
+    color: var(--muted);
+    line-height: 1.6;
+  }
+
+  .colophon code {
+    font-family: var(--font-mono);
+    font-size: 0.82em;
+    color: var(--ink-soft);
+  }
+
+  @media (max-width: 640px) {
+    .plate {
+      grid-template-columns: minmax(0, 1fr);
+      row-gap: 0.35rem;
+    }
+    .plate-no { font-size: 1.05rem; padding-top: 0; }
+    .plate-body { padding: 1rem 0.75rem; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    * { animation: none !important; transition: none !important; }
+  }
+</style>
+
+<div class="sheet">
+
+  <header class="masthead">
+    <span class="stamp">Neuvto WOS · Architecture Reference</span>
+    <h1>A platform, not an app.</h1>
+    <p class="standfirst">
+      Neuvto WOS is a multi-tenant Workforce Operating System. Leave Management is the first
+      of eleven planned modules — and it is built so that the second one is cheap.
+      These eight plates show how.
+    </p>
+    <div class="specs">
+      <span>Version <b>1.0</b></span>
+      <span>28 July 2026</span>
+      <span>Status <b>Approved for build</b></span>
+    </div>
+  </header>
+
+  <p class="notice">
+    <strong>What this document is.</strong> It describes the architecture as specified and
+    approved, drawn from the build specification rather than from a running system.
+    Construction has not started. Every module name and target quarter comes from the
+    product roadmap; nothing here is estimated or embellished.
+  </p>
+
+  <!-- ============================== PART ONE ============================== -->
+
+  <div class="part">
+    <span class="part-no">Part One</span>
+    <h2>The argument</h2>
+  </div>
+  <p class="part-note">
+    Four plates, readable without a technical background.
+  </p>
+
+  <figure class="plate">
+    <div class="plate-no">01</div>
+    <div class="plate-main">
+      <h3>The platform stack</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        Modules sit on top of shared services, and the arrows only point downward. A module
+        may consume the platform; the platform never depends on a module. That single
+        constraint is what allows a customer to switch modules on and off, and what stops
+        the eleventh module from being as expensive as the first.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart TB
+    subgraph MOD["BUSINESS MODULES — independent, enabled per customer"]
+        direction LR
+        L["Leave Management<br/>MVP · Q3 2026"]
+        A["Attendance<br/>Q4 2026"]
+        P["Payroll<br/>Q2 2027"]
+        S["Shift Management<br/>Q3 2027"]
+        V["Visitor Management<br/>Q4 2027"]
+        R["6 further modules<br/>through Q1 2029"]
+    end
+
+    subgraph PLAT["PLATFORM LAYER — built once, consumed by every module"]
+        direction LR
+        subgraph BUILT["Built in MVP"]
+            direction LR
+            AU["Authentication"]
+            RB["Roles &amp; Permissions"]
+            OG["Organization<br/>&amp; Settings"]
+            AE["Approval<br/>Engine"]
+            NE["Notification<br/>Engine"]
+            AL["Audit Log"]
+            WC["Working<br/>Calendar"]
+            MR["Module<br/>Registry"]
+        end
+        subgraph LATER["Deferred — additive, no rework"]
+            direction LR
+            RS["Reports"]
+            DS["Documents"]
+            SE["Search"]
+            BT["Branding<br/>&amp; Theme"]
+        end
+    end
+
+    subgraph INF["INFRASTRUCTURE"]
+        direction LR
+        PG[("Supabase Postgres<br/>row-level security")]
+        SA["Supabase Auth"]
+        RE["Resend"]
+    end
+
+    MOD ==>|"consume"| PLAT
+    PLAT ==>|"run on"| INF
+</pre>
+      </div>
+      <div class="plate-foot"><span>Source · 03_PLATFORM_ARCHITECTURE</span><span>Principle 1</span></div>
+    </div>
+  </figure>
+
+  <figure class="plate">
+    <div class="plate-no">02</div>
+    <div class="plate-main">
+      <h3>Why the second module is cheap</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        Leave Management pays for the platform. Attendance, Payroll and everything after
+        inherit approvals, notifications, audit, calendar, permissions and tenancy without
+        rebuilding any of it — so each new module is domain logic and screens, not
+        infrastructure. This is the whole reason to build platform-first, and the reason
+        the roadmap can credibly list eleven modules.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart LR
+    subgraph M1["MODULE 1 — Leave Management"]
+        direction TB
+        P1["BUILDS THE PLATFORM<br/><br/>Approval Engine<br/>Notification Engine<br/>Audit Log<br/>Working Calendar<br/>Roles &amp; Permissions<br/>Multi-tenancy &amp; RLS<br/>Module Registry"]
+        D1["AND its own domain<br/><br/>leave_types<br/>leave_balances<br/>leave_requests"]
+        P1 --- D1
+    end
+
+    subgraph M2["MODULE 2 — Attendance"]
+        direction TB
+        P2["REUSES all seven<br/>unchanged"]
+        D2["Builds only its domain<br/><br/>attendance_records<br/>shifts_worked"]
+        P2 --- D2
+    end
+
+    subgraph M3["MODULE 3 — Payroll"]
+        direction TB
+        P3["REUSES all seven<br/>unchanged"]
+        D3["Builds only its domain<br/><br/>salary_structures<br/>payslips"]
+        P3 --- D3
+    end
+
+    subgraph MN["MODULES 4 – 11"]
+        direction TB
+        PN["REUSES all seven<br/>unchanged"]
+        DN["Builds only its domain"]
+        PN --- DN
+    end
+
+    M1 ==>|"platform cost paid once"| M2
+    M2 ==> M3
+    M3 ==> MN
+</pre>
+      </div>
+      <div class="plate-foot"><span>Source · 04_MODULE_ROADMAP</span><span>Principles 8 &amp; 10</span></div>
+    </div>
+  </figure>
+
+  <figure class="plate">
+    <div class="plate-no">03</div>
+    <div class="plate-main">
+      <h3>How customers stay separated</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        One codebase and one database serve every customer, which is what makes the
+        economics work — but isolation is enforced by the database itself, not by
+        application code that a developer could forget to write. A request carries its
+        tenant in a signed token; the database refuses anything outside it.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart TB
+    C1(["Acme Security<br/>200 employees"])
+    C2(["Vertex Facilities<br/>80 employees"])
+    C3(["Customer N"])
+
+    subgraph APP["ONE CODEBASE · ONE DEPLOYMENT"]
+        direction TB
+        UI["Web application"]
+        API["Handlers<br/>tenant derived from the signed token,<br/>never from the request body"]
+        UI --> API
+    end
+
+    subgraph DB["ONE POSTGRES DATABASE"]
+        direction TB
+        RLS{{"ROW-LEVEL SECURITY<br/>enforced by the database,<br/>not by application code"}}
+        OA[("Acme rows<br/>organization_id = A")]
+        OB[("Vertex rows<br/>organization_id = B")]
+        ON[("Customer N rows<br/>organization_id = N")]
+        RLS --> OA
+        RLS --> OB
+        RLS --> ON
+    end
+
+    C1 --> UI
+    C2 --> UI
+    C3 --> UI
+    API ==> RLS
+
+    X["Cross-tenant request returns 403, never 404 —<br/>a 404 would confirm which IDs<br/>exist inside another tenant"]
+    RLS -.-> X
+</pre>
+      </div>
+      <div class="plate-foot"><span>Source · Principle 3</span><span>API standards §5</span></div>
+    </div>
+  </figure>
+
+  <figure class="plate">
+    <div class="plate-no">04</div>
+    <div class="plate-main">
+      <h3>One request, end to end</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        The engines are load-bearing, not decorative. A single leave request passes through
+        the Approval Engine to decide who signs off, the Notification Engine to reach them,
+        and the Audit Log to record it — all shared services that Attendance and Payroll
+        will use unchanged.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart LR
+    EMP(["Employee<br/>applies for leave"])
+    LV["Leave module<br/>checks the balance"]
+    AE["Approval Engine<br/>decides who must approve"]
+    NE1["Notification Engine<br/>emails the approver"]
+    MGR(["Manager<br/>approves or rejects"])
+    BAL["Balance updated<br/>days move to booked"]
+    NE2["Notification Engine<br/>tells the employee"]
+    DB[("Postgres")]
+    AL["Audit Log<br/>every step recorded, immutably"]
+
+    EMP --> LV
+    LV --> AE
+    AE --> NE1
+    NE1 --> MGR
+    MGR --> AE
+    AE --> BAL
+    BAL --> NE2
+    BAL --> DB
+
+    LV -.-> AL
+    AE -.-> AL
+    BAL -.-> AL
+    AL -.-> DB
+</pre>
+      </div>
+      <div class="plate-foot"><span>Source · 06_LEAVE_MANAGEMENT</span></div>
+    </div>
+  </figure>
+
+  <!-- ============================== PART TWO ============================== -->
+
+  <div class="part">
+    <span class="part-no">Part Two</span>
+    <h2>Technical annex</h2>
+  </div>
+  <p class="part-note">
+    For engineering review. Component boundaries, the submission sequence, the approval
+    state machine, and the data model.
+  </p>
+
+  <figure class="plate">
+    <div class="plate-no">05</div>
+    <div class="plate-main">
+      <h3>Component architecture</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        Two transport surfaces, one implementation. Server functions serve the web app and
+        a versioned REST API serves future native and integration clients — both wrapping
+        the same handlers, so business logic exists exactly once. Note the quarantine: the
+        build tool's proprietary APIs are reachable from a single directory, which is what
+        keeps the project portable off Lovable.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart TB
+    subgraph CLIENTS["CLIENTS"]
+        direction LR
+        WEB["Web app<br/>mobile-first · PWA"]
+        NAT["Native app<br/>Phase 2"]
+        INT["Third-party<br/>integrations"]
+    end
+
+    subgraph SURFACES["TRANSPORT SURFACES — two ways in, one contract"]
+        direction LR
+        SF["Server functions<br/>TanStack Start"]
+        RST["/api/v1/*<br/>REST"]
+    end
+
+    HAND["HANDLERS — src/modules/*/handlers<br/>pure functions ctx, input → output<br/>business logic exists exactly once"]
+
+    subgraph MODULE["src/modules/leave"]
+        direction LR
+        CON["contracts<br/>Zod schemas"]
+        DOM["domain logic<br/>balances · entitlement"]
+    end
+
+    subgraph PLATFORM["src/platform — modules import this; it never imports them"]
+        direction LR
+        APR["approvals"]
+        NOT["notifications"]
+        AUD["audit"]
+        CAL["calendar"]
+        RBA["rbac"]
+        ORG["organizations"]
+        AUTH["auth wrapper"]
+    end
+
+    subgraph QUAR["QUARANTINE"]
+        LOV["src/integrations/lovable<br/>importable from nowhere else —<br/>this keeps the project extractable"]
+    end
+
+    subgraph INFRA["INFRASTRUCTURE"]
+        direction LR
+        SUP[("Supabase<br/>Postgres · Auth")]
+        RES["Resend"]
+    end
+
+    WEB --> SF
+    NAT --> RST
+    INT --> RST
+    SF ==> HAND
+    RST ==> HAND
+    HAND ==> MODULE
+    MODULE ==> PLATFORM
+    PLATFORM ==> SUP
+    NOT --> RES
+    AUTH -.->|"only permitted import"| LOV
+    LOV -.-> SUP
+</pre>
+      </div>
+      <div class="plate-foot"><span>API standards §1</span><span>Coding standards §1, §9</span></div>
+    </div>
+  </figure>
+
+  <figure class="plate">
+    <div class="plate-no">06</div>
+    <div class="plate-main">
+      <h3>Leave submission — the hard path</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        A four-day request requiring two approvals, including the details that are easy to
+        get wrong: the balance row is locked before validation so two simultaneous requests
+        cannot both succeed, dates are compared in the organisation's own timezone rather
+        than the server's, and the number of approval levels is read from configuration
+        rather than written in code.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','actorBkg':'#13252F','actorTextColor':'#DCE9F0','actorBorder':'#38BDF8','actorLineColor':'#31556A','signalColor':'#7FA9C0','signalTextColor':'#DCE9F0','labelBoxBkg':'#13252F','labelBoxBorderColor':'#31556A','labelTextColor':'#DCE9F0','noteBkgColor':'#15303E','noteTextColor':'#C6DEEB','noteBorderColor':'#38BDF8','sequenceNumberColor':'#0B1720','activationBkgColor':'#1D3D4F','activationBorderColor':'#38BDF8'}}}%%
+sequenceDiagram
+    autonumber
+    actor EMP as Employee
+    participant LH as Leave handler
+    participant CAL as Working Calendar
+    participant AE as Approval Engine
+    participant NE as Notification Engine
+    participant AL as Audit Log
+    participant DB as Postgres
+    actor MGR as Manager
+    actor DIR as Director
+
+    EMP->>LH: apply — 4 days, Casual
+    activate LH
+
+    Note over LH,DB: single transaction
+    LH->>DB: SELECT balance FOR UPDATE
+    Note right of DB: lock first, so two simultaneous<br/>requests cannot both pass validation
+    LH->>CAL: working days between dates?
+    CAL-->>LH: 4 — weekends and holidays excluded
+    LH->>LH: is the start date past?
+    Note right of LH: compared in the org's timezone,<br/>never the server clock
+    LH->>DB: reserve 4 days
+    Note right of DB: reserved on submission,<br/>released if rejected
+    LH->>AE: approval_submit(leave_request, id, 4 days)
+    activate AE
+    AE->>DB: read approval_chains for this org
+    DB-->>AE: L1 reporting manager · L2 if days over 3
+    Note right of AE: the threshold is a row,<br/>not a line of code
+    AE-->>LH: 2 levels required
+
+    AE->>NE: approval.submitted
+    NE->>MGR: email — 4 days awaiting approval
+    AE->>AL: record
+    deactivate LH
+
+    MGR->>AE: approve
+    AE->>NE: approval.decided
+    NE->>DIR: email — escalated to you
+    AE->>AL: record
+
+    DIR->>AE: approve
+    AE->>AL: record
+    AE-->>LH: approval.completed — approved
+    deactivate AE
+
+    activate LH
+    LH->>DB: reserved 4 becomes booked 4
+    LH->>AL: record balance change
+    LH->>NE: notify employee
+    NE->>EMP: email — your leave is approved
+    deactivate LH
+</pre>
+      </div>
+      <div class="plate-foot"><span>Decisions D2 · D5 · D9 · D10</span></div>
+    </div>
+  </figure>
+
+  <figure class="plate">
+    <div class="plate-no">07</div>
+    <div class="plate-main">
+      <h3>Approval Engine — state machine</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        The engine knows nothing about leave. It operates on an entity type and an
+        identifier, which is why Attendance corrections and shift swaps will run through
+        the same machine. Two behaviours are deliberate: an approver who is also the
+        requester is skipped rather than allowed to approve themselves, and an unresolvable
+        chain fails loudly instead of quietly approving.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+stateDiagram-v2
+    direction LR
+
+    [*] --> draft
+
+    draft --> pending_approval : submitted, days reserved
+
+    state resolve <<choice>>
+    pending_approval --> resolve : engine reads approval_chains
+
+    resolve --> level_1 : always
+    resolve --> unresolved : no valid approver
+
+    state level_1 {
+        [*] --> awaiting_l1
+        awaiting_l1 --> skip_l1 : approver is the requester
+        skip_l1 --> [*]
+        awaiting_l1 --> [*] : decided
+    }
+
+    state needs_l2 <<choice>>
+    level_1 --> needs_l2 : approved at L1
+    needs_l2 --> level_2 : condition matches
+    needs_l2 --> approved : condition does not match
+
+    level_2 --> approved : approved at L2
+    level_2 --> rejected : rejected at L2
+    level_1 --> rejected : rejected at L1
+
+    pending_approval --> cancelled : cancelled before start
+    approved --> cancelled : cancelled before start
+
+    unresolved --> [*] : APPROVER_UNRESOLVED
+    approved --> [*]
+    rejected --> [*] : reservation released
+    cancelled --> [*] : days returned
+</pre>
+      </div>
+      <div class="plate-foot"><span>Decisions D5 · D13</span><span>Entity-agnostic by design</span></div>
+    </div>
+  </figure>
+
+  <figure class="plate">
+    <div class="plate-no">08</div>
+    <div class="plate-main">
+      <h3>Data model</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        Count the tables. Fifteen belong to the platform and three to Leave Management —
+        and the three are the only ones a second module would need to replace. Every table
+        carries an organisation, and the leave request delegates its approval to the shared
+        engine rather than owning one.
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'11px','attributeBackgroundColorOdd':'#0F1F29','attributeBackgroundColorEven':'#13252F'}}}%%
+erDiagram
+    organizations ||--|| organization_settings : configures
+    organizations ||--o{ departments : contains
+    organizations ||--o{ profiles : employs
+    organizations ||--o{ user_roles : grants
+    organizations ||--o{ organization_modules : enables
+    organizations ||--o{ holidays : observes
+    organizations ||--o{ approval_chains : defines
+    organizations ||--o{ audit_logs : records
+    organizations ||--o{ module_settings : tunes
+
+    profiles ||--o{ profiles : reports_to
+    profiles ||--o{ user_roles : holds
+    modules ||--o{ organization_modules : registered_in
+
+    approval_chains ||--o{ approval_requests : governs
+    approval_requests ||--o{ approval_steps : has
+    profiles ||--o{ approval_steps : approves
+
+    notification_templates ||--o{ notifications : renders
+
+    leave_types ||--o{ leave_requests : classifies
+    leave_types ||--o{ leave_balances : measured_in
+    profiles ||--o{ leave_requests : submits
+    profiles ||--o{ leave_balances : holds
+    leave_requests ||--|| approval_requests : delegates_to
+
+    organizations {
+        uuid id PK
+        text name
+        text slug
+    }
+    organization_settings {
+        uuid organization_id PK
+        text timezone
+        smallint fy_start_month
+        smallint_array weekend_days
+    }
+    profiles {
+        uuid id PK
+        uuid organization_id FK
+        date joined_date
+        uuid manager_id FK
+        boolean is_active
+    }
+    user_roles {
+        uuid user_id FK
+        app_role role
+    }
+    approval_chains {
+        text entity_type
+        smallint level
+        text approver_rule
+        text condition_field
+        numeric condition_value
+    }
+    approval_requests {
+        text entity_type
+        uuid entity_id
+        smallint required_levels
+        text status
+    }
+    approval_steps {
+        smallint level
+        uuid approver_id FK
+        text decision
+    }
+    audit_logs {
+        text action
+        jsonb before
+        jsonb after
+    }
+    leave_types {
+        text name
+        numeric max_days_per_year
+    }
+    leave_balances {
+        text fy_label
+        numeric entitled_days
+        numeric reserved_days
+        numeric available_days
+    }
+    leave_requests {
+        date from_date
+        date to_date
+        numeric working_days
+        leave_status status
+    }
+</pre>
+      </div>
+      <div class="plate-foot"><span>15 platform tables · 3 module tables</span></div>
+    </div>
+  </figure>
+
+  <!-- ============================== COLOPHON ============================== -->
+
+  <div class="colophon">
+    <div>
+      <h4>Sources</h4>
+      <p>
+        Drawn from the Neuvto WOS build specification and standards, which derive from
+        <code>02_PRODUCT_PRINCIPLES</code>, <code>03_PLATFORM_ARCHITECTURE</code>,
+        <code>04_MODULE_ROADMAP</code>, <code>06_LEAVE_MANAGEMENT</code> and
+        <code>07_ROLES_PERMISSIONS</code>.
+      </p>
+    </div>
+    <div>
+      <h4>Status</h4>
+      <p>
+        Architecture approved; construction not started. Module names and quarters are the
+        roadmap's own. No cost, headcount or revenue figures appear here because none have
+        been established.
+      </p>
+    </div>
+    <div>
+      <h4>Stack</h4>
+      <p>
+        TanStack Start · TypeScript · Tailwind · shadcn/ui · Supabase Postgres with
+        row-level security · Resend. Production database in <code>ap-south-1</code>.
+      </p>
+    </div>
+    <div>
+      <h4>On the plates</h4>
+      <p>
+        Diagrams hold a fixed dark ground in both light and dark themes, so contrast stays
+        identical however the page is viewed or printed.
+      </p>
+    </div>
+  </div>
+
+</div>
