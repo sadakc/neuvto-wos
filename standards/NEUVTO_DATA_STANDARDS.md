@@ -34,7 +34,10 @@ as $$
 begin
   if tg_op = 'INSERT' then
     new.created_at := now();
-    new.created_by := coalesce(new.created_by, (select auth.uid()));
+    -- The authenticated user always wins; the fallback covers system contexts
+    -- only. The reverse order would let a caller forge authorship by sending
+    -- created_by in the request payload.
+    new.created_by := coalesce((select auth.uid()), new.created_by);
   else
     new.created_at := old.created_at;   -- immutable
     new.created_by := old.created_by;   -- immutable
