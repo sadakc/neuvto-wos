@@ -1,0 +1,32 @@
+flowchart LR
+    subgraph M1["MODULE 1 — Leave Management"]
+        direction TB
+        P1["BUILDS THE PLATFORM<br/><br/>Approval Engine<br/>Notification Engine<br/>Audit Log<br/>Working Calendar<br/>Roles &amp; Permissions<br/>Multi-tenancy &amp; RLS<br/>Module Registry"]
+        D1["AND its own domain<br/><br/>leave_types<br/>leave_balances<br/>leave_requests"]
+        P1 --- D1
+    end
+
+    subgraph M2["MODULE 2 — Attendance"]
+        direction TB
+        P2["REUSES all seven<br/>unchanged"]
+        D2["Builds only its domain<br/><br/>attendance_records<br/>shifts_worked"]
+        P2 --- D2
+    end
+
+    subgraph M3["MODULE 3 — Payroll"]
+        direction TB
+        P3["REUSES all seven<br/>unchanged"]
+        D3["Builds only its domain<br/><br/>salary_structures<br/>payslips"]
+        P3 --- D3
+    end
+
+    subgraph MN["MODULES 4 – 11"]
+        direction TB
+        PN["REUSES all seven<br/>unchanged"]
+        DN["Builds only its domain"]
+        PN --- DN
+    end
+
+    M1 ==>|"platform cost paid once"| M2
+    M2 ==> M3
+    M3 ==> MN

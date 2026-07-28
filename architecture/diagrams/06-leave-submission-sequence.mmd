@@ -1,0 +1,52 @@
+sequenceDiagram
+    autonumber
+    actor EMP as Employee
+    participant LH as Leave handler
+    participant CAL as Working Calendar
+    participant AE as Approval Engine
+    participant NE as Notification Engine
+    participant AL as Audit Log
+    participant DB as Postgres
+    actor MGR as Manager
+    actor DIR as Director
+
+    EMP->>LH: apply — 4 days, Casual
+    activate LH
+
+    Note over LH,DB: single transaction
+    LH->>DB: SELECT balance FOR UPDATE
+    Note right of DB: lock first, so two simultaneous<br/>requests cannot both pass validation
+    LH->>CAL: working days between dates?
+    CAL-->>LH: 4 — weekends and holidays excluded
+    LH->>LH: is the start date past?
+    Note right of LH: compared in the org's timezone,<br/>never the server clock
+    LH->>DB: reserve 4 days
+    Note right of DB: reserved on submission,<br/>released if rejected
+    LH->>AE: approval_submit(leave_request, id, 4 days)
+    activate AE
+    AE->>DB: read approval_chains for this org
+    DB-->>AE: L1 reporting manager · L2 if days over 3
+    Note right of AE: the threshold is a row,<br/>not a line of code
+    AE-->>LH: 2 levels required
+
+    AE->>NE: approval.submitted
+    NE->>MGR: email — 4 days awaiting approval
+    AE->>AL: record
+    deactivate LH
+
+    MGR->>AE: approve
+    AE->>NE: approval.decided
+    NE->>DIR: email — escalated to you
+    AE->>AL: record
+
+    DIR->>AE: approve
+    AE->>AL: record
+    AE-->>LH: approval.completed — approved
+    deactivate AE
+
+    activate LH
+    LH->>DB: reserved 4 becomes booked 4
+    LH->>AL: record balance change
+    LH->>NE: notify employee
+    NE->>EMP: email — your leave is approved
+    deactivate LH

@@ -1,0 +1,88 @@
+erDiagram
+    organizations ||--|| organization_settings : configures
+    organizations ||--o{ departments : contains
+    organizations ||--o{ profiles : employs
+    organizations ||--o{ user_roles : grants
+    organizations ||--o{ organization_modules : enables
+    organizations ||--o{ holidays : observes
+    organizations ||--o{ approval_chains : defines
+    organizations ||--o{ audit_logs : records
+    organizations ||--o{ module_settings : tunes
+
+    profiles ||--o{ profiles : reports_to
+    profiles ||--o{ user_roles : holds
+    modules ||--o{ organization_modules : registered_in
+
+    approval_chains ||--o{ approval_requests : governs
+    approval_requests ||--o{ approval_steps : has
+    profiles ||--o{ approval_steps : approves
+
+    notification_templates ||--o{ notifications : renders
+
+    leave_types ||--o{ leave_requests : classifies
+    leave_types ||--o{ leave_balances : measured_in
+    profiles ||--o{ leave_requests : submits
+    profiles ||--o{ leave_balances : holds
+    leave_requests ||--|| approval_requests : delegates_to
+
+    organizations {
+        uuid id PK
+        text name
+        text slug
+    }
+    organization_settings {
+        uuid organization_id PK
+        text timezone
+        smallint fy_start_month
+        smallint_array weekend_days
+    }
+    profiles {
+        uuid id PK
+        uuid organization_id FK
+        date joined_date
+        uuid manager_id FK
+        boolean is_active
+    }
+    user_roles {
+        uuid user_id FK
+        app_role role
+    }
+    approval_chains {
+        text entity_type
+        smallint level
+        text approver_rule
+        text condition_field
+        numeric condition_value
+    }
+    approval_requests {
+        text entity_type
+        uuid entity_id
+        smallint required_levels
+        text status
+    }
+    approval_steps {
+        smallint level
+        uuid approver_id FK
+        text decision
+    }
+    audit_logs {
+        text action
+        jsonb before
+        jsonb after
+    }
+    leave_types {
+        text name
+        numeric max_days_per_year
+    }
+    leave_balances {
+        text fy_label
+        numeric entitled_days
+        numeric reserved_days
+        numeric available_days
+    }
+    leave_requests {
+        date from_date
+        date to_date
+        numeric working_days
+        leave_status status
+    }

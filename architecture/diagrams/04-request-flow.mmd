@@ -1,0 +1,24 @@
+flowchart LR
+    EMP(["Employee<br/>applies for leave"])
+    LV["Leave module<br/>checks the balance"]
+    AE["Approval Engine<br/>decides who must approve"]
+    NE1["Notification Engine<br/>emails the approver"]
+    MGR(["Manager<br/>approves or rejects"])
+    BAL["Balance updated<br/>days move to booked"]
+    NE2["Notification Engine<br/>tells the employee"]
+    DB[("Postgres")]
+    AL["Audit Log<br/>every step recorded, immutably"]
+
+    EMP --> LV
+    LV --> AE
+    AE --> NE1
+    NE1 --> MGR
+    MGR --> AE
+    AE --> BAL
+    BAL --> NE2
+    BAL --> DB
+
+    LV -.-> AL
+    AE -.-> AL
+    BAL -.-> AL
+    AL -.-> DB

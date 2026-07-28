@@ -1,0 +1,30 @@
+flowchart TB
+    C1(["Acme Security<br/>200 employees"])
+    C2(["Vertex Facilities<br/>80 employees"])
+    C3(["Customer N"])
+
+    subgraph APP["ONE CODEBASE · ONE DEPLOYMENT"]
+        direction TB
+        UI["Web application"]
+        API["Handlers<br/>tenant derived from the signed token,<br/>never from the request body"]
+        UI --> API
+    end
+
+    subgraph DB["ONE POSTGRES DATABASE"]
+        direction TB
+        RLS{{"ROW-LEVEL SECURITY<br/>enforced by the database,<br/>not by application code"}}
+        OA[("Acme rows<br/>organization_id = A")]
+        OB[("Vertex rows<br/>organization_id = B")]
+        ON[("Customer N rows<br/>organization_id = N")]
+        RLS --> OA
+        RLS --> OB
+        RLS --> ON
+    end
+
+    C1 --> UI
+    C2 --> UI
+    C3 --> UI
+    API ==> RLS
+
+    X["Cross-tenant request returns 403, never 404 —<br/>a 404 would confirm which IDs<br/>exist inside another tenant"]
+    RLS -.-> X

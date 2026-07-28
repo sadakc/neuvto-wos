@@ -1,0 +1,54 @@
+flowchart TB
+    subgraph CLIENTS["CLIENTS"]
+        direction LR
+        WEB["Web app<br/>mobile-first · PWA"]
+        NAT["Native app<br/>Phase 2"]
+        INT["Third-party<br/>integrations"]
+    end
+
+    subgraph SURFACES["TRANSPORT SURFACES — two ways in, one contract"]
+        direction LR
+        SF["Server functions<br/>TanStack Start"]
+        RST["/api/v1/*<br/>REST"]
+    end
+
+    HAND["HANDLERS — src/modules/*/handlers<br/>pure functions ctx, input → output<br/>business logic exists exactly once"]
+
+    subgraph MODULE["src/modules/leave"]
+        direction LR
+        CON["contracts<br/>Zod schemas"]
+        DOM["domain logic<br/>balances · entitlement"]
+    end
+
+    subgraph PLATFORM["src/platform — modules import this; it never imports them"]
+        direction LR
+        APR["approvals"]
+        NOT["notifications"]
+        AUD["audit"]
+        CAL["calendar"]
+        RBA["rbac"]
+        ORG["organizations"]
+        AUTH["auth wrapper"]
+    end
+
+    subgraph QUAR["QUARANTINE"]
+        LOV["src/integrations/lovable<br/>importable from nowhere else —<br/>this keeps the project extractable"]
+    end
+
+    subgraph INFRA["INFRASTRUCTURE"]
+        direction LR
+        SUP[("Supabase<br/>Postgres · Auth")]
+        RES["Resend"]
+    end
+
+    WEB --> SF
+    NAT --> RST
+    INT --> RST
+    SF ==> HAND
+    RST ==> HAND
+    HAND ==> MODULE
+    MODULE ==> PLATFORM
+    PLATFORM ==> SUP
+    NOT --> RES
+    AUTH -.->|"only permitted import"| LOV
+    LOV -.-> SUP

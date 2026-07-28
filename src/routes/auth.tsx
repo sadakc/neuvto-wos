@@ -1,6 +1,11 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
+// KNOWN DEBT — build step 2 replaces this with the wrapper in src/platform/auth/.
+// Direct Lovable imports break the portability contract (NEUVTO_CODING_STANDARDS.md §9):
+// off Lovable, this file stops compiling. The rule stays an error so no *new*
+// violations land; this single exemption is deliberate and time-boxed.
+// eslint-disable-next-line no-restricted-imports
 import { lovable } from "@/integrations/lovable";
 import { toast } from "sonner";
 
@@ -12,7 +17,10 @@ export const Route = createFileRoute("/auth")({
   head: () => ({
     meta: [
       { title: "Sign in — Neuvto WOS" },
-      { name: "description", content: "Sign in to Neuvto WOS to manage your workforce operating system." },
+      {
+        name: "description",
+        content: "Sign in to Neuvto WOS to manage your workforce operating system.",
+      },
       { property: "og:title", content: "Sign in — Neuvto WOS" },
       { property: "og:description", content: "Sign in to Neuvto WOS." },
       { name: "twitter:title", content: "Sign in — Neuvto WOS" },

@@ -1,0 +1,42 @@
+flowchart TB
+    subgraph MOD["BUSINESS MODULES — independent, enabled per customer"]
+        direction LR
+        L["Leave Management<br/>MVP · Q3 2026"]
+        A["Attendance<br/>Q4 2026"]
+        P["Payroll<br/>Q2 2027"]
+        S["Shift Management<br/>Q3 2027"]
+        V["Visitor Management<br/>Q4 2027"]
+        R["6 further modules<br/>through Q1 2029"]
+    end
+
+    subgraph PLAT["PLATFORM LAYER — built once, consumed by every module"]
+        direction LR
+        subgraph BUILT["Built in MVP"]
+            direction LR
+            AU["Authentication"]
+            RB["Roles &amp; Permissions"]
+            OG["Organization<br/>&amp; Settings"]
+            AE["Approval<br/>Engine"]
+            NE["Notification<br/>Engine"]
+            AL["Audit Log"]
+            WC["Working<br/>Calendar"]
+            MR["Module<br/>Registry"]
+        end
+        subgraph LATER["Deferred — additive, no rework"]
+            direction LR
+            RS["Reports"]
+            DS["Documents"]
+            SE["Search"]
+            BT["Branding<br/>&amp; Theme"]
+        end
+    end
+
+    subgraph INF["INFRASTRUCTURE"]
+        direction LR
+        PG[("Supabase Postgres<br/>row-level security")]
+        SA["Supabase Auth"]
+        RE["Resend"]
+    end
+
+    MOD ==>|"consume"| PLAT
+    PLAT ==>|"run on"| INF
