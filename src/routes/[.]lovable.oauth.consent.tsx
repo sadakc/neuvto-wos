@@ -11,9 +11,15 @@ type AuthorizationDetails = {
 
 // Beta helper — narrow local typing so TS doesn't fight the SDK.
 type OAuthApi = {
-  getAuthorizationDetails: (id: string) => Promise<{ data: AuthorizationDetails | null; error: Error | null }>;
-  approveAuthorization: (id: string) => Promise<{ data: AuthorizationDetails | null; error: Error | null }>;
-  denyAuthorization: (id: string) => Promise<{ data: AuthorizationDetails | null; error: Error | null }>;
+  getAuthorizationDetails: (
+    id: string,
+  ) => Promise<{ data: AuthorizationDetails | null; error: Error | null }>;
+  approveAuthorization: (
+    id: string,
+  ) => Promise<{ data: AuthorizationDetails | null; error: Error | null }>;
+  denyAuthorization: (
+    id: string,
+  ) => Promise<{ data: AuthorizationDetails | null; error: Error | null }>;
 };
 function oauthApi(): OAuthApi {
   return (supabase.auth as unknown as { oauth: OAuthApi }).oauth;
@@ -44,7 +50,9 @@ export const Route = createFileRoute("/.lovable/oauth/consent")({
   errorComponent: ({ error }) => (
     <main className="mx-auto max-w-md p-8">
       <h1 className="text-xl font-semibold">Could not load this authorization request</h1>
-      <p className="mt-2 text-sm text-muted-foreground">{String((error as Error)?.message ?? error)}</p>
+      <p className="mt-2 text-sm text-muted-foreground">
+        {String((error as Error)?.message ?? error)}
+      </p>
     </main>
   ),
 });
@@ -81,11 +89,15 @@ function Consent() {
     <main className="mx-auto flex min-h-screen max-w-md flex-col justify-center px-6 py-12">
       <h1 className="text-2xl font-semibold tracking-tight">Connect {clientName} to Neuvto</h1>
       <p className="mt-3 text-sm text-muted-foreground">
-        This lets {clientName} use Neuvto WOS as you — it will be able to call this app's enabled tools while
-        you are signed in. This does not bypass Neuvto's permissions or backend policies.
+        This lets {clientName} use Neuvto WOS as you — it will be able to call this app's enabled
+        tools while you are signed in. This does not bypass Neuvto's permissions or backend
+        policies.
       </p>
       {error && (
-        <p role="alert" className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive">
+        <p
+          role="alert"
+          className="mt-4 rounded-md border border-destructive/30 bg-destructive/10 p-3 text-sm text-destructive"
+        >
           {error}
         </p>
       )}

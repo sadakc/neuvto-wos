@@ -42,7 +42,6 @@ function Index() {
   );
 }
 
-
 function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur">
@@ -51,10 +50,18 @@ function Nav() {
           neuvto<span className="text-primary">.</span>
         </a>
         <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
-          <a href="#vision" className="hover:text-foreground">Vision</a>
-          <a href="#leave" className="hover:text-foreground">Leave Management</a>
-          <a href="#roadmap" className="hover:text-foreground">Roadmap</a>
-          <a href="#demo" className="hover:text-foreground">Request Demo</a>
+          <a href="#vision" className="hover:text-foreground">
+            Vision
+          </a>
+          <a href="#leave" className="hover:text-foreground">
+            Leave Management
+          </a>
+          <a href="#roadmap" className="hover:text-foreground">
+            Roadmap
+          </a>
+          <a href="#demo" className="hover:text-foreground">
+            Request Demo
+          </a>
         </nav>
         <a
           href="#demo"
@@ -78,12 +85,13 @@ function Hero() {
             Now raising · Investor preview
           </span>
           <h1 className="mt-6 font-display text-5xl font-bold tracking-tight text-ink lg:text-6xl">
-            The Workforce <span className="text-primary">Operating System</span> your teams actually open.
+            The Workforce <span className="text-primary">Operating System</span> your teams actually
+            open.
           </h1>
           <p className="mt-6 max-w-xl text-lg text-muted-foreground">
             Neuvto WOS is a mobile-first platform that replaces the HRMS your employees ignore.
-            We're launching with Leave Management — and expanding into the full spine of how
-            modern companies run their workforce.
+            We're launching with Leave Management — and expanding into the full spine of how modern
+            companies run their workforce.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
             <a
@@ -141,9 +149,9 @@ function ProblemSolution() {
             HRMS was built for HR. Not for the workforce.
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Legacy platforms are desktop-heavy, form-driven, and used by ~10% of the company.
-            The other 90% — the people actually doing the work — get emails, spreadsheets, and
-            paper approvals.
+            Legacy platforms are desktop-heavy, form-driven, and used by ~10% of the company. The
+            other 90% — the people actually doing the work — get emails, spreadsheets, and paper
+            approvals.
           </p>
         </div>
         <div className="mt-14 grid gap-6 md:grid-cols-3">
@@ -180,18 +188,34 @@ function LeavePreview() {
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-primary">MVP · Module 1</p>
-            <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">Leave Management</h2>
+            <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+              MVP · Module 1
+            </p>
+            <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
+              Leave Management
+            </h2>
             <p className="mt-4 text-lg text-muted-foreground">
               A complete leave workflow that respects everyone's time. Employees request in seconds,
               managers approve in one tap, and HR gets clean, exportable data.
             </p>
             <ul className="mt-8 space-y-4">
               <Feature title="One-tap requests" body="Pick a leave type, dates, reason — done." />
-              <Feature title="Smart approvals" body="Multi-level approval routing with delegation and escalation." />
-              <Feature title="Live balances" body="Accruals, carry-over, and holidays computed in real time." />
-              <Feature title="Team calendar" body="Everyone can see who's out — without spreadsheets." />
-              <Feature title="Policy engine" body="Configure leave types, eligibility, and rules per country or team." />
+              <Feature
+                title="Smart approvals"
+                body="Multi-level approval routing with delegation and escalation."
+              />
+              <Feature
+                title="Live balances"
+                body="Accruals, carry-over, and holidays computed in real time."
+              />
+              <Feature
+                title="Team calendar"
+                body="Everyone can see who's out — without spreadsheets."
+              />
+              <Feature
+                title="Policy engine"
+                body="Configure leave types, eligibility, and rules per country or team."
+              />
             </ul>
           </div>
           <div className="rounded-xl border border-border bg-secondary/50 p-6">
@@ -250,7 +274,13 @@ function Roadmap() {
 function DemoForm() {
   const submit = useServerFn(submitDemoRequest);
   const [loading, setLoading] = useState(false);
-  const [form, setForm] = useState({ name: "", email: "", company: "", employees: "", message: "" });
+  const [form, setForm] = useState({
+    name: "",
+    email: "",
+    company: "",
+    employees: "",
+    message: "",
+  });
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -270,25 +300,52 @@ function DemoForm() {
     <section id="demo" className="py-24">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 lg:grid-cols-2">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">Get in touch</p>
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+            Get in touch
+          </p>
           <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
             Be first in line for the Neuvto WOS preview.
           </h2>
           <p className="mt-4 text-lg text-muted-foreground">
-            Investors, design partners, and early customers — tell us a bit about you and we'll
-            set up a walkthrough.
+            Investors, design partners, and early customers — tell us a bit about you and we'll set
+            up a walkthrough.
           </p>
         </div>
-        <form onSubmit={onSubmit} className="rounded-xl border border-border bg-background p-6 shadow-sm">
+        <form
+          onSubmit={onSubmit}
+          className="rounded-xl border border-border bg-background p-6 shadow-sm"
+        >
           <div className="grid gap-4">
-            <Field label="Your name" value={form.name} onChange={(v) => setForm({ ...form, name: v })} required />
-            <Field label="Work email" type="email" value={form.email} onChange={(v) => setForm({ ...form, email: v })} required />
+            <Field
+              label="Your name"
+              value={form.name}
+              onChange={(v) => setForm({ ...form, name: v })}
+              required
+            />
+            <Field
+              label="Work email"
+              type="email"
+              value={form.email}
+              onChange={(v) => setForm({ ...form, email: v })}
+              required
+            />
             <div className="grid gap-4 sm:grid-cols-2">
-              <Field label="Company" value={form.company} onChange={(v) => setForm({ ...form, company: v })} />
-              <Field label="# Employees" value={form.employees} onChange={(v) => setForm({ ...form, employees: v })} placeholder="e.g. 50-200" />
+              <Field
+                label="Company"
+                value={form.company}
+                onChange={(v) => setForm({ ...form, company: v })}
+              />
+              <Field
+                label="# Employees"
+                value={form.employees}
+                onChange={(v) => setForm({ ...form, employees: v })}
+                placeholder="e.g. 50-200"
+              />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">What are you interested in?</label>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                What are you interested in?
+              </label>
               <textarea
                 value={form.message}
                 onChange={(e) => setForm({ ...form, message: e.target.value })}

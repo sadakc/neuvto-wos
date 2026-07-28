@@ -10,7 +10,6 @@ import {
 import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
-
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 
@@ -82,12 +81,32 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { title: "Neuvto WOS — Workforce Operating System" },
       { property: "og:title", content: "Neuvto WOS — Workforce Operating System" },
       { name: "twitter:title", content: "Neuvto WOS — Workforce Operating System" },
-      { name: "description", content: "Neuvto WOS is a mobile-first Workforce Operating System. Launching with Leave Management, expanding to attendance, payroll, and performance." },
-      { property: "og:description", content: "Mobile-first Workforce OS. Launching with Leave Management, expanding to attendance, payroll, and performance." },
-      { name: "twitter:description", content: "Mobile-first Workforce OS. Launching with Leave Management, expanding to attendance, payroll, and performance." },
+      {
+        name: "description",
+        content:
+          "Neuvto WOS is a mobile-first Workforce Operating System. Launching with Leave Management, expanding to attendance, payroll, and performance.",
+      },
+      {
+        property: "og:description",
+        content:
+          "Mobile-first Workforce OS. Launching with Leave Management, expanding to attendance, payroll, and performance.",
+      },
+      {
+        name: "twitter:description",
+        content:
+          "Mobile-first Workforce OS. Launching with Leave Management, expanding to attendance, payroll, and performance.",
+      },
 
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2738ba3e-7fcb-4e41-b990-1d3ddb5a1733/id-preview-b316bebf--c74d04ee-25dd-4be1-a46e-f8973fe8c5d4.lovable.app-1784785091719.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2738ba3e-7fcb-4e41-b990-1d3ddb5a1733/id-preview-b316bebf--c74d04ee-25dd-4be1-a46e-f8973fe8c5d4.lovable.app-1784785091719.png" },
+      {
+        property: "og:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2738ba3e-7fcb-4e41-b990-1d3ddb5a1733/id-preview-b316bebf--c74d04ee-25dd-4be1-a46e-f8973fe8c5d4.lovable.app-1784785091719.png",
+      },
+      {
+        name: "twitter:image",
+        content:
+          "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/2738ba3e-7fcb-4e41-b990-1d3ddb5a1733/id-preview-b316bebf--c74d04ee-25dd-4be1-a46e-f8973fe8c5d4.lovable.app-1784785091719.png",
+      },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
     ],
@@ -130,7 +149,6 @@ function RootComponent() {
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
       <Toaster />
-
     </QueryClientProvider>
   );
 }
