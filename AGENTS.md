@@ -56,6 +56,14 @@ If Leave needs something Attendance would also need, it belongs in `platform/`.
 
 ## Database
 
+> **Do not author migrations.** Schema changes are written locally, reviewed in a pull
+> request, and gated by CI before they reach this branch. If a task appears to need a
+> schema change, stop and say so rather than creating one.
+>
+> If asked to *apply* an existing migration file, apply that file — do not generate a new
+> migration containing the same DDL. Doing so produced two files with identical statements
+> and broke `supabase db reset` with `type "app_role" already exists` (29 Jul 2026).
+
 - **Tenancy is absolute.** Every table has `organization_id`. Every query filters by it.
 - **RLS is enabled in the same migration that creates the table.** Never a follow-up.
 - In every policy use `(select auth.uid())`, never bare `auth.uid()` — bare calls are
