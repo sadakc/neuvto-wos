@@ -1,0 +1,28 @@
+<!--
+  Sign-in email (D8).
+
+  Supabase's default template contains only a magic link, so a UI that asks for
+  a 6-digit code can never be completed — the code is never sent. This template
+  includes {{ .Token }} so both routes work: type the code, or click the link.
+
+  Keep both. The code is the primary flow on mobile, where switching to an email
+  app and back loses the form; the link is faster on desktop.
+-->
+<h2>Your sign-in code</h2>
+
+<p>Enter this code to sign in to Neuvto:</p>
+
+<p style="font-size: 28px; font-weight: 600; letter-spacing: 0.2em; font-family: ui-monospace, monospace;">
+  {{ .Token }}
+</p>
+
+<p>It expires shortly and can only be used once.</p>
+
+<hr />
+
+<p>Or <a href="{{ .ConfirmationURL }}">sign in with one click</a>.</p>
+
+<p style="color: #5E7484; font-size: 12px;">
+  If you didn't request this, you can ignore this email — nobody can sign in
+  without the code above.
+</p>

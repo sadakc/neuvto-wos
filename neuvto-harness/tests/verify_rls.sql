@@ -200,6 +200,66 @@ begin
     end;
   end if;
 
+  ---------------------------------------------------------------- signup (step 2)
+  -- Phase 0 made signup impossible: granting a role requires is_admin(), and the
+  -- founder of a brand-new organisation has none. signup_organization() is the
+  -- one SECURITY DEFINER path through that, so its limits matter.
+  -- to_regprocedure, not to_regproc: only the former accepts an argument list.
+  -- to_regproc returns null for a signature with parentheses, which made this
+  -- guard permanently false and skipped every assertion below without a word.
+  if to_regprocedure('public.signup_organization(text,text,text)') is not null then
+    perform pg_temp.as_postgres();
+    insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+                            email_confirmed_at, created_at, updated_at,
+                            raw_app_meta_data, raw_user_meta_data)
+    values ('00000000-0000-0000-0000-0000000000f1',
+            '00000000-0000-0000-0000-000000000000','authenticated','authenticated',
+            'newfounder@signup.test', crypt('x', gen_salt('bf')),
+            now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+    perform public.signup_organization('Signup Test Co', 'signup-test-co', 'New Founder');
+
+    perform pg_temp.as_postgres();
+    select count(*) into n from organizations where slug = 'signup-test-co';
+    perform pg_temp.check('signup creates exactly one organisation', n, 1);
+
+    select count(*) into n from user_roles
+     where user_id = '00000000-0000-0000-0000-0000000000f1' and role = 'org_admin';
+    perform pg_temp.check('signup makes the founder an org_admin', n, 1);
+
+    select count(*) into n from organization_settings s
+      join organizations o on o.id = s.organization_id where o.slug = 'signup-test-co';
+    perform pg_temp.check('signup creates settings (every date calculation needs them)', n, 1);
+
+    -- The email must come from the verified auth record, never a parameter,
+    -- or someone signs up under an address they do not control.
+    select count(*) into n from profiles
+     where id = '00000000-0000-0000-0000-0000000000f1' and email = 'newfounder@signup.test';
+    perform pg_temp.check('signup takes the email from auth, not from input', n, 1);
+
+    -- Without this the function is an unlimited organisation factory.
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+    begin
+      perform public.signup_organization('Second Co', 'second-co', 'New Founder');
+      raise exception 'RLS FAIL: signup_organization created a second organisation for one user';
+    exception
+      when unique_violation then raise notice 'ok: one organisation per person';
+    end;
+
+    -- Step 2 revoked direct insert; the function is the only supported path.
+    begin
+      insert into organizations (name, slug) values ('Sneaky Co', 'sneaky-co');
+      raise exception 'RLS FAIL: an organisation was created without going through signup_organization';
+    exception
+      when insufficient_privilege then raise notice 'ok: organisations cannot be inserted directly';
+    end;
+
+    perform pg_temp.as_postgres();
+    delete from auth.users where email = 'newfounder@signup.test';
+    delete from organizations where slug = 'signup-test-co';
+  end if;
+
   perform pg_temp.as_postgres();
   raise notice '--- RLS verification passed ---';
 end $$;
