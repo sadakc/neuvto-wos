@@ -181,22 +181,112 @@ begin
   select count(*) into n from analytics_events;
   perform pg_temp.check('other tenant cannot read those events', n, 0);
 
+  ---------------------------------------------------------------- calendar tenancy
+  -- The calendar functions are SECURITY DEFINER and take an organisation id, so
+  -- without a guard any authenticated user could pass another tenant's id and
+  -- read back their weekend, holiday and timezone configuration by probing.
+  if to_regprocedure('public.calculate_working_days(uuid,date,date)') is not null then
+    perform pg_temp.as_user(alice);            -- Acme admin
+    begin
+      perform public.calculate_working_days(vertex, '2026-08-07', '2026-08-10');
+      raise exception 'RLS FAIL: acme could compute working days for vertex';
+    exception
+      when insufficient_privilege then raise notice 'ok: working days refuse another tenant';
+    end;
+    begin
+      perform public.get_financial_year(vertex, '2026-06-15');
+      raise exception 'RLS FAIL: acme could read vertex financial-year configuration';
+    exception
+      when insufficient_privilege then raise notice 'ok: financial year refuses another tenant';
+    end;
+    begin
+      perform public.org_today(vertex);
+      raise exception 'RLS FAIL: acme could read vertex timezone';
+    exception
+      when insufficient_privilege then raise notice 'ok: org_today refuses another tenant';
+    end;
+
+    -- ...and still works for the caller's own organisation.
+    if public.calculate_working_days(acme, '2026-08-07', '2026-08-10') <> 2 then
+      raise exception 'RLS FAIL: the guard broke the caller''s own organisation';
+    end if;
+    raise notice 'ok: own-organisation calendar still works';
+
+    perform pg_temp.as_user(ravi);             -- a plain employee
+    select count(*) into n from holidays where organization_id = vertex;
+    perform pg_temp.check('employee sees no other-tenant holidays', n, 0);
+  end if;
+
   ---------------------------------------------------------------- audit log (Phase 1)
   if to_regclass('public.audit_logs') is not null then
+    -- The trigger must actually be writing. An empty table would make every
+    -- immutability assertion below pass vacuously.
+    perform pg_temp.as_postgres();
+    select count(*) into n from audit_logs;
+    if n = 0 then
+      raise exception 'RLS FAIL: audit_logs is empty — the trigger is not writing, so immutability proves nothing';
+    end if;
+    raise notice 'ok: audit trail is being written';
+
+    -- Role grants are the privilege boundary; every one must leave a record.
+    select count(*) into n from audit_logs where entity_type = 'user_roles' and action = 'user_roles.insert';
+    if n = 0 then
+      raise exception 'RLS FAIL: granting a role left no audit entry';
+    end if;
+    raise notice 'ok: role grants are audited';
+
+    -- Before/after captured on update, or the trail records that something
+    -- changed without recording what.
+    perform pg_temp.as_postgres();
+    update profiles set full_name = 'Renamed For Audit' where id = ravi;
+    select count(*) into n from audit_logs
+     where entity_type = 'profiles' and action = 'profiles.update'
+       and before ->> 'full_name' is distinct from after ->> 'full_name';
+    if n = 0 then
+      raise exception 'RLS FAIL: an update was audited without capturing the before/after change';
+    end if;
+    raise notice 'ok: updates record what actually changed';
+
+    -- Tenant isolation applies to the trail as much as the data.
+    perform pg_temp.as_user(bob);
+    select count(*) into n from audit_logs where organization_id = acme;
+    perform pg_temp.check('other tenant cannot read acme audit rows', n, 0);
+
+    perform pg_temp.as_user(ravi);
+    select count(*) into n from audit_logs;
+    perform pg_temp.check('employees cannot read the audit trail at all', n, 0);
+
+    -- Immutability. No UPDATE or DELETE policy exists for any role, so RLS
+    -- denies both — including to the organisation's own administrator.
     perform pg_temp.as_user(alice);
+    select count(*) into n from audit_logs;
+    if n = 0 then
+      raise exception 'RLS FAIL: org_admin cannot read their own audit trail';
+    end if;
+    raise notice 'ok: org_admin can read their own audit trail';
+
     begin
-      execute 'update audit_logs set action = ''tampered''';
+      update audit_logs set action = 'tampered';
       get diagnostics n = row_count;
       perform pg_temp.check('audit_logs not updatable even by org_admin', n, 0);
     exception
       when insufficient_privilege then raise notice 'ok: audit_logs not updatable';
     end;
     begin
-      execute 'delete from audit_logs';
+      delete from audit_logs;
       get diagnostics n = row_count;
       perform pg_temp.check('audit_logs not deletable even by org_admin', n, 0);
     exception
       when insufficient_privilege then raise notice 'ok: audit_logs not deletable';
+    end;
+
+    -- Nor may anyone forge an entry directly; rows arrive only via the trigger.
+    begin
+      insert into audit_logs (organization_id, action, entity_type)
+      values (acme, 'fake.entry', 'profiles');
+      raise exception 'RLS FAIL: an audit entry was forged directly';
+    exception
+      when insufficient_privilege then raise notice 'ok: audit entries cannot be forged';
     end;
   end if;
 

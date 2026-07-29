@@ -69,6 +69,48 @@ export type Database = {
           },
         ]
       }
+      audit_logs: {
+        Row: {
+          action: string
+          actor_id: string | null
+          after: Json | null
+          before: Json | null
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          organization_id: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          after?: Json | null
+          before?: Json | null
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          organization_id?: string | null
+          user_agent?: string | null
+        }
+        Relationships: []
+      }
       demo_requests: {
         Row: {
           company: string | null
@@ -146,6 +188,50 @@ export type Database = {
             columns: ["parent_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holidays: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          holiday_date: string
+          id: string
+          name: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          holiday_date: string
+          id?: string
+          name: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          holiday_date?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holidays_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -501,7 +587,16 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      assert_own_org: { Args: { _org_id: string }; Returns: undefined }
+      calculate_working_days: {
+        Args: { _from: string; _org_id: string; _to: string }
+        Returns: number
+      }
       current_org_id: { Args: never; Returns: string }
+      get_financial_year: {
+        Args: { _org_id: string; _ref?: string }
+        Returns: string
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
@@ -512,6 +607,7 @@ export type Database = {
       is_admin: { Args: never; Returns: boolean }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       module_enabled: { Args: { _module_key: string }; Returns: boolean }
+      org_today: { Args: { _org_id: string }; Returns: string }
       signup_organization: {
         Args: { p_full_name: string; p_org_name: string; p_slug: string }
         Returns: string
