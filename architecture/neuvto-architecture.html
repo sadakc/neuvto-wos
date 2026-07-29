@@ -313,14 +313,14 @@
     <div class="specs">
       <span>Version <b>1.0</b></span>
       <span>28 July 2026</span>
-      <span>Status <b>Approved for build</b></span>
+      <span>Status <b>Phase 0 built</b></span>
     </div>
   </header>
 
   <p class="notice">
     <strong>What this document is.</strong> It describes the architecture as specified and
-    approved, drawn from the build specification rather than from a running system.
-    Construction has not started. Every module name and target quarter comes from the
+    approved. The platform layer (Phase 0) is built and merged; the Leave module is
+    specified but not yet implemented. Every module name and target quarter comes from the
     product roadmap; nothing here is estimated or embellished.
   </p>
 
@@ -758,7 +758,7 @@ stateDiagram-v2
       <h3>Data model</h3>
       <p class="claim">
         <em>What this proves</em>
-        Count the tables. Fifteen belong to the platform and three to Leave Management —
+        Count the tables. Sixteen belong to the platform and three to Leave Management —
         and the three are the only ones a second module would need to replace. Every table
         carries an organisation, and the leave request delegates its approval to the shared
         engine rather than owning one.
@@ -785,6 +785,7 @@ erDiagram
     profiles ||--o{ approval_steps : approves
 
     notification_templates ||--o{ notifications : renders
+    organizations ||--o{ analytics_events : measured_by
 
     leave_types ||--o{ leave_requests : classifies
     leave_types ||--o{ leave_balances : measured_in
@@ -796,6 +797,14 @@ erDiagram
         uuid id PK
         text name
         text slug
+        timestamptz created_at
+        uuid created_by FK
+        timestamptz deleted_at
+    }
+    analytics_events {
+        text event
+        jsonb properties
+        timestamptz occurred_at
     }
     organization_settings {
         uuid organization_id PK
@@ -809,6 +818,7 @@ erDiagram
         date joined_date
         uuid manager_id FK
         boolean is_active
+        timestamptz deleted_at
     }
     user_roles {
         uuid user_id FK
@@ -855,7 +865,7 @@ erDiagram
     }
 </pre>
       </div>
-      <div class="plate-foot"><span>15 platform tables · 3 module tables</span></div>
+      <div class="plate-foot"><span>16 platform tables · 3 module tables</span></div>
     </div>
   </figure>
 

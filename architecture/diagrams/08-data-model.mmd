@@ -18,6 +18,7 @@ erDiagram
     profiles ||--o{ approval_steps : approves
 
     notification_templates ||--o{ notifications : renders
+    organizations ||--o{ analytics_events : measured_by
 
     leave_types ||--o{ leave_requests : classifies
     leave_types ||--o{ leave_balances : measured_in
@@ -29,6 +30,14 @@ erDiagram
         uuid id PK
         text name
         text slug
+        timestamptz created_at
+        uuid created_by FK
+        timestamptz deleted_at
+    }
+    analytics_events {
+        text event
+        jsonb properties
+        timestamptz occurred_at
     }
     organization_settings {
         uuid organization_id PK
@@ -42,6 +51,7 @@ erDiagram
         date joined_date
         uuid manager_id FK
         boolean is_active
+        timestamptz deleted_at
     }
     user_roles {
         uuid user_id FK

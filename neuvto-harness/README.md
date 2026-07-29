@@ -30,13 +30,25 @@ Edge cases seeded on purpose:
 
 ## Running
 
-**During MVP (Lovable Cloud):** run through the Lovable database tool — that backend
-is Lovable-managed and not reachable from the Supabase dashboard.
+**Locally — the normal case:**
 
-**After cutover (your own Supabase):** run against `neuvto-wos-prod`
-(`udrzhfgwqgolvyimbwto`, ap-south-1) or staging, via the SQL editor or MCP.
+```bash
+supabase start          # Docker must be running
+bun run harness
+```
 
-Order matters:
+The runner finds `psql` itself (Homebrew installs it keg-only, off `PATH`) and defaults to
+the local stack. It **skips cleanly** when no Neuvto schema exists yet, and every block
+guards itself on table existence — so it verifies whatever the current build phase has
+created rather than requiring a finished schema.
+
+**In CI:** the `database` job applies every migration to a clean Supabase stack and runs
+this suite on each push. That is the only place it runs automatically.
+
+**Against a remote database:** the runner **refuses** a non-local target unless
+`--allow-remote` is passed, because the seed truncates. Never pass it against production.
+
+Order matters when running the files by hand:
 
 ```
 1. seed/seed_test_data.sql

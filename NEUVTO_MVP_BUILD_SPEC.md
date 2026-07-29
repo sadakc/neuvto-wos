@@ -394,20 +394,24 @@ Subscribes to `approval.completed` for `entity_type = 'leave_request'`:
 
 ## Build sequence
 
-| Step | Content                                                                       | Gate                                                                                                     |
-| ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| 0    | Vitest + GitHub Actions CI                                                    | Lint, typecheck, unit tests, and the SQL harness run on every push                                       |
-| 1    | Phase 0 — schema, RLS, security-definer functions                             | Cross-org isolation verified by SQL as each role                                                         |
-| 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
-| 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                   | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
-| 4    | Phase 1 — Approval Engine                                                     | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
-| 5    | Phase 1 — Notification Engine + Resend                                        | Template renders, email delivers, `notifications` row marked sent                                        |
-| 6    | Phase 2 — Leave schema, entitlement, lazy balances, locked submission         | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
-| 7    | Phase 3 — Employee UI                                                         | PRD AC1–AC3, AC5, AC7                                                                                    |
-| 8    | Phase 3 — Manager UI + decision handling                                      | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |
-| 9    | Phase 3 — Admin config incl. chain editor + guarded deactivation              | PRD AC9; deactivating a manager with reports is blocked                                                  |
-| 10   | CSV employee import + opening balances                                        | 50-row import dry-run reports per-row errors; overrides audited                                          |
-| 11   | Reports 1, 3, 4 + CSV export                                                  | —                                                                                                        |
+**Progress as of 29 Jul 2026:** steps 0 and 1 are merged to `main`. Phase 0 carries 24 RLS
+assertions and 5 invariants, passing locally and in CI, and the suite is verified
+non-vacuous — removing a tenant filter fails it immediately.
+
+| Status   | Step | Content                                                                       | Gate                                                                                                     |
+| -------- | ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **done** | 0    | Vitest + GitHub Actions CI                                                    | Lint, typecheck, unit tests, and the SQL harness run on every push                                       |
+| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                             | Cross-org isolation verified by SQL as each role                                                         |
+| next     | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
+| —        | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                   | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
+| —        | 4    | Phase 1 — Approval Engine                                                     | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
+| —        | 5    | Phase 1 — Notification Engine + Resend                                        | Template renders, email delivers, `notifications` row marked sent                                        |
+| —        | 6    | Phase 2 — Leave schema, entitlement, lazy balances, locked submission         | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
+| —        | 7    | Phase 3 — Employee UI                                                         | PRD AC1–AC3, AC5, AC7                                                                                    |
+| —        | 8    | Phase 3 — Manager UI + decision handling                                      | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |
+| —        | 9    | Phase 3 — Admin config incl. chain editor + guarded deactivation              | PRD AC9; deactivating a manager with reports is blocked                                                  |
+| —        | 10   | CSV employee import + opening balances                                        | 50-row import dry-run reports per-row errors; overrides audited                                          |
+| —        | 11   | Reports 1, 3, 4 + CSV export                                                  | —                                                                                                        |
 
 ### Testing
 
