@@ -1,1 +1,33 @@
 project_id = "vkyvzhgigncranprhidn"
+
+# Local-development configuration. `supabase start` reads this; it is not pushed
+# to the hosted project, so anything here must also be configured there before
+# it ships. See the note on templates below.
+
+[auth]
+site_url = "http://localhost:8080"
+additional_redirect_urls = ["http://localhost:8080"]
+
+[auth.email]
+enable_signup = true
+# D8 — no passwords anywhere. Nothing to phish, forget, reuse, or leak.
+enable_confirmations = false
+secure_password_change = false
+max_frequency = "10s"
+otp_length = 6
+otp_expiry = 3600
+
+[auth.email.template.magic_link]
+subject = "Your Neuvto sign-in code"
+content_path = "./supabase/templates/magic_link.html"
+
+# ── IMPORTANT, before this reaches customers ────────────────────────────────
+# Supabase's DEFAULT email template contains only a magic link — no code. A UI
+# that asks for a 6-digit code therefore cannot be completed, because the code
+# is never sent. The template above fixes that locally.
+#
+# The hosted database uses its own template, configured in the Supabase
+# dashboard rather than from this file. Until that template includes
+# {{ .Token }}, the hosted app must rely on the magic link.
+#
+# Tracked as a launch blocker in NEUVTO_MVP_BUILD_SPEC.md.

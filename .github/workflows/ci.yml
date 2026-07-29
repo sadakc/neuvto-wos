@@ -134,7 +134,12 @@ jobs:
 
       - name: RLS policies must use (select auth.uid())
         run: |
+          # Skip SQL comment lines: migrations legitimately discuss auth.uid()
+          # in prose explaining why the wrapped form is required, and matching
+          # those made the check fail on its own documentation. A gate that
+          # cries wolf gets ignored.
           if grep -rEn "auth\.uid\(\)" supabase/migrations 2>/dev/null \
+             | grep -vE ":[0-9]+:[[:space:]]*--" \
              | grep -v "select auth.uid()" | grep -v "SELECT auth.uid()"; then
             echo "::error::Bare auth.uid() in a policy — it is re-evaluated per row. Wrap as (select auth.uid())."
             exit 1

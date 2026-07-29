@@ -127,11 +127,28 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+/**
+ * The design system defines dark tokens under a `.dark` class, but nothing was
+ * ever setting it — so dark mode was defined and never reachable, and every
+ * screen rendered light regardless of the viewer's preference.
+ *
+ * Runs before paint, inline in <head>, so the correct theme is applied on the
+ * first frame. Doing this in a React effect instead produces a white flash on
+ * every load for dark-mode users.
+ */
+const APPLY_THEME = `(function(){try{
+  var m=window.matchMedia('(prefers-color-scheme: dark)');
+  var set=function(dark){document.documentElement.classList.toggle('dark',dark)};
+  set(m.matches);
+  m.addEventListener('change',function(e){set(e.matches)});
+}catch(e){}})();`;
+
 function RootShell({ children }: { children: ReactNode }) {
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script dangerouslySetInnerHTML={{ __html: APPLY_THEME }} />
       </head>
       <body>
         {children}
