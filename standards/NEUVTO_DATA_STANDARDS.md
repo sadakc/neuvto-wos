@@ -19,8 +19,29 @@ created_by  uuid references auth.users(id) on delete set null,
 updated_by  uuid references auth.users(id) on delete set null
 ```
 
-**Exempt:** `audit_logs` (insert-only, already records actor and time) and pure join tables
-that carry no independent state.
+### Exemptions — the complete list
+
+"Every business table" needs an explicit list of what is not one, or the standard is untrue
+as written and a future reader treats each exception as a bug to fix.
+
+| Table | Exempt from | Why |
+|---|---|---|
+| `audit_logs` | all audit fields, `deleted_at` | Insert-only and already records actor, action and time. Soft-deleting an audit row would defeat the point of having one. |
+| `analytics_events` | all audit fields, `deleted_at` | Append-only event stream. `occurred_at` is its timestamp, `user_id` its actor. Events are never edited, so there is nothing for `updated_by` to mean. Removal happens by the 90-day retention purge, not by soft delete. |
+| `modules` | `created_by`, `updated_by`, `deleted_at` | Global registry with no tenant and no user authorship — rows are seeded by migration. Retiring a module sets `status = 'retired'`, which is the soft delete for this table. |
+| `demo_requests` | `updated_at`, `created_by`, `updated_by`, `deleted_at`, **and `organization_id`** | See below. |
+
+**`demo_requests` is the only table without `organization_id`, and that is correct.** It
+captures leads from the public landing page, submitted by people who are not yet customers
+and belong to no tenant. Adding an `organization_id` would mean inventing one, and the
+column would be null for every row that matters.
+
+It is therefore also the one table whose RLS cannot filter by tenant; it is protected by
+being insert-only for `anon` with no read policy at all. **Do not "fix" this by adding a
+tenant column** — a future agent scanning for tenancy violations will want to, and it would
+be wrong.
+
+Pure join tables carrying no independent state are also exempt.
 
 ### Maintained by trigger, never by application code
 
@@ -98,6 +119,14 @@ select * from public.list_deleted('leave_requests');
 Restoring is `deleted_at = null` through a dedicated function that re-checks constraints —
 a restored leave request must not violate the overlap constraint against something approved
 in the meantime.
+
+> **Not built yet.** `list_deleted()` and the restore function are specified here but do not
+> exist as of Phase 0. They land with the admin screens in build step 9, which is the first
+> point anything needs them. Until then there is no supported way to view a soft-deleted
+> row, which is acceptable because nothing soft-deletes yet.
+>
+> Recorded explicitly because a standard describing a function nobody wrote is a trap: the
+> next reader assumes it exists and builds on it.
 
 ### Retention
 
