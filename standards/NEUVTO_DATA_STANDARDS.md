@@ -24,12 +24,12 @@ updated_by  uuid references auth.users(id) on delete set null
 "Every business table" needs an explicit list of what is not one, or the standard is untrue
 as written and a future reader treats each exception as a bug to fix.
 
-| Table | Exempt from | Why |
-|---|---|---|
-| `audit_logs` | all audit fields, `deleted_at` | Insert-only and already records actor, action and time. Soft-deleting an audit row would defeat the point of having one. |
-| `analytics_events` | all audit fields, `deleted_at` | Append-only event stream. `occurred_at` is its timestamp, `user_id` its actor. Events are never edited, so there is nothing for `updated_by` to mean. Removal happens by the 90-day retention purge, not by soft delete. |
-| `modules` | `created_by`, `updated_by`, `deleted_at` | Global registry with no tenant and no user authorship — rows are seeded by migration. Retiring a module sets `status = 'retired'`, which is the soft delete for this table. |
-| `demo_requests` | `updated_at`, `created_by`, `updated_by`, `deleted_at`, **and `organization_id`** | See below. |
+| Table              | Exempt from                                                                       | Why                                                                                                                                                                                                                      |
+| ------------------ | --------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `audit_logs`       | all audit fields, `deleted_at`                                                    | Insert-only and already records actor, action and time. Soft-deleting an audit row would defeat the point of having one.                                                                                                 |
+| `analytics_events` | all audit fields, `deleted_at`                                                    | Append-only event stream. `occurred_at` is its timestamp, `user_id` its actor. Events are never edited, so there is nothing for `updated_by` to mean. Removal happens by the 90-day retention purge, not by soft delete. |
+| `modules`          | `created_by`, `updated_by`, `deleted_at`                                          | Global registry with no tenant and no user authorship — rows are seeded by migration. Retiring a module sets `status = 'retired'`, which is the soft delete for this table.                                              |
+| `demo_requests`    | `updated_at`, `created_by`, `updated_by`, `deleted_at`, **and `organization_id`** | See below.                                                                                                                                                                                                               |
 
 **`demo_requests` is the only table without `organization_id`, and that is correct.** It
 captures leads from the public landing page, submitted by people who are not yet customers
