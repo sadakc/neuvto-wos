@@ -145,7 +145,11 @@ const APPLY_THEME = `(function(){try{
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    // suppressHydrationWarning: APPLY_THEME adds className="dark" before React
+    // hydrates, so the server HTML and the client DOM differ by design. Without
+    // this, React logs a hydration mismatch on every single page load — which
+    // buries real errors in noise.
+    <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
         <script dangerouslySetInnerHTML={{ __html: APPLY_THEME }} />

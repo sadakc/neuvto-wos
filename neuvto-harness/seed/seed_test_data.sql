@@ -42,12 +42,27 @@ delete from auth.users
 
 -- ---------------------------------------------------------------- auth users
 -- Direct auth.users insert is test-only; the app creates these via Supabase Auth.
+--
+-- Two details are easy to miss and both break sign-in with the same opaque
+-- error, "Database error finding user":
+--
+--   • The token columns must be '' and not NULL. They are nullable in the
+--     schema, but GoTrue scans them into non-nullable Go strings, so a NULL
+--     fails the scan on every lookup.
+--   • Every user needs a row in auth.identities, which GoTrue joins.
+--
+-- Without both, seeded users exist in the database and can be impersonated in
+-- SQL, but can never sign in through the actual app — so role-aware behaviour
+-- could only ever be tested at the database layer.
 insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
                         email_confirmed_at, created_at, updated_at,
-                        raw_app_meta_data, raw_user_meta_data)
+                        raw_app_meta_data, raw_user_meta_data,
+                        confirmation_token, recovery_token,
+                        email_change, email_change_token_new, email_change_token_current)
 select u.id, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
        u.email, crypt('TestPass123!', gen_salt('bf')),
-       now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb
+       now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb,
+       '', '', '', '', ''
 from (values
   ('00000000-0000-0000-0000-00000000a001'::uuid, 'alice.admin@acme.test'),
   ('00000000-0000-0000-0000-00000000a002'::uuid, 'hema.hr@acme.test'),
@@ -61,6 +76,15 @@ from (values
   ('00000000-0000-0000-0000-00000000b002'::uuid, 'sara.emp@vertex.test'),
   ('00000000-0000-0000-0000-0000000000ff'::uuid, 'ghost@orphan.test')
 ) as u(id, email);
+
+-- The identity row GoTrue joins on every lookup.
+insert into auth.identities (id, user_id, identity_data, provider, provider_id,
+                             last_sign_in_at, created_at, updated_at)
+select gen_random_uuid(), u.id,
+       jsonb_build_object('sub', u.id::text, 'email', u.email, 'email_verified', true),
+       'email', u.id::text, now(), now(), now()
+from auth.users u
+where u.email like '%@acme.test' or u.email like '%@vertex.test' or u.email like '%@orphan.test';
 
 -- ghost@orphan.test deliberately gets NO profile row.
 -- Any authenticated request from it must return zero rows everywhere.
@@ -124,10 +148,18 @@ insert into public.user_roles (user_id, organization_id, role) values
 do $$
 begin
   if to_regclass('public.holidays') is not null then
+    -- At least one holiday MUST fall on a working day, or holiday exclusion is
+    -- never exercised: a holiday landing on a weekend is already excluded by the
+    -- weekend rule, so those cases pass identically with the holiday logic
+    -- completely broken. Both original entries (15 Aug 2026, 8 Nov 2026) were
+    -- weekends — the assertion in verify_invariants.sql now prevents that
+    -- regressing.
     insert into public.holidays (organization_id, name, holiday_date) values
-      ('00000000-0000-0000-0000-0000000000a0','Independence Day','2026-08-15'),
-      ('00000000-0000-0000-0000-0000000000a0','Diwali',          '2026-11-08'),
-      ('00000000-0000-0000-0000-0000000000b0','New Year',        '2027-01-01');
+      ('00000000-0000-0000-0000-0000000000a0','Gandhi Jayanti',   '2026-10-02'), -- Friday
+      ('00000000-0000-0000-0000-0000000000a0','Republic Day',     '2027-01-26'), -- Tuesday
+      ('00000000-0000-0000-0000-0000000000a0','Independence Day', '2026-08-15'), -- Saturday
+      ('00000000-0000-0000-0000-0000000000a0','Diwali',           '2026-11-08'), -- Sunday
+      ('00000000-0000-0000-0000-0000000000b0','New Year',         '2027-01-01');
     raise notice 'seeded: holidays';
   end if;
 end $$;

@@ -89,6 +89,94 @@ begin
     raise notice 'ok: analytics event names well-formed';
   end if;
 
+  -- ══════════════════════════════════════════════════ PHASE 1 — working calendar
+
+  if to_regprocedure('public.calculate_working_days(uuid,date,date)') is null then
+    raise notice 'skipped: calendar invariants (service not built yet)';
+  else
+    ---------------------------------------------------------------- PRD Case 4
+    -- "Given weekends are excluded, when an employee applies Fri–Mon,
+    --  then the system calculates 2 leave days."
+    if public.calculate_working_days(
+         '00000000-0000-0000-0000-0000000000a0','2026-08-07','2026-08-10') <> 2 then
+      raise exception 'INVARIANT FAIL: PRD Case 4 — Fri to Mon with weekends excluded must be 2 days';
+    end if;
+    raise notice 'ok: PRD Case 4 — weekend days excluded';
+
+    ---------------------------------------------------------------- weekends are per-org
+    -- Acme is Sat/Sun, Vertex is Fri/Sat. The same dates must give different
+    -- answers, or the weekend is hardcoded somewhere.
+    if public.calculate_working_days('00000000-0000-0000-0000-0000000000a0','2026-08-07','2026-08-08')
+       = public.calculate_working_days('00000000-0000-0000-0000-0000000000b0','2026-08-07','2026-08-08') then
+      raise exception 'INVARIANT FAIL: Fri–Sat counts the same for a Sat/Sun org and a Fri/Sat org — the weekend is hardcoded';
+    end if;
+    raise notice 'ok: weekend configuration is per-organisation';
+
+    ---------------------------------------------------------------- holidays actually exclude
+    -- A holiday on a WORKING day, so the weekend rule cannot mask the result.
+    -- Thu 1 Oct to Fri 2 Oct is 2 calendar weekdays; Gandhi Jayanti falls on the
+    -- Friday, so the answer must be 1.
+    if to_regclass('public.holidays') is not null then
+      if public.calculate_working_days(
+           '00000000-0000-0000-0000-0000000000a0','2026-10-01','2026-10-02') <> 1 then
+        raise exception 'INVARIANT FAIL: a holiday on a working day was still counted';
+      end if;
+      raise notice 'ok: holidays excluded from working days';
+
+      -- Guards the test itself. Every Acme holiday used to fall on a weekend, so
+      -- exclusion was never exercised and the assertion above would have passed
+      -- with the holiday logic entirely broken.
+      select count(*) into n
+      from holidays h
+      join organization_settings s on s.organization_id = h.organization_id
+      where h.organization_id = '00000000-0000-0000-0000-0000000000a0'
+        and extract(dow from h.holiday_date)::smallint <> all (s.weekend_days);
+      if n = 0 then
+        raise exception
+          'INVARIANT FAIL: no seeded holiday falls on a working day, so holiday exclusion is untestable';
+      end if;
+      raise notice 'ok: seed contains a holiday that genuinely tests exclusion';
+    end if;
+
+    ---------------------------------------------------------------- empty ranges
+    if public.calculate_working_days('00000000-0000-0000-0000-0000000000a0','2026-08-08','2026-08-09') <> 0 then
+      raise exception 'INVARIANT FAIL: a weekend-only range must be 0 working days';
+    end if;
+    if public.calculate_working_days('00000000-0000-0000-0000-0000000000a0','2026-08-10','2026-08-07') <> 0 then
+      raise exception 'INVARIANT FAIL: a reversed range must be 0, not negative';
+    end if;
+    raise notice 'ok: empty and reversed ranges return zero';
+
+    ---------------------------------------------------------------- financial year (D3)
+    -- April–March spans two calendar years; January–December does not.
+    if public.get_financial_year('00000000-0000-0000-0000-0000000000a0','2026-06-15') <> '2026-27' then
+      raise exception 'INVARIANT FAIL: June 2026 in an April-start year should be 2026-27';
+    end if;
+    if public.get_financial_year('00000000-0000-0000-0000-0000000000a0','2026-03-31') <> '2025-26' then
+      raise exception 'INVARIANT FAIL: 31 March 2026 is still the previous financial year';
+    end if;
+    if public.get_financial_year('00000000-0000-0000-0000-0000000000a0','2026-04-01') <> '2026-27' then
+      raise exception 'INVARIANT FAIL: 1 April 2026 starts the new financial year';
+    end if;
+    if public.get_financial_year('00000000-0000-0000-0000-0000000000b0','2026-06-15') <> '2026' then
+      raise exception 'INVARIANT FAIL: a January-start year should be labelled 2026, not 2026-27';
+    end if;
+    raise notice 'ok: financial year labels follow each organisation''s own start';
+
+    ---------------------------------------------------------------- org-local today (D9)
+    -- Acme is IST (+5:30), Vertex GST (+4). Neither may fall back to the
+    -- server clock, and for part of every UTC day IST is already tomorrow.
+    if public.org_today('00000000-0000-0000-0000-0000000000a0')
+       <> (now() at time zone 'Asia/Kolkata')::date then
+      raise exception 'INVARIANT FAIL: org_today did not resolve in the organisation timezone';
+    end if;
+    if public.org_today('00000000-0000-0000-0000-0000000000b0')
+       <> (now() at time zone 'Asia/Dubai')::date then
+      raise exception 'INVARIANT FAIL: org_today ignored the second organisation timezone';
+    end if;
+    raise notice 'ok: org_today resolves per organisation, not from the server clock';
+  end if;
+
   -- ══════════════════════════════════════════════════ PHASE 2 — leave module
 
   if to_regclass('public.leave_balances') is null then

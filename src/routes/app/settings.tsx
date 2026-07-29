@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { getCurrentUser, isAdmin } from "@/platform/auth";
+import { listHolidays, getFinancialYear, type Holiday } from "@/platform/calendar";
 
 export const Route = createFileRoute("/app/settings")({
   ssr: false,
@@ -47,6 +48,8 @@ function ordinal(n: number) {
 function SettingsPage() {
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
   const [settings, setSettings] = useState<Settings | null>(null);
+  const [holidays, setHolidays] = useState<Holiday[]>([]);
+  const [financialYear, setFinancialYear] = useState("");
   const [message, setMessage] = useState("");
 
   useEffect(() => {
@@ -78,6 +81,19 @@ function SettingsPage() {
         }
 
         setSettings(data as Settings);
+
+        // The calendar is a platform service; this is its first consumer.
+        // Failures here must not blank the whole page — the settings above are
+        // still worth showing.
+        const [holidayResult, fyResult] = await Promise.allSettled([
+          listHolidays(),
+          user ? getFinancialYear(user.organizationId) : Promise.resolve(""),
+        ]);
+        if (!cancelled) {
+          if (holidayResult.status === "fulfilled") setHolidays(holidayResult.value);
+          if (fyResult.status === "fulfilled") setFinancialYear(fyResult.value);
+        }
+
         setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -191,6 +207,41 @@ function SettingsPage() {
           </div>
         ))}
       </dl>
+
+      <h2 className="mt-10 font-display text-lg font-semibold tracking-tight">
+        Holidays
+        {financialYear && (
+          <span className="ml-2 text-sm font-normal text-muted-foreground">
+            financial year {financialYear}
+          </span>
+        )}
+      </h2>
+      <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+        Days excluded from leave when a request spans them. Shared with attendance and shift
+        planning when those arrive.
+      </p>
+
+      {holidays.length === 0 ? (
+        <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+          No holidays configured yet. Until some are added, only weekends are excluded from leave.
+        </p>
+      ) : (
+        <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+          {holidays.map((h) => (
+            <li key={h.id} className="flex items-baseline justify-between gap-4 p-4">
+              <span className="text-sm font-medium">{h.name}</span>
+              <span className="text-sm tabular-nums text-muted-foreground">
+                {new Date(h.holidayDate + "T00:00:00").toLocaleDateString(undefined, {
+                  weekday: "short",
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                })}
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }
