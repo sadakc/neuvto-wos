@@ -404,8 +404,8 @@ non-vacuous — removing a tenant filter fails it immediately.
 | **done** | 1    | Phase 0 — schema, RLS, security-definer functions                             | Cross-org isolation verified by SQL as each role                                                         |
 | **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
 | **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                   | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
-| next     | 4    | Phase 1 — Approval Engine                                                     | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
-| —        | 5    | Phase 1 — Notification Engine + Resend                                        | Template renders, email delivers, `notifications` row marked sent                                        |
+| **done** | 4    | Phase 1 — Approval Engine                                                     | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
+| next     | 5    | Phase 1 — Notification Engine + Resend                                        | Template renders, email delivers, `notifications` row marked sent                                        |
 | —        | 6    | Phase 2 — Leave schema, entitlement, lazy balances, locked submission         | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
 | —        | 7    | Phase 3 — Employee UI                                                         | PRD AC1–AC3, AC5, AC7                                                                                    |
 | —        | 8    | Phase 3 — Manager UI + decision handling                                      | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |

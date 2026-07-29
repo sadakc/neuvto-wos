@@ -37,6 +37,7 @@ declare
   vertex  uuid := '00000000-0000-0000-0000-0000000000b0';
   ravi    uuid := '00000000-0000-0000-0000-00000000a005';
   mark    uuid := '00000000-0000-0000-0000-00000000a004';
+  dan     uuid := '00000000-0000-0000-0000-00000000a003';   -- Mark's manager
   alice   uuid := '00000000-0000-0000-0000-00000000a001';
   bob     uuid := '00000000-0000-0000-0000-00000000b001';
   ghost   uuid := '00000000-0000-0000-0000-0000000000ff';
@@ -173,9 +174,15 @@ begin
   select count(*) into n from analytics_events;
   perform pg_temp.check('employee cannot read analytics events', n, 0);
 
+  -- Asserted as "at least one", not an exact count: this file inserts an event
+  -- each run, so an exact count only holds when it is run immediately after a
+  -- re-seed. What matters is who can see them, not how many there are.
   perform pg_temp.as_user(alice);
   select count(*) into n from analytics_events;
-  perform pg_temp.check('org_admin can read own-org analytics events', n, 1);
+  if n < 1 then
+    raise exception 'RLS FAIL: org_admin cannot read their own organisation''s analytics events';
+  end if;
+  raise notice 'ok: org_admin can read own-org analytics events';
 
   perform pg_temp.as_user(bob);
   select count(*) into n from analytics_events;
@@ -287,6 +294,165 @@ begin
       raise exception 'RLS FAIL: an audit entry was forged directly';
     exception
       when insufficient_privilege then raise notice 'ok: audit entries cannot be forged';
+    end;
+  end if;
+
+  ---------------------------------------------------------------- approval engine (step 4)
+  -- Driven with a NON-LEAVE entity type on purpose. The whole claim of this
+  -- service is that Attendance and Payroll reuse it unchanged, and the only way
+  -- to know that is to exercise it without any leave table in play.
+  if to_regprocedure('public.approval_submit(text,uuid,jsonb)') is not null then
+    declare
+      v_req    uuid;
+      v_status text;
+      v_raised boolean;
+      v_ent    uuid := gen_random_uuid();
+    begin
+      ---------------------------------------------------------- single level
+      -- size = 1, so the level-2 condition (size > 3) does not apply.
+      perform pg_temp.as_user(ravi);
+      v_req := public.approval_submit('harness_probe', v_ent, '{"size": 1}'::jsonb);
+
+      perform pg_temp.as_postgres();
+      select required_levels into n from approval_requests where id = v_req;
+      perform pg_temp.check('condition not met means one level only', n, 1);
+
+      select count(*) into n from approval_steps
+       where approval_request_id = v_req and approver_id = mark;
+      perform pg_temp.check('level 1 resolved to the reporting manager', n, 1);
+
+      -- The queue shows it to the approver, and to nobody else.
+      perform pg_temp.as_user(mark);
+      select count(*) into n from public.approval_pending_for();
+      if n < 1 then raise exception 'RLS FAIL: the approval is not in its approver''s queue'; end if;
+      raise notice 'ok: pending queue shows the approver their own work';
+
+      perform pg_temp.as_user(alice);
+      select count(*) into n from public.approval_pending_for();
+      perform pg_temp.check('an uninvolved admin has nothing pending', n, 0);
+
+      -- The requester may not decide their own request.
+      perform pg_temp.as_user(ravi);
+      begin
+        perform public.approval_decide(v_req, 'approved', null);
+        raise exception 'RLS FAIL: the requester approved their own request';
+      exception
+        when insufficient_privilege then raise notice 'ok: requester cannot decide their own request';
+      end;
+
+      perform pg_temp.as_user(mark);
+      v_status := public.approval_decide(v_req, 'approved', 'fine by me');
+      if v_status <> 'approved' then
+        raise exception 'RLS FAIL: a single-level approval did not complete, got %', v_status;
+      end if;
+      raise notice 'ok: single-level approval completes';
+
+      -- Deciding twice must not reopen a closed request.
+      v_raised := false;
+      begin
+        perform public.approval_decide(v_req, 'rejected', null);
+      exception when raise_exception then v_raised := true;
+      end;
+      if not v_raised then raise exception 'RLS FAIL: a completed approval was decided again'; end if;
+      raise notice 'ok: a completed approval cannot be decided again';
+
+      ---------------------------------------------------------- two levels
+      v_ent := gen_random_uuid();
+      perform pg_temp.as_user(ravi);
+      v_req := public.approval_submit('harness_probe', v_ent, '{"size": 5}'::jsonb);
+
+      perform pg_temp.as_postgres();
+      select required_levels into n from approval_requests where id = v_req;
+      perform pg_temp.check('condition met adds the second level', n, 2);
+
+      -- A later-level approver must not be able to act early.
+      perform pg_temp.as_user(dan);
+      begin
+        perform public.approval_decide(v_req, 'approved', null);
+        raise exception 'RLS FAIL: level 2 approved before level 1';
+      exception
+        when insufficient_privilege then raise notice 'ok: a later level cannot decide early';
+      end;
+
+      perform pg_temp.as_user(mark);
+      v_status := public.approval_decide(v_req, 'approved', null);
+      if v_status <> 'pending' then
+        raise exception 'RLS FAIL: approving level 1 of 2 should leave it pending, got %', v_status;
+      end if;
+      raise notice 'ok: approving level 1 advances rather than completes';
+
+      perform pg_temp.as_user(dan);
+      v_status := public.approval_decide(v_req, 'approved', null);
+      if v_status <> 'approved' then
+        raise exception 'RLS FAIL: approving the final level should complete, got %', v_status;
+      end if;
+      raise notice 'ok: the final level completes the approval';
+
+      ---------------------------------------------------------- rejection
+      v_ent := gen_random_uuid();
+      perform pg_temp.as_user(ravi);
+      v_req := public.approval_submit('harness_probe', v_ent, '{"size": 5}'::jsonb);
+      perform pg_temp.as_user(mark);
+      v_status := public.approval_decide(v_req, 'rejected', 'clashes with a deadline');
+      if v_status <> 'rejected' then
+        raise exception 'RLS FAIL: rejection at level 1 should end it, got %', v_status;
+      end if;
+      raise notice 'ok: rejection ends the chain without consulting later levels';
+
+      ---------------------------------------------------------- D13
+      -- Nobody to approve: this employee has no manager.
+      perform pg_temp.as_user('00000000-0000-0000-0000-00000000a008');
+      v_raised := false;
+      begin
+        perform public.approval_submit('harness_probe', gen_random_uuid(), '{"size": 1}'::jsonb);
+      exception when raise_exception then v_raised := true;
+      end;
+      if not v_raised then
+        raise exception 'RLS FAIL: an unresolvable chain was accepted instead of raising';
+      end if;
+      raise notice 'ok: an unresolvable chain raises rather than auto-approving';
+
+      -- Alice is the only org_admin, so a role-based level naming org_admin
+      -- resolves to nobody when she is the requester: skipped, not self-approved.
+      perform pg_temp.as_user(alice);
+      v_raised := false;
+      begin
+        perform public.approval_submit('admin_only_probe', gen_random_uuid(), '{}'::jsonb);
+      exception when raise_exception then v_raised := true;
+      end;
+      if not v_raised then
+        raise exception 'RLS FAIL: the only admin approved their own request — self-approval was allowed';
+      end if;
+      raise notice 'ok: a level resolving to the requester is skipped, not self-approved';
+
+      -- ...and the same chain resolves normally for somebody else.
+      perform pg_temp.as_user(ravi);
+      v_req := public.approval_submit('admin_only_probe', gen_random_uuid(), '{}'::jsonb);
+      perform pg_temp.as_postgres();
+      select count(*) into n from approval_steps
+       where approval_request_id = v_req and approver_id = alice;
+      perform pg_temp.check('the role rule resolves for a different requester', n, 1);
+
+      ---------------------------------------------------------- tenancy
+      perform pg_temp.as_user(bob);
+      select count(*) into n from approval_requests where organization_id = acme;
+      perform pg_temp.check('other tenant sees no acme approvals', n, 0);
+      select count(*) into n from approval_steps where organization_id = acme;
+      perform pg_temp.check('other tenant sees no acme approval steps', n, 0);
+      select count(*) into n from public.approval_pending_for();
+      perform pg_temp.check('other tenant has nothing pending from acme', n, 0);
+
+      -- An uninvolved employee must not read someone else's approval.
+      perform pg_temp.as_user('00000000-0000-0000-0000-00000000a006');   -- priya
+      select count(*) into n from approval_requests where requester_id = ravi;
+      perform pg_temp.check('an uninvolved colleague cannot read the approval', n, 0);
+
+      -- Clean up after ourselves so this file is re-runnable without a re-seed.
+      -- Leaving probe requests behind makes later runs fail on unrelated
+      -- assertions — which reads as a real defect and wastes the next hour.
+      perform pg_temp.as_postgres();
+      delete from public.approval_requests
+       where entity_type in ('harness_probe', 'admin_only_probe');
     end;
   end if;
 

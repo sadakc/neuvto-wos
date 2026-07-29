@@ -176,7 +176,25 @@ begin
     values
       ('00000000-0000-0000-0000-0000000000a0','leave_request',1,'reporting_manager',  null,          null,null,2),
       ('00000000-0000-0000-0000-0000000000a0','leave_request',2,'manager_of_manager','working_days','>', 3,  2),
-      ('00000000-0000-0000-0000-0000000000b0','leave_request',1,'reporting_manager',  null,          null,null,3);
+      ('00000000-0000-0000-0000-0000000000b0','leave_request',1,'reporting_manager',  null,          null,null,3),
+
+      -- A deliberately non-leave entity type. The Approval Engine's gate is that
+      -- it can be driven end to end without any leave table existing — a service
+      -- testable only through the module it was written for is not a service.
+      ('00000000-0000-0000-0000-0000000000a0','harness_probe',1,'reporting_manager',  null,     null,null,2),
+      ('00000000-0000-0000-0000-0000000000a0','harness_probe',2,'manager_of_manager','size','>', 3,  2);
+
+    -- Separate insert because a 'role' rule needs approver_role in the same
+    -- statement: chain_role_present rejects the pair otherwise, which is the
+    -- constraint working — an unresolvable chain should never reach a request.
+    --
+    -- Only Alice holds org_admin in Acme, so when she is the requester this
+    -- level resolves to nobody: it exercises "skip rather than self-approve"
+    -- and, with no other level, "raise rather than auto-approve".
+    insert into public.approval_chains
+      (organization_id, entity_type, level, approver_rule, approver_role)
+    values
+      ('00000000-0000-0000-0000-0000000000a0','admin_only_probe',1,'role','org_admin');
     raise notice 'seeded: approval_chains';
   end if;
 end $$;
