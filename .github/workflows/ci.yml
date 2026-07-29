@@ -134,16 +134,33 @@ jobs:
 
       - name: RLS policies must use (select auth.uid())
         run: |
-          # Skip SQL comment lines: migrations legitimately discuss auth.uid()
-          # in prose explaining why the wrapped form is required, and matching
-          # those made the check fail on its own documentation. A gate that
-          # cries wolf gets ignored.
-          if grep -rEn "auth\.uid\(\)" supabase/migrations 2>/dev/null \
-             | grep -vE ":[0-9]+:[[:space:]]*--" \
-             | grep -v "select auth.uid()" | grep -v "SELECT auth.uid()"; then
-            echo "::error::Bare auth.uid() in a policy — it is re-evaluated per row. Wrap as (select auth.uid())."
-            exit 1
-          fi
+          # Only executable SQL counts. Migrations legitimately discuss
+          # auth.uid() in prose — both in `--` comments and inside COMMENT ON
+          # string literals — and a plain grep flagged the check against its own
+          # documentation twice. Strip comments and single-quoted strings first,
+          # preserving line numbers so the report still points somewhere useful.
+          python3 - <<'PY'
+          import re, sys, pathlib
+
+          def blank_out(pattern, text):
+              # Replace each match with the same number of newlines, so line
+              # numbers survive.
+              return re.sub(pattern, lambda m: "\n" * m.group(0).count("\n"), text, flags=re.S)
+
+          offences = []
+          for path in sorted(pathlib.Path("supabase/migrations").glob("*.sql")):
+              src = path.read_text()
+              code = blank_out(r"--[^\n]*", src)          # line comments
+              code = blank_out(r"'(?:[^']|'')*'", code)   # string literals ($$ bodies survive)
+              for n, line in enumerate(code.splitlines(), 1):
+                  if "auth.uid()" in line and "select auth.uid()" not in line.lower():
+                      offences.append(f"{path}:{n}: {src.splitlines()[n-1].strip()}")
+
+          if offences:
+              print("\n".join(offences))
+              print("::error::Bare auth.uid() in a policy — it is re-evaluated per row. Wrap as (select auth.uid()).")
+              sys.exit(1)
+          PY
 
       - name: Every new table enables RLS
         run: |
