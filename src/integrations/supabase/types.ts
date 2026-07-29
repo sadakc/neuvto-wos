@@ -14,6 +14,41 @@ export type Database = {
   }
   public: {
     Tables: {
+      analytics_events: {
+        Row: {
+          event: string
+          id: string
+          occurred_at: string
+          organization_id: string | null
+          properties: Json
+          user_id: string | null
+        }
+        Insert: {
+          event: string
+          id?: string
+          occurred_at?: string
+          organization_id?: string | null
+          properties?: Json
+          user_id?: string | null
+        }
+        Update: {
+          event?: string
+          id?: string
+          occurred_at?: string
+          organization_id?: string | null
+          properties?: Json
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_requests: {
         Row: {
           company: string | null
@@ -44,15 +79,422 @@ export type Database = {
         }
         Relationships: []
       }
+      departments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          name: string
+          organization_id: string
+          parent_department_id: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          parent_department_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          parent_department_id?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "departments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "departments_parent_department_id_fkey"
+            columns: ["parent_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          module_key: string
+          organization_id: string
+          setting_key: string
+          updated_at: string
+          updated_by: string | null
+          value: Json
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          module_key: string
+          organization_id: string
+          setting_key: string
+          updated_at?: string
+          updated_by?: string | null
+          value: Json
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          module_key?: string
+          organization_id?: string
+          setting_key?: string
+          updated_at?: string
+          updated_by?: string | null
+          value?: Json
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      modules: {
+        Row: {
+          created_at: string
+          key: string
+          name: string
+          status: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+          name: string
+          status?: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+          name?: string
+          status?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      organization_modules: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          enabled: boolean
+          enabled_at: string | null
+          module_key: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          enabled?: boolean
+          enabled_at?: string | null
+          module_key: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          enabled?: boolean
+          enabled_at?: string | null
+          module_key?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_modules_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "organization_modules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_settings: {
+        Row: {
+          allow_retroactive: boolean
+          created_at: string
+          created_by: string | null
+          default_min_notice_days: number
+          deleted_at: string | null
+          exclude_holidays: boolean
+          exclude_weekends: boolean
+          fy_start_day: number
+          fy_start_month: number
+          notify_on_approve: boolean
+          notify_on_reject: boolean
+          notify_on_submit: boolean
+          organization_id: string
+          session_absolute_hours: number
+          session_idle_minutes: number
+          timezone: string
+          updated_at: string
+          updated_by: string | null
+          weekend_days: number[]
+        }
+        Insert: {
+          allow_retroactive?: boolean
+          created_at?: string
+          created_by?: string | null
+          default_min_notice_days?: number
+          deleted_at?: string | null
+          exclude_holidays?: boolean
+          exclude_weekends?: boolean
+          fy_start_day?: number
+          fy_start_month?: number
+          notify_on_approve?: boolean
+          notify_on_reject?: boolean
+          notify_on_submit?: boolean
+          organization_id: string
+          session_absolute_hours?: number
+          session_idle_minutes?: number
+          timezone?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekend_days?: number[]
+        }
+        Update: {
+          allow_retroactive?: boolean
+          created_at?: string
+          created_by?: string | null
+          default_min_notice_days?: number
+          deleted_at?: string | null
+          exclude_holidays?: boolean
+          exclude_weekends?: boolean
+          fy_start_day?: number
+          fy_start_month?: number
+          notify_on_approve?: boolean
+          notify_on_reject?: boolean
+          notify_on_submit?: boolean
+          organization_id?: string
+          session_absolute_hours?: number
+          session_idle_minutes?: number
+          timezone?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekend_days?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organizations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          industry_type: string | null
+          name: string
+          slug: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          industry_type?: string | null
+          name: string
+          slug: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          industry_type?: string | null
+          name?: string
+          slug?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          department_id: string | null
+          email: string
+          full_name: string | null
+          id: string
+          is_active: boolean
+          joined_date: string
+          manager_id: string | null
+          organization_id: string
+          phone: string | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          department_id?: string | null
+          email: string
+          full_name?: string | null
+          id: string
+          is_active?: boolean
+          joined_date?: string
+          manager_id?: string | null
+          organization_id: string
+          phone?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          department_id?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          is_active?: boolean
+          joined_date?: string
+          manager_id?: string | null
+          organization_id?: string
+          phone?: string | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "profiles_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_manager_id_fkey"
+            columns: ["manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          organization_id: string
+          role: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      current_org_id: { Args: never; Returns: string }
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
+      is_admin: { Args: never; Returns: boolean }
+      is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
+      module_enabled: { Args: { _module_key: string }; Returns: boolean }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "org_admin" | "hr_admin" | "manager" | "employee"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -179,6 +621,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["org_admin", "hr_admin", "manager", "employee"],
+    },
   },
 } as const
