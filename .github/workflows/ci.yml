@@ -229,3 +229,42 @@ jobs:
             done
           done
           exit $fail
+
+  # Lovable's changes get reviewed before they land. Keyed on commit authorship
+  # rather than CODEOWNERS: GitHub forbids a pull request author approving their
+  # own, and with a single owner a path-based rule would make our own migration
+  # PRs permanently unmergeable now that enforce_admins is on.
+  #
+  # The decision lives in scripts/lovable-gate.mjs, a pure function with its own
+  # tests. This job only gathers facts.
+  lovable-gate:
+    name: Lovable review gate
+    runs-on: ubuntu-latest
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Full history — the gate reads commit authors between base and head.
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      # An approving review from someone with write access is the go-ahead.
+      # Defaults to false, so a failure to read the API fails closed.
+      - name: Read review state
+        id: reviews
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          approved=$(gh api "repos/${{ github.repository }}/pulls/${{ github.event.pull_request.number }}/reviews" \
+            --jq '[.[] | select(.state == "APPROVED")] | length' 2>/dev/null || echo 0)
+          [ "${approved:-0}" -gt 0 ] && echo "approved=true" >> "$GITHUB_OUTPUT" || echo "approved=false" >> "$GITHUB_OUTPUT"
+
+      - name: Apply the gate
+        env:
+          GATE_BASE: origin/${{ github.event.pull_request.base.ref }}
+          GATE_HEAD: HEAD
+          GATE_APPROVED: ${{ steps.reviews.outputs.approved }}
+        run: bun scripts/lovable-gate-ci.mjs
