@@ -127,16 +127,47 @@ agent has no reason to recreate.
 
 ---
 
-## Branch protection, and the hole in it
+## Branch protection
 
-`main` requires all three CI checks to pass before a merge. **Lovable's own
-commits bypass this**, because Lovable pushes as the repository owner and
-GitHub's branch protection exempts administrators unless "Do not allow
-bypassing" is set — which would also lock out the Lovable integration entirely.
+`main` requires all three CI checks, **and this is enforced for administrators
+too** (`enforce_admins`, enabled 30 Jul 2026). Nothing reaches `main` except
+through a pull request with green checks — including Lovable, including the
+repository owner. Verified by attempting a direct push:
 
-This is a documented, accepted risk rather than a closed one. The mitigation is
-that Lovable is used for UI work, not schema, and that the harness runs on the
-next push regardless of who made the previous one.
+```
+remote: error: GH006: Protected branch update failed for refs/heads/main.
+remote: - 3 of 3 required status checks are expected.
+ ! [remote rejected] main -> main (protected branch hook declined)
+```
+
+### Why it was closed
+
+It was an accepted risk until it cost something. On 30 Jul 2026 Lovable pushed
+four commits straight to `main` scaffolding a **second email system** —
+`src/lib/email-templates/` calling `@lovable.dev/email-js` with a
+`LOVABLE_API_KEY`, four new dependencies, and `notify.neuvto.com` delegated to
+Lovable's nameservers.
+
+It duplicated the Notification Engine finished hours earlier, and it violated
+§9 of the coding standards, the portability contract: leaving Lovable would have
+meant rebuilding email _and_ moving DNS. It also left `main` failing lint, which
+is how it was noticed — nothing else would have caught it.
+
+Reverted in #14; the Notification Engine stays.
+
+### What this costs
+
+Lovable pushes as the repository owner, so it can no longer write to `main`
+either. **Whether its GitHub sync still works on a branch is not yet known** —
+it will become apparent at the next edit made in Lovable. If the integration
+breaks outright, reversing is one call:
+
+```bash
+gh api -X DELETE repos/sadakc/neuvto-wos/branches/main/protection/enforce_admins
+```
+
+That is a real trade and it was made deliberately: a scaffolded vendor
+integration landing unreviewed on `main` is worse than losing one-click sync.
 
 ---
 
