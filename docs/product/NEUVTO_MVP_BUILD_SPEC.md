@@ -66,6 +66,9 @@ These override the source docs where they conflict. Deviations are deliberate an
 | D23 | **`erase_employee()` anonymises personal data and retains leave history.**                                                                                                             | `03` §Compliance promises erasure; deleting the row would break every balance and report                                           |
 | D24 | **AI seams defined, no AI infrastructure built.** If retrieval is ever needed it is `pgvector` in the same database — never a separate vector service.                                 | Principle 6 anticipates AI; Principle 5 forbids building it with no consumer                                                       |
 | D25 | **Analytics events stored in-database**, not sent to a third-party SaaS.                                                                                                               | Not in any source doc — avoids adding a processor holding employee behavioural data                                                |
+| D26 | **The emitter names the event; the engine names the recipients.** Modules emit `approval.submitted`, never "email the approver".                                                       | Not in any source doc — a module that named recipients would be edited every time an organisation wanted its HR admin copied in    |
+| D27 | **Values substituted into templates are HTML-escaped.**                                                                                                                                | Not in any source doc — a leave reason is user input landing in an HTML email a manager opens                                      |
+| D28 | **A notification never fails the transaction that caused it.** A missing template records a failed notification; it does not roll back the approval.                                   | Not in any source doc — mail is not worth losing somebody's approved leave over                                                    |
 
 **Companion standards:** `docs/standards/NEUVTO_DATA_STANDARDS.md` (D16–D19, D23) ·
 `NEUVTO_SECURITY_POLICY.md` (D20–D22) · `NEUVTO_ANALYTICS.md` (D25) · `NEUVTO_AI_SEAMS.md` (D24)
@@ -394,10 +397,9 @@ Subscribes to `approval.completed` for `entity_type = 'leave_request'`:
 
 ## Build sequence
 
-**Progress as of 30 Jul 2026:** steps 0 through 4 are merged to `main` and applied to Lovable
-Cloud. The harness carries 78 RLS assertions and the invariant suite, passing locally and in
-CI, and is verified non-vacuous — removing a tenant filter fails it immediately. Step 5 is
-next.
+**Progress as of 30 Jul 2026:** steps 0 through 5 are merged to `main`. The harness carries
+100 RLS assertions and the invariant suite, passing locally and in CI, and is verified
+non-vacuous — every guard has been watched to fail under deliberate sabotage. Step 6 is next.
 
 | Status   | Step | Content                                                                       | Gate                                                                                                     |
 | -------- | ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -406,8 +408,8 @@ next.
 | **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
 | **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                   | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
 | **done** | 4    | Phase 1 — Approval Engine                                                     | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
-| next     | 5    | Phase 1 — Notification Engine + Resend                                        | Template renders, email delivers, `notifications` row marked sent                                        |
-| —        | 6    | Phase 2 — Leave schema, entitlement, lazy balances, locked submission         | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
+| **done** | 5    | Phase 1 — Notification Engine + Resend                                        | Template renders, email delivers, `notifications` row marked sent                                        |
+| next     | 6    | Phase 2 — Leave schema, entitlement, lazy balances, locked submission         | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
 | —        | 7    | Phase 3 — Employee UI                                                         | PRD AC1–AC3, AC5, AC7                                                                                    |
 | —        | 8    | Phase 3 — Manager UI + decision handling                                      | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |
 | —        | 9    | Phase 3 — Admin config incl. chain editor + guarded deactivation              | PRD AC9; deactivating a manager with reports is blocked                                                  |

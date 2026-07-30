@@ -100,6 +100,64 @@ reputation permanently.
 
 ---
 
+## How a notification actually gets sent
+
+Everything interesting happens in Postgres before anything is delivered:
+
+1. A module calls `emit_platform_event('approval.submitted', {facts})`. It names
+   an event, never a person (D26).
+2. `resolve_notification_recipients()` decides who hears about it.
+3. `notify()` picks the template — the organisation's own if it has one,
+   otherwise the system default — renders it with values HTML-escaped (D27), and
+   inserts a `pending` row in `notifications`.
+4. The `notification-dispatch` edge function claims the batch, posts each one to
+   Resend, and marks it `sent` or `failed` with a reason.
+
+The dispatcher is deliberately dumb. It turns a row into an HTTP call and
+records what happened; every decision was already made.
+
+**A row is rendered when it is enqueued, not when it is sent.** So the subject
+and body a customer received are a matter of record even if the template is
+edited afterwards — which is exactly the question asked when somebody disputes
+what they were told.
+
+**Claiming uses `FOR UPDATE SKIP LOCKED`**, so two dispatchers running at once
+never send the same email twice. Verified: a second dispatch immediately after
+the first claims nothing.
+
+### Running it
+
+```bash
+supabase functions deploy notification-dispatch --project-ref vkyvzhgigncranprhidn
+```
+
+It requires `Authorization: Bearer <service role key>` — without that the queue
+is drainable by anyone who finds the URL. Schedule it with `pg_cron` or an
+external scheduler; it is safe to call as often as you like.
+
+If `RESEND_API_KEY` is unset it returns **503 rather than doing nothing**. A
+silent no-op looks exactly like an empty queue, which is the hardest possible
+failure to notice.
+
+### Verifying without sending real mail
+
+`neuvto-harness/tools/resend-stub.ts` answers `/emails` the way Resend does and
+keeps what it was sent, so the whole loop can be driven locally and asserted on:
+
+```bash
+bun neuvto-harness/tools/resend-stub.ts &
+supabase functions serve notification-dispatch --env-file <(echo "
+RESEND_API_BASE=http://host.docker.internal:8787
+RESEND_API_KEY=re_stub_key_for_local_verification")
+curl -s http://127.0.0.1:8787/__captured    # exactly what would have gone out
+```
+
+Asserting only that the row flipped to `sent` would pass just as happily while
+mailing gibberish, which is why the stub captures the payload.
+
+**What this does not prove** is that Resend accepts the message — that needs the
+live key and a verified domain. Run one real send before the first customer.
+
 ## Open item
 
 The hosted Supabase magic-link template still lacks `{{ .Token }}`, so the
