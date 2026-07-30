@@ -15,7 +15,6 @@
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 // Overridable so the delivery loop can be verified end to end against a local
 // stub without a live key and without sending real mail to real people.
@@ -65,15 +64,30 @@ async function deliver(n: Claimed): Promise<{ ok: true } | { ok: false; reason: 
 }
 
 Deno.serve(async (req) => {
-  // The queue is not public. Without this, anyone who finds the URL can drain
-  // it — flushing mail early, or hammering the send quota.
-  const auth = req.headers.get("Authorization") ?? "";
-  if (auth !== `Bearer ${SERVICE_KEY}`) {
-    return new Response(JSON.stringify({ error: "unauthorized" }), {
-      status: 401,
-      headers: { "Content-Type": "application/json" },
-    });
+  // The queue is not public — anyone who found this URL could otherwise drain
+  // it, flushing mail early or burning the send quota.
+  //
+  // Authorisation is delegated to Postgres rather than checked here. The
+  // EXECUTE grant on notification_claim_batch is service-role-only and the
+  // harness asserts it, so presenting the wrong credential fails at the
+  // database and this function needs no opinion of its own.
+  //
+  // The first version compared the header against SUPABASE_SERVICE_ROLE_KEY by
+  // string equality. That was wrong twice over: Supabase issues both a legacy
+  // JWT and a newer sb_secret_ key and only one of them matches the variable,
+  // so a perfectly valid credential was refused; and it put an authorisation
+  // decision in a second place, which is exactly how the two drift apart.
+  const authHeader = req.headers.get("Authorization") ?? "";
+  if (!authHeader.startsWith("Bearer ")) {
+    return new Response(
+      JSON.stringify({
+        error: "unauthorized",
+        hint: "Send Authorization: Bearer <service role key or secret key>.",
+      }),
+      { status: 401, headers: { "Content-Type": "application/json" } },
+    );
   }
+  const callerKey = authHeader.slice("Bearer ".length).trim();
 
   if (!RESEND_KEY) {
     // Explicit rather than sending nothing and reporting success. A silent
@@ -85,14 +99,29 @@ Deno.serve(async (req) => {
     );
   }
 
-  const supabase = createClient(SUPABASE_URL, SERVICE_KEY);
+  // Built from the caller's own credential, so the claim below is attempted as
+  // whoever called — which is what makes the database the authority.
+  const supabase = createClient(SUPABASE_URL, callerKey);
 
   const { data: batch, error } = await supabase.rpc("notification_claim_batch", { _limit: BATCH });
   if (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json" },
-    });
+    // A refusal is a 401 and anything else is a 500. Reported distinctly
+    // because "you sent the wrong key" and "the queue is broken" need
+    // completely different responses, and the first version of this function
+    // returned a bare "unauthorized" that could not tell them apart.
+    const refused = /permission denied|not authoriz|no api key|invalid|jwt/i.test(error.message);
+    return new Response(
+      JSON.stringify({
+        error: refused ? "unauthorized" : error.message,
+        ...(refused && {
+          // Deliberately does not claim the credential "is valid" — it may be
+          // the wrong key, a key for a different project, or nonsense, and
+          // guessing wrong sends the reader hunting in the wrong place.
+          hint: "This credential is not the service role key for THIS project. Note the app runs on the Lovable Cloud project, which is not the one in your own Supabase dashboard — see docs/operations/DEPLOYMENT.md.",
+        }),
+      }),
+      { status: refused ? 401 : 500, headers: { "Content-Type": "application/json" } },
+    );
   }
 
   const claimed = (batch ?? []) as Claimed[];
