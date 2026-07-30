@@ -739,6 +739,74 @@ begin
       end if;
       raise notice 'ok: the dispatcher can claim the queue as service_role, with the address attached';
 
+      ------------------------------------------------- D29 retry
+      -- The behaviour that was claimed in a comment and not implemented: a
+      -- transient failure has to remain deliverable. Tested here rather than in
+      -- the dispatcher because the decision about when to give up lives in SQL.
+      if to_regprocedure('public.notification_mark_retry(uuid,text)') is not null then
+        declare
+          v_note uuid;
+          v_next timestamptz;
+          v_max  smallint := public.notification_max_attempts();
+        begin
+          perform pg_temp.as_postgres();
+          delete from notifications;
+
+          v_note := public.notify('approval.completed', ravi,
+            jsonb_build_object('entity_type', 'leave', 'status', 'approved'));
+
+          -- One transient failure: still pending, still ours, but not yet.
+          update notifications set attempts = 1 where id = v_note;
+          perform public.notification_mark_retry(v_note, 'NETWORK: connection reset');
+
+          select status::text, next_attempt_at into strict v_subj, v_next
+            from notifications where id = v_note;
+          if v_subj <> 'pending' then
+            raise exception 'RLS FAIL: a transient failure was not left retryable — status is %', v_subj;
+          end if;
+          if v_next <= now() then
+            raise exception 'RLS FAIL: no backoff applied — it would be re-claimed immediately';
+          end if;
+          raise notice 'ok: a transient failure stays pending and backs off';
+
+          -- Backed off means backed off: the dispatcher must not pick it up yet.
+          set local role service_role;
+          select count(*) into n from public.notification_claim_batch(10);
+          reset role;
+          perform pg_temp.check('a backed-off notification is not claimed early', n, 0);
+
+          -- Once its time comes it is claimable again.
+          update notifications set next_attempt_at = now() - interval '1 second' where id = v_note;
+          set local role service_role;
+          select count(*) into n from public.notification_claim_batch(10);
+          reset role;
+          perform pg_temp.check('it becomes claimable once the backoff expires', n, 1);
+
+          -- And it does not retry forever. At the cap it goes terminal, or a
+          -- permanently broken notification never surfaces to anyone.
+          update notifications set attempts = v_max where id = v_note;
+          perform public.notification_mark_retry(v_note, 'NETWORK: still down');
+
+          select status::text into strict v_subj from notifications where id = v_note;
+          if v_subj <> 'failed' then
+            raise exception 'RLS FAIL: retries never give up — status is % at the attempt cap', v_subj;
+          end if;
+          select count(*) into n from notifications
+           where id = v_note and failed_reason like 'GAVE_UP%';
+          perform pg_temp.check('giving up records that it gave up, and why', n, 1);
+
+          -- A signed-in user must not be able to defer their own mail forever.
+          perform pg_temp.as_postgres();
+          if has_function_privilege('authenticated', 'public.notification_mark_retry(uuid,text)', 'execute') then
+            raise exception 'RLS FAIL: an ordinary user can reschedule notification delivery';
+          end if;
+          raise notice 'ok: rescheduling delivery is service-role only';
+
+          perform pg_temp.as_postgres();
+          delete from notifications;
+        end;
+      end if;
+
       ------------------------------------------------- leave the queue as we found it
       perform pg_temp.as_postgres();
       delete from notifications;
