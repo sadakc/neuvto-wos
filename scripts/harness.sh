@@ -113,6 +113,11 @@ run "seeding test data"        "$HARNESS_DIR/seed/seed_test_data.sql"
 run "verifying tenant isolation" "$HARNESS_DIR/tests/verify_rls.sql"
 run "verifying data integrity"   "$HARNESS_DIR/tests/verify_invariants.sql"
 
+# Needs two connections, so it cannot live in the SQL suite — a single session
+# cannot race itself. This is the D10 regression guard.
+printf '\n──  %s\n' "verifying concurrent submission"
+PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_concurrency.sh"
+
 cat <<'MSG'
 
 ──  HARNESS PASSED
