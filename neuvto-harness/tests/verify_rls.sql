@@ -516,6 +516,237 @@ begin
     delete from organizations where slug = 'signup-test-co';
   end if;
 
+  ---------------------------------------------------------------- notification engine (step 5)
+  if to_regprocedure('public.notify(text,uuid,jsonb)') is not null then
+    declare
+      v_ent   uuid := gen_random_uuid();
+      v_req   uuid;
+      v_subj  text;
+      v_body  text;
+      v_bad   boolean;
+    begin
+      perform pg_temp.as_postgres();
+      delete from notifications;
+
+      ------------------------------------------------- the approval lifecycle notifies
+      perform pg_temp.as_user(ravi);
+      v_req := public.approval_submit('harness_probe', v_ent, '{"size": 5}'::jsonb);
+
+      perform pg_temp.as_postgres();
+      select count(*) into n from notifications
+       where event_key = 'approval.submitted' and recipient_id = mark;
+      perform pg_temp.check('submission notifies the level-1 approver', n, 1);
+
+      -- D26: the module named an event, not a person. Nobody uninvolved is mailed.
+      select count(*) into n from notifications where recipient_id in (alice, bob, dan);
+      perform pg_temp.check('submission mails nobody who is not involved', n, 0);
+
+      ------------------------------------------------- an org template beats the default
+      -- Acme overrides approval.submitted in the seed; Vertex does not.
+      select subject into v_subj from notifications
+       where event_key = 'approval.submitted' and recipient_id = mark;
+      if v_subj not like 'ACME OVERRIDE%' then
+        raise exception 'RLS FAIL: the organisation''s own template did not win — got %', v_subj;
+      end if;
+      raise notice 'ok: an organisation''s template beats the system default';
+
+      ------------------------------------------------- the next approver, and only them
+      perform pg_temp.as_user(mark);
+      perform public.approval_decide(v_req, 'approved', 'level one');
+
+      perform pg_temp.as_postgres();
+      select count(*) into n from notifications
+       where event_key = 'approval.decided' and recipient_id = dan;
+      perform pg_temp.check('a decision notifies whoever is next in the chain', n, 1);
+
+      select count(*) into n from notifications
+       where event_key = 'approval.decided' and recipient_id <> dan;
+      perform pg_temp.check('a decision mails only the next approver', n, 0);
+
+      ------------------------------------------------- completion reaches the requester
+      perform pg_temp.as_user(dan);
+      perform public.approval_decide(v_req, 'approved', 'level two');
+
+      perform pg_temp.as_postgres();
+      select count(*) into n from notifications
+       where event_key = 'approval.completed' and recipient_id = ravi;
+      perform pg_temp.check('completion notifies the person who asked', n, 1);
+
+      select count(*) into n from notifications where event_key = 'approval.decided';
+      perform pg_temp.check('the closing decision does not also mail a next approver', n, 1);
+
+      ------------------------------------------------- a rejection stops the chain
+      -- This is the case the resolver's "is the request still open" check
+      -- exists for, and the only one that exercises it. When a two-level
+      -- request is REJECTED at level one, level two's step is still pending —
+      -- so a resolver that looks only at step decisions cheerfully tells the
+      -- level-two approver it is their turn to act on a request that is already
+      -- dead. Approving twice never reaches that state, which is why the first
+      -- version of this block passed against a deliberately broken resolver.
+      declare
+        v_ent2 uuid := gen_random_uuid();
+        v_req2 uuid;
+      begin
+        perform pg_temp.as_postgres();
+        delete from notifications;
+
+        perform pg_temp.as_user(ravi);
+        v_req2 := public.approval_submit('harness_probe', v_ent2, '{"size": 5}'::jsonb);
+
+        perform pg_temp.as_user(mark);
+        perform public.approval_decide(v_req2, 'rejected', 'not this time');
+
+        perform pg_temp.as_postgres();
+        select count(*) into n from notifications
+         where event_key = 'approval.decided' and recipient_id = dan;
+        perform pg_temp.check('a rejection does not summon the next approver', n, 0);
+
+        select count(*) into n from notifications
+         where event_key = 'approval.completed' and recipient_id = ravi;
+        perform pg_temp.check('a rejection still tells the requester', n, 1);
+
+        select count(*) into n from notifications
+         where event_key = 'approval.completed' and body like '%rejected%';
+        perform pg_temp.check('the requester is told it was rejected, not approved', n, 1);
+
+        delete from approval_steps    where approval_request_id = v_req2;
+        delete from approval_requests where id = v_req2;
+        delete from notifications;
+      end;
+
+      -- Rebuild the approved-path fixture the later assertions read.
+      perform pg_temp.as_user(ravi);
+      v_req := public.approval_submit('harness_probe', gen_random_uuid(), '{"size": 5}'::jsonb);
+      perform pg_temp.as_user(mark);
+      perform public.approval_decide(v_req, 'approved', 'level one');
+      perform pg_temp.as_user(dan);
+      perform public.approval_decide(v_req, 'approved', 'level two');
+      perform pg_temp.as_postgres();
+
+      ------------------------------------------------- everything renders
+      select count(*) into n from notifications
+       where subject like '%{{%' or body like '%{{%';
+      perform pg_temp.check('no notification went out with an unrendered placeholder', n, 0);
+
+      select count(*) into n from notifications where status = 'failed';
+      perform pg_temp.check('no notification failed for want of a template', n, 0);
+
+      ------------------------------------------------- D27, on the real path
+      -- Not render_template() in isolation — the whole way through notify(),
+      -- because escaping that is skipped on the path actually used is escaping
+      -- that does not exist.
+      perform public.notify('approval.completed', ravi,
+        jsonb_build_object('entity_type', 'leave', 'status', '<img src=x onerror=alert(1)>'));
+
+      select body into v_body from notifications
+       where recipient_id = ravi and body like '%img%' order by created_at desc limit 1;
+      if v_body like '%<img%' then
+        raise exception 'RLS FAIL: D27 — live markup reached a rendered notification body';
+      end if;
+      if v_body not like '%&lt;img%' then
+        raise exception 'RLS FAIL: D27 — the value was dropped rather than escaped: %', v_body;
+      end if;
+      raise notice 'ok: user input is escaped, not executed, in a rendered body';
+
+      ------------------------------------------------- tenancy
+      perform pg_temp.as_user(bob);
+      select count(*) into n from notifications;
+      perform pg_temp.check('a vertex user sees no acme notifications', n, 0);
+
+      select count(*) into n from notification_templates where organization_id = acme;
+      perform pg_temp.check('a vertex user cannot read acme templates', n, 0);
+
+      -- But the system defaults are readable, or an admin cannot see what they
+      -- are about to override.
+      select count(*) into n from notification_templates where organization_id is null;
+      if n < 1 then raise exception 'RLS FAIL: system default templates are invisible to an admin'; end if;
+      raise notice 'ok: system defaults are readable by everyone';
+
+      ------------------------------------------------- your mail is yours
+      perform pg_temp.as_user(mark);
+      select count(*) into n from notifications where recipient_id <> mark;
+      perform pg_temp.check('an employee sees only their own notifications', n, 0);
+
+      perform pg_temp.as_user(alice);
+      select count(*) into n from notifications where recipient_id = mark;
+      if n < 1 then raise exception 'RLS FAIL: an org_admin cannot see their organisation''s notifications'; end if;
+      raise notice 'ok: an org_admin sees the organisation''s mail';
+
+      ------------------------------------------------- an admin cannot rewrite the defaults
+      v_bad := false;
+      perform pg_temp.as_user(alice);
+      begin
+        insert into notification_templates (organization_id, event_key, channel, subject_template, body_template)
+        values (null, 'approval.submitted', 'email', 'hijacked', 'hijacked');
+        v_bad := true;
+      exception when insufficient_privilege or check_violation then null;
+      end;
+      if v_bad then
+        raise exception 'RLS FAIL: an org_admin wrote a system default template every customer depends on';
+      end if;
+      raise notice 'ok: system defaults are not writable by a customer admin';
+
+      ------------------------------------------------- nobody marks their own mail sent
+      -- Asserted on the grant itself rather than by calling and catching the
+      -- error. Calling appears to prove it, but the exception that comes back
+      -- is raised by the column-level GRANT on notifications, not by the
+      -- missing EXECUTE — so the call still fails after someone grants EXECUTE
+      -- to authenticated, and a test that only calls reports "ok" while the
+      -- privilege it names has actually been given away.
+      perform pg_temp.as_postgres();
+      if has_function_privilege('authenticated', 'public.notification_mark_sent(uuid)', 'execute')
+         or has_function_privilege('authenticated', 'public.notification_mark_failed(uuid,text)', 'execute')
+         or has_function_privilege('authenticated', 'public.notification_claim_batch(integer)', 'execute')
+      then
+        raise exception 'RLS FAIL: a delivery function is executable by ordinary users — a recipient could mark their own mail sent and hide it';
+      end if;
+      raise notice 'ok: delivery functions are service-role only';
+
+      -- And the behaviour, belt and braces: even with the grant, the write is
+      -- refused. Two independent defences, asserted independently.
+      v_bad := false;
+      perform pg_temp.as_user(mark);
+      begin
+        perform public.notification_mark_sent(
+          (select id from notifications where recipient_id = mark limit 1));
+        v_bad := true;
+      exception when insufficient_privilege then null;
+      end;
+      if v_bad then
+        raise exception 'RLS FAIL: a signed-in user marked a notification sent';
+      end if;
+      raise notice 'ok: marking mail sent is refused at the table as well as the grant';
+
+      ------------------------------------------------- the dispatcher can actually work
+      -- Run as service_role, which is what the edge function is. This is the
+      -- only assertion in the suite that does, and it exists because nothing
+      -- else could catch what it caught: the delivery functions were not
+      -- SECURITY DEFINER, so they inherited service_role's rights, and
+      -- service_role has no grant on profiles. Every SQL test passed. The
+      -- dispatcher failed on its first real call with "permission denied for
+      -- table profiles". A test that never assumes the identity that runs the
+      -- code in production is not testing production.
+      perform pg_temp.as_postgres();
+      set local role service_role;
+      begin
+        select count(*) into n from public.notification_claim_batch(10);
+      exception when others then
+        raise exception 'RLS FAIL: the dispatcher cannot claim its own queue as service_role — %', sqlerrm;
+      end;
+      reset role;
+      if n < 1 then
+        raise exception 'RLS FAIL: the dispatcher claimed nothing from a queue that has pending mail in it';
+      end if;
+      raise notice 'ok: the dispatcher can claim the queue as service_role, with the address attached';
+
+      ------------------------------------------------- leave the queue as we found it
+      perform pg_temp.as_postgres();
+      delete from notifications;
+      delete from approval_steps    where approval_request_id = v_req;
+      delete from approval_requests where id = v_req;
+    end;
+  end if;
+
   perform pg_temp.as_postgres();
   raise notice '--- RLS verification passed ---';
 end $$;

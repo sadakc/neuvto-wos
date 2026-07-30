@@ -199,6 +199,36 @@ begin
   end if;
 end $$;
 
+-- ---------------------------------------------------------------- notifications
+-- The reset above truncates notification_templates, which takes the system
+-- defaults installed by the migration with it. They are restored by calling the
+-- migration's own function rather than by restating the template text here:
+-- a second copy would let the harness pass against wording that production does
+-- not send, and neither copy would fail when they drifted apart.
+do $$
+begin
+  if to_regprocedure('public.ensure_system_notification_templates()') is not null then
+    perform public.ensure_system_notification_templates();
+    raise notice 'seeded: notification_templates (system defaults restored)';
+  end if;
+end $$;
+
+-- Acme overrides one event; Vertex does not. That difference is the fixture for
+-- "an organisation's own template beats the system default, for that
+-- organisation only".
+do $$
+begin
+  if to_regclass('public.notification_templates') is not null then
+    insert into public.notification_templates
+      (organization_id, event_key, channel, subject_template, body_template)
+    values
+      ('00000000-0000-0000-0000-0000000000a0', 'approval.submitted', 'email',
+       'ACME OVERRIDE: {{ entity_type }} needs you',
+       '<p>Acme wording for {{ entity_type }}.</p>');
+    raise notice 'seeded: notification_templates (Acme override)';
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------- leave types
 do $$
 begin
