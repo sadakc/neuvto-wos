@@ -36,6 +36,16 @@ jobs:
       - name: Unit tests
         run: bun run test
 
+      # The literal statement of the requirement: changing or removing a module
+      # must not require touching anything else. Delete the folder, delete its
+      # registry line, and the application must still build.
+      #
+      # Lives here rather than with the architecture greps because it compiles
+      # the project — the guardrails job has no runtime, and putting it there
+      # failed with a bare "command not found".
+      - name: A module can be removed without touching anything else
+        run: bash scripts/verify-module-removal.sh
+
   database:
     name: Migrations · Tenant isolation · Data integrity
     runs-on: ubuntu-latest
@@ -111,6 +121,50 @@ jobs:
       # src/routes/auth.tsx and this job failed it. Two enforcement mechanisms that
       # disagree are worse than one that is precise — so this check was removed
       # rather than taught to parse comments.
+
+      # Only the registry may name a module. This is what makes removing one a
+      # two-line operation rather than a search across the codebase — and it is
+      # the rule that decays first, because importing a module directly always
+      # looks like the shorter path in the moment.
+      #
+      # Comments are stripped before matching. The auth.uid() check was written
+      # twice without doing that and flagged its own documentation both times.
+      - name: Only the registry may name a module
+        run: |
+          python3 - <<'PY'
+          import re, sys, pathlib
+
+          offences = []
+          for path in pathlib.Path("src").rglob("*.ts*"):
+              rel = str(path)
+              if rel.startswith("src/modules/"):
+                  continue                      # a module may import itself
+              if rel == "src/modules/registry.ts":
+                  continue
+              src = path.read_text()
+              code = re.sub(r"/\*.*?\*/", "", src, flags=re.S)      # block comments
+              code = re.sub(r"//[^\n]*", "", code)                   # line comments
+              for n, line in enumerate(code.splitlines(), 1):
+                  m = re.search(r"""from ['"]@?/?modules/([a-z0-9_]+)""", line)
+                  if m and m.group(1) != "registry":
+                      offences.append(f"{path}:{n}: {line.strip()}")
+
+          if offences:
+              print("\n".join(offences))
+              print("::error::Only src/modules/registry.ts may name a module. "
+                    "Everything else goes through @/platform/modules.")
+              sys.exit(1)
+          PY
+
+      # Rule 3 of the coding standards, documented since Phase 0 and until now
+      # never enforced: a module is imported by its root or not at all.
+      - name: No deep imports into a module
+        run: |
+          if grep -rEn "from ['\"][^'\"]*modules/[a-z0-9_]+/[a-z]" src --include='*.ts' --include='*.tsx' \
+               | grep -v '^src/modules/'; then
+            echo "::error::Import a module by its root (@/modules/leave), never a path inside it."
+            exit 1
+          fi
 
       - name: No raw colour values in product code
         run: |

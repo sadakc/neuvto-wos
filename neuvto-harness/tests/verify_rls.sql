@@ -815,6 +815,179 @@ begin
     end;
   end if;
 
+  ---------------------------------------------------------------- leave module (step 6)
+  if to_regprocedure('public.leave_submit(uuid,date,date,text)') is not null then
+    declare
+      casual uuid := '00000000-0000-0000-0000-0000000000c1';
+      priya  uuid := '00000000-0000-0000-0000-00000000a006';
+      d0     date;
+      v_req  uuid;
+      v_appr uuid;
+      v_bad  boolean;
+      v_status text;
+      v_before numeric;
+      v_after  numeric;
+    begin
+      perform pg_temp.as_postgres();
+      delete from leave_requests;
+      update leave_balances set reserved_days = 0, pending_days = 0;
+      d0 := public.org_today(acme) + 45;
+
+      ------------------------------------------------- submission reserves
+      select available_days into v_before from leave_balances
+       where employee_id = ravi and leave_type_id = casual;
+
+      perform pg_temp.as_user(ravi);
+      v_req := public.leave_submit(casual, d0, d0 + 4, 'harness');
+
+      perform pg_temp.as_postgres();
+      select available_days into v_after from leave_balances
+       where employee_id = ravi and leave_type_id = casual;
+
+      select working_days into n from leave_requests where id = v_req;
+      if v_before - v_after <> n then
+        raise exception 'RLS FAIL: submitting % days moved available by %', n, v_before - v_after;
+      end if;
+      raise notice 'ok: submitting reserves exactly the working days requested';
+
+      -- The engine was handed the request; this module decided no levels.
+      select approval_request_id into v_appr from leave_requests where id = v_req;
+      if v_appr is null then
+        raise exception 'RLS FAIL: a submitted request has no approval attached';
+      end if;
+      perform pg_temp.check('the approval names the leave request as its entity', (
+        select count(*) from approval_requests
+         where id = v_appr and entity_type = 'leave_request' and entity_id = v_req), 1);
+
+      ------------------------------------------------- D18, at the constraint
+      -- The handler check gives the readable message. This proves the database
+      -- refuses it even when the handler is bypassed entirely — an insert made
+      -- directly, as postgres, exactly as a race would.
+      v_bad := false;
+      begin
+        insert into leave_requests
+          (organization_id, employee_id, leave_type_id, from_date, to_date, working_days, status)
+        values (acme, ravi, casual, d0 + 1, d0 + 2, 1, 'pending_approval');
+        v_bad := true;
+      exception when exclusion_violation then null;
+      end;
+      if v_bad then
+        raise exception 'RLS FAIL: D18 — overlapping leave was inserted past the constraint';
+      end if;
+      raise notice 'ok: overlap is refused by the constraint, not only the handler';
+
+      ------------------------------------------------- D31, overdraw is unrepresentable
+      v_bad := false;
+      begin
+        update leave_balances set reserved_days = reserved_days + 999
+         where employee_id = ravi and leave_type_id = casual;
+        v_bad := true;
+      exception when check_violation then null;
+      end;
+      if v_bad then
+        raise exception 'RLS FAIL: D31 — a balance was driven negative';
+      end if;
+      raise notice 'ok: a balance cannot be overdrawn, whatever the caller does';
+
+      ------------------------------------------------- named refusals
+      perform pg_temp.as_user(ravi);
+      begin
+        perform public.leave_submit(casual, public.org_today(acme) - 5, public.org_today(acme) - 4, 'past');
+        raise exception 'RLS FAIL: leave was accepted for a date already past';
+      exception when raise_exception then
+        if sqlerrm <> 'PAST_DATE' then raise; end if;
+      end;
+      raise notice 'ok: retroactive leave is refused in org-local time';
+
+      begin
+        -- A Saturday and Sunday for Acme, whose weekend is Sat/Sun.
+        perform public.leave_submit(casual, date '2026-09-05', date '2026-09-06', 'weekend');
+        raise exception 'RLS FAIL: leave was accepted for non-working days only';
+      exception when raise_exception then
+        if sqlerrm <> 'NO_WORKING_DAYS' then raise; end if;
+      end;
+      raise notice 'ok: a weekend-only request is refused';
+
+      -- Priya's balance covers 3 days; a fortnight cannot fit in it.
+      perform pg_temp.as_user(priya);
+      begin
+        perform public.leave_submit(casual, d0 + 100, d0 + 113, 'overdraw');
+        raise exception 'RLS FAIL: a request larger than the balance was accepted';
+      exception when raise_exception then
+        if sqlerrm not like 'INSUFFICIENT_BALANCE%' then raise; end if;
+      end;
+      raise notice 'ok: a request beyond the available balance is refused';
+
+      ------------------------------------------------- D30, the decision moves the days
+      -- This request is 4 working days, and the seeded chain requires a second
+      -- approval above 3 — D5 as a row rather than a line of code. The first
+      -- decision must therefore advance and change nothing about the leave.
+      perform pg_temp.as_user(mark);
+      perform public.approval_decide(v_appr, 'approved', 'level one');
+
+      perform pg_temp.as_postgres();
+      select status::text into v_status from leave_requests where id = v_req;
+      if v_status <> 'pending_approval' then
+        raise exception 'RLS FAIL: leave went to % after only the first of two approvals', v_status;
+      end if;
+      select reserved_days into v_before from leave_balances
+       where employee_id = ravi and leave_type_id = casual;
+      if v_before <> n then
+        raise exception 'RLS FAIL: the reservation moved before the chain finished';
+      end if;
+      raise notice 'ok: a part-approved request stays pending and stays reserved';
+
+      -- The second, which completes it.
+      perform pg_temp.as_user(dan);
+      perform public.approval_decide(v_appr, 'approved', 'level two');
+
+      perform pg_temp.as_postgres();
+      select status::text into v_status from leave_requests where id = v_req;
+      if v_status <> 'approved' then
+        raise exception 'RLS FAIL: the approval completed but the leave request is still %', v_status;
+      end if;
+      raise notice 'ok: completing the chain approves the leave';
+
+      select reserved_days into v_before from leave_balances
+       where employee_id = ravi and leave_type_id = casual;
+      perform pg_temp.check('approval releases the reservation', v_before::bigint, 0::bigint);
+
+      select pending_days into v_after from leave_balances
+       where employee_id = ravi and leave_type_id = casual;
+      if v_after <> n then
+        raise exception 'RLS FAIL: % days were reserved but % became pending', n, v_after;
+      end if;
+      raise notice 'ok: approved days move from reserved to pending, none lost';
+
+      ------------------------------------------------- tenancy
+      -- Scoped to Acme's rows specifically. Counting everything Bob can see
+      -- would count Vertex's own balances, which he is entitled to — and the
+      -- assertion would then be measuring the seed rather than the policy.
+      perform pg_temp.as_user(bob);
+      select count(*) into n from leave_requests where organization_id = acme;
+      perform pg_temp.check('a vertex user sees no acme leave requests', n, 0);
+      select count(*) into n from leave_balances where organization_id = acme;
+      perform pg_temp.check('a vertex user sees no acme balances', n, 0);
+
+      -- The one an employee would notice immediately, and the reason RLS is
+      -- where this is enforced rather than in a query somebody might forget.
+      perform pg_temp.as_user(priya);
+      select count(*) into n from leave_balances where employee_id = ravi;
+      perform pg_temp.check('an employee cannot see a colleague''s balance', n, 0);
+
+      perform pg_temp.as_user(mark);
+      select count(*) into n from leave_balances where employee_id = ravi;
+      if n < 1 then
+        raise exception 'RLS FAIL: a manager cannot see their own report''s balance';
+      end if;
+      raise notice 'ok: a manager sees their reports, and only their reports';
+
+      perform pg_temp.as_postgres();
+      delete from leave_requests;
+      update leave_balances set reserved_days = 0, pending_days = 0;
+    end;
+  end if;
+
   perform pg_temp.as_postgres();
   raise notice '--- RLS verification passed ---';
 end $$;

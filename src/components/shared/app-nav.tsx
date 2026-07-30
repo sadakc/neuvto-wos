@@ -1,9 +1,16 @@
 /**
  * Role-aware navigation.
  *
- * What a person can see is decided here from their roles, and enforced for real
- * by RLS in the database. Hiding a link is presentation, not security — the
+ * What a person can see is decided from their roles, and enforced for real by
+ * RLS in the database. Hiding a link is presentation, not security — the
  * database refuses the data either way.
+ *
+ * **This file knows about no module.** It used to hardcode "Apply", "My leave",
+ * "Calendar" and "Approvals", which meant changing Leave meant editing a shared
+ * file, and every future module would have added its own line here. Module
+ * destinations now come from the manifests of whatever the organisation has
+ * switched on; this file contributes only the two entries the platform itself
+ * owns.
  *
  * Mobile shows a bottom tab bar (employee views are mobile-first); desktop shows
  * a sidebar (admin work is desktop-first). Destinations that are not built yet
@@ -11,39 +18,56 @@
  */
 
 import { Link, useLocation } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import type { CurrentUser } from "@/platform/auth";
-import { canApprove, isAdmin } from "@/platform/auth";
+import { isAdmin } from "@/platform/auth";
+import { getModuleNavigation, type ModuleNavItem } from "@/platform/modules";
 import { cn } from "@/lib/utils";
 
-interface NavItem {
-  label: string;
-  to?: string;
-  /** Which build step delivers this, when it isn't here yet. */
-  soon?: string;
-}
+type NavItem = ModuleNavItem;
 
-export function navItemsFor(user: CurrentUser | null): NavItem[] {
-  const items: NavItem[] = [
-    { label: "Dashboard", to: "/app" },
-    { label: "Apply", soon: "step 7" },
-    { label: "My leave", soon: "step 7" },
-    { label: "Calendar", soon: "step 7" },
-  ];
-
-  if (canApprove(user)) {
-    items.push({ label: "Approvals", soon: "step 8" }, { label: "Team", soon: "step 8" });
-  }
-
-  if (isAdmin(user)) {
-    items.push({ label: "Settings", to: "/app/settings" });
-  }
-
+/**
+ * The platform's own destinations. Dashboard is the shell; Settings configures
+ * the organisation, not any one module. Everything else is contributed.
+ */
+export function platformNavItems(user: CurrentUser | null): NavItem[] {
+  const items: NavItem[] = [{ label: "Dashboard", to: "/app" }];
+  if (isAdmin(user)) items.push({ label: "Settings", to: "/app/settings" });
   return items;
 }
 
+/**
+ * Platform items first, module items between them and Settings — so the shape
+ * of the sidebar does not shift as modules are switched on and off.
+ */
+export function mergeNavItems(platform: NavItem[], modules: NavItem[]): NavItem[] {
+  const settingsIndex = platform.findIndex((i) => i.to === "/app/settings");
+  if (settingsIndex === -1) return [...platform, ...modules];
+  return [...platform.slice(0, settingsIndex), ...modules, ...platform.slice(settingsIndex)];
+}
+
 export function AppNav({ user }: { user: CurrentUser | null }) {
-  const items = navItemsFor(user);
+  const [moduleItems, setModuleItems] = useState<NavItem[]>([]);
   const { pathname } = useLocation();
+
+  useEffect(() => {
+    let cancelled = false;
+    // A module's navigation depends on which modules the organisation has
+    // enabled, which is a database read. Failing quietly to the platform's own
+    // items is deliberate: a navigation hiccup must not blank the shell.
+    getModuleNavigation(user)
+      .then((items) => {
+        if (!cancelled) setModuleItems(items);
+      })
+      .catch(() => {
+        if (!cancelled) setModuleItems([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  const items = mergeNavItems(platformNavItems(user), moduleItems);
 
   return (
     <>
