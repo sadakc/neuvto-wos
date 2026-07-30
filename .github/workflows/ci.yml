@@ -36,6 +36,16 @@ jobs:
       - name: Unit tests
         run: bun run test
 
+      # The literal statement of the requirement: changing or removing a module
+      # must not require touching anything else. Delete the folder, delete its
+      # registry line, and the application must still build.
+      #
+      # Lives here rather than with the architecture greps because it compiles
+      # the project — the guardrails job has no runtime, and putting it there
+      # failed with a bare "command not found".
+      - name: A module can be removed without touching anything else
+        run: bash scripts/verify-module-removal.sh
+
   database:
     name: Migrations · Tenant isolation · Data integrity
     runs-on: ubuntu-latest
@@ -155,23 +165,6 @@ jobs:
             echo "::error::Import a module by its root (@/modules/leave), never a path inside it."
             exit 1
           fi
-
-      # The literal statement of the requirement: changing or removing a module
-      # must not require touching anything else. Delete the folder, delete its
-      # registry line, and the application must still build.
-      #
-      # Asserted rather than believed, because "we were careful" is how the
-      # coupling comes back.
-      # The literal statement of the requirement: changing or removing a module
-      # must not require touching anything else. Delete the folder, delete its
-      # registry line, and the application must still build.
-      #
-      # Asserted rather than believed — "we were careful" is how the coupling
-      # comes back.
-      - name: A module can be removed without touching anything else
-        run: |
-          bun install --frozen-lockfile
-          bash scripts/verify-module-removal.sh
 
       - name: No raw colour values in product code
         run: |
