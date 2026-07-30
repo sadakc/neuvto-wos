@@ -959,6 +959,151 @@ begin
       end if;
       raise notice 'ok: approved days move from reserved to pending, none lost';
 
+      ------------------------------------------------- D33, cancelling
+      -- The invariant that matters is not "the status changed" but "the days
+      -- came back, once". A release that happens twice inflates the balance
+      -- silently — no constraint is violated and nobody notices until somebody
+      -- takes leave they never had.
+      if to_regprocedure('public.leave_cancel(uuid)') is not null then
+        declare
+          v_avail0 numeric;
+          v_avail1 numeric;
+          v_req2   uuid;
+          v_appr2  uuid;
+          v_step   record;
+        begin
+          ------------------------------------------- cancelling an APPROVED request
+          -- v_req from above is approved, its days sitting in pending_days.
+          select available_days into v_avail0 from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+
+          perform pg_temp.as_user(ravi);
+          perform public.leave_cancel(v_req);
+
+          perform pg_temp.as_postgres();
+          select status::text into v_status from leave_requests where id = v_req;
+          if v_status <> 'cancelled' then
+            raise exception 'RLS FAIL: cancel left the request as %', v_status;
+          end if;
+
+          select available_days into v_avail1 from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+          if v_avail1 - v_avail0 <> n then
+            raise exception 'RLS FAIL: cancelling % approved days returned % to available', n, v_avail1 - v_avail0;
+          end if;
+          raise notice 'ok: cancelling approved leave returns the days from pending';
+
+          select pending_days into v_before from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+          perform pg_temp.check('nothing is left stranded in pending', v_before::bigint, 0::bigint);
+
+          ------------------------------------------- cancelling a PENDING request
+          perform pg_temp.as_user(ravi);
+          select available_days into v_avail0 from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+          v_req2 := public.leave_submit(casual, d0 + 200, d0 + 202, 'to withdraw');
+
+          perform pg_temp.as_postgres();
+          select working_days into n from leave_requests where id = v_req2;
+          perform pg_temp.as_user(ravi);
+          perform public.leave_cancel(v_req2);
+
+          perform pg_temp.as_postgres();
+          select available_days into v_avail1 from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+          if v_avail1 <> v_avail0 then
+            raise exception 'RLS FAIL: withdrawing a pending request left available at % instead of %', v_avail1, v_avail0;
+          end if;
+          raise notice 'ok: withdrawing a pending request returns the days from reserved';
+
+          select reserved_days into v_before from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+          perform pg_temp.check('nothing is left stranded in reserved', v_before::bigint, 0::bigint);
+
+          ------------------------------------------- released exactly once
+          -- Cancelling twice must not pay out twice. The second call is refused,
+          -- but the assertion is on the balance, because a refusal that still
+          -- moved days would pass a status check.
+          perform pg_temp.as_user(ravi);
+          v_bad := false;
+          begin
+            perform public.leave_cancel(v_req2);
+            v_bad := true;
+          exception when raise_exception then
+            if sqlerrm <> 'ALREADY_DECIDED' then raise; end if;
+          end;
+          if v_bad then
+            raise exception 'RLS FAIL: an already-cancelled request was cancelled again';
+          end if;
+
+          perform pg_temp.as_postgres();
+          select available_days into v_avail1 from leave_balances
+           where employee_id = ravi and leave_type_id = casual;
+          if v_avail1 <> v_avail0 then
+            raise exception 'RLS FAIL: a second cancel moved the balance to % — days released twice', v_avail1;
+          end if;
+          raise notice 'ok: cancelling twice pays out once';
+
+          ------------------------------------------- somebody else's leave
+          perform pg_temp.as_user(ravi);
+          v_req2 := public.leave_submit(casual, d0 + 300, d0 + 302, 'not yours');
+
+          perform pg_temp.as_user(priya);
+          v_bad := false;
+          begin
+            perform public.leave_cancel(v_req2);
+            v_bad := true;
+          exception when raise_exception then
+            if sqlerrm <> 'NOT_YOUR_REQUEST' then raise; end if;
+          end;
+          if v_bad then
+            raise exception 'RLS FAIL: an employee cancelled a colleague''s leave';
+          end if;
+          raise notice 'ok: an employee cannot cancel a colleague''s leave';
+
+          ------------------------------------------- leave already under way
+          -- D9: judged in the organisation's today, not the server's.
+          perform pg_temp.as_postgres();
+          update leave_requests
+             set from_date = public.org_today(acme) - 1, to_date = public.org_today(acme) + 1
+           where id = v_req2;
+
+          perform pg_temp.as_user(ravi);
+          v_bad := false;
+          begin
+            perform public.leave_cancel(v_req2);
+            v_bad := true;
+          exception when raise_exception then
+            if sqlerrm <> 'CANCEL_TOO_LATE' then raise; end if;
+          end;
+          if v_bad then
+            raise exception 'RLS FAIL: leave that had already started was cancelled';
+          end if;
+          raise notice 'ok: leave already under way cannot be cancelled';
+
+          ------------------------------------------- the reason cap agrees with the form
+          perform pg_temp.as_postgres();
+          v_bad := false;
+          begin
+            update leave_requests set reason = repeat('x', 501) where id = v_req2;
+            v_bad := true;
+          exception when check_violation then null;
+          end;
+          if v_bad then
+            raise exception 'RLS FAIL: a reason longer than the form permits was accepted';
+          end if;
+          raise notice 'ok: the reason cap matches the 500 the form enforces';
+
+          perform pg_temp.as_postgres();
+          delete from approval_steps    where approval_request_id in
+            (select approval_request_id from leave_requests where employee_id = ravi);
+          delete from approval_requests where entity_id in
+            (select id from leave_requests where employee_id = ravi);
+          delete from leave_requests where employee_id = ravi;
+          update leave_balances set reserved_days = 0, pending_days = 0 where employee_id = ravi;
+        end;
+      end if;
+
       ------------------------------------------------- tenancy
       -- Scoped to Acme's rows specifically. Counting everything Bob can see
       -- would count Vertex's own balances, which he is entitled to — and the
