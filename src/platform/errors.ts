@@ -2,7 +2,7 @@
  * Typed application errors.
  *
  * Every thrown error carries a stable code from the published taxonomy in
- * standards/NEUVTO_API_STANDARDS.md §6. Codes are never renamed once shipped —
+ * docs/standards/NEUVTO_API_STANDARDS.md §6. Codes are never renamed once shipped —
  * callers branch on them.
  *
  * `message` is user-facing and may be rendered verbatim. Write it for an

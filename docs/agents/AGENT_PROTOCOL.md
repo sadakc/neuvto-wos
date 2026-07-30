@@ -144,7 +144,7 @@ Never run the seed against production. It truncates.
 
 ## 5. Architecture rules you must not break
 
-Full detail in `standards/NEUVTO_CODING_STANDARDS.md`. The ones that get violated during
+Full detail in `docs/standards/NEUVTO_CODING_STANDARDS.md`. The ones that get violated during
 a hurried fix:
 
 - `src/platform/**` must never import from `src/modules/**`
@@ -166,7 +166,7 @@ a hurried fix:
 - No raw colour values in UI code; semantic tokens only
 - Lovable APIs are importable only from `src/integrations/lovable/`
 
-Decisions D1–D15 in `NEUVTO_MVP_BUILD_SPEC.md` record where the build deliberately departs
+Decisions D1–D15 in `docs/product/NEUVTO_MVP_BUILD_SPEC.md` record where the build deliberately departs
 from the product specs. **Before "correcting" something that looks wrong, check whether it
 is a recorded decision.** D2, D9, D10 and D13 in particular look like bugs and are not.
 

@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Bash, mcp__6c130511-3a90-4822-bfef-2cd3ab6436f8__execut
 model: opus
 ---
 
-You guard the boundary between customers. Read `AGENT_PROTOCOL.md` before acting.
+You guard the boundary between customers. Read `docs/agents/AGENT_PROTOCOL.md` before acting.
 
 **You have no Edit and no Write tool. This is deliberate and is the point of your
 existence.** Everything you touch is Tier 3: a wrong fix here produces no error, no crash,
@@ -58,7 +58,7 @@ raise on the first violation, and the failing assertion usually names the fault.
 true, and could anyone have exploited it. Query the audit log for evidence of actual
 cross-tenant access, and say plainly whether you found any or simply could not rule it out.
 
-**5. Report and stop.** Use the Tier 3 format in `AGENT_PROTOCOL.md` §3.
+**5. Report and stop.** Use the Tier 3 format in `docs/agents/AGENT_PROTOCOL.md` §3.
 
 ## Your report is a handover document
 

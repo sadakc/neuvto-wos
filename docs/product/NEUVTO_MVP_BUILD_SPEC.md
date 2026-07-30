@@ -67,7 +67,7 @@ These override the source docs where they conflict. Deviations are deliberate an
 | D24 | **AI seams defined, no AI infrastructure built.** If retrieval is ever needed it is `pgvector` in the same database — never a separate vector service.                                 | Principle 6 anticipates AI; Principle 5 forbids building it with no consumer                                                       |
 | D25 | **Analytics events stored in-database**, not sent to a third-party SaaS.                                                                                                               | Not in any source doc — avoids adding a processor holding employee behavioural data                                                |
 
-**Companion standards:** `standards/NEUVTO_DATA_STANDARDS.md` (D16–D19, D23) ·
+**Companion standards:** `docs/standards/NEUVTO_DATA_STANDARDS.md` (D16–D19, D23) ·
 `NEUVTO_SECURITY_POLICY.md` (D20–D22) · `NEUVTO_ANALYTICS.md` (D25) · `NEUVTO_AI_SEAMS.md` (D24)
 
 ### Contracts first
@@ -153,7 +153,7 @@ deleted_at timestamptz
 ```
 
 Maintained by the `set_audit_fields()` trigger. `audit_logs` is exempt — insert-only, and
-already carries actor and timestamp. Full rules in `standards/NEUVTO_DATA_STANDARDS.md`.
+already carries actor and timestamp. Full rules in `docs/standards/NEUVTO_DATA_STANDARDS.md`.
 
 **`analytics_events`** — `id`, `organization_id`, `user_id`, `event text`, `properties jsonb`,
 `occurred_at`. Org-scoped under RLS, retained 90 days (D25).
@@ -394,9 +394,10 @@ Subscribes to `approval.completed` for `entity_type = 'leave_request'`:
 
 ## Build sequence
 
-**Progress as of 29 Jul 2026:** steps 0 and 1 are merged to `main`. Phase 0 carries 24 RLS
-assertions and 5 invariants, passing locally and in CI, and the suite is verified
-non-vacuous — removing a tenant filter fails it immediately.
+**Progress as of 30 Jul 2026:** steps 0 through 4 are merged to `main` and applied to Lovable
+Cloud. The harness carries 78 RLS assertions and the invariant suite, passing locally and in
+CI, and is verified non-vacuous — removing a tenant filter fails it immediately. Step 5 is
+next.
 
 | Status   | Step | Content                                                                       | Gate                                                                                                     |
 | -------- | ---- | ----------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
@@ -512,7 +513,7 @@ Not blockers for the MVP, but unowned. Recorded so they are decisions rather tha
 | Gap                                                  | Why it matters                                                                                                                                                                                                      | When                             |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------- |
 | **Billing / subscription model**                     | No document defines how customers pay. Per-employee/month is the obvious shape but nothing is specified.                                                                                                            | Before first paying customer     |
-| **Verified email sending domain**                    | Resend needs DNS records on a real domain. Sending from a shared domain lands in spam, which silently breaks the entire approval loop.                                                                              | Before step 5                    |
+| **Verified email sending domain**                    | Resolved 30 Jul 2026 — `neuvto.com` is registered. DNS records still to be added in Resend before notifications can deliver. See `docs/operations/EMAIL_AND_DOMAINS.md`.                                            | During step 5                    |
 | **Terms, Privacy Policy, DPA**                       | B2B buyers ask for a DPA at contract. India's **DPDP Act 2023** applies alongside the GDPR claim in `03` §Compliance.                                                                                               | Before first customer            |
 | **Error monitoring**                                 | No Sentry or equivalent. Production failures will be invisible.                                                                                                                                                     | At cutover                       |
 | **Customer data export**                             | `03` §Compliance promises it; DPDP and GDPR both require portability.                                                                                                                                               | Before first customer            |

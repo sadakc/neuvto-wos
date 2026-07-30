@@ -61,7 +61,7 @@ begin
   insert into public.organization_modules (organization_id, module_key, enabled, enabled_at)
   values (v_org, 'leave', true, now());
 
-  -- Activation funnel starts here (see standards/NEUVTO_ANALYTICS.md).
+  -- Activation funnel starts here (see docs/standards/NEUVTO_ANALYTICS.md).
   insert into public.analytics_events (organization_id, user_id, event, properties)
   values (v_org, v_uid, 'organization.created', jsonb_build_object('slug', lower(btrim(p_slug))));
 
