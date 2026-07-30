@@ -28,7 +28,7 @@ export const SubmitLeaveInput = z
     leaveTypeId: z.string().uuid("Choose a leave type"),
     fromDate: isoDate,
     toDate: isoDate,
-    reason: z.string().trim().max(1000, "Reason is too long").optional(),
+    reason: z.string().trim().max(500, "Keep the reason under 500 characters").optional(),
   })
   .refine((v) => v.toDate >= v.fromDate, {
     message: "The end date cannot be before the start date",
@@ -57,6 +57,14 @@ export interface LeaveBalance {
   reservedDays: number;
   pendingDays: number;
   availableDays: number;
+}
+
+export interface ApprovalStep {
+  level: number;
+  approverName: string;
+  decision: "pending" | "approved" | "rejected";
+  comments: string | null;
+  decidedAt: string | null;
 }
 
 export interface LeaveRequest {
@@ -89,6 +97,10 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   NO_WORKING_DAYS: "Those dates are all weekend or holiday — there's nothing to book.",
   OVERLAPPING_REQUEST: "You already have leave booked over some of those dates.",
   EXCEEDS_MAX_PER_REQUEST: "That's more days than this leave type allows in one request.",
+  NOT_YOUR_REQUEST: "That request isn't yours to cancel.",
+  ALREADY_DECIDED: "This request has already been settled and can't be cancelled.",
+  CANCEL_TOO_LATE:
+    "This leave has already started, so it can't be cancelled here. Speak to your manager.",
   APPROVER_UNRESOLVED:
     "There's nobody set up to approve this. Ask your administrator to assign a manager.",
 };

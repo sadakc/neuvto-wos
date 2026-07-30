@@ -12,6 +12,7 @@ export {
   getEnabledModules,
   getModuleNavigation,
   resolveModuleRoute,
+  getDashboardCards,
 } from "./registry";
 
 export {
@@ -19,4 +20,7 @@ export {
   type ModuleDefinition,
   type ModuleNavItem,
   type ModuleRoute,
+  type ModuleDashboardCard,
 } from "./contract";
+
+export { ModuleLink } from "./ModuleLink";

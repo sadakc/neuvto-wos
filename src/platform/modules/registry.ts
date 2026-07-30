@@ -13,7 +13,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import type { CurrentUser } from "@/platform/auth";
-import { ModuleDefinitionSchema, type ModuleDefinition, type ModuleNavItem } from "./contract";
+import {
+  ModuleDefinitionSchema,
+  type ModuleDefinition,
+  type ModuleDashboardCard,
+  type ModuleNavItem,
+} from "./contract";
 
 let installed: readonly ModuleDefinition[] = [];
 
@@ -104,6 +109,23 @@ export async function getModuleNavigation(user: CurrentUser | null): Promise<Mod
       return item.roles.some((r) => user?.roles.includes(r));
     }),
   );
+}
+
+/**
+ * Dashboard cards from enabled modules, for this user, in declared order.
+ *
+ * A module that contributes none is simply absent — the dashboard must not
+ * render an empty frame for it, and must still work when no module is enabled
+ * at all. That last case is what the module-removal check exercises.
+ */
+export async function getDashboardCards(
+  user: CurrentUser | null,
+): Promise<(ModuleDashboardCard & { moduleKey: string })[]> {
+  const enabled = await getEnabledModules();
+
+  return enabled
+    .flatMap((m) => (m.dashboardCards?.(user) ?? []).map((card) => ({ ...card, moduleKey: m.key })))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
 /** Resolves a path below /app to the module route that serves it, if any. */

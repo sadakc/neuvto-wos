@@ -20,14 +20,27 @@ export const leave: ModuleDefinition = {
   version: "1.0.0",
 
   navigation: () => [
+    { label: "Apply", to: "/app/leave/apply" },
     { label: "My leave", to: "/app/leave" },
-    // Destinations arriving in steps 7 and 8. Declared here rather than in a
-    // shared navigation file, so the module owns its own roadmap.
-    { label: "Apply", soon: "step 7" },
+    { label: "Calendar", to: "/app/leave/calendar" },
+    // Arrives in step 8. Declared here rather than in a shared navigation file,
+    // so the module owns its own roadmap.
     { label: "Approvals", soon: "step 8", roles: ["manager", "hr_admin", "org_admin"] },
   ],
 
-  routes: [{ path: "leave", component: lazy(() => import("./components/MyLeave")) }],
+  routes: [
+    { path: "leave", component: lazy(() => import("./components/MyLeave")) },
+    { path: "leave/apply", component: lazy(() => import("./components/ApplyLeave")) },
+    { path: "leave/calendar", component: lazy(() => import("./components/LeaveCalendar")) },
+  ],
+
+  dashboardCards: () => [
+    {
+      id: "leave-balance",
+      component: lazy(() => import("./components/LeaveDashboardCard")),
+      order: 10,
+    },
+  ],
 
   // Registered with the Approval Engine, which knows nothing about leave and
   // would happily let a second module claim the same string.
@@ -51,4 +64,5 @@ export {
   type LeaveStatus,
   type LeaveBalance,
   type LeaveRequest,
+  type ApprovalStep,
 } from "./contracts";

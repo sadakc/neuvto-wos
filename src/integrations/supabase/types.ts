@@ -1255,6 +1255,7 @@ export type Database = {
       is_approver_on: { Args: { _request_id: string }; Returns: boolean }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
+      leave_cancel: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_balances: { Args: { _org_id: string }; Returns: number }
       leave_submit: {
         Args: {

@@ -26,6 +26,12 @@
   --color-muted-foreground: var(--muted-foreground);
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
+  --color-leave-approved: var(--leave-approved);
+  --color-leave-approved-foreground: var(--leave-approved-foreground);
+  --color-leave-approved-muted: var(--leave-approved-muted);
+  --color-leave-pending: var(--leave-pending);
+  --color-leave-pending-foreground: var(--leave-pending-foreground);
+  --color-leave-pending-muted: var(--leave-pending-muted);
   --color-destructive: var(--destructive);
   --color-destructive-foreground: var(--destructive-foreground);
   --color-border: var(--border);
@@ -60,6 +66,17 @@
   --accent-foreground: oklch(0.15 0 0);
   /* Red #EF4444 */
   --destructive: oklch(0.63 0.23 27);
+  /* Leave status. Semantic, not "blue" and "yellow" — the design system's one
+     rule, and what makes per-organisation theming additive later (D15). The
+     PRD asks for blue for approved and yellow for pending; these are those
+     hues, named for what they mean. */
+  --leave-approved: oklch(0.62 0.16 250);
+  --leave-approved-foreground: oklch(1 0 0);
+  --leave-approved-muted: oklch(0.94 0.04 250);
+  --leave-pending: oklch(0.76 0.15 85);
+  --leave-pending-foreground: oklch(0.25 0.05 85);
+  --leave-pending-muted: oklch(0.96 0.06 85);
+
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(0.92 0.005 240);
   --input: oklch(0.92 0.005 240);
@@ -84,6 +101,14 @@
   --accent: oklch(0.22 0 0);
   --accent-foreground: oklch(0.98 0 0);
   --destructive: oklch(0.63 0.23 27);
+  /* Same meanings, adjusted for a dark surface. */
+  --leave-approved: oklch(0.66 0.15 250);
+  --leave-approved-foreground: oklch(0.16 0.02 250);
+  --leave-approved-muted: oklch(0.3 0.06 250);
+  --leave-pending: oklch(0.78 0.14 85);
+  --leave-pending-foreground: oklch(0.2 0.04 85);
+  --leave-pending-muted: oklch(0.32 0.06 85);
+
   --destructive-foreground: oklch(1 0 0);
   --border: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 15%);

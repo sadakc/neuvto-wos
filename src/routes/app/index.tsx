@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, canApprove, type CurrentUser } from "@/platform/auth";
+import { getDashboardCards, type ModuleDashboardCard } from "@/platform/modules";
 
 export const Route = createFileRoute("/app/")({
   ssr: false,
@@ -17,12 +18,30 @@ const ROLE_LABELS: Record<string, string> = {
 
 function Dashboard() {
   const [user, setUser] = useState<CurrentUser | null>(null);
+  const [cards, setCards] = useState<(ModuleDashboardCard & { moduleKey: string })[]>([]);
 
   useEffect(() => {
     getCurrentUser()
       .then(setUser)
       .catch(() => setUser(null));
   }, []);
+
+  // Contributed by whatever modules this organisation has enabled. This file
+  // names none of them — it used to hardcode a Leave Management panel, which is
+  // the coupling the module contract exists to remove.
+  useEffect(() => {
+    let cancelled = false;
+    getDashboardCards(user)
+      .then((c) => {
+        if (!cancelled) setCards(c);
+      })
+      .catch(() => {
+        if (!cancelled) setCards([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
 
   return (
     <div className="mx-auto max-w-3xl">
@@ -35,31 +54,32 @@ function Dashboard() {
           : "Loading your access…"}
       </p>
 
-      {/* Honest empty state: the module is enabled but not built. Saying so is
-          better than a fake dashboard with placeholder numbers on it. */}
-      <section className="mt-8 rounded-lg border border-border bg-card p-6">
-        <h2 className="font-display text-base font-semibold">Leave Management</h2>
-        <p className="mt-2 max-w-prose text-sm text-muted-foreground">
-          Enabled for {user?.organizationName ?? "your workspace"}, and being built now. Applying
-          for leave and approvals arrive in the next steps; balances follow once the leave module
-          lands.
-        </p>
-        <dl className="mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {[
-            { term: "Employees", detail: "Import arrives with member management" },
-            { term: "Leave types", detail: "Configurable per organisation" },
-            { term: "Approvals", detail: "Chains are configuration, not code" },
-          ].map((item) => (
-            <div key={item.term}>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">{item.term}</dt>
-              <dd className="mt-1 font-display text-2xl font-semibold tabular-nums text-muted-foreground/50">
-                —
-              </dd>
-              <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
-            </div>
-          ))}
-        </dl>
-      </section>
+      {cards.length > 0 ? (
+        <div className="mt-8 space-y-4">
+          {cards.map((card) => {
+            const Card = card.component;
+            return (
+              <Suspense
+                key={`${card.moduleKey}:${card.id}`}
+                fallback={<div className="h-28 animate-pulse rounded-lg bg-muted" />}
+              >
+                <Card />
+              </Suspense>
+            );
+          })}
+        </div>
+      ) : (
+        /* Honest about being empty rather than showing placeholder numbers.
+           This is also the state the application is in when every module has
+           been removed, which the module-removal check exercises. */
+        <section className="mt-8 rounded-lg border border-border bg-card p-6">
+          <h2 className="font-display text-base font-semibold">Nothing here yet</h2>
+          <p className="mt-2 max-w-prose text-sm text-muted-foreground">
+            No modules are switched on for {user?.organizationName ?? "your workspace"} yet. An
+            administrator turns them on, and what you can do here appears.
+          </p>
+        </section>
+      )}
 
       {isAdmin(user) && (
         <p className="mt-6 text-sm text-muted-foreground">

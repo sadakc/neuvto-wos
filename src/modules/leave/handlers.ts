@@ -18,6 +18,7 @@ import {
   type LeaveBalance,
   type LeaveRequest,
   type LeaveStatus,
+  type ApprovalStep,
 } from "./contracts";
 
 /**
@@ -91,6 +92,41 @@ export async function getMyRequests(): Promise<LeaveRequest[]> {
     submittedAt: r.submitted_at,
     decidedAt: r.decided_at,
     rejectionReason: r.rejection_reason,
+  }));
+}
+
+/**
+ * Cancels own future leave. The database decides whether it is allowed and
+ * returns a named reason if not — this never pre-judges, because a rule
+ * duplicated in the browser is a rule that will one day disagree.
+ */
+export async function cancelLeave(requestId: string): Promise<void> {
+  const { error } = await supabase.rpc("leave_cancel", { _request_id: requestId });
+  if (error) throw toLeaveError(error.message);
+}
+
+/**
+ * Who has to approve, who already has, and what they said. Employees can read
+ * their own steps — `is_requester_of` in the approval engine's policy — so this
+ * needs no special privilege.
+ */
+export async function getApprovalTimeline(approvalRequestId: string): Promise<ApprovalStep[]> {
+  const { data, error } = await supabase
+    .from("approval_steps")
+    .select(
+      "level, decision, comments, decided_at, profiles!approval_steps_approver_id_fkey(full_name)",
+    )
+    .eq("approval_request_id", approvalRequestId)
+    .order("level");
+
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the approval history.", 500);
+
+  return (data ?? []).map((r) => ({
+    level: r.level,
+    approverName: (r.profiles as { full_name: string | null } | null)?.full_name ?? "Approver",
+    decision: r.decision as ApprovalStep["decision"],
+    comments: r.comments,
+    decidedAt: r.decided_at,
   }));
 }
 
