@@ -27,7 +27,11 @@ export default defineConfig({
   },
   test: {
     environment: "node",
-    include: ["src/**/*.{test,spec}.{ts,tsx}"],
+    // `scripts/` is included deliberately. The guardrail scripts that decide
+    // what may merge need tests more than most application code does, and an
+    // src-only pattern silently skipped them — a suite of tests that never runs
+    // is worse than none, because it reads as coverage.
+    include: ["src/**/*.{test,spec}.{ts,tsx}", "scripts/**/*.{test,spec}.{ts,tsx}"],
     server: {
       deps: {
         // Force zod through Vite's transform so the ESM build is used.

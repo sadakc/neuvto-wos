@@ -153,7 +153,9 @@ It duplicated the Notification Engine finished hours earlier, and it violated
 meant rebuilding email _and_ moving DNS. It also left `main` failing lint, which
 is how it was noticed — nothing else would have caught it.
 
-Reverted in #14; the Notification Engine stays.
+Reverted in #14; the Notification Engine stays. Lovable's changes are now gated
+on authorship before they can merge — see
+[REVIEWING_LOVABLE_CHANGES.md](REVIEWING_LOVABLE_CHANGES.md).
 
 ### What this costs
 

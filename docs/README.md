@@ -57,13 +57,14 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 
 ### [operations/](operations/)
 
-| File                                                              | Covers                                                                                      |
-| ----------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)           | running locally, and the `.env` trap that points at the shared database                     |
-| [DEPLOYMENT.md](operations/DEPLOYMENT.md)                         | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud     |
-| [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)           | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives |
-| [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md) | what a real customer must do to go live — and every gap that stops them                     |
-| [AUTOSAVE.md](operations/AUTOSAVE.md)                             | why work reaches git on its own, and the credential guard that stops it doing harm          |
+| File                                                                    | Covers                                                                                      |
+| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
+| [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                     |
+| [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud     |
+| [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives |
+| [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                     |
+| [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm          |
+| [REVIEWING_LOVABLE_CHANGES.md](operations/REVIEWING_LOVABLE_CHANGES.md) | what Lovable may never do, what needs your approval, and why it is not CODEOWNERS           |
 
 ### [agents/](agents/)
 

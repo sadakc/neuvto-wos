@@ -1,0 +1,35 @@
+# Who owns what.
+#
+# DOCUMENTATION AND A REVIEWER HINT — NOT A MERGE GATE.
+#
+# This file is deliberately NOT wired to `require_code_owner_reviews`. GitHub
+# forbids a pull request author approving their own, and @sadakc is the only
+# owner: a path rule on supabase/ would make our own migration PRs require his
+# approval *and* be unapprovable by him. Permanently unmergeable, with no admin
+# bypass now that enforce_admins is on.
+#
+# Lovable's changes are gated instead by commit authorship, in the `lovable-gate`
+# CI job. See docs/operations/REVIEWING_LOVABLE_CHANGES.md.
+#
+# If a second maintainer ever joins, wiring this up becomes viable — and worth
+# revisiting.
+
+# Everything, by default.
+*                           @sadakc
+
+# Schema. Changes here are irreversible in a way application code is not.
+/supabase/                  @sadakc
+
+# The checks, and the scripts they run. Must not be edited by what they check.
+/.github/                   @sadakc
+/scripts/                   @sadakc
+
+# Shared services every module depends on.
+/src/platform/              @sadakc
+
+# The only file outside a module that may name one.
+/src/modules/registry.ts    @sadakc
+
+# The rules themselves.
+/AGENTS.md                  @sadakc
+/docs/standards/            @sadakc
