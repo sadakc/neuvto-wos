@@ -36,7 +36,10 @@ if [ ${#MODULES[@]} -eq 0 ]; then
 fi
 
 cp -R "$MODULES_DIR" "$WORK/modules-backup"
-ORIGINAL_REGISTRY=$(cat "$REGISTRY")
+# Copied, not read into a variable: $(cat) strips the trailing newline and
+# printf puts back whatever you tell it to, so the round trip silently
+# reformats the file and prettier then fails on a file nobody edited.
+cp "$REGISTRY" "$WORK/registry-original.ts"
 failed=()
 
 restore() {
@@ -77,7 +80,7 @@ PY
   fi
 
   restore
-  printf '%s' "$ORIGINAL_REGISTRY" > "$REGISTRY"
+  cp "$WORK/registry-original.ts" "$REGISTRY"
 done
 
 if [ ${#failed[@]} -gt 0 ]; then
