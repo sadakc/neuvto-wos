@@ -1,0 +1,16 @@
+{
+  "hooks": {
+    "Stop": [
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash scripts/autosave.sh",
+            "timeout": 60
+          }
+        ]
+      }
+    ]
+  }
+}
