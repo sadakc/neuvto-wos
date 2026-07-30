@@ -63,6 +63,7 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 | [DEPLOYMENT.md](operations/DEPLOYMENT.md)                         | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud     |
 | [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)           | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives |
 | [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md) | what a real customer must do to go live — and every gap that stops them                     |
+| [AUTOSAVE.md](operations/AUTOSAVE.md)                             | why work reaches git on its own, and the credential guard that stops it doing harm          |
 
 ### [agents/](agents/)
 
