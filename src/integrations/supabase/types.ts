@@ -7,30 +7,10 @@ export type Json =
   | Json[]
 
 export type Database = {
-  graphql_public: {
-    Tables: {
-      [_ in never]: never
-    }
-    Views: {
-      [_ in never]: never
-    }
-    Functions: {
-      graphql: {
-        Args: {
-          extensions?: Json
-          operationName?: string
-          query?: string
-          variables?: Json
-        }
-        Returns: Json
-      }
-    }
-    Enums: {
-      [_ in never]: never
-    }
-    CompositeTypes: {
-      [_ in never]: never
-    }
+  // Allows to automatically instantiate createClient with right options
+  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
+  __InternalSupabase: {
+    PostgrestVersion: "14.5"
   }
   public: {
     Tables: {
@@ -62,6 +42,207 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "analytics_events_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_chains: {
+        Row: {
+          approver_role: Database["public"]["Enums"]["app_role"] | null
+          approver_rule: Database["public"]["Enums"]["approver_rule"]
+          condition_field: string | null
+          condition_op: string | null
+          condition_value: number | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          entity_type: string
+          escalate_after_days: number | null
+          id: string
+          level: number
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approver_role?: Database["public"]["Enums"]["app_role"] | null
+          approver_rule: Database["public"]["Enums"]["approver_rule"]
+          condition_field?: string | null
+          condition_op?: string | null
+          condition_value?: number | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entity_type: string
+          escalate_after_days?: number | null
+          id?: string
+          level: number
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approver_role?: Database["public"]["Enums"]["app_role"] | null
+          approver_rule?: Database["public"]["Enums"]["approver_rule"]
+          condition_field?: string | null
+          condition_op?: string | null
+          condition_value?: number | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          entity_type?: string
+          escalate_after_days?: number | null
+          id?: string
+          level?: number
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_chains_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_requests: {
+        Row: {
+          completed_at: string | null
+          context: Json
+          created_at: string
+          created_by: string | null
+          current_level: number
+          deleted_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          organization_id: string
+          requester_id: string
+          required_levels: number
+          status: Database["public"]["Enums"]["approval_status"]
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          context?: Json
+          created_at?: string
+          created_by?: string | null
+          current_level: number
+          deleted_at?: string | null
+          entity_id: string
+          entity_type: string
+          id?: string
+          organization_id: string
+          requester_id: string
+          required_levels: number
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          context?: Json
+          created_at?: string
+          created_by?: string | null
+          current_level?: number
+          deleted_at?: string | null
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          organization_id?: string
+          requester_id?: string
+          required_levels?: number
+          status?: Database["public"]["Enums"]["approval_status"]
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_requests_requester_id_fkey"
+            columns: ["requester_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      approval_steps: {
+        Row: {
+          approval_request_id: string
+          approver_id: string
+          comments: string | null
+          created_at: string
+          created_by: string | null
+          decided_at: string | null
+          decision: Database["public"]["Enums"]["approval_decision"]
+          deleted_at: string | null
+          id: string
+          level: number
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approval_request_id: string
+          approver_id: string
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["approval_decision"]
+          deleted_at?: string | null
+          id?: string
+          level: number
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approval_request_id?: string
+          approver_id?: string
+          comments?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          decision?: Database["public"]["Enums"]["approval_decision"]
+          deleted_at?: string | null
+          id?: string
+          level?: number
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_steps_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_approver_id_fkey"
+            columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -303,6 +484,137 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      notification_templates: {
+        Row: {
+          body_template: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          event_key: string
+          id: string
+          is_active: boolean
+          organization_id: string | null
+          subject_template: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          body_template: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          event_key: string
+          id?: string
+          is_active?: boolean
+          organization_id?: string | null
+          subject_template: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          body_template?: string
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          event_key?: string
+          id?: string
+          is_active?: boolean
+          organization_id?: string | null
+          subject_template?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_templates_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notifications: {
+        Row: {
+          attempts: number
+          body: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          event_key: string
+          failed_reason: string | null
+          id: string
+          organization_id: string
+          payload: Json
+          read_at: string | null
+          recipient_id: string
+          sent_at: string | null
+          status: Database["public"]["Enums"]["notification_status"]
+          subject: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          attempts?: number
+          body: string
+          channel: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          event_key: string
+          failed_reason?: string | null
+          id?: string
+          organization_id: string
+          payload?: Json
+          read_at?: string | null
+          recipient_id: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status"]
+          subject: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          attempts?: number
+          body?: string
+          channel?: Database["public"]["Enums"]["notification_channel"]
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          event_key?: string
+          failed_reason?: string | null
+          id?: string
+          organization_id?: string
+          payload?: Json
+          read_at?: string | null
+          recipient_id?: string
+          sent_at?: string | null
+          status?: Database["public"]["Enums"]["notification_status"]
+          subject?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notifications_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notifications_recipient_id_fkey"
+            columns: ["recipient_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       organization_modules: {
         Row: {
@@ -587,12 +899,60 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      approval_decide: {
+        Args: {
+          _comments?: string
+          _decision: Database["public"]["Enums"]["approval_decision"]
+          _request_id: string
+        }
+        Returns: Database["public"]["Enums"]["approval_status"]
+      }
+      approval_pending_for: {
+        Args: { _user_id?: string }
+        Returns: {
+          completed_at: string | null
+          context: Json
+          created_at: string
+          created_by: string | null
+          current_level: number
+          deleted_at: string | null
+          entity_id: string
+          entity_type: string
+          id: string
+          organization_id: string
+          requester_id: string
+          required_levels: number
+          status: Database["public"]["Enums"]["approval_status"]
+          updated_at: string
+          updated_by: string | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "approval_requests"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      approval_submit: {
+        Args: { _context?: Json; _entity_id: string; _entity_type: string }
+        Returns: string
+      }
       assert_own_org: { Args: { _org_id: string }; Returns: undefined }
       calculate_working_days: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: number
       }
+      chain_condition_matches: {
+        Args: { _context: Json; _field: string; _op: string; _value: number }
+        Returns: boolean
+      }
       current_org_id: { Args: never; Returns: string }
+      emit_platform_event: {
+        Args: { _event_key: string; _payload: Json }
+        Returns: undefined
+      }
+      ensure_system_notification_templates: { Args: never; Returns: undefined }
+      escape_html: { Args: { _text: string }; Returns: string }
       get_financial_year: {
         Args: { _org_id: string; _ref?: string }
         Returns: string
@@ -605,9 +965,49 @@ export type Database = {
         Returns: boolean
       }
       is_admin: { Args: never; Returns: boolean }
+      is_approver_on: { Args: { _request_id: string }; Returns: boolean }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
+      is_requester_of: { Args: { _request_id: string }; Returns: boolean }
       module_enabled: { Args: { _module_key: string }; Returns: boolean }
+      notification_claim_batch: {
+        Args: { _limit?: number }
+        Returns: {
+          body: string
+          event_key: string
+          id: string
+          organization_id: string
+          recipient_email: string
+          recipient_name: string
+          subject: string
+        }[]
+      }
+      notification_mark_failed: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
+      notification_mark_sent: { Args: { _id: string }; Returns: undefined }
+      notify: {
+        Args: { _event_key: string; _payload: Json; _recipient_id: string }
+        Returns: string
+      }
       org_today: { Args: { _org_id: string }; Returns: string }
+      render_template: {
+        Args: { _payload: Json; _template: string }
+        Returns: string
+      }
+      resolve_approver: {
+        Args: {
+          _org_id: string
+          _requester_id: string
+          _role: Database["public"]["Enums"]["app_role"]
+          _rule: Database["public"]["Enums"]["approver_rule"]
+        }
+        Returns: string
+      }
+      resolve_notification_recipients: {
+        Args: { _event_key: string; _payload: Json }
+        Returns: string[]
+      }
       signup_organization: {
         Args: { p_full_name: string; p_org_name: string; p_slug: string }
         Returns: string
@@ -615,6 +1015,11 @@ export type Database = {
     }
     Enums: {
       app_role: "org_admin" | "hr_admin" | "manager" | "employee"
+      approval_decision: "pending" | "approved" | "rejected"
+      approval_status: "pending" | "approved" | "rejected" | "cancelled"
+      approver_rule: "reporting_manager" | "manager_of_manager" | "role"
+      notification_channel: "email" | "in_app"
+      notification_status: "pending" | "sent" | "failed"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -740,13 +1145,14 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
-  graphql_public: {
-    Enums: {},
-  },
   public: {
     Enums: {
       app_role: ["org_admin", "hr_admin", "manager", "employee"],
+      approval_decision: ["pending", "approved", "rejected"],
+      approval_status: ["pending", "approved", "rejected", "cancelled"],
+      approver_rule: ["reporting_manager", "manager_of_manager", "role"],
+      notification_channel: ["email", "in_app"],
+      notification_status: ["pending", "sent", "failed"],
     },
   },
 } as const
-
