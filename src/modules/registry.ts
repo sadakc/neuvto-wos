@@ -15,5 +15,6 @@
  */
 
 import type { ModuleDefinition } from "@/platform/modules";
+import { leave } from "./leave";
 
-export const MODULES: readonly ModuleDefinition[] = [];
+export const MODULES: readonly ModuleDefinition[] = [leave];

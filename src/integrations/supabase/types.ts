@@ -7,10 +7,30 @@ export type Json =
   | Json[]
 
 export type Database = {
-  // Allows to automatically instantiate createClient with right options
-  // instead of createClient<Database, { PostgrestVersion: 'XX' }>(URL, KEY)
-  __InternalSupabase: {
-    PostgrestVersion: "14.5"
+  graphql_public: {
+    Tables: {
+      [_ in never]: never
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      graphql: {
+        Args: {
+          extensions?: Json
+          operationName?: string
+          query?: string
+          variables?: Json
+        }
+        Returns: Json
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
   }
   public: {
     Tables: {
@@ -417,6 +437,236 @@ export type Database = {
           },
         ]
       }
+      leave_balances: {
+        Row: {
+          available_days: number | null
+          carryforward_days: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          employee_id: string
+          entitled_days: number
+          fy_label: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          pending_days: number
+          reserved_days: number
+          updated_at: string
+          updated_by: string | null
+          used_days: number
+        }
+        Insert: {
+          available_days?: number | null
+          carryforward_days?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          employee_id: string
+          entitled_days?: number
+          fy_label: string
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          pending_days?: number
+          reserved_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          used_days?: number
+        }
+        Update: {
+          available_days?: number | null
+          carryforward_days?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          employee_id?: string
+          entitled_days?: number
+          fy_label?: string
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          pending_days?: number
+          reserved_days?: number
+          updated_at?: string
+          updated_by?: string | null
+          used_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_balances_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_balances_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_balances_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_requests: {
+        Row: {
+          approval_request_id: string | null
+          created_at: string
+          created_by: string | null
+          decided_at: string | null
+          deleted_at: string | null
+          employee_id: string
+          from_date: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          reason: string | null
+          rejection_reason: string | null
+          status: Database["public"]["Enums"]["leave_status"]
+          submitted_at: string | null
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+          working_days: number
+        }
+        Insert: {
+          approval_request_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          deleted_at?: string | null
+          employee_id: string
+          from_date: string
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          reason?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["leave_status"]
+          submitted_at?: string | null
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+          working_days: number
+        }
+        Update: {
+          approval_request_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          decided_at?: string | null
+          deleted_at?: string | null
+          employee_id?: string
+          from_date?: string
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          reason?: string | null
+          rejection_reason?: string | null
+          status?: Database["public"]["Enums"]["leave_status"]
+          submitted_at?: string | null
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+          working_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_requests_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_types: {
+        Row: {
+          approval_required: boolean
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          description: string | null
+          id: string
+          max_days_per_year: number
+          max_per_request: number | null
+          min_notice_days: number | null
+          name: string
+          organization_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approval_required?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          max_days_per_year?: number
+          max_per_request?: number | null
+          min_notice_days?: number | null
+          name: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approval_required?: boolean
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          description?: string | null
+          id?: string
+          max_days_per_year?: number
+          max_per_request?: number | null
+          min_notice_days?: number | null
+          name?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_settings: {
         Row: {
           created_at: string
@@ -549,6 +799,8 @@ export type Database = {
           event_key: string
           failed_reason: string | null
           id: string
+          last_error: string | null
+          next_attempt_at: string
           organization_id: string
           payload: Json
           read_at: string | null
@@ -569,6 +821,8 @@ export type Database = {
           event_key: string
           failed_reason?: string | null
           id?: string
+          last_error?: string | null
+          next_attempt_at?: string
           organization_id: string
           payload?: Json
           read_at?: string | null
@@ -589,6 +843,8 @@ export type Database = {
           event_key?: string
           failed_reason?: string | null
           id?: string
+          last_error?: string | null
+          next_attempt_at?: string
           organization_id?: string
           payload?: Json
           read_at?: string | null
@@ -938,6 +1194,10 @@ export type Database = {
         Returns: string
       }
       assert_own_org: { Args: { _org_id: string }; Returns: undefined }
+      calculate_entitlement: {
+        Args: { _employee_id: string; _fy: string; _leave_type_id: string }
+        Returns: number
+      }
       calculate_working_days: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: number
@@ -950,6 +1210,33 @@ export type Database = {
       emit_platform_event: {
         Args: { _event_key: string; _payload: Json }
         Returns: undefined
+      }
+      ensure_balance: {
+        Args: { _employee_id: string; _fy: string; _leave_type_id: string }
+        Returns: {
+          available_days: number | null
+          carryforward_days: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          employee_id: string
+          entitled_days: number
+          fy_label: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          pending_days: number
+          reserved_days: number
+          updated_at: string
+          updated_by: string | null
+          used_days: number
+        }
+        SetofOptions: {
+          from: "*"
+          to: "leave_balances"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       ensure_system_notification_templates: { Args: never; Returns: undefined }
       escape_html: { Args: { _text: string }; Returns: string }
@@ -968,6 +1255,16 @@ export type Database = {
       is_approver_on: { Args: { _request_id: string }; Returns: boolean }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
+      leave_mature_balances: { Args: { _org_id: string }; Returns: number }
+      leave_submit: {
+        Args: {
+          _from_date: string
+          _leave_type_id: string
+          _reason?: string
+          _to_date: string
+        }
+        Returns: string
+      }
       module_enabled: { Args: { _module_key: string }; Returns: boolean }
       notification_claim_batch: {
         Args: { _limit?: number }
@@ -985,7 +1282,12 @@ export type Database = {
         Args: { _id: string; _reason: string }
         Returns: undefined
       }
+      notification_mark_retry: {
+        Args: { _id: string; _reason: string }
+        Returns: undefined
+      }
       notification_mark_sent: { Args: { _id: string }; Returns: undefined }
+      notification_max_attempts: { Args: never; Returns: number }
       notify: {
         Args: { _event_key: string; _payload: Json; _recipient_id: string }
         Returns: string
@@ -1018,6 +1320,12 @@ export type Database = {
       approval_decision: "pending" | "approved" | "rejected"
       approval_status: "pending" | "approved" | "rejected" | "cancelled"
       approver_rule: "reporting_manager" | "manager_of_manager" | "role"
+      leave_status:
+        | "draft"
+        | "pending_approval"
+        | "approved"
+        | "rejected"
+        | "cancelled"
       notification_channel: "email" | "in_app"
       notification_status: "pending" | "sent" | "failed"
     }
@@ -1145,14 +1453,25 @@ export type CompositeTypes<
     : never
 
 export const Constants = {
+  graphql_public: {
+    Enums: {},
+  },
   public: {
     Enums: {
       app_role: ["org_admin", "hr_admin", "manager", "employee"],
       approval_decision: ["pending", "approved", "rejected"],
       approval_status: ["pending", "approved", "rejected", "cancelled"],
       approver_rule: ["reporting_manager", "manager_of_manager", "role"],
+      leave_status: [
+        "draft",
+        "pending_approval",
+        "approved",
+        "rejected",
+        "cancelled",
+      ],
       notification_channel: ["email", "in_app"],
       notification_status: ["pending", "sent", "failed"],
     },
   },
 } as const
+
