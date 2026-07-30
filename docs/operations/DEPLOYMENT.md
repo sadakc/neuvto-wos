@@ -16,6 +16,30 @@ build against a broken database.
 | **Lovable Cloud**     | `vkyvzhgigncranprhidn` | `neuvto.lovable.app` and `bun run dev` **without** `.env.local` | Real data — treat as shared    |
 | **`neuvto-wos-prod`** | ap-south-1 (Mumbai)    | nothing yet                                                     | Cutover target, still empty    |
 
+> ## ⚠️ The Supabase dashboard shows you the WRONG project
+>
+> Signing in at supabase.com shows **`udrzhfgwqgolvyimbwto` (neuvto-wos-prod)**,
+> because that is the only one in your own Supabase organisation. **It is empty
+> and nothing uses it** — 0 tables as of 30 Jul 2026.
+>
+> Everything real lives in **`vkyvzhgigncranprhidn`**, which belongs to
+> Lovable's organisation and therefore **never appears in your Supabase
+> dashboard at all**. Reach it through the Lovable project's own backend
+> settings.
+>
+> | You want             | Correct project        | Where to get it                              |
+> | -------------------- | ---------------------- | -------------------------------------------- |
+> | Service role key     | `vkyvzhgigncranprhidn` | Lovable → project → Cloud/Backend → API keys |
+> | Set `RESEND_API_KEY` | `vkyvzhgigncranprhidn` | Lovable → project → Cloud/Backend → secrets  |
+> | Run SQL              | `vkyvzhgigncranprhidn` | Lovable's database tool                      |
+>
+> This has already cost an afternoon once: a service role key copied from
+> `neuvto-wos-prod` was used against the function deployed on Lovable Cloud, and
+> the resulting `unauthorized` looked exactly like a broken function. **A key
+> from the wrong project is indistinguishable from a wrong key.** If something
+> returns 401, check which project the credential came from before changing any
+> code.
+
 Because production is empty and serving nobody, **Lovable Cloud is the
 pre-production environment** for the MVP. A dedicated staging project is created
 at cutover, when the Supabase Pro plan is needed anyway. The harness is written
