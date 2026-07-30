@@ -171,7 +171,7 @@ can.
 
 ## 7 · Instrumentation checklist per build step
 
-Each step in `NEUVTO_MVP_BUILD_SPEC.md` that ships a user-facing action:
+Each step in `docs/product/NEUVTO_MVP_BUILD_SPEC.md` that ships a user-facing action:
 
 - [ ] Which events from §4 does this step make possible?
 - [ ] Emitted from the handler, not the component

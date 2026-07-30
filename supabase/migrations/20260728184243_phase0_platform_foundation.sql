@@ -2,7 +2,7 @@
 -- NEUVTO WOS — Phase 0: Platform Layer (tenancy, identity, RBAC)
 --
 -- Build step 1. Creates no business module — only the platform every module
--- will consume. See NEUVTO_MVP_BUILD_SPEC.md "PHASE 0".
+-- will consume. See docs/product/NEUVTO_MVP_BUILD_SPEC.md "PHASE 0".
 --
 -- Gate for this migration: Org A cannot read one row of Org B through any
 -- query, as any role; and an employee cannot insert their own org_admin row.
@@ -66,7 +66,7 @@ create table public.organizations (
 -- ─────────────────────────────────────────────────────────── organization_settings
 -- Everything a customer might configure lives here as data. Nothing in this table
 -- may be hardcoded in application code — not the financial year, not the weekend,
--- not a threshold. See NEUVTO_MVP_BUILD_SPEC.md "Configuration, not code".
+-- not a threshold. See docs/product/NEUVTO_MVP_BUILD_SPEC.md "Configuration, not code".
 
 create table public.organization_settings (
   organization_id         uuid primary key references public.organizations(id) on delete cascade,
@@ -500,6 +500,6 @@ create policy "admins read events" on public.analytics_events
 comment on table public.organizations    is 'Tenants. Every business table carries organization_id.';
 comment on table public.user_roles       is 'D4 — roles live here, never on profiles.';
 comment on table public.modules          is 'Global module registry; per-tenant enablement in organization_modules.';
-comment on table public.analytics_events is 'D25 — in-database analytics; see standards/NEUVTO_ANALYTICS.md.';
+comment on table public.analytics_events is 'D25 — in-database analytics; see docs/standards/NEUVTO_ANALYTICS.md.';
 comment on column public.organization_settings.timezone is
   'D9 — all date comparisons resolve here, never against the server clock.';

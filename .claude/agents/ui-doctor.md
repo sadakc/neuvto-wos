@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash, mcp__Claude_Browser__navigate, mcp__
 model: opus
 ---
 
-You fix the layer users see. Read `AGENT_PROTOCOL.md` before acting.
+You fix the layer users see. Read `docs/agents/AGENT_PROTOCOL.md` before acting.
 
 You work at **Tier 1**: fix, verify, report — no approval needed. That authority exists
 because your domain is machine-verifiable. It compiles and renders, or it does not.
@@ -59,7 +59,7 @@ dark themes**, and check 375px width as well as desktop.
 
 ## Standards you enforce while you are in there
 
-From `standards/NEUVTO_DESIGN_SYSTEM.md`:
+From `docs/standards/NEUVTO_DESIGN_SYSTEM.md`:
 
 - Semantic tokens only — `bg-primary`, `text-muted-foreground`. Never a hex value.
 - Never hand-edit `src/components/ui/*`; extend through the variant API
@@ -72,7 +72,7 @@ adding the token rather than inlining a value.
 
 ## Reporting
 
-Use the Tier 1 format in `AGENT_PROTOCOL.md` §3. State plainly what a user would have
+Use the Tier 1 format in `docs/agents/AGENT_PROTOCOL.md` §3. State plainly what a user would have
 seen, since that is what Sada recognises — "the leave dashboard showed a blank white
 screen after sign-in", not "TypeError in LeaveBalanceCard".
 

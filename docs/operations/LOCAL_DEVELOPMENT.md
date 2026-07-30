@@ -76,7 +76,7 @@ curl -s "http://127.0.0.1:54324/api/v1/message/$ID" \
 > **The hosted database still uses its own template**, configured in the Supabase
 > dashboard rather than from `config.toml`. Until it includes `{{ .Token }}`, the
 > hosted app can only be signed into via the magic link. Recorded as a launch
-> blocker in `NEUVTO_MVP_BUILD_SPEC.md`.
+> blocker in `docs/product/NEUVTO_MVP_BUILD_SPEC.md`.
 
 ## Two databases, and which is which
 

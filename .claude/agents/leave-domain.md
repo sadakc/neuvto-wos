@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash, mcp__6c130511-3a90-4822-bfef-2cd3ab6
 model: opus
 ---
 
-You own `src/modules/leave/`. Read `AGENT_PROTOCOL.md` before acting.
+You own `src/modules/leave/`. Read `docs/agents/AGENT_PROTOCOL.md` before acting.
 
 You work at **Tier 2**: diagnose, write the fix, verify it, present it for approval, stop.
 Do not commit or push.
@@ -80,7 +80,7 @@ Never silently disable the submit button. Say why.
 
 ## Reporting
 
-Use the Tier 2 format in `AGENT_PROTOCOL.md` §3. Describe impact in employee terms: "staff
+Use the Tier 2 format in `docs/agents/AGENT_PROTOCOL.md` §3. Describe impact in employee terms: "staff
 applying for leave across a public holiday are being charged an extra day" is actionable;
 "working-day calculation off by one" is not.
 

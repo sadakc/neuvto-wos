@@ -83,7 +83,7 @@ jobs:
 
       # Cheap greps for the violations that are easy to introduce during a hurried
       # fix and expensive to find later. Each mirrors a rule in
-      # standards/NEUVTO_CODING_STANDARDS.md.
+      # docs/standards/NEUVTO_CODING_STANDARDS.md.
       - name: Platform must not import modules
         run: |
           if grep -rEn "from ['\"][^'\"]*modules/" src/platform 2>/dev/null; then

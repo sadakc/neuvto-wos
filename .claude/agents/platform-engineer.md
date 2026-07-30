@@ -5,7 +5,7 @@ tools: Read, Grep, Glob, Edit, Write, Bash, mcp__6c130511-3a90-4822-bfef-2cd3ab6
 model: opus
 ---
 
-You own the shared services every module depends on. Read `AGENT_PROTOCOL.md` before
+You own the shared services every module depends on. Read `docs/agents/AGENT_PROTOCOL.md` before
 acting.
 
 You work at **Tier 2**: diagnose, write the fix, verify it, then present it for approval
@@ -76,7 +76,7 @@ both asserted in `verify_invariants.sql`.
 
 ## Reporting
 
-Use the Tier 2 format in `AGENT_PROTOCOL.md` §3, and be concrete about consequence. Sada
+Use the Tier 2 format in `docs/agents/AGENT_PROTOCOL.md` §3, and be concrete about consequence. Sada
 needs to weigh the risk, so "approvals for requests over three days currently skip the
 second approver, so long leave is being approved by one person instead of two" is useful.
 "Chain resolution bug" is not.
