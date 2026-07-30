@@ -36,7 +36,15 @@ type Claimed = {
   body: string;
 };
 
-async function deliver(n: Claimed): Promise<{ ok: true } | { ok: false; reason: string }> {
+/**
+ * D29. Whether a failure is worth trying again decides whether an email that
+ * hit a momentary blip is delivered or silently lost. Getting it wrong in the
+ * other direction is cheaper but not free: retrying a malformed address burns
+ * quota and delays the moment somebody notices it is broken.
+ */
+type Outcome = { ok: true } | { ok: false; reason: string; transient: boolean };
+
+async function deliver(n: Claimed): Promise<Outcome> {
   const to = n.recipient_name ? `${n.recipient_name} <${n.recipient_email}>` : n.recipient_email;
 
   let response: Response;
@@ -50,8 +58,13 @@ async function deliver(n: Claimed): Promise<{ ok: true } | { ok: false; reason: 
       body: JSON.stringify({ from: FROM, to: [to], subject: n.subject, html: n.body }),
     });
   } catch (e) {
-    // The network, not the message. Left retryable rather than marked failed.
-    return { ok: false, reason: `NETWORK: ${e instanceof Error ? e.message : String(e)}` };
+    // Never reached the provider at all. Nothing about the message is known to
+    // be wrong, so this is the clearest possible case for trying again.
+    return {
+      ok: false,
+      reason: `NETWORK: ${e instanceof Error ? e.message : String(e)}`,
+      transient: true,
+    };
   }
 
   if (response.ok) return { ok: true };
@@ -60,7 +73,14 @@ async function deliver(n: Claimed): Promise<{ ok: true } | { ok: false; reason: 
   // unverified sending domain and a malformed address are both 4xx, and they
   // need completely different fixes.
   const detail = await response.text().catch(() => "");
-  return { ok: false, reason: `HTTP ${response.status}: ${detail.slice(0, 400)}` };
+
+  // 429 is explicitly "try later". 5xx is the provider's problem, not the
+  // message's. Every other 4xx is a statement about this message — a bad
+  // address, a rejected sender, a revoked key — and will fail identically
+  // forever, so it is terminal.
+  const transient = response.status === 429 || response.status >= 500;
+
+  return { ok: false, reason: `HTTP ${response.status}: ${detail.slice(0, 400)}`, transient };
 }
 
 Deno.serve(async (req) => {
@@ -99,6 +119,24 @@ Deno.serve(async (req) => {
     );
   }
 
+  // Every Resend key starts with re_. Checking the shape here turns three
+  // rounds of "API key is invalid" into one unambiguous message, and costs
+  // nothing.
+  //
+  // Deliberately a shape check and NOT a call to Resend. Validating by listing
+  // domains was tried and was wrong: a key correctly scoped to sending-only
+  // cannot list domains, so that test rejects exactly the well-configured keys
+  // it is supposed to approve.
+  if (!RESEND_KEY.startsWith("re_")) {
+    return new Response(
+      JSON.stringify({
+        error: "RESEND_API_KEY is set but is not a Resend API key",
+        hint: "Every Resend key begins with re_. Resend shows a key once, at creation — a value copied afterwards is the masked version, and neighbouring values (webhook signing secret, key ID, a Supabase key) are easy to grab by mistake. Create a new key and copy it on that screen.",
+      }),
+      { status: 503, headers: { "Content-Type": "application/json" } },
+    );
+  }
+
   // Built from the caller's own credential, so the claim below is attempted as
   // whoever called — which is what makes the database the authority.
   const supabase = createClient(SUPABASE_URL, callerKey);
@@ -127,6 +165,7 @@ Deno.serve(async (req) => {
   const claimed = (batch ?? []) as Claimed[];
   let sent = 0;
   let failed = 0;
+  let retrying = 0;
 
   // Sequential on purpose. The batch is small, the provider rate-limits, and a
   // burst of parallel sends buys nothing while making a 429 storm likely.
@@ -135,13 +174,20 @@ Deno.serve(async (req) => {
     if (result.ok) {
       await supabase.rpc("notification_mark_sent", { _id: n.id });
       sent++;
+    } else if (result.transient) {
+      // Backed off and left pending. The database decides when attempts run out
+      // and it becomes terminal — this process does not count.
+      await supabase.rpc("notification_mark_retry", { _id: n.id, _reason: result.reason });
+      retrying++;
     } else {
       await supabase.rpc("notification_mark_failed", { _id: n.id, _reason: result.reason });
       failed++;
     }
   }
 
-  return new Response(JSON.stringify({ claimed: claimed.length, sent, failed }), {
+  // `retrying` is reported separately from `failed` so a monitored run can tell
+  // "the provider is having a moment" from "these will never send".
+  return new Response(JSON.stringify({ claimed: claimed.length, sent, failed, retrying }), {
     headers: { "Content-Type": "application/json" },
   });
 });
