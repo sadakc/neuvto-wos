@@ -53,6 +53,28 @@ export interface ModuleDashboardCard {
   order?: number;
 }
 
+/**
+ * A block of configuration a module contributes to Settings.
+ *
+ * Same reasoning as `dashboardCards`, one screen over. Leave types belong to
+ * Leave; the settings page belongs to the platform. Without this, configuring
+ * leave would mean `src/routes/app/settings.tsx` importing a module — the exact
+ * coupling `app-nav.tsx` shed in step 6, reintroduced by the back door.
+ *
+ * Rendered only for administrators. That is presentation: RLS is what actually
+ * refuses the write.
+ */
+export interface ModuleAdminSection {
+  /** Stable across renders; used as the React key and for ordering. */
+  id: string;
+  title: string;
+  /** One line under the heading, saying what this configures and for whom. */
+  description?: string;
+  component: ComponentType | LazyExoticComponent<ComponentType>;
+  /** Lower sorts first. Platform configuration always precedes module configuration. */
+  order?: number;
+}
+
 export interface ModuleRoute {
   /** Relative to /app, no leading slash. "leave/apply" serves /app/leave/apply. */
   path: string;
@@ -89,6 +111,14 @@ export interface ModuleDefinition {
    * dashboard is not an employee's.
    */
   dashboardCards?: (user: CurrentUser | null) => ModuleDashboardCard[];
+
+  /**
+   * Rendered on the settings page for administrators of organisations that have
+   * this module enabled. A function of the user for the same reason the others
+   * are — and because "what may I configure" is a different question from "what
+   * may I see".
+   */
+  adminSections?: (user: CurrentUser | null) => ModuleAdminSection[];
 
   /**
    * Entity types this module registers with the Approval Engine. Declared so
@@ -135,6 +165,7 @@ export const ModuleDefinitionSchema = z.object({
     }),
   ),
   dashboardCards: z.function().optional(),
+  adminSections: z.function().optional(),
   approvalEntityTypes: z.array(z.string().regex(/^[a-z_]+$/)).readonly(),
   eventKeys: z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/)).readonly(),
   settingsSchema: z.any(),

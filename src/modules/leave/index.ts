@@ -42,6 +42,20 @@ export const leave: ModuleDefinition = {
     },
   ],
 
+  // What an administrator configures. Contributed rather than routed: the
+  // platform's settings page renders this without importing anything here, the
+  // same way the dashboard renders the balance card.
+  adminSections: () => [
+    {
+      id: "leave-types",
+      title: "Leave types",
+      description:
+        "What people in this workspace can apply for, and how many days a year each one allows.",
+      component: lazy(() => import("./components/LeaveTypes")),
+      order: 10,
+    },
+  ],
+
   // Registered with the Approval Engine, which knows nothing about leave and
   // would happily let a second module claim the same string.
   approvalEntityTypes: ["leave_request"],
@@ -54,11 +68,21 @@ export const leave: ModuleDefinition = {
   ownedTables: ["leave_types", "leave_balances", "leave_requests"],
 };
 
-export { submitLeave, getMyBalances, getMyRequests, getLeaveTypes } from "./handlers";
+export {
+  submitLeave,
+  getMyBalances,
+  getMyRequests,
+  getLeaveTypes,
+  listLeaveTypes,
+  saveLeaveType,
+  setLeaveTypeStatus,
+} from "./handlers";
 
 export {
   SubmitLeaveInput,
+  LeaveTypeInput,
   LeaveSettings,
+  type LeaveType,
   LEAVE_STATUSES,
   leaveErrorMessage,
   type LeaveStatus,

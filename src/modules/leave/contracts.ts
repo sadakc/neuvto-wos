@@ -37,6 +37,51 @@ export const SubmitLeaveInput = z
 export type SubmitLeaveInput = z.infer<typeof SubmitLeaveInput>;
 
 /**
+ * A leave type, as an administrator configures it.
+ *
+ * Every rule here mirrors a CHECK constraint in `leave_types` exactly. A form
+ * that accepts what the database refuses produces an unexplained failure, which
+ * is worse than a validation message — and this project has met that bug more
+ * than once.
+ */
+export const LeaveTypeInput = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Give this leave type a name").max(60, "That name is too long"),
+  description: z.string().trim().max(300, "Keep the description under 300 characters").optional(),
+  /** leave_type_days_sane: >= 0. Zero is legitimate — an unpaid type with no allowance. */
+  maxDaysPerYear: z
+    .number({ invalid_type_error: "Enter a number of days" })
+    .min(0, "Days per year cannot be negative")
+    .max(365, "That is more days than there are in a year"),
+  /** leave_type_notice_sane: null or >= 0. */
+  minNoticeDays: z.number().int().min(0, "Notice cannot be negative").max(365).nullable(),
+  /** leave_type_per_request_sane: null or > 0. Null means no limit — not zero. */
+  maxPerRequest: z
+    .number()
+    .positive("A maximum per request must be more than zero")
+    .max(365)
+    .nullable(),
+  /**
+   * D38. False means approved the moment it is submitted. The reason this
+   * exists in the interface at all: a workspace with one person in it has
+   * nobody who can approve anything, because D13 forbids self-approval.
+   */
+  approvalRequired: z.boolean(),
+});
+export type LeaveTypeInput = z.infer<typeof LeaveTypeInput>;
+
+export interface LeaveType {
+  id: string;
+  name: string;
+  description: string | null;
+  maxDaysPerYear: number;
+  minNoticeDays: number | null;
+  maxPerRequest: number | null;
+  approvalRequired: boolean;
+  status: "active" | "archived";
+}
+
+/**
  * Per-organisation settings, persisted through `module_settings` (D7) rather
  * than a column, so adding a setting needs no migration. Customers configure
  * modules even though they do not write them.
@@ -105,8 +150,14 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   ALREADY_DECIDED: "This request has already been settled and can't be cancelled.",
   CANCEL_TOO_LATE:
     "This leave has already started, so it can't be cancelled here. Speak to your manager.",
+  // Reworded after Sada met it as the only person in his own workspace, being
+  // told to ask an administrator — about himself. It now says what can actually
+  // be done, and both routes out are things an admin has a screen for.
   APPROVER_UNRESOLVED:
-    "There's nobody set up to approve this. Ask your administrator to assign a manager.",
+    "Nobody can approve this yet. Set a manager for this person under Members, or mark this leave type as needing no approval.",
+  LEAVE_TYPE_NAME_TAKEN: "There's already a leave type with that name.",
+  LEAVE_TYPE_IN_USE:
+    "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",
 };
 
 /** INSUFFICIENT_BALANCE carries the numbers, so it is matched by prefix. */

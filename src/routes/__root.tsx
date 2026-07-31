@@ -109,10 +109,24 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       },
       { name: "twitter:card", content: "summary_large_image" },
       { property: "og:type", content: "website" },
+
+      // D1 promised a PWA-installable app and nothing implemented it: Add to
+      // Home Screen gave a Safari shell with browser chrome. These three plus
+      // the manifest are what make it open fullscreen, like an app.
+      //
+      // No service worker, deliberately. Offline is not claimed anywhere, and a
+      // cache serving a stale leave balance is worse than no cache — somebody
+      // books days they have already spent.
+      { name: "apple-mobile-web-app-capable", content: "yes" },
+      { name: "apple-mobile-web-app-title", content: "Neuvto" },
+      { name: "apple-mobile-web-app-status-bar-style", content: "default" },
+      { name: "theme-color", content: "#00b0ed" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      { rel: "manifest", href: "/manifest.webmanifest" },
+      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {

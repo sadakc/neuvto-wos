@@ -437,6 +437,74 @@ export type Database = {
           },
         ]
       }
+      invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          email: string
+          expires_at: string
+          full_name: string | null
+          id: string
+          organization_id: string
+          phone: string | null
+          phone_normalized: string | null
+          revoked_at: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          token: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          email: string
+          expires_at?: string
+          full_name?: string | null
+          id?: string
+          organization_id: string
+          phone?: string | null
+          phone_normalized?: string | null
+          revoked_at?: string | null
+          role: Database["public"]["Enums"]["app_role"]
+          token?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          email?: string
+          expires_at?: string
+          full_name?: string | null
+          id?: string
+          organization_id?: string
+          phone?: string | null
+          phone_normalized?: string | null
+          revoked_at?: string | null
+          role?: Database["public"]["Enums"]["app_role"]
+          token?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_balances: {
         Row: {
           available_days: number | null
@@ -804,7 +872,9 @@ export type Database = {
           organization_id: string
           payload: Json
           read_at: string | null
-          recipient_id: string
+          recipient_email: string | null
+          recipient_id: string | null
+          recipient_name: string | null
           sent_at: string | null
           status: Database["public"]["Enums"]["notification_status"]
           subject: string
@@ -826,7 +896,9 @@ export type Database = {
           organization_id: string
           payload?: Json
           read_at?: string | null
-          recipient_id: string
+          recipient_email?: string | null
+          recipient_id?: string | null
+          recipient_name?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["notification_status"]
           subject: string
@@ -848,7 +920,9 @@ export type Database = {
           organization_id?: string
           payload?: Json
           read_at?: string | null
-          recipient_id?: string
+          recipient_email?: string | null
+          recipient_id?: string | null
+          recipient_name?: string | null
           sent_at?: string | null
           status?: Database["public"]["Enums"]["notification_status"]
           subject?: string
@@ -1036,6 +1110,27 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_admins: {
+        Row: {
+          created_at: string
+          note: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          note?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          note?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1050,6 +1145,7 @@ export type Database = {
           manager_id: string | null
           organization_id: string
           phone: string | null
+          phone_normalized: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -1066,6 +1162,7 @@ export type Database = {
           manager_id?: string | null
           organization_id: string
           phone?: string | null
+          phone_normalized?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -1082,6 +1179,7 @@ export type Database = {
           manager_id?: string | null
           organization_id?: string
           phone?: string | null
+          phone_normalized?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -1158,6 +1256,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      app_base_url: { Args: never; Returns: string }
       approval_decide: {
         Args: {
           _comments?: string
@@ -1268,12 +1367,43 @@ export type Database = {
         }
         Returns: boolean
       }
+      install_default_approval_chain: {
+        Args: { _org_id: string }
+        Returns: undefined
+      }
+      invitation_accept: { Args: { _token: string }; Returns: string }
+      invitation_create: {
+        Args: {
+          _email: string
+          _full_name?: string
+          _phone?: string
+          _role?: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
+      invitation_revoke: { Args: { _id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_approver_on: { Args: { _request_id: string }; Returns: boolean }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
+      is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
+      leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_balances: { Args: { _org_id: string }; Returns: number }
+      leave_my_balances: {
+        Args: never
+        Returns: {
+          available_days: number
+          carryforward_days: number
+          entitled_days: number
+          fy_label: string
+          leave_type_id: string
+          leave_type_name: string
+          pending_days: number
+          reserved_days: number
+          used_days: number
+        }[]
+      }
       leave_submit: {
         Args: {
           _from_date: string
@@ -1314,7 +1444,40 @@ export type Database = {
         Args: { _event_key: string; _payload: Json; _recipient_id: string }
         Returns: string
       }
+      notify_address: {
+        Args: {
+          _email: string
+          _event_key: string
+          _name: string
+          _org_id: string
+          _payload: Json
+        }
+        Returns: string
+      }
       org_today: { Args: { _org_id: string }; Returns: string }
+      platform_list_organizations: {
+        Args: never
+        Returns: {
+          admin_accepted: boolean
+          admin_email: string
+          admin_invite_url: string
+          created_at: string
+          id: string
+          member_count: number
+          name: string
+          slug: string
+        }[]
+      }
+      provision_organization: {
+        Args: {
+          _admin_email: string
+          _admin_name?: string
+          _admin_phone?: string
+          _name: string
+          _slug: string
+        }
+        Returns: string
+      }
       render_template: {
         Args: { _payload: Json; _template: string }
         Returns: string
@@ -1328,13 +1491,16 @@ export type Database = {
         }
         Returns: string
       }
+      resolve_notification_addresses: {
+        Args: { _event_key: string; _payload: Json }
+        Returns: {
+          email: string
+          name: string
+        }[]
+      }
       resolve_notification_recipients: {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
-      }
-      signup_organization: {
-        Args: { p_full_name: string; p_org_name: string; p_slug: string }
-        Returns: string
       }
     }
     Enums: {

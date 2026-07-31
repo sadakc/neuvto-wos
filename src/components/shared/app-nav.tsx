@@ -32,18 +32,34 @@ type NavItem = ModuleNavItem;
  */
 export function platformNavItems(user: CurrentUser | null): NavItem[] {
   const items: NavItem[] = [{ label: "Dashboard", to: "/app" }];
-  if (isAdmin(user)) items.push({ label: "Settings", to: "/app/settings" });
+  if (isAdmin(user)) {
+    // People and Approval rules are platform concerns, not Leave's: who is in
+    // the workspace and who signs things off are the same questions whatever
+    // modules are switched on.
+    items.push({ label: "People", to: "/app/members" });
+    items.push({ label: "Approval rules", to: "/app/approval-rules" });
+    items.push({ label: "Settings", to: "/app/settings" });
+  }
   return items;
 }
 
 /**
- * Platform items first, module items between them and Settings — so the shape
- * of the sidebar does not shift as modules are switched on and off.
+ * Dashboard, then whatever the modules contribute, then the admin destinations.
+ *
+ * Order matters more than it looks: the mobile bar shows the first FIVE items
+ * and nothing else. Putting the admin items before the module ones pushed
+ * "Apply" and "My leave" off the bar entirely for an administrator — who is also
+ * an employee, and whose own leave is the thing they reach for most. Admin work
+ * is desktop-first; the sidebar shows everything either way.
  */
 export function mergeNavItems(platform: NavItem[], modules: NavItem[]): NavItem[] {
-  const settingsIndex = platform.findIndex((i) => i.to === "/app/settings");
-  if (settingsIndex === -1) return [...platform, ...modules];
-  return [...platform.slice(0, settingsIndex), ...modules, ...platform.slice(settingsIndex)];
+  const dashboardIndex = platform.findIndex((i) => i.to === "/app");
+  if (dashboardIndex === -1) return [...platform, ...modules];
+  return [
+    ...platform.slice(0, dashboardIndex + 1),
+    ...modules,
+    ...platform.slice(dashboardIndex + 1),
+  ];
 }
 
 export function AppNav({ user }: { user: CurrentUser | null }) {

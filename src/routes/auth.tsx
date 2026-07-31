@@ -1,19 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import {
-  requestOtp,
-  verifyOtp,
-  getCurrentUser,
-  createOrganization,
-  suggestSlug,
-} from "@/platform/auth";
+import { requestOtp, verifyOtp, getCurrentUser, acceptInvitation } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
-  validateSearch: (s: Record<string, unknown>) => ({
+  // The return type is annotated so `invite` is OPTIONAL in the route's search
+  // type. Inferred, it would be required, and every other place that redirects
+  // here — the OAuth consent screen, for one — would have to pass an empty
+  // string it knows nothing about.
+  validateSearch: (s: Record<string, unknown>): { next: string; invite?: string } => ({
     next: typeof s.next === "string" ? s.next : "",
+    invite: typeof s.invite === "string" && s.invite ? s.invite : undefined,
   }),
   head: () => ({
     meta: [
@@ -32,40 +31,82 @@ function safeNext(next: string) {
   return next;
 }
 
-type Step = "email" | "code" | "workspace";
+/**
+ * `workspace` is gone.
+ *
+ * It used to offer a form: any verified email could create an organisation and
+ * become its administrator. That is how a second address of Sada's became an
+ * administrator of a workspace nobody meant to exist — isolated and harmless,
+ * but the wrong model for a product deployed to named customers. Workspaces are
+ * provisioned now (D39), and someone signing in with no workspace and no
+ * invitation is told so rather than handed a form.
+ *
+ * `joining` is where an invited person lands: the link identified the
+ * invitation, the code proved the address, and this redeems the two together.
+ */
+type Step = "email" | "code" | "joining" | "orphan";
 
 function AuthPage() {
-  const { next } = Route.useSearch();
+  const { next, invite } = Route.useSearch();
   const [step, setStep] = useState<Step>("email");
   const [busy, setBusy] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [joinError, setJoinError] = useState("");
 
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
-  const [orgName, setOrgName] = useState("");
-  const [slug, setSlug] = useState("");
-  const [slugEdited, setSlugEdited] = useState(false);
-  const [fullName, setFullName] = useState("");
 
-  // Already signed in with a workspace? Skip the whole flow.
+  /**
+   * Redeems the invitation if there is one, and routes onward.
+   *
+   * Called after the code is verified, and also on arrival — somebody who is
+   * already signed in and follows an invitation link should not have to prove an
+   * address they proved this morning.
+   */
+  async function finish() {
+    if (invite) {
+      setStep("joining");
+      try {
+        await acceptInvitation(invite);
+        window.location.href = safeNext(next);
+        return;
+      } catch (e) {
+        // Shown in place rather than as a toast that vanishes: this is the end
+        // of the road for this link, and the message says what to do next.
+        setJoinError(
+          isAppError(e) ? e.message : "We couldn't complete your invitation. Please try again.",
+        );
+        return;
+      }
+    }
+    window.location.href = safeNext(next);
+  }
+
   useEffect(() => {
     let cancelled = false;
     getCurrentUser()
       .then((user) => {
-        if (!cancelled && user) window.location.href = safeNext(next);
-        else if (!cancelled) setChecking(false);
+        if (cancelled) return;
+        // Already in a workspace. An invitation link is then either stale or
+        // meant for somebody else; either way they belong where they were going.
+        if (user) {
+          window.location.href = safeNext(next);
+          return;
+        }
+        setChecking(false);
       })
       .catch(() => {
-        // NO_ORGANIZATION lands here: authenticated but signup never finished.
-        if (!cancelled) {
-          setStep("workspace");
-          setChecking(false);
-        }
+        // NO_ORGANIZATION lands here: authenticated, but in no workspace.
+        if (cancelled) return;
+        setChecking(false);
+        if (invite) void finish();
+        else setStep("orphan");
       });
     return () => {
       cancelled = true;
     };
-  }, [next]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [next, invite]);
 
   function fail(e: unknown) {
     toast.error(isAppError(e) ? e.message : "Something went wrong. Please try again.");
@@ -91,21 +132,13 @@ function AuthPage() {
     try {
       await verifyOtp({ email, token: code });
       const user = await getCurrentUser().catch(() => null);
-      if (user) window.location.href = safeNext(next);
-      else setStep("workspace");
-    } catch (err) {
-      fail(err);
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  async function onCreateWorkspace(e: React.FormEvent) {
-    e.preventDefault();
-    setBusy(true);
-    try {
-      await createOrganization({ organizationName: orgName, slug, fullName });
-      window.location.href = safeNext(next);
+      if (user) {
+        window.location.href = safeNext(next);
+        return;
+      }
+      // Signed in, but in no workspace yet — redeem the invitation, or explain.
+      if (invite) await finish();
+      else setStep("orphan");
     } catch (err) {
       fail(err);
     } finally {
@@ -125,9 +158,13 @@ function AuthPage() {
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
       {step === "email" && (
         <>
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Sign in to Neuvto</h1>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            {invite ? "Accept your invitation" : "Sign in to Neuvto"}
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            We&apos;ll email you a 6-digit code. No password needed.
+            {invite
+              ? "Confirm the address this invitation was sent to and we'll email you a 6-digit code."
+              : "We'll email you a 6-digit code. No password needed."}
           </p>
 
           <form onSubmit={onRequestCode} className="mt-8 flex flex-col gap-4">
@@ -199,69 +236,57 @@ function AuthPage() {
         </>
       )}
 
-      {step === "workspace" && (
+      {step === "joining" && (
         <>
           <h1 className="font-display text-2xl font-semibold tracking-tight">
-            Create your workspace
+            {joinError ? "This invitation didn't work" : "Setting up your account…"}
+          </h1>
+          {joinError ? (
+            <>
+              <p role="alert" className="mt-2 text-sm text-destructive">
+                {joinError}
+              </p>
+              <a
+                href="/auth"
+                className="mt-8 inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium"
+              >
+                Back to sign in
+              </a>
+            </>
+          ) : (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Adding you to your workspace. This only takes a moment.
+            </p>
+          )}
+        </>
+      )}
+
+      {/*
+        Signed in, and in no workspace. Previously a form that created one; now
+        an explanation, because who administers a workspace is Neuvto's decision
+        and not a side effect of who signed in first.
+      */}
+      {step === "orphan" && (
+        <>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            You&apos;re not in a workspace yet
           </h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            You&apos;ll be its first administrator.
+            Neuvto workspaces are set up for your company, and you join one by invitation. Ask your
+            administrator to invite{" "}
+            <span className="text-foreground">{email || "your address"}</span>, then follow the link
+            in the email they send.
           </p>
-
-          <form onSubmit={onCreateWorkspace} className="mt-8 flex flex-col gap-4">
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Company name
-              <input
-                required
-                autoFocus
-                maxLength={200}
-                value={orgName}
-                onChange={(e) => {
-                  setOrgName(e.target.value);
-                  if (!slugEdited) setSlug(suggestSlug(e.target.value));
-                }}
-                placeholder="Acme Security Services"
-                className="h-12 w-full rounded-md border border-input bg-background px-3 text-base"
-              />
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Workspace address
-              <input
-                required
-                maxLength={63}
-                value={slug}
-                onChange={(e) => {
-                  setSlugEdited(true);
-                  setSlug(e.target.value.toLowerCase());
-                }}
-                placeholder="acme"
-                className="h-12 w-full rounded-md border border-input bg-background px-3 text-base"
-              />
-              <span className="text-xs font-normal text-muted-foreground">
-                Lowercase letters, numbers and hyphens.
-              </span>
-            </label>
-
-            <label className="flex flex-col gap-2 text-sm font-medium">
-              Your name
-              <input
-                maxLength={200}
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                placeholder="Optional"
-                className="h-12 w-full rounded-md border border-input bg-background px-3 text-base"
-              />
-            </label>
-
-            <button
-              type="submit"
-              disabled={busy}
-              className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-60"
+          <p className="mt-4 text-sm text-muted-foreground">
+            If your company doesn&apos;t use Neuvto yet, get in touch at{" "}
+            <a
+              href="mailto:hello@neuvto.com"
+              className="text-foreground underline underline-offset-4"
             >
-              {busy ? "Creating…" : "Create workspace"}
-            </button>
-          </form>
+              hello@neuvto.com
+            </a>
+            .
+          </p>
         </>
       )}
     </main>

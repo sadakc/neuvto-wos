@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, canApprove, type CurrentUser } from "@/platform/auth";
 import { getDashboardCards, type ModuleDashboardCard } from "@/platform/modules";
@@ -81,11 +81,38 @@ function Dashboard() {
         </section>
       )}
 
+      {/*
+        Real links, not a sentence naming a destination.
+
+        The mobile bar shows the FIRST FIVE items and nothing else, and the
+        sidebar is desktop-only — so once People and Approval rules were added,
+        an administrator on a phone had no route to any of them. Found by
+        looking at the bottom bar on a 321px viewport, which is the width Sada
+        actually tests on.
+
+        Keeping these here rather than juggling the tab bar: the five tabs an
+        employee needs are the right five, and admin work wants a wider screen
+        anyway. What it must not be is unreachable.
+      */}
       {isAdmin(user) && (
-        <p className="mt-6 text-sm text-muted-foreground">
-          As an administrator you can review your workspace configuration in{" "}
-          <span className="text-foreground">Settings</span>.
-        </p>
+        <section className="mt-8 border-t border-border pt-6">
+          <h2 className="text-sm font-medium">Administration</h2>
+          <div className="mt-3 flex flex-wrap gap-2">
+            {[
+              { to: "/app/settings", label: "Settings" },
+              { to: "/app/members", label: "People" },
+              { to: "/app/approval-rules", label: "Approval rules" },
+            ].map((l) => (
+              <Link
+                key={l.to}
+                to={l.to}
+                className="inline-flex h-12 items-center rounded-md border border-border px-4 text-sm font-medium"
+              >
+                {l.label}
+              </Link>
+            ))}
+          </div>
+        </section>
       )}
       {!isAdmin(user) && canApprove(user) && (
         <p className="mt-6 text-sm text-muted-foreground">

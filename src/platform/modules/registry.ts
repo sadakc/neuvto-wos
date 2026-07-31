@@ -16,6 +16,7 @@ import type { CurrentUser } from "@/platform/auth";
 import {
   ModuleDefinitionSchema,
   type ModuleDefinition,
+  type ModuleAdminSection,
   type ModuleDashboardCard,
   type ModuleNavItem,
 } from "./contract";
@@ -125,6 +126,25 @@ export async function getDashboardCards(
 
   return enabled
     .flatMap((m) => (m.dashboardCards?.(user) ?? []).map((card) => ({ ...card, moduleKey: m.key })))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/**
+ * Configuration blocks from enabled modules, for this user, in declared order.
+ *
+ * The settings page renders these without importing a module or knowing one
+ * exists — which is what keeps "configure leave types" inside
+ * `src/modules/leave/` where every other leave decision lives. A module that
+ * contributes none is simply absent, and settings still works when no module is
+ * enabled at all: the module-removal check exercises exactly that.
+ */
+export async function getAdminSections(
+  user: CurrentUser | null,
+): Promise<(ModuleAdminSection & { moduleKey: string })[]> {
+  const enabled = await getEnabledModules();
+
+  return enabled
+    .flatMap((m) => (m.adminSections?.(user) ?? []).map((s) => ({ ...s, moduleKey: m.key })))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 
