@@ -934,6 +934,7 @@ export type Database = {
           exclude_weekends: boolean
           fy_start_day: number
           fy_start_month: number
+          next_fy_opens_months_before: number
           notify_on_approve: boolean
           notify_on_reject: boolean
           notify_on_submit: boolean
@@ -955,6 +956,7 @@ export type Database = {
           exclude_weekends?: boolean
           fy_start_day?: number
           fy_start_month?: number
+          next_fy_opens_months_before?: number
           notify_on_approve?: boolean
           notify_on_reject?: boolean
           notify_on_submit?: boolean
@@ -976,6 +978,7 @@ export type Database = {
           exclude_weekends?: boolean
           fy_start_day?: number
           fy_start_month?: number
+          next_fy_opens_months_before?: number
           notify_on_approve?: boolean
           notify_on_reject?: boolean
           notify_on_submit?: boolean
@@ -1193,6 +1196,16 @@ export type Database = {
         Args: { _context?: Json; _entity_id: string; _entity_type: string }
         Returns: string
       }
+      approval_timeline: {
+        Args: { _approval_request_id: string }
+        Returns: {
+          approver_name: string
+          comments: string
+          decided_at: string
+          decision: Database["public"]["Enums"]["approval_decision"]
+          level: number
+        }[]
+      }
       assert_own_org: { Args: { _org_id: string }; Returns: undefined }
       calculate_entitlement: {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
@@ -1240,6 +1253,10 @@ export type Database = {
       }
       ensure_system_notification_templates: { Args: never; Returns: undefined }
       escape_html: { Args: { _text: string }; Returns: string }
+      financial_year_start: {
+        Args: { _fy: string; _org_id: string }
+        Returns: string
+      }
       get_financial_year: {
         Args: { _org_id: string; _ref?: string }
         Returns: string
@@ -1265,6 +1282,10 @@ export type Database = {
           _to_date: string
         }
         Returns: string
+      }
+      leave_year_open: {
+        Args: { _org_id: string; _ref: string }
+        Returns: boolean
       }
       module_enabled: { Args: { _module_key: string }; Returns: boolean }
       notification_claim_batch: {

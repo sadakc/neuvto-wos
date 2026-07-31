@@ -959,6 +959,60 @@ begin
       end if;
       raise notice 'ok: approved days move from reserved to pending, none lost';
 
+      ------------------------------------------------- D35, the approval timeline
+      -- SECURITY DEFINER bypasses RLS, so this function restates the rule
+      -- rather than inheriting it. If that restatement is wrong, one employee
+      -- reads another's approval history — and the join it replaced failed
+      -- closed, so nothing else here would notice.
+      declare
+        v_name text;
+        v_seen boolean;
+      begin
+        perform pg_temp.as_user(ravi);
+        select approver_name into v_name
+          from public.approval_timeline(v_appr) where level = 1;
+        if v_name is null or v_name = 'Approver' then
+          raise exception 'RLS FAIL: the requester cannot see who has to approve their leave — got %', coalesce(v_name, '(null)');
+        end if;
+        raise notice 'ok: the requester sees their approver by name';
+
+        -- The approver can see it too; they are on the request.
+        perform pg_temp.as_user(mark);
+        select count(*) > 0 into v_seen from public.approval_timeline(v_appr);
+        if not v_seen then
+          raise exception 'RLS FAIL: an approver cannot read the timeline of a request they must decide';
+        end if;
+        raise notice 'ok: an approver sees the timeline of what they must decide';
+
+        -- Nobody else. Priya is in the same organisation and uninvolved.
+        perform pg_temp.as_user(priya);
+        v_bad := false;
+        begin
+          perform public.approval_timeline(v_appr);
+          v_bad := true;
+        exception when raise_exception then
+          if sqlerrm <> 'FORBIDDEN' then raise; end if;
+        end;
+        if v_bad then
+          raise exception 'RLS FAIL: an uninvolved colleague read somebody else''s approval history';
+        end if;
+        raise notice 'ok: an uninvolved colleague cannot read the timeline';
+
+        -- And no one from another tenant, whatever they pass.
+        perform pg_temp.as_user(bob);
+        v_bad := false;
+        begin
+          perform public.approval_timeline(v_appr);
+          v_bad := true;
+        exception when raise_exception then
+          if sqlerrm <> 'FORBIDDEN' then raise; end if;
+        end;
+        if v_bad then
+          raise exception 'RLS FAIL: another tenant read an approval timeline';
+        end if;
+        raise notice 'ok: another tenant cannot read the timeline';
+      end;
+
       ------------------------------------------------- D33, cancelling
       -- The invariant that matters is not "the status changed" but "the days
       -- came back, once". A release that happens twice inflates the balance

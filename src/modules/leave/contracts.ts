@@ -69,6 +69,8 @@ export interface ApprovalStep {
 
 export interface LeaveRequest {
   id: string;
+  /** Null only if the approval could not be attached — the timeline needs it. */
+  approvalRequestId: string | null;
   leaveTypeId: string;
   leaveTypeName: string;
   fromDate: string;

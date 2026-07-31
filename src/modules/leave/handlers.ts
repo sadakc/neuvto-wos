@@ -74,7 +74,7 @@ export async function getMyRequests(): Promise<LeaveRequest[]> {
   const { data, error } = await supabase
     .from("leave_requests")
     .select(
-      "id, leave_type_id, from_date, to_date, working_days, reason, status, submitted_at, decided_at, rejection_reason, leave_types(name)",
+      "id, approval_request_id, leave_type_id, from_date, to_date, working_days, reason, status, submitted_at, decided_at, rejection_reason, leave_types(name)",
     )
     .order("from_date", { ascending: false });
 
@@ -82,6 +82,7 @@ export async function getMyRequests(): Promise<LeaveRequest[]> {
 
   return (data ?? []).map((r) => ({
     id: r.id,
+    approvalRequestId: r.approval_request_id,
     leaveTypeId: r.leave_type_id,
     leaveTypeName: (r.leave_types as { name: string } | null)?.name ?? "Leave",
     fromDate: r.from_date,
@@ -111,19 +112,19 @@ export async function cancelLeave(requestId: string): Promise<void> {
  * needs no special privilege.
  */
 export async function getApprovalTimeline(approvalRequestId: string): Promise<ApprovalStep[]> {
-  const { data, error } = await supabase
-    .from("approval_steps")
-    .select(
-      "level, decision, comments, decided_at, profiles!approval_steps_approver_id_fkey(full_name)",
-    )
-    .eq("approval_request_id", approvalRequestId)
-    .order("level");
+  // A dedicated function rather than a join. An employee cannot read the
+  // approver's profile — they see only their own — so the join returned no name
+  // and the timeline said "Approver". This discloses the name and nothing else
+  // about them (D35).
+  const { data, error } = await supabase.rpc("approval_timeline", {
+    _approval_request_id: approvalRequestId,
+  });
 
   if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the approval history.", 500);
 
   return (data ?? []).map((r) => ({
     level: r.level,
-    approverName: (r.profiles as { full_name: string | null } | null)?.full_name ?? "Approver",
+    approverName: r.approver_name,
     decision: r.decision as ApprovalStep["decision"],
     comments: r.comments,
     decidedAt: r.decided_at,
