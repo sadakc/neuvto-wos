@@ -14,7 +14,15 @@ dist-ssr
 .vinxi
 .tanstack/**
 .nitro
+
+# Local environment. `.env` itself IS committed and holds only publishable
+# values; everything machine-specific goes in a .env.local* file.
+#
+# `*.local` alone was not enough: scripts/dev-lan.sh writes
+# .env.local.localhost-backup, which does not end in `.local`, and it was
+# committed in eba35e1 before anyone noticed. Match the prefix, not the suffix.
 *.local
+.env.local*
 
 # Wrangler / Cloudflare
 .wrangler/
