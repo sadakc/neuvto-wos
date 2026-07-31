@@ -28,10 +28,14 @@ export function BalanceCard({ balance }: { balance: LeaveBalance }) {
 
   // Only the parts that are actually non-zero. A row of "− 0 awaiting approval"
   // is noise on the common case, where nothing is pending.
+  // Labels carry no "less" or "minus" prefix — the − on the figure says that,
+  // and saying it twice reads as clutter. "Less taken" was the first wording;
+  // it is ordinary accounting shorthand and the first person to read it took it
+  // for a typo, which is all the evidence a label needs to be wrong.
   const deductions = [
-    { label: "taken", value: balance.usedDays },
-    { label: "awaiting approval", value: balance.reservedDays },
-    { label: "booked", value: balance.pendingDays },
+    { label: "Taken", value: balance.usedDays },
+    { label: "Awaiting approval", value: balance.reservedDays },
+    { label: "Booked", value: balance.pendingDays },
   ].filter((d) => d.value > 0);
 
   return (
@@ -53,7 +57,7 @@ export function BalanceCard({ balance }: { balance: LeaveBalance }) {
         </div>
         {deductions.map((d) => (
           <div key={d.label} className="flex justify-between gap-2">
-            <dt className="text-muted-foreground">Less {d.label}</dt>
+            <dt className="text-muted-foreground">{d.label}</dt>
             <dd className="tabular-nums">−{d.value}</dd>
           </div>
         ))}
