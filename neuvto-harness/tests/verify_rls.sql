@@ -42,6 +42,7 @@ declare
   bob     uuid := '00000000-0000-0000-0000-00000000b001';
   ghost   uuid := '00000000-0000-0000-0000-0000000000ff';
   joiner  uuid := '00000000-0000-0000-0000-00000000a007';
+  v_text  text;
   n       bigint;
 begin
   ---------------------------------------------------------------- tenant isolation
@@ -456,64 +457,255 @@ begin
     end;
   end if;
 
-  ---------------------------------------------------------------- signup (step 2)
-  -- Phase 0 made signup impossible: granting a role requires is_admin(), and the
-  -- founder of a brand-new organisation has none. signup_organization() is the
-  -- one SECURITY DEFINER path through that, so its limits matter.
+  ------------------------------------------------- provisioning (step 8, D39/D42)
+  -- Self-serve signup is closed. signup_organization is DROPPED, not revoked:
+  -- any verified email creating a workspace and administering it is exactly the
+  -- behaviour that had to stop, and a SECURITY DEFINER function which grants
+  -- org_admin is not something to leave in the schema behind a comment.
+  --
   -- to_regprocedure, not to_regproc: only the former accepts an argument list.
-  -- to_regproc returns null for a signature with parentheses, which made this
-  -- guard permanently false and skipped every assertion below without a word.
-  if to_regprocedure('public.signup_organization(text,text,text)') is not null then
+  -- to_regproc returns null for a signature with parentheses, which once made a
+  -- guard here permanently false and skipped every assertion below without a word.
+  if to_regprocedure('public.provision_organization(text,text,text,text,text)') is not null then
+
+    if to_regprocedure('public.signup_organization(text,text,text)') is not null then
+      raise exception 'RLS FAIL: signup_organization still exists — self-serve signup is meant to be gone (D39)';
+    end if;
+    raise notice 'ok: self-serve signup no longer exists';
+
     perform pg_temp.as_postgres();
+    delete from public.invitations where email in ('provisioned@signup.test', 'nobody@signup.test');
+    delete from public.platform_admins where user_id = '00000000-0000-0000-0000-0000000000f0';
+    delete from auth.users where email in ('staff@signup.test', 'provisioned@signup.test');
+
     insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
                             email_confirmed_at, created_at, updated_at,
                             raw_app_meta_data, raw_user_meta_data)
-    values ('00000000-0000-0000-0000-0000000000f1',
-            '00000000-0000-0000-0000-000000000000','authenticated','authenticated',
-            'newfounder@signup.test', crypt('x', gen_salt('bf')),
-            now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+    values
+      ('00000000-0000-0000-0000-0000000000f0',
+       '00000000-0000-0000-0000-000000000000','authenticated','authenticated',
+       'staff@signup.test', crypt('x', gen_salt('bf')),
+       now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb),
+      ('00000000-0000-0000-0000-0000000000f1',
+       '00000000-0000-0000-0000-000000000000','authenticated','authenticated',
+       'provisioned@signup.test', crypt('x', gen_salt('bf')),
+       now(), now(), now(), '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
 
+    -- ─────────────────────────────────────── nobody promotes themselves
+    -- platform_admins has RLS on, no policy, and NO GRANT. Both matter: RLS
+    -- restricts and GRANT permits, and this is the one table where a path from a
+    -- signed-in session would be catastrophic.
     perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
-    perform public.signup_organization('Signup Test Co', 'signup-test-co', 'New Founder');
+    begin
+      insert into public.platform_admins (user_id)
+      values ('00000000-0000-0000-0000-0000000000f1');
+      raise exception 'RLS FAIL: an ordinary user made themselves a platform admin';
+    exception
+      when insufficient_privilege then raise notice 'ok: platform_admins cannot be written from the application';
+    end;
+
+    begin
+      perform count(*) from public.platform_admins;
+      raise exception 'RLS FAIL: an ordinary user can read platform_admins';
+    exception
+      when insufficient_privilege then raise notice 'ok: platform_admins cannot be read from the application';
+    end;
+
+    -- Provisioning refuses anyone who is not staff, including a tenant org_admin.
+    begin
+      perform public.provision_organization('Sneaky Co', 'sneaky-co', 'x@sneaky.test', null, null);
+      raise exception 'RLS FAIL: a non-platform-admin provisioned an organisation';
+    exception
+      when insufficient_privilege then raise notice 'ok: provisioning refuses a non-platform admin';
+    end;
+
+    perform pg_temp.as_user(alice);   -- Alice, org_admin of Acme
+    begin
+      perform public.provision_organization('Sneaky Co', 'sneaky-co', 'x@sneaky.test', null, null);
+      raise exception 'RLS FAIL: a tenant org_admin provisioned an organisation';
+    exception
+      when insufficient_privilege then raise notice 'ok: a tenant admin is not a platform admin';
+    end;
+
+    -- ─────────────────────────────────────── provisioning, done properly
+    perform pg_temp.as_postgres();
+    insert into public.platform_admins (user_id, note)
+    values ('00000000-0000-0000-0000-0000000000f0', 'harness');
+
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f0');
+    perform public.provision_organization(
+      'Provisioned Co', 'provisioned-co', 'provisioned@signup.test', '+91 90000 09999', 'New Admin');
 
     perform pg_temp.as_postgres();
-    select count(*) into n from organizations where slug = 'signup-test-co';
-    perform pg_temp.check('signup creates exactly one organisation', n, 1);
-
-    select count(*) into n from user_roles
-     where user_id = '00000000-0000-0000-0000-0000000000f1' and role = 'org_admin';
-    perform pg_temp.check('signup makes the founder an org_admin', n, 1);
+    select count(*) into n from organizations where slug = 'provisioned-co';
+    perform pg_temp.check('provisioning creates exactly one organisation', n, 1);
 
     select count(*) into n from organization_settings s
-      join organizations o on o.id = s.organization_id where o.slug = 'signup-test-co';
-    perform pg_temp.check('signup creates settings (every date calculation needs them)', n, 1);
+      join organizations o on o.id = s.organization_id where o.slug = 'provisioned-co';
+    perform pg_temp.check('provisioning creates settings (every date calculation needs them)', n, 1);
 
-    -- The email must come from the verified auth record, never a parameter,
-    -- or someone signs up under an address they do not control.
-    select count(*) into n from profiles
-     where id = '00000000-0000-0000-0000-0000000000f1' and email = 'newfounder@signup.test';
-    perform pg_temp.check('signup takes the email from auth, not from input', n, 1);
+    -- No profile. The designated admin proves they control the address first.
+    select count(*) into n from profiles where email = 'provisioned@signup.test';
+    perform pg_temp.check('provisioning creates no profile — the admin accepts an invitation (D39)', n, 0);
 
-    -- Without this the function is an unlimited organisation factory.
+    select count(*) into n from invitations i join organizations o on o.id = i.organization_id
+     where o.slug = 'provisioned-co' and i.role = 'org_admin' and i.accepted_at is null;
+    perform pg_temp.check('provisioning invites the named administrator', n, 1);
+
+    -- ─────────────────────────────────────── D42 · staff read no tenant data
+    --
+    -- This is the promise the whole product rests on, so it is asserted rather
+    -- than assumed. A platform admin has no profile, so current_org_id() is null
+    -- and every tenant policy refuses them. Sabotage-tested below.
+    -- SOMETHING TO FAIL TO SEE.
+    --
+    -- The first version of this block asserted zero against leave_requests and
+    -- approval_requests without checking there was anything there — and the seed
+    -- creates NEITHER. Both assertions were decoration: they would have passed
+    -- just as happily with isolation switched off. Found by sabotaging them,
+    -- watching only the balances check fail, and asking why.
+    --
+    -- So the fixture is built here, and its presence is asserted as postgres
+    -- first. If the seed ever stops producing these rows, this fails loudly
+    -- instead of going quietly vacuous again.
+    perform pg_temp.as_postgres();
+    insert into public.leave_requests
+      (organization_id, employee_id, leave_type_id, from_date, to_date,
+       working_days, status, submitted_at)
+    select acme, ravi, lt.id, current_date + 45, current_date + 45, 1,
+           'pending_approval', now()
+      from public.leave_types lt
+     where lt.organization_id = acme and lt.deleted_at is null
+     limit 1;
+
+    select count(*) into n from leave_requests;
+    if n = 0 then
+      raise exception 'RLS FAIL: no leave_requests exist, so "platform admin reads none" would prove nothing';
+    end if;
+    select count(*) into n from leave_balances;
+    if n = 0 then
+      raise exception 'RLS FAIL: no leave_balances exist, so "platform admin reads none" would prove nothing';
+    end if;
+    select count(*) into n from profiles;
+    if n = 0 then
+      raise exception 'RLS FAIL: no profiles exist, so "platform admin reads none" would prove nothing';
+    end if;
+    select count(*) into n from invitations;
+    if n = 0 then
+      raise exception 'RLS FAIL: no invitations exist, so "platform admin reads none" would prove nothing';
+    end if;
+
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f0');
+    select count(*) into n from leave_requests;
+    perform pg_temp.check('platform admin reads no leave requests', n, 0);
+    select count(*) into n from leave_balances;
+    perform pg_temp.check('platform admin reads no leave balances', n, 0);
+    select count(*) into n from profiles;
+    perform pg_temp.check('platform admin reads no profiles', n, 0);
+    select count(*) into n from invitations;
+    perform pg_temp.check('platform admin reads no invitations through RLS', n, 0);
+
+    -- ...and the console read they DO have discloses only names and counts.
+    select count(*) into n from public.platform_list_organizations();
+    if n = 0 then
+      raise exception 'RLS FAIL: platform_list_organizations returned nothing — the console cannot be verified against an empty result';
+    end if;
+    raise notice 'ok: a platform admin sees workspaces but no tenant data (D42)';
+
+    -- ─────────────────────────────────────── the invitation, accepted
+    perform pg_temp.as_postgres();
+    select token into v_text from invitations i join organizations o on o.id = i.organization_id
+     where o.slug = 'provisioned-co' and i.role = 'org_admin';
+
+    -- A token addressed to somebody else must fail exactly as a bad one does.
+    perform pg_temp.as_user(alice);
+    begin
+      perform public.invitation_accept(v_text);
+      raise exception 'RLS FAIL: an invitation was accepted by the wrong person';
+    exception
+      when raise_exception then
+        if sqlerrm not in ('INVITATION_NOT_FOUND', 'EMAIL_IN_ANOTHER_WORKSPACE') then
+          raise exception 'RLS FAIL: wrong-recipient acceptance said "%"', sqlerrm;
+        end if;
+    end;
+
+    -- A token that does not exist says the same thing as one that does but is
+    -- not yours. Anything more specific is an oracle for probing tokens.
     perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
     begin
-      perform public.signup_organization('Second Co', 'second-co', 'New Founder');
-      raise exception 'RLS FAIL: signup_organization created a second organisation for one user';
+      perform public.invitation_accept('deadbeef' || repeat('0', 40));
+      raise exception 'RLS FAIL: a nonexistent invitation token was accepted';
     exception
-      when unique_violation then raise notice 'ok: one organisation per person';
+      when raise_exception then
+        if sqlerrm <> 'INVITATION_NOT_FOUND' then
+          raise exception 'RLS FAIL: a bad token said "%" instead of INVITATION_NOT_FOUND', sqlerrm;
+        end if;
     end;
+    raise notice 'ok: a bad token and somebody else''s token are indistinguishable';
 
-    -- Step 2 revoked direct insert; the function is the only supported path.
-    begin
-      insert into organizations (name, slug) values ('Sneaky Co', 'sneaky-co');
-      raise exception 'RLS FAIL: an organisation was created without going through signup_organization';
-    exception
-      when insufficient_privilege then raise notice 'ok: organisations cannot be inserted directly';
-    end;
+    perform public.invitation_accept(v_text);
 
     perform pg_temp.as_postgres();
-    delete from auth.users where email = 'newfounder@signup.test';
-    delete from organizations where slug = 'signup-test-co';
+    select count(*) into n from profiles where email = 'provisioned@signup.test';
+    perform pg_temp.check('accepting an invitation creates the profile', n, 1);
+    select count(*) into n from user_roles r join profiles p on p.id = r.user_id
+     where p.email = 'provisioned@signup.test' and r.role = 'org_admin';
+    perform pg_temp.check('accepting an invitation grants the invited role', n, 1);
+
+    -- Once used, it is spent.
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f1');
+    begin
+      perform public.invitation_accept(v_text);
+      raise exception 'RLS FAIL: an invitation was accepted twice';
+    exception
+      when raise_exception then
+        if sqlerrm not in ('INVITATION_NOT_FOUND', 'EMAIL_IN_ANOTHER_WORKSPACE') then
+          raise exception 'RLS FAIL: reuse said "%"', sqlerrm;
+        end if;
+    end;
+    raise notice 'ok: an invitation cannot be redeemed twice';
+
+    -- ─────────────────────────────────────── invitations are tenant-scoped
+    -- Alice administers Acme. Vertex's invitations are none of her business,
+    -- and she cannot revoke one she cannot see.
+    perform pg_temp.as_user(alice);
+    select count(*) into n from invitations i join organizations o on o.id = i.organization_id
+     where o.slug = 'provisioned-co';
+    perform pg_temp.check('an admin cannot read another organisation''s invitations', n, 0);
+
+    -- An employee cannot read even their own organisation's — a token is a
+    -- credential and the guest list is not theirs.
+    perform pg_temp.as_user(ravi);
+    begin
+      perform public.invitation_create('someone@acme.test', null, 'employee', null);
+      raise exception 'RLS FAIL: an employee created an invitation';
+    exception
+      when insufficient_privilege then raise notice 'ok: only an admin invites';
+    end;
+
+    select count(*) into n from invitations;
+    perform pg_temp.check('an employee reads no invitations at all', n, 0);
+
+    -- ─────────────────────────────────────── cleanup
+    perform pg_temp.as_postgres();
+    delete from public.leave_requests where employee_id = ravi;
+    delete from public.notifications  where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.invitations    where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.approval_chains where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.user_roles     where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.audit_logs     where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.analytics_events where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.profiles       where organization_id in
+      (select id from organizations where slug = 'provisioned-co');
+    delete from public.organizations  where slug = 'provisioned-co';
+    delete from public.platform_admins where user_id = '00000000-0000-0000-0000-0000000000f0';
+    delete from auth.users where email in ('staff@signup.test', 'provisioned@signup.test');
   end if;
 
   ---------------------------------------------------------------- notification engine (step 5)

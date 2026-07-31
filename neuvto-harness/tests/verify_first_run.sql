@@ -69,6 +69,8 @@ end $$ language plpgsql;
 do $$
 declare
   v_founder uuid := '00000000-0000-0000-0000-00000000f1f1';
+  v_staff   uuid := '00000000-0000-0000-0000-00000000f1f0';   -- Neuvto, not a tenant
+  v_token   text;
   v_org     uuid;
   v_type    uuid;
   v_free    uuid;
@@ -89,28 +91,60 @@ declare
   v_fy_from text;
   n         bigint;
 begin
-  if to_regprocedure('public.signup_organization(text,text,text)') is null then
-    raise notice 'skipped: first-run checks (signup not built yet)';
+  if to_regprocedure('public.provision_organization(text,text,text,text,text)') is null then
+    raise notice 'skipped: first-run checks (provisioning not built yet)';
     return;
   end if;
 
   -- ══════════════════════════════════════════════════ a workspace, from nothing
+  --
+  -- Exactly the path a real customer takes, and no other: Sada provisions the
+  -- workspace and names its first administrator, who then accepts an invitation
+  -- like anybody else (D39). There is no self-serve signup to shortcut through
+  -- any more, and nothing here creates a profile, a leave type, a balance or an
+  -- approval chain by hand. That restraint is the whole value of this file.
 
   perform pg_temp.as_postgres();
 
+  delete from public.invitations   where email = 'founder@first-run.test';
   delete from public.organizations where slug = 'first-run-test';
-  delete from auth.users where id = v_founder;
+  delete from public.platform_admins where user_id = v_staff;
+  delete from auth.users where id in (v_founder, v_staff);
 
   insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
                           email_confirmed_at, created_at, updated_at,
                           raw_app_meta_data, raw_user_meta_data)
-  values (v_founder, '00000000-0000-0000-0000-000000000000',
-          'authenticated', 'authenticated', 'founder@first-run.test',
-          crypt('x', gen_salt('bf')), now(), now(), now(),
-          '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+  values
+    (v_staff, '00000000-0000-0000-0000-000000000000',
+     'authenticated', 'authenticated', 'staff@neuvto.test',
+     crypt('x', gen_salt('bf')), now(), now(), now(),
+     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb),
+    (v_founder, '00000000-0000-0000-0000-000000000000',
+     'authenticated', 'authenticated', 'founder@first-run.test',
+     crypt('x', gen_salt('bf')), now(), now(), now(),
+     '{"provider":"email","providers":["email"]}'::jsonb, '{}'::jsonb);
+
+  -- Neuvto staff. No profile, and deliberately never given one — that absence is
+  -- what makes current_org_id() null and every tenant policy refuse them (D42).
+  insert into public.platform_admins (user_id, note) values (v_staff, 'harness');
+
+  perform pg_temp.as_user(v_staff);
+  v_org := public.provision_organization(
+    'First Run Test Co', 'first-run-test',
+    'founder@first-run.test', '+91 90000 00001', 'First Founder');
+
+  perform pg_temp.as_postgres();
+  select token into v_token from public.invitations
+   where organization_id = v_org and role = 'org_admin' and accepted_at is null;
+  if v_token is null then
+    perform pg_temp.fail(
+      'provisioning created no administrator invitation',
+      'provision_organization must invite the named admin — it creates no profile, so without an invitation nobody can ever reach the workspace (D39)');
+  end if;
 
   perform pg_temp.as_user(v_founder);
-  v_org := public.signup_organization('First Run Test Co', 'first-run-test', 'First Founder');
+  perform public.invitation_accept(v_token);
+  raise notice 'ok: provisioning invites an administrator who accepts their way in';
 
   v_today := public.org_today(v_org);
   v_fy    := public.get_financial_year(v_org, v_today);
@@ -260,6 +294,8 @@ begin
   -- has to take its own fixtures down in order.
   perform pg_temp.as_postgres();
 
+  delete from public.notifications   where organization_id = v_org;
+  delete from public.invitations     where organization_id = v_org;
   delete from public.leave_requests  where organization_id = v_org;
   delete from public.leave_balances  where organization_id = v_org;
   delete from public.leave_types     where organization_id = v_org;
@@ -272,7 +308,8 @@ begin
   delete from public.user_roles        where organization_id = v_org;
   delete from public.profiles          where organization_id = v_org;
   delete from public.organizations     where id = v_org;
-  delete from auth.users               where id = v_founder;
+  delete from public.platform_admins   where user_id = v_staff;
+  delete from auth.users               where id in (v_founder, v_staff);
 
   raise notice '--- first-run verification passed ---';
 end $$;
