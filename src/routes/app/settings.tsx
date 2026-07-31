@@ -13,6 +13,7 @@ import {
   type OrgSettings,
 } from "@/platform/calendar";
 import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platform/modules";
+import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
 
 export const Route = createFileRoute("/app/settings")({
   ssr: false,
@@ -211,6 +212,18 @@ function SettingsPage() {
         Configuration your organisation owns. Changing the working week or the financial year
         changes how every future request is counted.
       </p>
+
+      {/* ─────────────────────────────────────────────── company */}
+      <section className="mt-8">
+        <h2 className="font-display text-base font-semibold">Your company</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          What this workspace is called, and the mark your people see on every screen and in every
+          email from it.
+        </p>
+        <div className="mt-4">
+          <CompanyIdentity />
+        </div>
+      </section>
 
       {/* ─────────────────────────────────────────────── the working week */}
       <section className="mt-8">

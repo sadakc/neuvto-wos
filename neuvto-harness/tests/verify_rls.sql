@@ -802,6 +802,86 @@ begin
   end if;
 
 
+  ------------------------------------------- company identity + storage (step 9, D45)
+  -- A workspace that looks like the customer's own — and a logo that is theirs
+  -- alone. The bucket is PRIVATE: public would make every customer's identity
+  -- enumerable by anyone who can guess a UUID, and who Neuvto's customers are
+  -- is not ours to publish.
+  if to_regprocedure('public.organization_display_name(uuid)') is not null then
+
+    perform pg_temp.as_postgres();
+    if exists (select 1 from storage.buckets where id = 'org-logos' and public) then
+      raise exception 'RLS FAIL: the org-logos bucket is PUBLIC — every customer''s logo is world-readable';
+    end if;
+
+    insert into storage.objects (bucket_id, name, metadata)
+    values ('org-logos', acme::text   || '/logo.png', '{}'::jsonb),
+           ('org-logos', vertex::text || '/logo.png', '{}'::jsonb)
+    on conflict do nothing;
+
+    perform pg_temp.as_user(alice);
+    select count(*) into n from storage.objects where bucket_id = 'org-logos';
+    perform pg_temp.check('an admin sees only their own company logo', n, 1);
+
+    begin
+      insert into storage.objects (bucket_id, name, metadata)
+      values ('org-logos', vertex::text || '/stolen.png', '{}'::jsonb);
+      raise exception 'RLS FAIL: an admin wrote into another customer''s logo path';
+    exception when insufficient_privilege then null;
+    end;
+
+    -- An employee sees the logo — it is on every screen they open — and cannot
+    -- change it.
+    perform pg_temp.as_user(ravi);
+    select count(*) into n from storage.objects where bucket_id = 'org-logos';
+    perform pg_temp.check('an employee sees their own company logo', n, 1);
+    begin
+      insert into storage.objects (bucket_id, name, metadata)
+      values ('org-logos', acme::text || '/employee.png', '{}'::jsonb);
+      raise exception 'RLS FAIL: an employee replaced the company logo';
+    exception when insufficient_privilege then null;
+    end;
+    raise notice 'ok: a logo belongs to one customer, and only their admins may change it';
+
+    -- Deletion and replacement cannot be exercised here: Supabase's
+    -- protect_delete() trigger refuses direct DML on storage.objects and points
+    -- at the Storage API. Assert the policies EXIST and are scoped, which is
+    -- the part a migration can get wrong.
+    perform pg_temp.as_postgres();
+    select count(*) into n from pg_policy p join pg_class c on c.oid = p.polrelid
+     where c.relname = 'objects'
+       and p.polname in ('admins replace organization logo', 'admins remove organization logo')
+       and pg_get_expr(p.polqual, p.polrelid) like '%current_org_id%'
+       and pg_get_expr(p.polqual, p.polrelid) like '%is_admin%';
+    perform pg_temp.check('replace and remove are org-scoped and admin-only', n, 2);
+
+    -- ─────────────────────────────────────── what an admin may change
+    --
+    -- authenticated held UPDATE on EVERY column of organizations. Two were
+    -- reachable that should never have been: `slug`, which is the workspace
+    -- address every link depends on, and `deleted_at` — an administrator could
+    -- SOFT-DELETE THEIR OWN ORGANISATION and lock everyone out of a workspace
+    -- that no policy would show them again.
+    perform pg_temp.as_user(alice);
+    begin
+      update public.organizations set deleted_at = now() where id = acme;
+      raise exception 'RLS FAIL: an admin soft-deleted their own organisation';
+    exception when insufficient_privilege then null;
+    end;
+    begin
+      update public.organizations set slug = 'stolen' where id = acme;
+      raise exception 'RLS FAIL: an admin changed their workspace address';
+    exception when insufficient_privilege then null;
+    end;
+    update public.organizations set display_name = 'Acme' where id = acme;
+    raise notice 'ok: an admin sets their own identity, not their address or their existence';
+
+    -- No cleanup: protect_delete() refuses direct deletion here too, and the
+    -- inserts above are fixed names with ON CONFLICT DO NOTHING, so repeated
+    -- runs leave exactly one object per organisation either way.
+  end if;
+
+
   ---------------------------------------------------------------- notification engine (step 5)
   if to_regprocedure('public.notify(text,uuid,jsonb)') is not null then
     declare

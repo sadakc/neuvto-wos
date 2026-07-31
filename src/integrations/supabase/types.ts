@@ -1079,9 +1079,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           deleted_at: string | null
+          display_name: string | null
           id: string
           industry_type: string | null
+          logo_path: string | null
+          logo_updated_at: string | null
           name: string
+          onboarding_completed_at: string | null
           slug: string
           updated_at: string
           updated_by: string | null
@@ -1090,9 +1094,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          display_name?: string | null
           id?: string
           industry_type?: string | null
+          logo_path?: string | null
+          logo_updated_at?: string | null
           name: string
+          onboarding_completed_at?: string | null
           slug: string
           updated_at?: string
           updated_by?: string | null
@@ -1101,9 +1109,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          display_name?: string | null
           id?: string
           industry_type?: string | null
+          logo_path?: string | null
+          logo_updated_at?: string | null
           name?: string
+          onboarding_completed_at?: string | null
           slug?: string
           updated_at?: string
           updated_by?: string | null
@@ -1419,7 +1431,6 @@ export type Database = {
         Args: { _org_id: string; _ref: string }
         Returns: boolean
       }
-      module_enabled: { Args: { _module_key: string }; Returns: boolean }
       module_enabled_for: {
         Args: { _module_key: string; _org_id: string }
         Returns: boolean
@@ -1461,6 +1472,7 @@ export type Database = {
         Returns: string
       }
       org_today: { Args: { _org_id: string }; Returns: string }
+      organization_display_name: { Args: { _org_id: string }; Returns: string }
       platform_list_org_modules: {
         Args: { _org_id: string }
         Returns: {
