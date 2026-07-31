@@ -37,6 +37,22 @@ export interface ModuleNavItem {
   roles?: readonly AppRole[];
 }
 
+/**
+ * A card a module contributes to the dashboard.
+ *
+ * The dashboard belongs to the platform; an employee's leave balance belongs to
+ * Leave. Without this, `src/routes/app/index.tsx` would have to name a module to
+ * show anything useful — the coupling removed from `app-nav.tsx`, reintroduced
+ * one screen over.
+ */
+export interface ModuleDashboardCard {
+  /** Stable across renders; used as the React key and for ordering. */
+  id: string;
+  component: ComponentType | LazyExoticComponent<ComponentType>;
+  /** Lower sorts first. Platform content always precedes module content. */
+  order?: number;
+}
+
 export interface ModuleRoute {
   /** Relative to /app, no leading slash. "leave/apply" serves /app/leave/apply. */
   path: string;
@@ -66,6 +82,13 @@ export interface ModuleDefinition {
   navigation: (user: CurrentUser | null) => ModuleNavItem[];
 
   routes: ModuleRoute[];
+
+  /**
+   * Rendered on the dashboard, for organisations that have this module enabled.
+   * A function of the user for the same reason navigation is: a manager's
+   * dashboard is not an employee's.
+   */
+  dashboardCards?: (user: CurrentUser | null) => ModuleDashboardCard[];
 
   /**
    * Entity types this module registers with the Approval Engine. Declared so
@@ -111,6 +134,7 @@ export const ModuleDefinitionSchema = z.object({
       component: z.any(),
     }),
   ),
+  dashboardCards: z.function().optional(),
   approvalEntityTypes: z.array(z.string().regex(/^[a-z_]+$/)).readonly(),
   eventKeys: z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/)).readonly(),
   settingsSchema: z.any(),

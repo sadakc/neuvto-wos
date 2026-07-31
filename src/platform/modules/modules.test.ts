@@ -35,6 +35,7 @@ const {
   moduleByKey,
   getEnabledModules,
   getModuleNavigation,
+  getDashboardCards,
   resolveModuleRoute,
 } = await import("./registry");
 
@@ -65,6 +66,12 @@ function noticeboard(overrides: Partial<ModuleDefinition> = {}): ModuleDefinitio
     routes: [
       { path: "noticeboard", component: () => null },
       { path: "noticeboard/new", component: () => null },
+    ],
+    dashboardCards: (u) => [
+      { id: "notices-summary", component: () => null, order: 10 },
+      ...(u?.roles.includes("hr_admin")
+        ? [{ id: "notices-draft", component: () => null, order: 20 }]
+        : []),
     ],
     approvalEntityTypes: ["notice"],
     eventKeys: ["notice.published"],
@@ -156,6 +163,54 @@ describe("navigation", () => {
   it("contributes nothing when the module is off", async () => {
     enabledKeys.current = [];
     expect(await getModuleNavigation(user(["org_admin"]))).toEqual([]);
+  });
+});
+
+describe("dashboard cards", () => {
+  beforeEach(() => {
+    installModules([noticeboard()]);
+    enabledKeys.current = ["noticeboard"];
+  });
+
+  it("contributes cards without the dashboard knowing what they are", async () => {
+    const cards = await getDashboardCards(user(["employee"]));
+    expect(cards.map((c) => c.id)).toEqual(["notices-summary"]);
+    expect(cards[0].moduleKey).toBe("noticeboard");
+  });
+
+  it("gives a role-restricted card only to someone holding the role", async () => {
+    const cards = await getDashboardCards(user(["hr_admin"]));
+    expect(cards.map((c) => c.id)).toEqual(["notices-summary", "notices-draft"]);
+  });
+
+  it("contributes nothing when the module is switched off", async () => {
+    enabledKeys.current = [];
+    expect(await getDashboardCards(user(["hr_admin"]))).toEqual([]);
+  });
+
+  it("returns nothing at all when no module is installed", async () => {
+    // The dashboard has to work with zero modules — which is exactly the state
+    // the module-removal check puts the application in.
+    installModules([]);
+    expect(await getDashboardCards(user(["employee"]))).toEqual([]);
+  });
+
+  it("tolerates a module that contributes no cards", async () => {
+    installModules([noticeboard({ dashboardCards: undefined })]);
+    expect(await getDashboardCards(user(["employee"]))).toEqual([]);
+  });
+
+  it("orders cards by their declared order, not by module order", async () => {
+    const late = noticeboard({
+      key: "bulletin",
+      routes: [{ path: "bulletin", component: () => null }],
+      approvalEntityTypes: [],
+      dashboardCards: () => [{ id: "bulletin-card", component: () => null, order: 5 }],
+    });
+    installModules([noticeboard(), late]);
+    enabledKeys.current = ["noticeboard", "bulletin"];
+    const cards = await getDashboardCards(user(["employee"]));
+    expect(cards.map((c) => c.id)).toEqual(["bulletin-card", "notices-summary"]);
   });
 });
 

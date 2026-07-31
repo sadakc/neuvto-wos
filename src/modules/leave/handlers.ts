@@ -18,6 +18,7 @@ import {
   type LeaveBalance,
   type LeaveRequest,
   type LeaveStatus,
+  type ApprovalStep,
 } from "./contracts";
 
 /**
@@ -73,7 +74,7 @@ export async function getMyRequests(): Promise<LeaveRequest[]> {
   const { data, error } = await supabase
     .from("leave_requests")
     .select(
-      "id, leave_type_id, from_date, to_date, working_days, reason, status, submitted_at, decided_at, rejection_reason, leave_types(name)",
+      "id, approval_request_id, leave_type_id, from_date, to_date, working_days, reason, status, submitted_at, decided_at, rejection_reason, leave_types(name)",
     )
     .order("from_date", { ascending: false });
 
@@ -81,6 +82,7 @@ export async function getMyRequests(): Promise<LeaveRequest[]> {
 
   return (data ?? []).map((r) => ({
     id: r.id,
+    approvalRequestId: r.approval_request_id,
     leaveTypeId: r.leave_type_id,
     leaveTypeName: (r.leave_types as { name: string } | null)?.name ?? "Leave",
     fromDate: r.from_date,
@@ -91,6 +93,41 @@ export async function getMyRequests(): Promise<LeaveRequest[]> {
     submittedAt: r.submitted_at,
     decidedAt: r.decided_at,
     rejectionReason: r.rejection_reason,
+  }));
+}
+
+/**
+ * Cancels own future leave. The database decides whether it is allowed and
+ * returns a named reason if not — this never pre-judges, because a rule
+ * duplicated in the browser is a rule that will one day disagree.
+ */
+export async function cancelLeave(requestId: string): Promise<void> {
+  const { error } = await supabase.rpc("leave_cancel", { _request_id: requestId });
+  if (error) throw toLeaveError(error.message);
+}
+
+/**
+ * Who has to approve, who already has, and what they said. Employees can read
+ * their own steps — `is_requester_of` in the approval engine's policy — so this
+ * needs no special privilege.
+ */
+export async function getApprovalTimeline(approvalRequestId: string): Promise<ApprovalStep[]> {
+  // A dedicated function rather than a join. An employee cannot read the
+  // approver's profile — they see only their own — so the join returned no name
+  // and the timeline said "Approver". This discloses the name and nothing else
+  // about them (D35).
+  const { data, error } = await supabase.rpc("approval_timeline", {
+    _approval_request_id: approvalRequestId,
+  });
+
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the approval history.", 500);
+
+  return (data ?? []).map((r) => ({
+    level: r.level,
+    approverName: r.approver_name,
+    decision: r.decision as ApprovalStep["decision"],
+    comments: r.comments,
+    decidedAt: r.decided_at,
   }));
 }
 
