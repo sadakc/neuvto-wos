@@ -13,6 +13,7 @@ export {
   getModuleNavigation,
   resolveModuleRoute,
   getDashboardCards,
+  getAdminSections,
 } from "./registry";
 
 export {
@@ -21,6 +22,7 @@ export {
   type ModuleNavItem,
   type ModuleRoute,
   type ModuleDashboardCard,
+  type ModuleAdminSection,
 } from "./contract";
 
 export { ModuleLink } from "./ModuleLink";

@@ -1,0 +1,22 @@
+{
+  "name": "Neuvto — Workforce OS",
+  "short_name": "Neuvto",
+  "description": "Apply for leave, see your balance, and approve your team's requests.",
+  "id": "/app",
+  "start_url": "/app",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#ffffff",
+  "theme_color": "#00b0ed",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/icon-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/icon-maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ],
+  "shortcuts": [
+    { "name": "Apply for leave", "url": "/app/leave/apply" },
+    { "name": "My leave", "url": "/app/leave" }
+  ]
+}

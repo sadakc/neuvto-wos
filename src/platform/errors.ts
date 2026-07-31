@@ -25,6 +25,19 @@ export const ERROR_CODES = [
   "ALREADY_IN_ORGANIZATION",
   "SLUG_TAKEN",
   "NO_ORGANIZATION",
+  // joining a workspace (D39/D40)
+  //
+  // INVITATION_NOT_FOUND covers expired, revoked, already-used, addressed to
+  // somebody else, and never-existed. One code because the database returns one
+  // message for all of them: finer distinctions would let a token be probed.
+  "INVITATION_NOT_FOUND",
+  "EMAIL_IN_ANOTHER_WORKSPACE",
+  "ALREADY_A_MEMBER",
+  "ALREADY_INVITED",
+  "PHONE_ALREADY_A_MEMBER",
+  "PHONE_ALREADY_INVITED",
+  "INVALID_EMAIL",
+  "ORGANIZATION_NAME_REQUIRED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

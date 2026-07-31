@@ -11,9 +11,9 @@
  */
 
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate } from "@tanstack/react-router";
+import { Link, useNavigate } from "@tanstack/react-router";
 import { getWorkingDays } from "@/platform/calendar";
-import { getCurrentUser, type CurrentUser } from "@/platform/auth";
+import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { getLeaveTypes, getMyBalances, submitLeave } from "../handlers";
 import type { LeaveBalance } from "../contracts";
@@ -173,13 +173,25 @@ export default function ApplyLeave() {
     );
   }
 
+  // The same dead end the dashboard used to offer, reached the other way. An
+  // administrator gets the fix; everybody else gets told who has it.
   if (types.length === 0) {
     return (
       <div className="max-w-lg">
         <h1 className="font-display text-lg font-semibold">Apply for leave</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          No leave types have been set up yet. Ask your administrator to add them.
+          {isAdmin(user)
+            ? "No leave types are set up yet, so there's nothing to apply for."
+            : "No leave types have been set up yet. Ask your administrator to add them."}
         </p>
+        {isAdmin(user) && (
+          <Link
+            to="/app/settings"
+            className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            Set up leave types
+          </Link>
+        )}
       </div>
     );
   }

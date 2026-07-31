@@ -8,12 +8,36 @@
 
 export { requestOtp, verifyOtp, signOut } from "./otp";
 export { getUserId, getCurrentUser, hasRole, isAdmin, canApprove } from "./session";
-export { createOrganization } from "./signup";
+
+/**
+ * D39 — the one way into a workspace. `createOrganization` is deliberately
+ * absent: self-serve signup let any verified address create a workspace and
+ * administer it, and workspaces are provisioned now.
+ */
+export { acceptInvitation } from "./invitations";
+export {
+  isPlatformAdmin,
+  listOrganizations,
+  provisionOrganization,
+  type CustomerWorkspace,
+} from "./platform";
+export {
+  inviteMember,
+  revokeInvitation,
+  listInvitations,
+  listMembers,
+  type Member,
+  type Invitation,
+} from "./members";
+
 export {
   APP_ROLES,
   EmailInput,
   VerifyOtpInput,
   SignupInput,
+  ProvisionInput,
+  InviteInput,
+  PhoneInput,
   suggestSlug,
   type AppRole,
   type CurrentUser,

@@ -11,8 +11,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { Link } from "@tanstack/react-router";
 import { ModuleLink } from "@/platform/modules";
-import { getCurrentUser } from "@/platform/auth";
+import { getCurrentUser, isAdmin } from "@/platform/auth";
 import { getFinancialYear } from "@/platform/calendar";
 import { getMyBalances, getMyRequests } from "../handlers";
 import { BalanceCard } from "./BalanceCard";
@@ -24,11 +25,15 @@ export default function LeaveDashboardCard() {
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
   const [fyLabel, setFyLabel] = useState<string | null>(null);
+  const [admin, setAdmin] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
     getCurrentUser()
-      .then((u) => (u ? getFinancialYear(u.organizationId) : null))
+      .then((u) => {
+        if (!cancelled) setAdmin(isAdmin(u));
+        return u ? getFinancialYear(u.organizationId) : null;
+      })
       .then((fy) => !cancelled && setFyLabel(fy))
       .catch(() => !cancelled && setFyLabel(null));
 
@@ -89,34 +94,61 @@ export default function LeaveDashboardCard() {
         </ModuleLink>
       </div>
 
+      {/*
+        Nothing to book, no button.
+
+        Reported on sight: the card said "you don't have a leave balance yet"
+        and offered "Apply for leave" directly underneath it. The CTA sat
+        outside this branch and rendered unconditionally, so the one action on
+        screen was the one action that could not work — it led to a form whose
+        only content was another apology.
+
+        What replaces it depends on who is reading. An administrator is one
+        click from fixing it and gets that click. Everybody else is not, and
+        gets a sentence instead of a dead end.
+      */}
       {balances.length === 0 ? (
-        <p className="mt-2 text-sm text-muted-foreground">
-          You don&apos;t have a leave balance yet. It appears once your administrator sets up leave
-          types.
-        </p>
+        <>
+          <p className="mt-2 text-sm text-muted-foreground">
+            {admin
+              ? "No leave types are set up yet, so nobody here can apply for leave."
+              : "You don't have a leave balance yet. It appears once your administrator sets up leave types."}
+          </p>
+          {admin && (
+            <Link
+              to="/app/settings"
+              data-testid="setup-leave-types"
+              className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+            >
+              Set up leave types
+            </Link>
+          )}
+        </>
       ) : (
-        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-          {currentYear.map((b) => (
-            <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
-          ))}
-        </div>
+        <>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {currentYear.map((b) => (
+              <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
+            ))}
+          </div>
+
+          <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
+            {pendingCount > 0 && (
+              <span data-testid="pending-count">{pendingCount} awaiting approval</span>
+            )}
+            {nextApproved && (
+              <span data-testid="next-approved">Next leave {nextApproved.fromDate}</span>
+            )}
+          </div>
+
+          <ModuleLink
+            path="leave/apply"
+            className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+          >
+            Apply for leave
+          </ModuleLink>
+        </>
       )}
-
-      <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
-        {pendingCount > 0 && (
-          <span data-testid="pending-count">{pendingCount} awaiting approval</span>
-        )}
-        {nextApproved && (
-          <span data-testid="next-approved">Next leave {nextApproved.fromDate}</span>
-        )}
-      </div>
-
-      <ModuleLink
-        path="leave/apply"
-        className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
-      >
-        Apply for leave
-      </ModuleLink>
     </section>
   );
 }

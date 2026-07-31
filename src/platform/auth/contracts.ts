@@ -49,6 +49,43 @@ export const SignupInput = z.object({
 });
 export type SignupInput = z.infer<typeof SignupInput>;
 
+/**
+ * A phone number as an administrator types it.
+ *
+ * Deliberately permissive about shape: international formats vary far more than
+ * any regex written in one country accounts for, and rejecting a valid number is
+ * worse than storing an odd-looking one. The database normalises to digits and a
+ * leading + for its uniqueness rule.
+ *
+ * This is NOT verified, and is not an identity key (D41). Making it one needs
+ * phone OTP, which D8 defers.
+ */
+export const PhoneInput = z
+  .string()
+  .trim()
+  .refine(
+    (v) => v === "" || v.replace(/\D/g, "").length >= 6,
+    "That doesn't look like a phone number",
+  )
+  .refine((v) => v.length <= 32, "That phone number is too long");
+
+/** Provisioning a customer workspace. Platform admins only — see `platform.ts`. */
+export const ProvisionInput = SignupInput.extend({
+  adminEmail: z.string().trim().toLowerCase().email("Enter the administrator's email address"),
+  adminPhone: PhoneInput.optional().default(""),
+  adminName: z.string().trim().max(200).optional().default(""),
+});
+export type ProvisionInput = z.infer<typeof ProvisionInput>;
+
+/** Inviting somebody into the caller's own workspace. */
+export const InviteInput = z.object({
+  email: z.string().trim().toLowerCase().email("Enter a valid email address").max(320),
+  phone: PhoneInput.optional().default(""),
+  role: z.enum(APP_ROLES),
+  fullName: z.string().trim().max(200).optional().default(""),
+});
+export type InviteInput = z.infer<typeof InviteInput>;
+
 /** The signed-in user as the app needs them: identity, tenant and roles in one object. */
 export interface CurrentUser {
   id: string;

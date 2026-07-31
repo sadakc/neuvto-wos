@@ -113,6 +113,13 @@ run "seeding test data"        "$HARNESS_DIR/seed/seed_test_data.sql"
 run "verifying tenant isolation" "$HARNESS_DIR/tests/verify_rls.sql"
 run "verifying data integrity"   "$HARNESS_DIR/tests/verify_invariants.sql"
 
+# Deliberately NOT seeded. Everything above runs against two organisations the
+# seed has already configured — leave types, balances, approval chains — which
+# is a state no customer has ever been in. Three faults lived through a green
+# harness because of exactly that. This one builds an organisation the way the
+# product does and asserts somebody can then use it. It cleans up after itself.
+run "verifying the first run"    "$HARNESS_DIR/tests/verify_first_run.sql"
+
 # Needs two connections, so it cannot live in the SQL suite — a single session
 # cannot race itself. This is the D10 regression guard.
 printf '\n──  %s\n' "verifying concurrent submission"

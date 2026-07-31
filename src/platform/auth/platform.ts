@@ -1,0 +1,108 @@
+/**
+ * Platform ownership — Neuvto's own view, above every tenant.
+ *
+ * Sada provisions a customer workspace and names the person who will administer
+ * it. That person is invited, not created: they accept like anybody else, which
+ * means they have proved they control the address before they hold the role.
+ *
+ * D42 — a platform admin provisions and never reads tenant data. `listOrganizations`
+ * is the entire read surface, and it returns names and counts. The enforcement
+ * is not here: a platform admin has no profile, so `current_org_id()` is null
+ * and every tenant policy already refuses them. The harness asserts that, and
+ * sabotages it to prove the assertion can fail.
+ */
+
+import { supabase } from "@/integrations/supabase/client";
+import { AppError, toAppError, type ErrorCode } from "@/platform/errors";
+import { ProvisionInput } from "./contracts";
+
+export interface CustomerWorkspace {
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: string;
+  memberCount: number;
+  adminEmail: string | null;
+  adminAccepted: boolean;
+  /** Present only while the administrator's invitation is unaccepted. */
+  adminInviteUrl: string | null;
+}
+
+/**
+ * Whether the signed-in person is Neuvto staff.
+ *
+ * Answered by the database, never inferred from anything the browser holds.
+ * Used to decide whether to render the console at all — which is courtesy, not
+ * security: every provisioning function re-checks it server-side.
+ */
+export async function isPlatformAdmin(): Promise<boolean> {
+  const { data, error } = await supabase.rpc("is_platform_admin");
+  if (error) return false;
+  return data === true;
+}
+
+export async function listOrganizations(): Promise<CustomerWorkspace[]> {
+  const { data, error } = await supabase.rpc("platform_list_organizations");
+  if (error) throw toAppError(error, "listOrganizations");
+
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    name: r.name,
+    slug: r.slug,
+    createdAt: r.created_at,
+    memberCount: Number(r.member_count),
+    adminEmail: r.admin_email,
+    adminAccepted: r.admin_accepted,
+    adminInviteUrl: r.admin_invite_url,
+  }));
+}
+
+const PROVISION_ERRORS: Partial<Record<ErrorCode, { message: string; field?: string }>> = {
+  SLUG_TAKEN: { message: "That workspace address is already taken.", field: "slug" },
+  INVALID_EMAIL: { message: "Enter a valid administrator email address.", field: "adminEmail" },
+  ORGANIZATION_NAME_REQUIRED: { message: "Enter the company name.", field: "organizationName" },
+};
+
+export async function provisionOrganization(input: unknown): Promise<{ organizationId: string }> {
+  const parsed = ProvisionInput.parse(input);
+
+  const { data, error } = await supabase.rpc("provision_organization", {
+    _name: parsed.organizationName,
+    _slug: parsed.slug,
+    _admin_email: parsed.adminEmail,
+    _admin_phone: parsed.adminPhone || undefined,
+    _admin_name: parsed.adminName || undefined,
+  });
+
+  if (error) {
+    const code = (Object.keys(PROVISION_ERRORS) as ErrorCode[]).find((k) =>
+      error.message.includes(k),
+    );
+    if (code) {
+      const e = PROVISION_ERRORS[code]!;
+      throw new AppError(code, e.message, 400, e.field ? { field: e.field } : undefined);
+    }
+    // 42501. Shown rather than hidden: somebody who reached this screen and is
+    // not staff should be told plainly, not left with a form that silently
+    // never works.
+    if (error.message.includes("FORBIDDEN")) {
+      throw new AppError("FORBIDDEN", "Only Neuvto staff can provision a workspace.", 403);
+    }
+    // The slug format CHECK, reached when the client rule and the database rule
+    // have drifted apart.
+    if (error.message.includes("organizations_slug_format")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "Use lowercase letters, numbers and hyphens only.",
+        400,
+        {
+          field: "slug",
+        },
+      );
+    }
+    throw toAppError(error, "provisionOrganization");
+  }
+
+  if (!data) throw new AppError("INTERNAL_ERROR", "The workspace could not be created.", 500);
+  return { organizationId: data as string };
+}

@@ -1,0 +1,355 @@
+/**
+ * Leave types — what an administrator configures for the whole company.
+ *
+ * The first thing Sada went looking for and did not find. The database has
+ * allowed this write since step 6; nothing was ever built to make it, so a
+ * workspace could be signed into and not used.
+ *
+ * Contributed to Settings through `adminSections`, so the platform's settings
+ * page renders it without importing this module or knowing Leave exists.
+ *
+ * Entitlement is not set per person here, and that is the design: days per year
+ * on the type, pro-rated by joined date (D3). One number configures the company.
+ * Per-person opening balances are step 10, for customers arriving mid-year.
+ */
+
+import { useEffect, useState } from "react";
+import { getCurrentUser, type CurrentUser } from "@/platform/auth";
+import { isAppError } from "@/platform/errors";
+import { listLeaveTypes, saveLeaveType, setLeaveTypeStatus } from "../handlers";
+import { LeaveTypeInput, type LeaveType } from "../contracts";
+
+/** The form's own shape: numbers are strings until they parse. */
+type Draft = {
+  id?: string;
+  name: string;
+  description: string;
+  maxDaysPerYear: string;
+  minNoticeDays: string;
+  maxPerRequest: string;
+  approvalRequired: boolean;
+};
+
+const EMPTY: Draft = {
+  name: "",
+  description: "",
+  maxDaysPerYear: "12",
+  minNoticeDays: "0",
+  approvalRequired: true,
+  maxPerRequest: "",
+};
+
+const toDraft = (t: LeaveType): Draft => ({
+  id: t.id,
+  name: t.name,
+  description: t.description ?? "",
+  maxDaysPerYear: String(t.maxDaysPerYear),
+  minNoticeDays: t.minNoticeDays === null ? "" : String(t.minNoticeDays),
+  maxPerRequest: t.maxPerRequest === null ? "" : String(t.maxPerRequest),
+  approvalRequired: t.approvalRequired,
+});
+
+/** Blank means "no limit", which is not the same as zero — hence null, not 0. */
+const optionalNumber = (v: string) => (v.trim() === "" ? null : Number(v));
+
+export default function LeaveTypes() {
+  const [user, setUser] = useState<CurrentUser | null>(null);
+  const [types, setTypes] = useState<LeaveType[]>([]);
+  const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+
+  const [draft, setDraft] = useState<Draft | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
+
+  async function load() {
+    setTypes(await listLeaveTypes());
+  }
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([getCurrentUser(), listLeaveTypes()])
+      .then(([u, t]) => {
+        if (cancelled) return;
+        setUser(u);
+        setTypes(t);
+        setState("ready");
+      })
+      .catch(() => !cancelled && setState("error"));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function onSave(e: React.FormEvent) {
+    e.preventDefault();
+    if (!draft || !user) return;
+    setError("");
+    setSaving(true);
+    try {
+      const parsed = LeaveTypeInput.parse({
+        id: draft.id,
+        name: draft.name,
+        description: draft.description || undefined,
+        maxDaysPerYear: Number(draft.maxDaysPerYear),
+        minNoticeDays: optionalNumber(draft.minNoticeDays),
+        maxPerRequest: optionalNumber(draft.maxPerRequest),
+        approvalRequired: draft.approvalRequired,
+      });
+      await saveLeaveType(parsed, user.organizationId);
+      await load();
+      setDraft(null);
+    } catch (err) {
+      // A Zod message is written for the person reading it; anything else comes
+      // from the database and has already been translated.
+      setError(
+        isAppError(err)
+          ? err.message
+          : err instanceof Error && "issues" in err
+            ? (err as { issues: { message: string }[] }).issues[0].message
+            : "That didn't save. Please try again.",
+      );
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  async function onToggleStatus(t: LeaveType) {
+    setError("");
+    try {
+      await setLeaveTypeStatus(t.id, t.status === "active" ? "archived" : "active");
+      await load();
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That didn't work. Please try again.");
+    }
+  }
+
+  if (state === "loading") {
+    return <div className="h-32 animate-pulse rounded-lg bg-muted" />;
+  }
+
+  if (state === "error") {
+    return (
+      <p className="text-sm text-muted-foreground">
+        We couldn&apos;t load your leave types just now. Try refreshing.
+      </p>
+    );
+  }
+
+  const active = types.filter((t) => t.status === "active");
+  const archived = types.filter((t) => t.status === "archived");
+
+  return (
+    <div>
+      {types.length === 0 && !draft && (
+        <p className="mb-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+          No leave types yet. Until you add one, nobody in this workspace can apply for leave.
+        </p>
+      )}
+
+      {types.length > 0 && (
+        <ul className="divide-y divide-border rounded-lg border border-border">
+          {[...active, ...archived].map((t) => (
+            <li
+              key={t.id}
+              data-testid="leave-type-row"
+              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
+            >
+              <div className="min-w-0">
+                <p className="text-sm font-medium">
+                  {t.name}
+                  {t.status === "archived" && (
+                    <span className="ml-2 rounded bg-secondary px-1.5 py-0.5 text-xs font-normal text-muted-foreground">
+                      Archived
+                    </span>
+                  )}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {t.maxDaysPerYear} {t.maxDaysPerYear === 1 ? "day" : "days"} a year
+                  {t.minNoticeDays ? ` · ${t.minNoticeDays} days' notice` : ""}
+                  {t.maxPerRequest ? ` · up to ${t.maxPerRequest} at a time` : ""}
+                  {!t.approvalRequired && " · no approval needed"}
+                </p>
+                {t.description && (
+                  <p className="mt-1 max-w-prose text-xs text-muted-foreground">{t.description}</p>
+                )}
+              </div>
+
+              <div className="flex shrink-0 gap-2">
+                <button
+                  onClick={() => {
+                    setError("");
+                    setDraft(toDraft(t));
+                  }}
+                  className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
+                >
+                  Edit
+                </button>
+                <button
+                  onClick={() => onToggleStatus(t)}
+                  data-testid="archive-leave-type"
+                  className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
+                >
+                  {t.status === "active" ? "Archive" : "Restore"}
+                </button>
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {!draft && (
+        <button
+          onClick={() => {
+            setError("");
+            setDraft({ ...EMPTY });
+          }}
+          data-testid="add-leave-type"
+          className="mt-4 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
+        >
+          Add a leave type
+        </button>
+      )}
+
+      {draft && (
+        <form
+          onSubmit={onSave}
+          data-testid="leave-type-form"
+          className="mt-4 space-y-4 rounded-lg border border-border p-4"
+        >
+          <div>
+            <label htmlFor="lt-name" className="block text-sm font-medium">
+              Name
+            </label>
+            <input
+              id="lt-name"
+              value={draft.name}
+              onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+              placeholder="Casual leave"
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+            />
+          </div>
+
+          <div>
+            <label htmlFor="lt-desc" className="block text-sm font-medium">
+              Description <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <input
+              id="lt-desc"
+              value={draft.description}
+              onChange={(e) => setDraft({ ...draft, description: e.target.value })}
+              maxLength={300}
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+            />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-3">
+            <div>
+              <label htmlFor="lt-days" className="block text-sm font-medium">
+                Days a year
+              </label>
+              <input
+                id="lt-days"
+                type="number"
+                inputMode="decimal"
+                min={0}
+                max={365}
+                value={draft.maxDaysPerYear}
+                onChange={(e) => setDraft({ ...draft, maxDaysPerYear: e.target.value })}
+                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Pro-rated for anyone who joins part-way through the year
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="lt-notice" className="block text-sm font-medium">
+                Notice needed
+              </label>
+              <input
+                id="lt-notice"
+                type="number"
+                inputMode="numeric"
+                min={0}
+                max={365}
+                value={draft.minNoticeDays}
+                onChange={(e) => setDraft({ ...draft, minNoticeDays: e.target.value })}
+                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">
+                Days. Blank uses the workspace default
+              </p>
+            </div>
+
+            <div>
+              <label htmlFor="lt-max" className="block text-sm font-medium">
+                Most at a time
+              </label>
+              <input
+                id="lt-max"
+                type="number"
+                inputMode="decimal"
+                min={1}
+                max={365}
+                value={draft.maxPerRequest}
+                onChange={(e) => setDraft({ ...draft, maxPerRequest: e.target.value })}
+                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">Blank means no limit</p>
+            </div>
+          </div>
+
+          {/* D38. The reason this switch exists, spelled out — it is the only
+              way a one-person workspace can book anything, and an admin has no
+              way to guess that from the label alone. */}
+          <div className="rounded-md border border-border p-3">
+            <label className="flex items-start gap-3">
+              <input
+                type="checkbox"
+                checked={draft.approvalRequired}
+                onChange={(e) => setDraft({ ...draft, approvalRequired: e.target.checked })}
+                data-testid="approval-required"
+                className="mt-1 h-5 w-5 shrink-0"
+              />
+              <span>
+                <span className="block text-sm font-medium">Needs approval</span>
+                <span className="block text-xs text-muted-foreground">
+                  Off means it is approved the moment somebody applies. Useful for compensatory time
+                  off — and it is the only way to book leave in a workspace where nobody has a
+                  manager yet, since people cannot approve their own requests.
+                </span>
+              </span>
+            </label>
+          </div>
+
+          {error && (
+            <p role="alert" data-testid="leave-type-error" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+
+          <div className="flex flex-col gap-3 sm:flex-row">
+            <button
+              type="submit"
+              disabled={saving}
+              data-testid="save-leave-type"
+              className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+            >
+              {saving ? "Saving…" : draft.id ? "Save changes" : "Add leave type"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setDraft(null);
+                setError("");
+              }}
+              className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm"
+            >
+              Cancel
+            </button>
+          </div>
+        </form>
+      )}
+    </div>
+  );
+}
