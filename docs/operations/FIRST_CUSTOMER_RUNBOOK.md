@@ -25,20 +25,46 @@ Three gaps before a contract can be signed, and none of them are engineering.
 
 ## Day 1 — account and configuration
 
-**1. Create the organisation.** Sada provisions it. **[GAP]** — no super-admin console
-exists (`07_ROLES_PERMISSIONS.md` defines the role; nothing implements it). Manual SQL is
-acceptable for customer one if it is a conscious choice, not for customer five.
+**0. One time only — make yourself a platform admin.** Nothing in the application can do
+this, on purpose: a self-service path into `platform_admins` would be god-mode over every
+customer. Sign in to Neuvto normally first, so Supabase Auth creates your account properly,
+then run this once as `service_role`:
 
-**2. Invite the first admin**, who enrols TOTP at first sign-in (D21).
+```sql
+insert into public.platform_admins (user_id, note)
+select id, 'Sada — founder' from auth.users where email = 'you@neuvto.com';
+```
 
-**3. Configure the working calendar.** Financial year start, weekend days, public holidays.
-Ask early — an Indian firm on April–March and a Gulf firm on Friday/Saturday are both
-normal, and getting this wrong invalidates every balance calculated afterwards.
+**Sign in FIRST.** Creating the auth user with a bare `INSERT` into `auth.users` produces an
+account that cannot sign in at all — GoTrue scans the token columns into non-nullable Go
+strings and joins `auth.identities`, so a row missing either fails every lookup with
+"Database error finding user". The seed file carries the full incantation if you ever need it;
+signing in normally avoids needing it.
 
-**4. Configure leave types.** Name, days per year, notice period, maximum per request.
+**1. Provision the workspace** at `/admin`: company name, address, and the administrator's
+email and phone. They are invited, not created — they accept like anybody else, which means
+they have proved they control the address before they hold the role (D39).
 
-**5. Configure the approval chain.** Level 1 always; level 2 above a threshold they choose.
-Confirm the threshold explicitly rather than leaving the default of 3 days.
+**2. They accept the invitation** and land in the workspace as its administrator. If the email
+is slow, `/admin` shows a copyable link until it is accepted. TOTP enrolment (D21) is not
+built yet.
+
+**3. Configure the working calendar** in Settings. Financial year start, working week, public
+holidays. Ask early — an Indian firm on April–March and a Gulf firm on Friday/Saturday are
+both normal, six-day weeks are ordinary, and getting this wrong invalidates every balance
+calculated afterwards.
+
+**4. Configure leave types** in Settings. Name, days per year, notice period, maximum per
+request, and whether approval is needed at all. Days per year is pro-rated by joined date
+(D3), so one number configures the whole company.
+
+**5. Configure the approval chain** under Approval rules. Level 1 always; level 2 above a
+threshold they choose. Confirm the threshold explicitly rather than leaving the default of 3
+days.
+
+**A one-person workspace cannot book leave that needs approval**, and that is correct rather
+than broken: D13 forbids self-approval, so no level resolves. Either invite a second person,
+or mark a leave type as needing no approval (D38).
 
 ---
 
