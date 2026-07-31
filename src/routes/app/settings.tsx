@@ -202,6 +202,15 @@ function SettingsPage() {
           </button>
         </form>
 
+        {/* Set by both handlers below and, until now, rendered nowhere — so a
+            holiday that failed to save failed in silence and the row simply
+            did not appear. Caught by lint, not by anybody using the screen. */}
+        {error && (
+          <p role="alert" data-testid="holidays-error" className="mt-4 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
         {holidays.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
             No holidays configured yet. Until some are added, only non-working days are excluded.

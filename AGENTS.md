@@ -19,9 +19,9 @@ Multi-tenant Workforce Operating System. Leave Management is the first module.
 All documentation lives in **`docs/`** — start at [`docs/README.md`](docs/README.md).
 
 - [`docs/product/NEUVTO_MVP_BUILD_SPEC.md`](docs/product/NEUVTO_MVP_BUILD_SPEC.md)
-  is the source of truth: schema, build sequence, and the **D1–D25** decision
-  table. Check that table before "fixing" something that looks wrong — much of
-  it is deliberate.
+  is the source of truth: the platform and its services, the module contract,
+  the build sequence, and the **D1–D46** decision table. Check that table before
+  "fixing" something that looks wrong — much of it is deliberate.
 - [`docs/standards/`](docs/standards/) holds the rules CI enforces.
 
 Anything worth knowing goes in a file under `docs/`, not in a commit message

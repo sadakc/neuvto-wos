@@ -5,13 +5,37 @@ broken approval chains. Runs against **any** environment, unchanged.
 
 ## Files
 
-| File                          | Purpose                                                                              |
-| ----------------------------- | ------------------------------------------------------------------------------------ |
-| `seed/seed_test_data.sql`     | Two orgs with deliberately different config, full role spread, edge-case employees   |
-| `tests/verify_rls.sql`        | Tenant isolation, scope enforcement, privilege escalation, audit immutability        |
-| `tests/verify_invariants.sql` | Balance arithmetic, reservation reconciliation, approval integrity, cross-tenant FKs |
+| File                             | Purpose                                                                                  |
+| -------------------------------- | ---------------------------------------------------------------------------------------- |
+| `seed/seed_test_data.sql`        | Two orgs with deliberately different config, full role spread, edge-case employees       |
+| `tests/verify_rls.sql`           | Tenant isolation, scope enforcement, privilege escalation, storage and module boundaries |
+| `tests/verify_invariants.sql`    | Balance arithmetic, reservation reconciliation, approval integrity, cross-tenant FKs     |
+| `tests/verify_first_run.sql`     | An organisation built the way the product builds one, then used                          |
+| `tests/verify_concurrency.sh`    | D10 — two submissions racing for a balance that covers one                               |
+| `tests/verify_scheduled_work.sh` | D43 — the work that is supposed to happen on its own actually happens                    |
 
-Both verify scripts **raise an exception on the first violation**. Silence means pass.
+The SQL scripts **raise an exception on the first violation**. Silence means pass.
+
+## The one that invokes nothing
+
+`verify_scheduled_work.sh` is the odd one out, and the reason it exists belongs
+in front of anyone editing this directory.
+
+Every other check here asks the product to do something and inspects what
+happened. All of them passed while **nothing in this repository ran on a
+schedule** — no cron, no scheduled function, nothing. Invitations were rendered
+correctly, queued correctly, and sat in `notifications` forever. The dispatcher's
+own comment said "Invoked on a schedule", and that comment was the only
+occurrence of the word in the codebase. It survived four build steps because
+every assertion invoked the dispatcher by hand first.
+
+**A queue nobody drains is indistinguishable from a queue with nothing in it.**
+Telling them apart means refusing to invoke anything and waiting, so this file
+queues work and watches. It takes up to a minute, deliberately.
+
+Where delivery is configured it asserts the queue drains unattended. Where it is
+not — CI has no Vault secrets by design — it asserts the run *says so out loud*,
+because silent success is the exact shape of the original fault.
 
 ## Why two organizations
 

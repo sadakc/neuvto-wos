@@ -11,13 +11,20 @@ thing that exists only in a chat log does not exist.
 
 ## Start here
 
-| If you want to know                                  | Read                                                                 |
-| ---------------------------------------------------- | -------------------------------------------------------------------- |
-| What is being built, in what order, and what is done | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md) |
-| Why something was built differently from the PRD     | the **D1–D25** decision table in the same file                       |
-| How to run the thing on your own machine             | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)   |
-| How code and schema reach the hosted site            | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                 |
-| How the system is shaped, for an investor or advisor | [architecture/](architecture/)                                       |
+**What Neuvto is:** a platform that customers are provisioned onto, with modules
+deployed onto it multi-tenant. Leave Management is the first module, not the
+point. If a document here reads as though the leave product is the product, it
+predates 31 Jul 2026 and is wrong.
+
+| If you want to know                                  | Read                                                                          |
+| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
+| What is being built, in what order, and what is done | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)          |
+| Why something was built differently from the PRD     | the **D1–D46** decision table in the same file                                |
+| Whether the platform itself is finished              | the **platform acceptance criteria** (PA1–PA10) in the same file              |
+| How to run the thing on your own machine             | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)            |
+| How code and schema reach the hosted site            | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                          |
+| Why email works in one environment and not another   | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md) |
+| How the system is shaped, for an investor or advisor | [architecture/](architecture/)                                                |
 
 ---
 
@@ -26,11 +33,12 @@ thing that exists only in a chat log does not exist.
 ### [product/](product/)
 
 **[NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)** — the single
-source of truth. Schema, the build sequence with its status column, the
-verification gate for every step, and the **D1–D25 decision table** recording
-every deliberate deviation from the PRD with its reason. Its "Known gaps"
-section is the live list of launch blockers; there is no separate blockers file,
-because two lists of blockers means one of them is wrong.
+source of truth. The platform and its services, the module contract, the build
+sequence with its status column, the verification gate for every step, and the
+**D1–D46 decision table** recording every deliberate deviation from the PRD with
+its reason. Its "Known gaps" section is the live list of launch blockers; there
+is no separate blockers file, because two lists of blockers means one of them is
+wrong.
 
 Read the D-table before concluding something is a bug. Several things that look
 wrong are decisions.
