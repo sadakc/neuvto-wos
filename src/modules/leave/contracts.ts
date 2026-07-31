@@ -97,6 +97,8 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   NO_WORKING_DAYS: "Those dates are all weekend or holiday — there's nothing to book.",
   OVERLAPPING_REQUEST: "You already have leave booked over some of those dates.",
   EXCEEDS_MAX_PER_REQUEST: "That's more days than this leave type allows in one request.",
+  NEXT_YEAR_NOT_OPEN_YET:
+    "Next year's leave isn't open for booking yet. It opens shortly before the new leave year starts.",
   NOT_YOUR_REQUEST: "That request isn't yours to cancel.",
   ALREADY_DECIDED: "This request has already been settled and can't be cancelled.",
   CANCEL_TOO_LATE:

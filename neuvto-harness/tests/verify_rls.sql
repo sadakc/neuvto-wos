@@ -1001,7 +1001,7 @@ begin
           perform pg_temp.as_user(ravi);
           select available_days into v_avail0 from leave_balances
            where employee_id = ravi and leave_type_id = casual;
-          v_req2 := public.leave_submit(casual, d0 + 200, d0 + 202, 'to withdraw');
+          v_req2 := public.leave_submit(casual, d0 + 100, d0 + 102, 'to withdraw');
 
           perform pg_temp.as_postgres();
           select working_days into n from leave_requests where id = v_req2;
@@ -1046,7 +1046,7 @@ begin
 
           ------------------------------------------- somebody else's leave
           perform pg_temp.as_user(ravi);
-          v_req2 := public.leave_submit(casual, d0 + 300, d0 + 302, 'not yours');
+          v_req2 := public.leave_submit(casual, d0 + 130, d0 + 132, 'not yours');
 
           perform pg_temp.as_user(priya);
           v_bad := false;
@@ -1101,6 +1101,14 @@ begin
             (select id from leave_requests where employee_id = ravi);
           delete from leave_requests where employee_id = ravi;
           update leave_balances set reserved_days = 0, pending_days = 0 where employee_id = ravi;
+          -- Requests far enough ahead land in the NEXT financial year, and
+          -- ensure_balance creates a balance row there. Resetting the buckets
+          -- left those rows behind, and they then showed up in the interface as
+          -- a second, unexplained bucket for the same leave type. Test data has
+          -- to leave nothing behind, or it becomes somebody's bug report.
+          delete from leave_balances
+           where employee_id = ravi
+             and fy_label <> public.get_financial_year(acme, public.org_today(acme));
         end;
       end if;
 

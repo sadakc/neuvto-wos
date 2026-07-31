@@ -112,6 +112,36 @@ begin
     end if;
     raise notice 'ok: weekend configuration is per-organisation';
 
+    ---------------------------------------------------------------- six-day week
+    -- Plenty of companies work Monday to Saturday and rest only on Sunday.
+    -- Two-day weekends are a default, not an assumption, and this proves the
+    -- calendar honours a one-day one rather than quietly counting Saturday off.
+    --
+    -- Applied to a scratch organisation and rolled back, so it cannot leave the
+    -- seed in a state later assertions read.
+    declare
+      v_six numeric;
+      v_two numeric;
+    begin
+      select public.calculate_working_days(
+        '00000000-0000-0000-0000-0000000000a0', date '2026-09-07', date '2026-09-13') into v_two;
+
+      update organization_settings set weekend_days = '{0}'
+       where organization_id = '00000000-0000-0000-0000-0000000000a0';
+      select public.calculate_working_days(
+        '00000000-0000-0000-0000-0000000000a0', date '2026-09-07', date '2026-09-13') into v_six;
+      update organization_settings set weekend_days = '{0,6}'
+       where organization_id = '00000000-0000-0000-0000-0000000000a0';
+
+      if v_two <> 5 then
+        raise exception 'INVARIANT FAIL: a Sat/Sun weekend gave % working days in a week, not 5', v_two;
+      end if;
+      if v_six <> 6 then
+        raise exception 'INVARIANT FAIL: a Sunday-only weekend gave % working days in a week, not 6', v_six;
+      end if;
+      raise notice 'ok: a six-day working week counts Saturday, a five-day one does not';
+    end;
+
     ---------------------------------------------------------------- holidays actually exclude
     -- A holiday on a WORKING day, so the weekend rule cannot mask the result.
     -- Thu 1 Oct to Fri 2 Oct is 2 calendar weekdays; Gandhi Jayanti falls on the

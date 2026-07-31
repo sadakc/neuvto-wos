@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from "react";
 import { getMyBalances, getMyRequests } from "../handlers";
+import { BalanceCard } from "./BalanceCard";
 import type { LeaveBalance, LeaveRequest } from "../contracts";
 
 const STATUS_LABEL: Record<string, string> = {
@@ -73,21 +74,7 @@ export default function MyLeave() {
         ) : (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
             {balances.map((b) => (
-              <div
-                key={`${b.leaveTypeId}-${b.fyLabel}`}
-                className="rounded-lg border border-border p-4"
-              >
-                <p className="text-sm font-medium">{b.leaveTypeName}</p>
-                <p className="mt-1 font-display text-2xl font-semibold">{b.availableDays}</p>
-                <p className="text-xs text-muted-foreground">
-                  days available · {b.usedDays} used of {b.entitledDays + b.carryforwardDays}
-                </p>
-                {b.reservedDays > 0 && (
-                  <p className="mt-2 text-xs text-muted-foreground">
-                    {b.reservedDays} awaiting approval
-                  </p>
-                )}
-              </div>
+              <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
             ))}
           </div>
         )}

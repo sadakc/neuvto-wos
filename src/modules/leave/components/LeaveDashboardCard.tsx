@@ -12,7 +12,10 @@
 
 import { useEffect, useState } from "react";
 import { ModuleLink } from "@/platform/modules";
+import { getCurrentUser } from "@/platform/auth";
+import { getFinancialYear } from "@/platform/calendar";
 import { getMyBalances, getMyRequests } from "../handlers";
+import { BalanceCard } from "./BalanceCard";
 import type { LeaveBalance, LeaveRequest } from "../contracts";
 
 export default function LeaveDashboardCard() {
@@ -20,8 +23,15 @@ export default function LeaveDashboardCard() {
   const [requests, setRequests] = useState<LeaveRequest[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
 
+  const [fyLabel, setFyLabel] = useState<string | null>(null);
+
   useEffect(() => {
     let cancelled = false;
+    getCurrentUser()
+      .then((u) => (u ? getFinancialYear(u.organizationId) : null))
+      .then((fy) => !cancelled && setFyLabel(fy))
+      .catch(() => !cancelled && setFyLabel(null));
+
     Promise.all([getMyBalances(), getMyRequests()])
       .then(([b, r]) => {
         if (cancelled) return;
@@ -36,6 +46,17 @@ export default function LeaveDashboardCard() {
   }, []);
 
   const pendingCount = requests.filter((r) => r.status === "pending_approval").length;
+
+  // The dashboard shows this financial year only. A request for next April
+  // creates a balance for next year, and two unlabelled buckets for the same
+  // leave type read as a duplicate — which is exactly how this was reported.
+  // The full set, labelled by year, is on My leave.
+  //
+  // The year comes from the platform's calendar service, which knows each
+  // organisation's own financial year start. Guessing it from the balances —
+  // by taking the commonest label, say — is wrong the moment somebody has more
+  // rows for next year than this one.
+  const currentYear = fyLabel ? balances.filter((b) => b.fyLabel === fyLabel) : balances;
 
   const today = new Date().toISOString().slice(0, 10);
   const nextApproved = requests
@@ -74,19 +95,11 @@ export default function LeaveDashboardCard() {
           types.
         </p>
       ) : (
-        <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
-          {balances.slice(0, 3).map((b) => (
-            <div key={`${b.leaveTypeId}-${b.fyLabel}`}>
-              <dt className="text-xs uppercase tracking-wide text-muted-foreground">
-                {b.leaveTypeName}
-              </dt>
-              <dd className="mt-1 font-display text-2xl font-semibold tabular-nums">
-                {b.availableDays}
-              </dd>
-              <p className="text-xs text-muted-foreground">days available</p>
-            </div>
+        <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {currentYear.map((b) => (
+            <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
           ))}
-        </dl>
+        </div>
       )}
 
       <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted-foreground">
