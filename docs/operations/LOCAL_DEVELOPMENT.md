@@ -78,6 +78,34 @@ curl -s "http://127.0.0.1:54324/api/v1/message/$ID" \
 > hosted app can only be signed into via the magic link. Recorded as a launch
 > blocker in `docs/product/NEUVTO_MVP_BUILD_SPEC.md`.
 
+## Testing on a real phone
+
+```bash
+bun run dev:lan
+```
+
+Prints the address to open on a phone on the same Wi-Fi, and rewrites
+`.env.local` to point at this Mac's LAN address first.
+
+**That rewrite is the whole point.** Left at `127.0.0.1`, the app works
+perfectly on the Mac and fails on the phone — because `127.0.0.1` there means
+the _phone_, where nothing is listening. It looks like a broken app rather than
+a misconfiguration.
+
+The address changes with the network, so the script recomputes it every run
+rather than trusting what `.env.local` last said. `.env.local.localhost-backup`
+holds the Mac-only version.
+
+Sign-in codes arrive in Mailpit, also on the LAN address, port 54324.
+
+**Limits worth knowing.** This is the local database, so the data is throwaway
+and vanishes on the next `supabase db reset`. It is HTTP, not HTTPS, so anything
+needing a secure context — installing to the home screen, notifications — will
+not work. And it is a development build, so it is slower than the real thing.
+
+For a realistic assessment, or to hand to somebody else, use the deployed site
+instead.
+
 ## Two databases, and which is which
 
 |                   | Used by                                                        | Contains                        |
