@@ -95,14 +95,17 @@ export default function LeaveCalendar() {
         <div className="flex gap-2">
           <button
             aria-label="Previous month"
-            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))}
+            // Functional update: two quick taps must advance two months. Reading
+            // `month` from the closure made the second tap reuse the first's
+            // value, so rapid navigation silently lost clicks.
+            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
             className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-border"
           >
             ‹
           </button>
           <button
             aria-label="Next month"
-            onClick={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))}
+            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
             className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-border"
           >
             ›
