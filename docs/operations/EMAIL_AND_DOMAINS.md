@@ -158,11 +158,79 @@ mailing gibberish, which is why the stub captures the payload.
 **What this does not prove** is that Resend accepts the message — that needs the
 live key and a verified domain. Run one real send before the first customer.
 
-## Open item
+## ⚠️ Sign-in email is not yet fit to show anyone
 
-The hosted Supabase magic-link template still lacks `{{ .Token }}`, so the
-6-digit code the UI asks for is never actually sent on `neuvto.lovable.app` —
-only the magic link works. Fixed locally in `supabase/templates/`; the hosted
-one is dashboard configuration and must be edited there. Tracked as a launch
-blocker in
-[../product/NEUVTO_MVP_BUILD_SPEC.md](../product/NEUVTO_MVP_BUILD_SPEC.md).
+Confirmed on the live site, 31 Jul 2026, by signing up as a real person. Three
+faults, all configuration on the Lovable Cloud project, none fixable from this
+repository.
+
+**Status, end of 31 Jul 2026:** faults 2 and 3 are fixed. Fault 1 — the sender —
+is still open, and it is the one a customer sees first.
+
+A fourth turned up while fixing the others, and it is the more useful lesson:
+after `{{ .Token }}` was added to both templates the code arrived as **eight
+digits**, against a form that accepts six. `supabase/config.toml` says
+`otp_length = 6` and is read only by `supabase start` — the hosted project keeps
+its own value, and nothing reconciles the two. Set in the backend's auth
+settings, it began issuing six.
+
+The general shape, worth remembering because it will recur: **anything in
+`config.toml` configures local development and nothing else.** Auth settings,
+OTP length and expiry, email templates and SMTP all live in the hosted project's
+own configuration. A local file agreeing with the code proves nothing about
+production.
+
+### 1 · It comes from Lovable, not from Neuvto
+
+> **Neuvto-WOS** `<no-reply@auth.lovable.cloud>`
+
+That is the first email a customer ever receives from this product, and it
+carries another company's domain. Documented here previously as "sign-in already
+works" — which was true and beside the point. Working and presentable are
+different tests, and only the second one matters to somebody deciding whether to
+trust a payroll-adjacent system with their staff data.
+
+**Fix:** custom SMTP on the Lovable Cloud project, pointed at Resend.
+`neuvto.com` is already verified for sending, so this is configuration rather
+than new infrastructure.
+
+| Setting      | Value                      |
+| ------------ | -------------------------- |
+| Host         | `smtp.resend.com`          |
+| Port         | `465`                      |
+| Username     | `resend`                   |
+| Password     | the Resend API key         |
+| Sender email | `notifications@neuvto.com` |
+| Sender name  | `Neuvto`                   |
+
+### 2 · It sends a link, not the six-digit code the screen asks for — **fixed**
+
+The interface asks for a code. The email contains a **Verify Email** button.
+Somebody who follows the screen has nothing to type.
+
+Supabase's stock templates carry only `{{ .ConfirmationURL }}`. The code lives in
+`{{ .Token }}`, which has to be added by hand. Fixed locally in
+`supabase/templates/`; the hosted templates are dashboard settings and this
+repository cannot reach them.
+
+**Both templates need it**, which is the part that was missed:
+
+- **Magic Link** — sent to somebody who already exists
+- **Confirm signup** — sent to somebody new
+
+### 3 · A new signup gets the wrong template entirely — **fixed**
+
+`signInWithOtp()` against an address that has never been seen creates the user
+and sends **Confirm signup**, not Magic Link. So the first person ever to use the
+product gets the one template nobody thought to check.
+
+Either add `{{ .Token }}` to both, or turn off email confirmation so the OTP
+template is always the one used. Adding it to both is the smaller change and
+keeps confirmation available.
+
+### Where this stands
+
+Signing in works by the intended route: a six-digit code arrives and the form
+takes it. What remains is **fault 1** — it arrives from `auth.lovable.cloud`, so
+the first email a customer ever gets from this product carries another company's
+domain. That is a launch blocker, not a bug: custom SMTP on the table above.

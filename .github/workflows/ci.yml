@@ -177,13 +177,29 @@ jobs:
       # Lovable commits .env with the *publishable* Supabase keys, which are designed
       # to ship in the browser and are protected by RLS. That is fine. What must never
       # land there is a real secret, because git history is permanent.
-      - name: No real secrets in .env
+      # Every TRACKED .env file, not just `.env`. Checking one filename missed
+      # .env.local.localhost-backup, which scripts/dev-lan.sh writes and which
+      # was committed in eba35e1: `*.local` in .gitignore does not match it.
+      # Nothing real leaked — it held a 127.0.0.1 publishable key — but the
+      # check that was supposed to notice looked straight past it.
+      - name: No real secrets in any committed .env file
         run: |
-          if [ -f .env ]; then
-            if grep -nE '(service_role|SERVICE_ROLE|sk_live|sk_test|re_[A-Za-z0-9]{16,}|SECRET|PRIVATE_KEY|-----BEGIN)' .env; then
-              echo "::error file=.env::A real secret appears to be in .env, which is committed. Move it to GitHub Actions secrets, Supabase Edge Function secrets, or Lovable's secret manager. Publishable/anon keys are fine here; service_role keys and API keys are not."
-              exit 1
+          FOUND=0
+          for f in $(git ls-files '.env' '.env.*'); do
+            if grep -nE '(service_role|SERVICE_ROLE|sk_live|sk_test|re_[A-Za-z0-9]{16,}|SECRET|PRIVATE_KEY|-----BEGIN)' "$f"; then
+              echo "::error file=$f::A real secret appears to be in $f, which is committed. Move it to GitHub Actions secrets, Supabase Edge Function secrets, or Lovable's secret manager. Publishable/anon keys are fine here; service_role keys and API keys are not."
+              FOUND=1
             fi
+          done
+          exit $FOUND
+
+      # A machine-specific env file has no business being tracked at all,
+      # whatever it contains.
+      - name: No local env files are committed
+        run: |
+          if git ls-files '.env.*local*' | grep .; then
+            echo "::error::A .env.local* file is tracked. These are per-machine and must stay untracked — 'git rm --cached' it and check .gitignore."
+            exit 1
           fi
 
       - name: RLS policies must use (select auth.uid())
