@@ -98,7 +98,6 @@ function AdminConsole() {
     return () => {
       cancelled = true;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function openModules(orgId: string) {

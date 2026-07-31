@@ -28,6 +28,33 @@ export interface Organization {
   onboardingCompletedAt: string | null;
 }
 
+/**
+ * Anything on screen showing the company's identity, told that it changed.
+ *
+ * The app shell reads the organisation once when it mounts, and the shell does
+ * NOT remount when the page inside it changes. So renaming the company in
+ * Settings, or finishing the setup wizard, left the old name and the old logo
+ * in the header until a full page load. Caught by walking the wizard: the
+ * banner said "Testco is ready" while the header above it still said "Testco
+ * Facilities".
+ *
+ * A fifteen-line emitter rather than a state library: exactly one producer, one
+ * consumer, and no history to replay.
+ */
+type IdentityListener = () => void;
+const identityListeners = new Set<IdentityListener>();
+
+export function identityChanged(): void {
+  for (const listener of identityListeners) listener();
+}
+
+export function onIdentityChange(cb: IdentityListener): () => void {
+  identityListeners.add(cb);
+  return () => {
+    identityListeners.delete(cb);
+  };
+}
+
 /** The name to show. One definition, so no screen invents its own fallback. */
 export function companyName(org: Organization | null): string {
   if (!org) return "";

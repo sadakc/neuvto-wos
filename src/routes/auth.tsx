@@ -6,6 +6,7 @@ import {
   verifyOtp,
   getCurrentUser,
   acceptInvitation,
+  isAdmin,
   isPlatformAdmin,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
@@ -70,6 +71,16 @@ function AuthPage() {
    * address they proved this morning.
    */
   /**
+   * Whether the person who just accepted is an administrator of what they
+   * joined. Read back from the database rather than assumed from the
+   * invitation, because the role is the database's to state.
+   */
+  async function acceptedAsAdmin(organizationId: string): Promise<boolean> {
+    const user = await getCurrentUser().catch(() => null);
+    return Boolean(user && user.organizationId === organizationId && isAdmin(user));
+  }
+
+  /**
    * Where somebody with no workspace actually belongs.
    *
    * Neuvto staff have no profile — deliberately, since that absence is what
@@ -89,7 +100,17 @@ function AuthPage() {
     if (invite) {
       setStep("joining");
       try {
-        await acceptInvitation(invite);
+        const { organizationId } = await acceptInvitation(invite);
+        // An administrator has a workspace to set up, and a dashboard cannot
+        // tell them that — Sada landed on one and it could only report that he
+        // had no leave balance. Everyone else goes where they were going.
+        //
+        // `next` still wins when it was given: somebody following a deep link
+        // to a specific page asked for that page.
+        if (!next && (await acceptedAsAdmin(organizationId))) {
+          window.location.href = "/app/setup";
+          return;
+        }
         window.location.href = safeNext(next);
         return;
       } catch (e) {

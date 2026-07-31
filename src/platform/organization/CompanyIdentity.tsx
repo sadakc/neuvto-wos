@@ -12,6 +12,7 @@ import {
   companyName,
   getLogoUrl,
   getOrganization,
+  identityChanged,
   removeLogo,
   updateOrganization,
   uploadLogo,
@@ -46,13 +47,24 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
   const [error, setError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
-  async function load() {
+  /**
+   * Re-reads the organisation.
+   *
+   * `resetFields` is false for the logo, and that is the whole point: uploading
+   * one used to re-read everything and overwrite the text inputs from the
+   * server, silently discarding whatever had been typed but not yet saved.
+   * Found by typing a display name, uploading a logo, and watching both the
+   * name and the industry go back to blank.
+   */
+  async function load(resetFields = true) {
     const o = await getOrganization();
     if (!o) throw new Error("no organisation");
     setOrg(o);
-    setName(o.name);
-    setDisplayName(o.displayName ?? "");
-    setIndustry(o.industryType ?? "");
+    if (resetFields) {
+      setName(o.name);
+      setDisplayName(o.displayName ?? "");
+      setIndustry(o.industryType ?? "");
+    }
     setLogoUrl(await getLogoUrl(o.logoPath, o.logoUpdatedAt));
     return o;
   }
@@ -75,6 +87,7 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
       await updateOrganization(org.id, { name, displayName, industryType: industry });
       const fresh = await load();
       setSaved(true);
+      identityChanged();
       onSaved?.(fresh);
     } catch (e) {
       setError(isAppError(e) ? e.message : "That didn't save. Please try again.");
@@ -93,7 +106,8 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
     setSaving(true);
     try {
       await uploadLogo(org.id, file);
-      const fresh = await load();
+      const fresh = await load(false);
+      identityChanged();
       onSaved?.(fresh);
     } catch (err) {
       setError(isAppError(err) ? err.message : "That image couldn't be uploaded.");
@@ -107,7 +121,8 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
     setError("");
     try {
       await removeLogo(org.id, org.logoPath);
-      const fresh = await load();
+      const fresh = await load(false);
+      identityChanged();
       onSaved?.(fresh);
     } catch (e) {
       setError(isAppError(e) ? e.message : "That logo couldn't be removed.");

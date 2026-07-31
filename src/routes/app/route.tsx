@@ -5,6 +5,7 @@ import {
   companyName,
   getLogoUrl,
   getOrganization,
+  onIdentityChange,
   type Organization,
 } from "@/platform/organization";
 import { isAppError } from "@/platform/errors";
@@ -26,6 +27,21 @@ function AppShell() {
   // problem and must never be why somebody cannot reach their leave.
   const [org, setOrg] = useState<Organization | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // The shell outlives every page inside it, so identity changed under it
+  // without it noticing. This is how it hears.
+  useEffect(() => {
+    const reread = () => {
+      void getOrganization()
+        .then(async (o) => {
+          if (!o) return;
+          setOrg(o);
+          setLogoUrl(await getLogoUrl(o.logoPath, o.logoUpdatedAt));
+        })
+        .catch(() => {});
+    };
+    return onIdentityChange(reread);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
