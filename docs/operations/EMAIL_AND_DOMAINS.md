@@ -158,11 +158,62 @@ mailing gibberish, which is why the stub captures the payload.
 **What this does not prove** is that Resend accepts the message — that needs the
 live key and a verified domain. Run one real send before the first customer.
 
-## Open item
+## ⚠️ Sign-in email is not yet fit to show anyone
 
-The hosted Supabase magic-link template still lacks `{{ .Token }}`, so the
-6-digit code the UI asks for is never actually sent on `neuvto.lovable.app` —
-only the magic link works. Fixed locally in `supabase/templates/`; the hosted
-one is dashboard configuration and must be edited there. Tracked as a launch
-blocker in
-[../product/NEUVTO_MVP_BUILD_SPEC.md](../product/NEUVTO_MVP_BUILD_SPEC.md).
+Confirmed on the live site, 31 Jul 2026, by signing up as a real person. Three
+faults, all configuration on the Lovable Cloud project, none fixable from this
+repository.
+
+### 1 · It comes from Lovable, not from Neuvto
+
+> **Neuvto-WOS** `<no-reply@auth.lovable.cloud>`
+
+That is the first email a customer ever receives from this product, and it
+carries another company's domain. Documented here previously as "sign-in already
+works" — which was true and beside the point. Working and presentable are
+different tests, and only the second one matters to somebody deciding whether to
+trust a payroll-adjacent system with their staff data.
+
+**Fix:** custom SMTP on the Lovable Cloud project, pointed at Resend.
+`neuvto.com` is already verified for sending, so this is configuration rather
+than new infrastructure.
+
+| Setting      | Value                      |
+| ------------ | -------------------------- |
+| Host         | `smtp.resend.com`          |
+| Port         | `465`                      |
+| Username     | `resend`                   |
+| Password     | the Resend API key         |
+| Sender email | `notifications@neuvto.com` |
+| Sender name  | `Neuvto`                   |
+
+### 2 · It sends a link, not the six-digit code the screen asks for
+
+The interface asks for a code. The email contains a **Verify Email** button.
+Somebody who follows the screen has nothing to type.
+
+Supabase's stock templates carry only `{{ .ConfirmationURL }}`. The code lives in
+`{{ .Token }}`, which has to be added by hand. Fixed locally in
+`supabase/templates/`; the hosted templates are dashboard settings and this
+repository cannot reach them.
+
+**Both templates need it**, which is the part that was missed:
+
+- **Magic Link** — sent to somebody who already exists
+- **Confirm signup** — sent to somebody new
+
+### 3 · A new signup gets the wrong template entirely
+
+`signInWithOtp()` against an address that has never been seen creates the user
+and sends **Confirm signup**, not Magic Link. So the first person ever to use the
+product gets the one template nobody thought to check.
+
+Either add `{{ .Token }}` to both, or turn off email confirmation so the OTP
+template is always the one used. Adding it to both is the smaller change and
+keeps confirmation available.
+
+### Until this is fixed
+
+Nobody can sign in to the hosted site by the intended route. The **Verify Email**
+link does work — it is a valid magic link — so the product is usable, but the
+screen and the email disagree, and that is what a customer would see first.
