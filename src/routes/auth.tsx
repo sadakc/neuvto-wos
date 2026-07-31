@@ -1,7 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
-import { requestOtp, verifyOtp, getCurrentUser, acceptInvitation } from "@/platform/auth";
+import {
+  requestOtp,
+  verifyOtp,
+  getCurrentUser,
+  acceptInvitation,
+  isPlatformAdmin,
+} from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 
 export const Route = createFileRoute("/auth")({
@@ -63,6 +69,22 @@ function AuthPage() {
    * already signed in and follows an invitation link should not have to prove an
    * address they proved this morning.
    */
+  /**
+   * Where somebody with no workspace actually belongs.
+   *
+   * Neuvto staff have no profile — deliberately, since that absence is what
+   * makes every tenant policy refuse them (D42). Without this they were told to
+   * "ask your administrator to invite you", which for the person who invites
+   * everybody is both wrong and a dead end. Sada hit it on the first attempt.
+   */
+  async function routeWorkspacelessUser() {
+    if (await isPlatformAdmin().catch(() => false)) {
+      window.location.href = "/admin";
+      return true;
+    }
+    return false;
+  }
+
   async function finish() {
     if (invite) {
       setStep("joining");
@@ -95,12 +117,18 @@ function AuthPage() {
         }
         setChecking(false);
       })
-      .catch(() => {
+      .catch(async () => {
         // NO_ORGANIZATION lands here: authenticated, but in no workspace.
         if (cancelled) return;
+        if (invite) {
+          setChecking(false);
+          void finish();
+          return;
+        }
+        if (await routeWorkspacelessUser()) return;
+        if (cancelled) return;
         setChecking(false);
-        if (invite) void finish();
-        else setStep("orphan");
+        setStep("orphan");
       });
     return () => {
       cancelled = true;
@@ -136,9 +164,10 @@ function AuthPage() {
         window.location.href = safeNext(next);
         return;
       }
-      // Signed in, but in no workspace yet — redeem the invitation, or explain.
+      // Signed in, but in no workspace yet — redeem the invitation, send staff
+      // to the console, or explain.
       if (invite) await finish();
-      else setStep("orphan");
+      else if (!(await routeWorkspacelessUser())) setStep("orphan");
     } catch (err) {
       fail(err);
     } finally {

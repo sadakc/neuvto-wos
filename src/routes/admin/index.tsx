@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
+  getUserId,
   isPlatformAdmin,
   listOrganizations,
   provisionOrganization,
@@ -55,22 +56,39 @@ function AdminConsole() {
 
   useEffect(() => {
     let cancelled = false;
-    isPlatformAdmin()
-      .then(async (ok) => {
-        if (cancelled) return;
-        setAllowed(ok);
-        if (ok) {
-          try {
-            await load();
-          } catch {
-            if (!cancelled) setLoadError("We couldn't load the customer list.");
-          }
-        }
-      })
-      .catch(() => !cancelled && setAllowed(false));
+
+    (async () => {
+      // Signed out is NOT the same as not staff, and conflating them stranded
+      // the one person who is definitely allowed in: Sada opened /admin signed
+      // out, got a not-found with no way to sign in, and the only link on it
+      // sent him to /app — which has no workspace for a platform admin either.
+      //
+      // So: no session, go and get one. A session that simply is not staff's
+      // still gets the not-found, which is the case that has to disclose
+      // nothing.
+      const uid = await getUserId().catch(() => null);
+      if (cancelled) return;
+      if (!uid) {
+        window.location.href = `/auth?next=${encodeURIComponent("/admin")}`;
+        return;
+      }
+
+      const ok = await isPlatformAdmin().catch(() => false);
+      if (cancelled) return;
+      setAllowed(ok);
+      if (!ok) return;
+
+      try {
+        await load();
+      } catch {
+        if (!cancelled) setLoadError("We couldn't load the customer list.");
+      }
+    })();
+
     return () => {
       cancelled = true;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function onProvision(e: React.FormEvent) {
