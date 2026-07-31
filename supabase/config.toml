@@ -4,6 +4,22 @@ project_id = "vkyvzhgigncranprhidn"
 # to the hosted project, so anything here must also be configured there before
 # it ships. See the note on templates below.
 
+# Mailpit, the local mail catcher.
+#
+# It publishes its web UI by default but NOT its SMTP port, so nothing on this
+# machine can post a message into it. Supabase Auth doesn't care — it talks to
+# Mailpit inside the Docker network — but that left product email with nowhere
+# local to go, and looking for an invitation in the one inbox on the machine
+# turned up only sign-in codes.
+#
+# Publishing the SMTP port lets the Resend stub relay product mail into the same
+# inbox, so there is ONE place to check rather than two delivery paths and one
+# visible outcome. Requires a `supabase stop && supabase start` to take effect.
+[local_smtp]
+enabled = true
+port = 54324
+smtp_port = 54325
+
 [auth]
 site_url = "http://localhost:8080"
 additional_redirect_urls = ["http://localhost:8080"]
