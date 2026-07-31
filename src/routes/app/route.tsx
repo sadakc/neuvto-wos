@@ -1,6 +1,13 @@
 import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCurrentUser, signOut, type CurrentUser } from "@/platform/auth";
+import {
+  companyName,
+  getLogoUrl,
+  getOrganization,
+  onIdentityChange,
+  type Organization,
+} from "@/platform/organization";
 import { isAppError } from "@/platform/errors";
 import { AppNav } from "@/components/shared/app-nav";
 
@@ -14,6 +21,27 @@ function AppShell() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
+
+  // D45. The workspace should look like the customer's, not like ours. Loaded
+  // after the user and allowed to fail quietly — a missing logo is a cosmetic
+  // problem and must never be why somebody cannot reach their leave.
+  const [org, setOrg] = useState<Organization | null>(null);
+  const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // The shell outlives every page inside it, so identity changed under it
+  // without it noticing. This is how it hears.
+  useEffect(() => {
+    const reread = () => {
+      void getOrganization()
+        .then(async (o) => {
+          if (!o) return;
+          setOrg(o);
+          setLogoUrl(await getLogoUrl(o.logoPath, o.logoUpdatedAt));
+        })
+        .catch(() => {});
+    };
+    return onIdentityChange(reread);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -29,6 +57,14 @@ function AppShell() {
         }
         setUser(u);
         setState("ready");
+
+        void getOrganization()
+          .then(async (o) => {
+            if (cancelled || !o) return;
+            setOrg(o);
+            setLogoUrl(await getLogoUrl(o.logoPath, o.logoUpdatedAt));
+          })
+          .catch(() => {});
       })
       .catch((e) => {
         if (cancelled) return;
@@ -87,16 +123,28 @@ function AppShell() {
   return (
     <div className="flex min-h-screen flex-col">
       <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-4">
-        <div className="min-w-0">
-          <p className="truncate font-display text-sm font-semibold">{user?.organizationName}</p>
-          <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+        <div className="flex min-w-0 items-center gap-3">
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt=""
+              aria-hidden
+              className="h-8 w-8 shrink-0 rounded object-contain"
+            />
+          )}
+          <div className="min-w-0">
+            <p className="truncate font-display text-sm font-semibold">
+              {companyName(org) || user?.organizationName}
+            </p>
+            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+          </div>
         </div>
         <button
           onClick={async () => {
             await signOut();
             window.location.href = "/auth";
           }}
-          className="shrink-0 rounded-md px-3 py-2 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+          className="inline-flex h-12 shrink-0 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
         >
           Sign out
         </button>

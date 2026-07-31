@@ -46,6 +46,13 @@ jobs:
       - name: A module can be removed without touching anything else
         run: bash scripts/verify-module-removal.sh
 
+      # Three capabilities in two steps were written, documented, granted and
+      # then called by nothing: ensure_balance (D36), approval_required (D38)
+      # and module_enabled (D44). Each looked correct, each passed every test,
+      # and each was simply not connected to anything.
+      - name: Every function we define is actually called
+        run: bash scripts/verify-functions-wired.sh
+
   database:
     name: Migrations · Tenant isolation · Data integrity
     runs-on: ubuntu-latest

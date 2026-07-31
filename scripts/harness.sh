@@ -125,6 +125,14 @@ run "verifying the first run"    "$HARNESS_DIR/tests/verify_first_run.sql"
 printf '\n──  %s\n' "verifying concurrent submission"
 PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_concurrency.sh"
 
+# The only check here that deliberately invokes nothing. Everything above proves
+# the product does the right thing when asked; this one refuses to ask, because
+# a queue nobody drains looks exactly like a queue with nothing in it. That is
+# not hypothetical — it is how every email the product sends went undelivered
+# for four build steps under a green harness. It waits, and it is meant to.
+printf '\n──  %s\n' "verifying scheduled work"
+PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_scheduled_work.sh"
+
 cat <<'MSG'
 
 ──  HARNESS PASSED

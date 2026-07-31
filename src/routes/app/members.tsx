@@ -1,9 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
-  APP_ROLES,
   getCurrentUser,
-  inviteMember,
   isAdmin,
   listInvitations,
   listMembers,
@@ -14,6 +12,7 @@ import {
   type Member,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
+import { InviteTeam } from "@/platform/auth/InviteTeam";
 
 export const Route = createFileRoute("/app/members")({
   ssr: false,
@@ -47,14 +46,9 @@ function MembersPage() {
   const [members, setMembers] = useState<Member[]>([]);
   const [invitations, setInvitations] = useState<Invitation[]>([]);
 
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [fullName, setFullName] = useState("");
-  const [role, setRole] = useState<AppRole>("employee");
-
-  const [busy, setBusy] = useState(false);
+  // The invite form owns its own state — see InviteTeam. What is left here is
+  // what this page still does itself: revoking, and copying a link.
   const [error, setError] = useState("");
-  const [sent, setSent] = useState("");
   const [copied, setCopied] = useState("");
 
   const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
@@ -87,31 +81,6 @@ function MembersPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  async function onInvite(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setSent("");
-    setBusy(true);
-    try {
-      await inviteMember({ email, phone, role, fullName });
-      await load();
-      setSent(email);
-      setEmail("");
-      setPhone("");
-      setFullName("");
-    } catch (err) {
-      setError(
-        isAppError(err)
-          ? err.message
-          : err instanceof Error && "issues" in err
-            ? (err as { issues: { message: string }[] }).issues[0].message
-            : "That invitation couldn't be sent.",
-      );
-    } finally {
-      setBusy(false);
-    }
-  }
 
   async function onRevoke(id: string) {
     setError("");
@@ -171,94 +140,16 @@ function MembersPage() {
           six-digit code and land straight in this workspace.
         </p>
 
-        <form onSubmit={onInvite} className="mt-4 space-y-4">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="inv-email" className="block text-sm font-medium">
-                Work email
-              </label>
-              <input
-                id="inv-email"
-                type="email"
-                required
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="colleague@company.com"
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="inv-phone" className="block text-sm font-medium">
-                Phone
-              </label>
-              <input
-                id="inv-phone"
-                type="tel"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                placeholder="+91 98765 43210"
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Used to tell one person from another when they have several addresses
-              </p>
-            </div>
-          </div>
-
-          <div className="grid gap-4 sm:grid-cols-2">
-            <div>
-              <label htmlFor="inv-name" className="block text-sm font-medium">
-                Name <span className="text-muted-foreground">(optional)</span>
-              </label>
-              <input
-                id="inv-name"
-                value={fullName}
-                onChange={(e) => setFullName(e.target.value)}
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              />
-            </div>
-
-            <div>
-              <label htmlFor="inv-role" className="block text-sm font-medium">
-                Role
-              </label>
-              <select
-                id="inv-role"
-                value={role}
-                onChange={(e) => setRole(e.target.value as AppRole)}
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              >
-                {APP_ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {ROLE_LABELS[r]}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          {error && (
-            <p role="alert" data-testid="invite-error" className="text-sm text-destructive">
-              {error}
-            </p>
-          )}
-          {sent && (
-            <p className="text-sm text-muted-foreground">
-              Invitation sent to <span className="text-foreground">{sent}</span>.
-            </p>
-          )}
-
-          <button
-            type="submit"
-            disabled={busy || !email}
-            data-testid="send-invite"
-            className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-          >
-            {busy ? "Sending…" : "Send invitation"}
-          </button>
-        </form>
+        <div className="mt-4">
+          <InviteTeam onInvited={() => void load()} />
+        </div>
       </section>
+
+      {error && (
+        <p role="alert" data-testid="members-error" className="mt-4 text-sm text-destructive">
+          {error}
+        </p>
+      )}
 
       {/* ─────────────────────────────────────────────── pending */}
       {pending.length > 0 && (

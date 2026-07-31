@@ -2,39 +2,16 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
-import {
-  addHoliday,
-  getOrgSettings,
-  listHolidays,
-  removeHoliday,
-  saveOrgSettings,
-  getFinancialYear,
-  type Holiday,
-  type OrgSettings,
-} from "@/platform/calendar";
-import { getAdminSections, type ModuleAdminSection } from "@/platform/modules";
+import { addHoliday, listHolidays, removeHoliday, type Holiday } from "@/platform/calendar";
+import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platform/modules";
+import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
+import { WorkingCalendar } from "@/platform/calendar/WorkingCalendar";
 
 export const Route = createFileRoute("/app/settings")({
   ssr: false,
   head: () => ({ meta: [{ title: "Settings — Neuvto WOS" }] }),
   component: SettingsPage,
 });
-
-const DAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-const MONTHS = [
-  "January",
-  "February",
-  "March",
-  "April",
-  "May",
-  "June",
-  "July",
-  "August",
-  "September",
-  "October",
-  "November",
-  "December",
-];
 
 /**
  * Configuration, not code.
@@ -48,14 +25,10 @@ const MONTHS = [
 function SettingsPage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
-  const [settings, setSettings] = useState<OrgSettings | null>(null);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
-  const [financialYear, setFinancialYear] = useState("");
   const [sections, setSections] = useState<(ModuleAdminSection & { moduleKey: string })[]>([]);
 
   const [message, setMessage] = useState("");
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
 
   const [holidayName, setHolidayName] = useState("");
@@ -75,25 +48,11 @@ function SettingsPage() {
           return;
         }
 
-        const s = await getOrgSettings();
-        if (cancelled) return;
-        if (!s) {
-          setMessage("No configuration found for this workspace.");
-          setState("error");
-          return;
-        }
-        setSettings(s);
-
         // None of these are worth blanking the page for — the settings above
         // are still editable if the holiday list or the module sections fail.
-        const [h, fy, sec] = await Promise.allSettled([
-          listHolidays(),
-          u ? getFinancialYear(u.organizationId) : Promise.resolve(""),
-          getAdminSections(u),
-        ]);
+        const [h, sec] = await Promise.allSettled([listHolidays(), getAdminSections(u)]);
         if (!cancelled) {
           if (h.status === "fulfilled") setHolidays(h.value);
-          if (fy.status === "fulfilled") setFinancialYear(fy.value);
           if (sec.status === "fulfilled") setSections(sec.value);
         }
 
@@ -110,33 +69,6 @@ function SettingsPage() {
       cancelled = true;
     };
   }, []);
-
-  function update<K extends keyof OrgSettings>(key: K, value: OrgSettings[K]) {
-    setSettings((s) => (s ? { ...s, [key]: value } : s));
-    setSaved(false);
-  }
-
-  function toggleWeekendDay(day: number) {
-    if (!settings) return;
-    const next = settings.weekendDays.includes(day)
-      ? settings.weekendDays.filter((d) => d !== day)
-      : [...settings.weekendDays, day].sort((a, b) => a - b);
-    update("weekendDays", next);
-  }
-
-  async function onSave() {
-    if (!settings || !user) return;
-    setError("");
-    setSaving(true);
-    try {
-      await saveOrgSettings(user.organizationId, settings);
-      setSaved(true);
-    } catch (e) {
-      setError(isAppError(e) ? e.message : "That didn't save. Please try again.");
-    } finally {
-      setSaving(false);
-    }
-  }
 
   async function onAddHoliday(e: React.FormEvent) {
     e.preventDefault();
@@ -201,9 +133,6 @@ function SettingsPage() {
     );
   }
 
-  const s = settings!;
-  const workingDays = DAYS.filter((_, i) => !s.weekendDays.includes(i)).length;
-
   return (
     <div className="mx-auto max-w-3xl pb-16">
       <h1 className="font-display text-xl font-semibold tracking-tight">Workspace settings</h1>
@@ -212,201 +141,33 @@ function SettingsPage() {
         changes how every future request is counted.
       </p>
 
-      {/* ─────────────────────────────────────────────── the working week */}
+      {/* ─────────────────────────────────────────────── company */}
       <section className="mt-8">
-        <h2 className="font-display text-base font-semibold">The working week</h2>
+        <h2 className="font-display text-base font-semibold">Your company</h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Which days are <strong>not</strong> worked. A six-day week has only Sunday selected; a
-          five-day week has Saturday and Sunday.
+          What this workspace is called, and the mark your people see on every screen and in every
+          email from it.
         </p>
-
-        <div className="mt-4 flex flex-wrap gap-2" role="group" aria-label="Non-working days">
-          {DAYS.map((d, i) => {
-            const off = s.weekendDays.includes(i);
-            return (
-              <button
-                key={d}
-                onClick={() => toggleWeekendDay(i)}
-                aria-pressed={off}
-                data-testid={`weekend-${i}`}
-                className={`inline-flex h-12 items-center rounded-md border px-3 text-sm ${
-                  off
-                    ? "border-foreground bg-secondary font-medium"
-                    : "border-border text-muted-foreground"
-                }`}
-              >
-                {d.slice(0, 3)}
-              </button>
-            );
-          })}
+        <div className="mt-4">
+          <CompanyIdentity />
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">
-          {workingDays === 0
-            ? "A working week needs at least one working day."
-            : `${workingDays}-day working week`}
-        </p>
-
-        <label className="mt-4 flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={s.excludeWeekends}
-            onChange={(e) => update("excludeWeekends", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0"
-          />
-          <span>
-            <span className="block text-sm font-medium">
-              Don&apos;t count non-working days as leave
-            </span>
-            <span className="block text-xs text-muted-foreground">
-              Friday to Monday costs 2 days rather than 4
-            </span>
-          </span>
-        </label>
-
-        <label className="mt-3 flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={s.excludeHolidays}
-            onChange={(e) => update("excludeHolidays", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0"
-          />
-          <span>
-            <span className="block text-sm font-medium">Don&apos;t count holidays as leave</span>
-            <span className="block text-xs text-muted-foreground">
-              A request spanning a holiday below doesn&apos;t spend a day on it
-            </span>
-          </span>
-        </label>
       </section>
 
-      {/* ─────────────────────────────────────────────── the year */}
+      {/* ───────────────────────────────────────── the working calendar
+          Shared with the setup wizard. It lived here in full until the wizard
+          needed the same weekend picker, and a weekend whose rules exist in two
+          files is a weekend that eventually means two things — with every
+          balance in the product counted against it. */}
       <section className="mt-10">
-        <h2 className="font-display text-base font-semibold">The leave year</h2>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="fy-month" className="block text-sm font-medium">
-              Financial year starts
-            </label>
-            <div className="mt-2 flex gap-2">
-              <select
-                id="fy-month"
-                value={s.fyStartMonth}
-                onChange={(e) => update("fyStartMonth", Number(e.target.value))}
-                className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-              >
-                {MONTHS.map((m, i) => (
-                  <option key={m} value={i + 1}>
-                    {m}
-                  </option>
-                ))}
-              </select>
-              <input
-                aria-label="Day of month"
-                type="number"
-                min={1}
-                max={31}
-                value={s.fyStartDay}
-                onChange={(e) => update("fyStartDay", Number(e.target.value))}
-                className="h-12 w-20 rounded-md border border-border bg-background px-3 text-sm"
-              />
-            </div>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Drives entitlement and the annual reset
-              {financialYear && ` · currently ${financialYear}`}
-            </p>
-          </div>
-
-          {/* D34, in the customer's hands. */}
-          <div>
-            <label htmlFor="fy-open" className="block text-sm font-medium">
-              Next year opens
-            </label>
-            <select
-              id="fy-open"
-              value={s.nextFyOpensMonthsBefore}
-              onChange={(e) => update("nextFyOpensMonthsBefore", Number(e.target.value))}
-              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-            >
-              <option value={0}>Not until it starts</option>
-              {[1, 2, 3, 6, 12].map((m) => (
-                <option key={m} value={m}>
-                  {m} month{m === 1 ? "" : "s"} before
-                </option>
-              ))}
-            </select>
-            <p className="mt-1 text-xs text-muted-foreground">
-              How early people can book into next year
-            </p>
-          </div>
-        </div>
-      </section>
-
-      {/* ─────────────────────────────────────────────── requests */}
-      <section className="mt-10">
-        <h2 className="font-display text-base font-semibold">Requests</h2>
-
-        <div className="mt-4 grid gap-4 sm:grid-cols-2">
-          <div>
-            <label htmlFor="notice" className="block text-sm font-medium">
-              Minimum notice
-            </label>
-            <input
-              id="notice"
-              type="number"
-              min={0}
-              max={365}
-              value={s.defaultMinNoticeDays}
-              onChange={(e) => update("defaultMinNoticeDays", Number(e.target.value))}
-              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-            />
-            <p className="mt-1 text-xs text-muted-foreground">
-              Days. A leave type can require more
-            </p>
-          </div>
-
-          <div>
-            <span className="block text-sm font-medium">Time zone</span>
-            <p className="mt-2 flex h-12 items-center text-sm tabular-nums">{s.timezone}</p>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Every date check resolves here, never against the server clock
-            </p>
-          </div>
-        </div>
-
-        <label className="mt-4 flex items-start gap-3">
-          <input
-            type="checkbox"
-            checked={s.allowRetroactive}
-            onChange={(e) => update("allowRetroactive", e.target.checked)}
-            className="mt-1 h-5 w-5 shrink-0"
-          />
-          <span>
-            <span className="block text-sm font-medium">Allow backdated requests</span>
-            <span className="block text-xs text-muted-foreground">
-              Lets somebody record leave they have already taken
-            </span>
-          </span>
-        </label>
-      </section>
-
-      {error && (
-        <p role="alert" data-testid="settings-error" className="mt-6 text-sm text-destructive">
-          {error}
+        <h2 className="font-display text-base font-semibold">Working calendar</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          Changing the working week or the financial year changes how every future request is
+          counted. Leave already booked is not recalculated.
         </p>
-      )}
-
-      <div className="mt-6 flex items-center gap-4">
-        <button
-          onClick={onSave}
-          disabled={saving || workingDays === 0}
-          data-testid="save-settings"
-          className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {saving ? "Saving…" : "Save settings"}
-        </button>
-        {saved && <span className="text-sm text-muted-foreground">Saved</span>}
-      </div>
+        <div className="mt-4">
+          {user && <WorkingCalendar organizationId={user.organizationId} />}
+        </div>
+      </section>
 
       {/* ─────────────────────────────────────────────── holidays */}
       <section className="mt-12">
@@ -441,6 +202,15 @@ function SettingsPage() {
           </button>
         </form>
 
+        {/* Set by both handlers below and, until now, rendered nowhere — so a
+            holiday that failed to save failed in silence and the row simply
+            did not appear. Caught by lint, not by anybody using the screen. */}
+        {error && (
+          <p role="alert" data-testid="holidays-error" className="mt-4 text-sm text-destructive">
+            {error}
+          </p>
+        )}
+
         {holidays.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
             No holidays configured yet. Until some are added, only non-working days are excluded.
@@ -470,6 +240,18 @@ function SettingsPage() {
             ))}
           </ul>
         )}
+      </section>
+
+      {/* ─────────────────────────────────────────────── modules */}
+      <section className="mt-12">
+        <h2 className="font-display text-lg font-semibold tracking-tight">Modules</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          What this workspace has, and what is switched on. Neuvto adds modules to your workspace;
+          switching them on and off is yours.
+        </p>
+        <div className="mt-4">
+          <OrgModules user={user} />
+        </div>
       </section>
 
       {/*

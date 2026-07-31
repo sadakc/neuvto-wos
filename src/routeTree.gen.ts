@@ -16,6 +16,7 @@ import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
+import { Route as AppSetupRouteImport } from './routes/app/setup'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppMembersRouteImport } from './routes/app/members'
 import { Route as AppApprovalRulesRouteImport } from './routes/app/approval-rules'
@@ -59,6 +60,11 @@ const AdminIndexRoute = AdminIndexRouteImport.update({
   id: '/admin/',
   path: '/admin/',
   getParentRoute: () => rootRouteImport,
+} as any)
+const AppSetupRoute = AppSetupRouteImport.update({
+  id: '/setup',
+  path: '/setup',
+  getParentRoute: () => AppRouteRoute,
 } as any)
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
@@ -116,6 +122,7 @@ export interface FileRoutesByFullPath {
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/setup': typeof AppSetupRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -132,6 +139,7 @@ export interface FileRoutesByTo {
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/setup': typeof AppSetupRoute
   '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -150,6 +158,7 @@ export interface FileRoutesById {
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
+  '/app/setup': typeof AppSetupRoute
   '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
@@ -169,6 +178,7 @@ export interface FileRouteTypes {
     | '/app/approval-rules'
     | '/app/members'
     | '/app/settings'
+    | '/app/setup'
     | '/admin/'
     | '/app/'
     | '/.lovable/oauth/consent'
@@ -185,6 +195,7 @@ export interface FileRouteTypes {
     | '/app/approval-rules'
     | '/app/members'
     | '/app/settings'
+    | '/app/setup'
     | '/admin'
     | '/app'
     | '/.lovable/oauth/consent'
@@ -202,6 +213,7 @@ export interface FileRouteTypes {
     | '/app/approval-rules'
     | '/app/members'
     | '/app/settings'
+    | '/app/setup'
     | '/admin/'
     | '/app/'
     | '/.lovable/oauth/consent'
@@ -272,6 +284,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AdminIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/app/setup': {
+      id: '/app/setup'
+      path: '/setup'
+      fullPath: '/app/setup'
+      preLoaderRoute: typeof AppSetupRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/settings': {
       id: '/app/settings'
       path: '/settings'
@@ -336,6 +355,7 @@ interface AppRouteRouteChildren {
   AppApprovalRulesRoute: typeof AppApprovalRulesRoute
   AppMembersRoute: typeof AppMembersRoute
   AppSettingsRoute: typeof AppSettingsRoute
+  AppSetupRoute: typeof AppSetupRoute
   AppIndexRoute: typeof AppIndexRoute
 }
 
@@ -344,6 +364,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppApprovalRulesRoute: AppApprovalRulesRoute,
   AppMembersRoute: AppMembersRoute,
   AppSettingsRoute: AppSettingsRoute,
+  AppSetupRoute: AppSetupRoute,
   AppIndexRoute: AppIndexRoute,
 }
 

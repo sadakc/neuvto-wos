@@ -101,6 +101,47 @@ broken landing page means something unexpected happened.
 
 ---
 
+## Per-environment setup that no migration can do — Vault
+
+**Applying every migration is not enough to make a new environment work.** Two
+values are needed that must never appear in a migration, because a migration is a
+file in git:
+
+| Vault secret                | Value                                           |
+| --------------------------- | ----------------------------------------------- |
+| `notification_dispatch_url` | the `notification-dispatch` edge function's URL |
+| `notification_dispatch_key` | that project's **service role key**             |
+
+`20260801100000_scheduled_work.sql` ships the `pg_cron` job that drains the
+notification queue every minute, and the job runs whether or not these exist.
+Without them **every email queues and none is delivered** — which is exactly the
+fault this whole mechanism was built to fix, so the dispatcher is deliberately
+loud about it: with mail waiting and no secrets, it raises a `WARNING` naming
+both keys into the Postgres log every minute.
+
+Set them once per environment, in the SQL editor:
+
+```sql
+select vault.create_secret(
+  'https://<project-ref>.supabase.co/functions/v1/notification-dispatch',
+  'notification_dispatch_url', 'set at cutover');
+select vault.create_secret(
+  '<service role key>', 'notification_dispatch_key', 'set at cutover');
+```
+
+**Never paste the service role key into a chat, a PR, or a file.** Read it from
+the project's API settings and paste it into the SQL editor directly.
+
+**A `db reset` clears Vault**, so a local machine needs them again afterwards —
+`scripts/dev-mail.sh` does that for you, along with starting the dispatcher and
+relaying into Mailpit.
+
+**How to tell it worked:** provision a customer and touch nothing. The invitation
+should arrive within about a minute. `neuvto-harness/tests/verify_scheduled_work.sh`
+asserts exactly this and can be pointed at any environment.
+
+---
+
 ## ⚠️ `499 request_cancelled` does not mean the SQL failed
 
 This has now happened twice, and both times **the DDL had executed** despite the
@@ -187,6 +228,10 @@ Then, after the merge:
 - [ ] Migration applied to Lovable Cloud and verified by `SELECT`
 - [ ] Row present in `supabase_migrations.schema_migrations`
 - [ ] `neuvto.lovable.app` loads
+- [ ] **Both Vault secrets set in that environment** — see above. A migration
+      cannot do this, and without it every email queues silently
+- [ ] **`select * from cron.job`** returns the jobs the migrations declare, and
+      `cron.job_run_details` shows them running
 - [ ] Build-sequence table in
       [../product/NEUVTO_MVP_BUILD_SPEC.md](../product/NEUVTO_MVP_BUILD_SPEC.md)
       marked `**done**`

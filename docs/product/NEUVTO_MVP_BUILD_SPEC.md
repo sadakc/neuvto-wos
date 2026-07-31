@@ -1,25 +1,52 @@
-# NEUVTO WOS — MVP Build Spec (Platform + Leave Management)
+# NEUVTO WOS — Build Spec
+
+## The platform is the product
 
 **Derived from:** `02_PRODUCT_PRINCIPLES.md`, `03_PLATFORM_ARCHITECTURE.md`, `04_MODULE_ROADMAP.md`, `06_LEAVE_MANAGEMENT.md`, `07_ROLES_PERMISSIONS.md` (all v1.0)
 **Target:** Lovable project `neuvto` (`c74d04ee-25dd-4be1-a46e-f8973fe8c5d4`)
 **Stack:** TanStack Start + TypeScript + Tailwind + shadcn/ui + Supabase (Lovable Cloud)
-**Status:** Revised for platform-first — 28 Jul 2026
+**Status:** Rewritten platform-first — 31 Jul 2026
 
 ---
 
-## Architectural stance
+## What is being built
 
-Per **Principle 1: Platform Before Features**, this build produces a **Platform Layer** and one **Business Module** that consumes it. Leave Management owns no capability that a second module would also need.
+**Neuvto is a platform that customers are provisioned onto, and modules are
+deployed onto it multi-tenant.** Leave Management is the first module. It is an
+instance of a contract, not the destination.
+
+That sentence is the whole reframe, and this document was written the other way
+round until 31 Jul 2026 — as a leave product that happened to have a platform
+underneath. The build followed the spec, so the platform was built as far as
+Leave happened to exercise it and no further. What that cost, concretely:
+
+- Three capabilities were written to run **on a schedule**, and nothing in the
+  repository ran on a schedule. Every email the product sends was affected.
+- The **module boundary** filtered routes and not functions, so a company with
+  Leave switched off could still submit leave through the API.
+- A provisioned customer had **no way to say who they were** — no display name,
+  no logo — and no path through setting their workspace up.
+
+None of those are leave defects. All three were found the week the product was
+first used by somebody who was not building it.
+
+### The shape
 
 ```
-BUSINESS MODULE            Leave Management
-                                  ↓ consumes
-PLATFORM LAYER    Auth · Users · Org Structure · RBAC · Settings
-                  Approval Engine · Notification Engine · Audit Log
-                  Working Calendar · Module Registry
-                                  ↓
-INFRASTRUCTURE            Supabase (Postgres + Auth + Edge Functions)
+MODULES            Leave  ·  Attendance (Q4)  ·  Payroll (2027)
+                              ↓ deployed onto, per customer
+PLATFORM           Tenancy · Provisioning · Invitations · Identity · RBAC
+                   Approval Engine · Notification Engine · Audit Log
+                   Working Calendar · Module Registry · Scheduled Work
+                              ↓
+INFRASTRUCTURE     Supabase (Postgres + Auth + Edge Functions + Storage)
 ```
+
+**Two jobs, and they belong to different people.** Neuvto provisions a customer
+and decides which modules they are entitled to (D39/D42/D44). The customer's own
+administrator configures their workspace, switches those modules on, and invites
+their people — with no SQL run by anyone, which is what the platform acceptance
+criteria below actually assert.
 
 ### Platform services built in MVP
 
@@ -39,50 +66,61 @@ Workflow Engine (Approval Engine covers MVP state transitions) · Reports Servic
 
 These override the source docs where they conflict. Deviations are deliberate and recorded.
 
-| #   | Decision                                                                                                                                                                               | Overrides                                                                                                                                                                                          |
-| --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| D1  | **Responsive web app, mobile-first.** One codebase, PWA-installable.                                                                                                                   | PRD line 1362 (React Native/Flutter) — not buildable in Lovable                                                                                                                                    |
-| D2  | **Balance reserved on submission**, released on reject/cancel.                                                                                                                         | PRD Rules 3–4 — as written, employees can overdraw                                                                                                                                                 |
-| D3  | **Entitlement pro-rated within the financial year**, capped at max. FY start per-organization.                                                                                         | PRD Rule 1 — unbounded formula, no `joined_date` source                                                                                                                                            |
-| D4  | **Roles in a separate table** behind `SECURITY DEFINER` functions; enum not string arrays.                                                                                             | PRD line 436 (`roles UUID[]` on users) — privilege-escalation risk under RLS                                                                                                                       |
-| D5  | **Approval chains are data, not code.** L1 always; L2 when a configured condition matches. Default: days > 3.                                                                          | PRD Rules 6–7 — realises them as configuration per Principle: _configuration over customization_                                                                                                   |
-| D6  | Weekend/holiday exclusion **in MVP**. Email notifications **in MVP**. Attachments and escalation cron **deferred**.                                                                    | PRD scope list                                                                                                                                                                                     |
-| D7  | **Settings split:** typed columns for platform calendar/FY (integrity — they feed generated columns); JSONB key-value for module settings (new modules need no migration).             | `03` §12 pure key-value store                                                                                                                                                                      |
-| D8  | **Email OTP + Google OAuth.** No passwords.                                                                                                                                            | `03` §Security specifies OTP; current build uses passwords. Phone OTP deferred — needs an SMS provider and Indian DLT registration                                                                 |
-| D9  | **Per-organization timezone**, default `Asia/Kolkata`. All "today" comparisons resolve in org-local time.                                                                              | Not in any source doc — a genuine omission                                                                                                                                                         |
-| D10 | **Balance rows locked `FOR UPDATE`** inside the submission transaction.                                                                                                                | Not in any source doc — D2 alone stops sequential overdraw but not concurrent                                                                                                                      |
-| D11 | **CSV employee import and opening-balance entry in MVP.**                                                                                                                              | `03` §User Management lists bulk import; opening balances were unaddressed                                                                                                                         |
-| D12 | **Balance rows created lazily** on first read for a financial year, not by a scheduled job.                                                                                            | Nothing in the PRD creates next year's rows                                                                                                                                                        |
-| D13 | **Approval chain skips an approver who is the requester**, advancing to the next level; if no level resolves, the request fails with `APPROVER_UNRESOLVED` rather than auto-approving. | PRD does not define manager-applies-for-own-leave                                                                                                                                                  |
-| D14 | **Deactivating a user requires reassigning their reports and open approvals.**                                                                                                         | PRD does not define manager departure                                                                                                                                                              |
-| D15 | **Branding and Theme services deferred.** Per-org theming is additive because every colour resolves through a CSS variable.                                                            | Principle 9 (White-Label Ready) — deliberate deferral, confirmed 28 Jul 2026                                                                                                                       |
-| D16 | **Audit fields on every business table** — `created_at`, `updated_at`, `created_by`, `updated_by`, maintained by trigger, never by application code.                                   | Not in any source doc — `created_by` cannot be backfilled once data exists                                                                                                                         |
-| D17 | **Soft delete** — `deleted_at` on business tables, enforced **inside the RLS policy**, not by query convention.                                                                        | Not in any source doc — retrofitting means re-auditing every query and policy                                                                                                                      |
-| D18 | **Overlapping leave prevented by a Postgres exclusion constraint**, not only by the handler check.                                                                                     | PRD Rule 11 — the application check races; a constraint does not                                                                                                                                   |
-| D19 | **Explicit `ON DELETE` on every foreign key.** No Postgres defaults.                                                                                                                   | Not in any source doc                                                                                                                                                                              |
-| D20 | **Per-organization session policy** — idle and absolute timeouts; sessions revoked on role change or deactivation.                                                                     | `03` §Security mentions auto-logout but specifies nothing                                                                                                                                          |
-| D21 | **TOTP MFA required for `org_admin` and `hr_admin`**; employees use email OTP alone.                                                                                                   | Principle 7 names MFA; nothing specified it                                                                                                                                                        |
-| D22 | **RPO ≤ 5 min, RTO 4 h, quarterly restore drill** that runs the harness against the restored copy.                                                                                     | Not in any source doc                                                                                                                                                                              |
-| D23 | **`erase_employee()` anonymises personal data and retains leave history.**                                                                                                             | `03` §Compliance promises erasure; deleting the row would break every balance and report                                                                                                           |
-| D24 | **AI seams defined, no AI infrastructure built.** If retrieval is ever needed it is `pgvector` in the same database — never a separate vector service.                                 | Principle 6 anticipates AI; Principle 5 forbids building it with no consumer                                                                                                                       |
-| D25 | **Analytics events stored in-database**, not sent to a third-party SaaS.                                                                                                               | Not in any source doc — avoids adding a processor holding employee behavioural data                                                                                                                |
-| D26 | **The emitter names the event; the engine names the recipients.** Modules emit `approval.submitted`, never "email the approver".                                                       | Not in any source doc — a module that named recipients would be edited every time an organisation wanted its HR admin copied in                                                                    |
-| D27 | **Values substituted into templates are HTML-escaped.**                                                                                                                                | Not in any source doc — a leave reason is user input landing in an HTML email a manager opens                                                                                                      |
-| D28 | **A notification never fails the transaction that caused it.** A missing template records a failed notification; it does not roll back the approval.                                   | Not in any source doc — mail is not worth losing somebody's approved leave over                                                                                                                    |
-| D29 | **A notification that failed for a reason that might not recur is retried with exponential backoff, up to a cap.** A reason that certainly will recur is terminal immediately.         | Not in any source doc — step 5 claimed this in a comment and did not implement it, so a momentary blip lost an approval email permanently                                                          |
-| D30 | **A module reacts to platform events with a trigger it defines itself**, on a platform table. The platform never names a module.                                                       | Not in any source doc — a hook inside approval_decide naming 'leave_request' would invert the dependency, and application code would move balances outside the decision transaction                |
-| D31 | **A balance cannot be overdrawn** — enforced by CHECK, not by remembering to look.                                                                                                     | Found by sabotage: two locks were defending an invariant nothing asserted, and removing both left available_days at -3                                                                             |
-| D32 | **Modules declare themselves; the platform reads manifests.** `src/modules/registry.ts` is the only file outside a module that names one, and CI proves a module can be deleted.       | Sada, 30 Jul 2026 — "only touch the individual module and not the entire code itself"                                                                                                              |
-| D33 | **Cancellation releases days from whichever bucket actually holds them**, and exactly one thing moves them.                                                                            | Found by sabotage: the cancel branch decremented `reserved_days` unconditionally, so cancelling APPROVED leave subtracted from an empty bucket and stranded the days in `pending_days` forever     |
-| D34 | **Next year's leave does not exist until shortly before next year.** A per-organisation setting, default one month.                                                                    | Sada, 31 Jul 2026 — two unlabelled "Casual" cards read as a duplicate, because to an employee that is what they are                                                                                |
-| D35 | **The approval timeline discloses the approver's NAME and nothing else about them.**                                                                                                   | Employees cannot read an approver's profile, so the timeline said "Level 1 Approver"; widening the profiles policy would have handed over email, joined date, manager and department to fix a name |
-| D36 | **A balance materialises when it is READ** — which is what D12 always said. Current financial year only, so D34 still holds.                                                           | `ensure_balance` was commented "created lazily on first read" and its only caller was `leave_submit`. Nothing read, so a configured workspace still showed "no leave balance yet"                  |
-| D37 | **An organisation is created with a default approval chain** — L1 reporting manager, L2 HR above three days.                                                                           | Sada's first request died with APPROVER_UNRESOLVED, rendered as "ask your administrator" — to the administrator. Test scenario 6 had always assumed a chain existed                                |
-| D38 | **`leave_types.approval_required = false` means approved on submission**, with no approval request and nothing emitted.                                                                | The column shipped in step 6 and was read by nothing. A one-person workspace cannot book a day otherwise: D13 forbids self-approval and no level resolves                                          |
-| D39 | **A workspace is entered by invitation only.** Neuvto provisions it and names the first administrator; there is no self-serve signup.                                                  | Sada, 31 Jul 2026 — "let me decide who can be the admin for that particular workspace". Every sign-in was a signup, so an uninvited employee would create a rival tenant                           |
-| D40 | **A duplicate inside the organisation is named to the admin; a clash across organisations is never disclosed to them.** The invitee is told, at acceptance.                            | Answering "already in another workspace" at invite time makes the invite box a staff-directory oracle — type addresses, watch which come back duplicate, enumerate a competitor's payroll          |
-| D41 | **Phone is stored and unique within an organisation, and is NOT an identity key.**                                                                                                     | The goal (one human, not one address) is right and phone is the correct key, but an admin types it and nothing verifies it. Real enforcement needs phone OTP, which D8 defers                      |
-| D42 | **Platform admins provision and never read tenant data.** `platform_admins` has RLS on, no policy and no grant; bootstrap is one manual INSERT.                                        | Support access was considered and declined. It falls out of the design — staff have no profile, so `current_org_id()` is null and every tenant policy already refuses them                         |
+| #   | Decision                                                                                                                                                                                                          | Overrides                                                                                                                                                                                                                                                                        |
+| --- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| D1  | **Responsive web app, mobile-first.** One codebase, PWA-installable.                                                                                                                                              | PRD line 1362 (React Native/Flutter) — not buildable in Lovable                                                                                                                                                                                                                  |
+| D2  | **Balance reserved on submission**, released on reject/cancel.                                                                                                                                                    | PRD Rules 3–4 — as written, employees can overdraw                                                                                                                                                                                                                               |
+| D3  | **Entitlement pro-rated within the financial year**, capped at max. FY start per-organization.                                                                                                                    | PRD Rule 1 — unbounded formula, no `joined_date` source                                                                                                                                                                                                                          |
+| D4  | **Roles in a separate table** behind `SECURITY DEFINER` functions; enum not string arrays.                                                                                                                        | PRD line 436 (`roles UUID[]` on users) — privilege-escalation risk under RLS                                                                                                                                                                                                     |
+| D5  | **Approval chains are data, not code.** L1 always; L2 when a configured condition matches. Default: days > 3.                                                                                                     | PRD Rules 6–7 — realises them as configuration per Principle: _configuration over customization_                                                                                                                                                                                 |
+| D6  | Weekend/holiday exclusion **in MVP**. Email notifications **in MVP**. Attachments and escalation cron **deferred**.                                                                                               | PRD scope list                                                                                                                                                                                                                                                                   |
+| D7  | **Settings split:** typed columns for platform calendar/FY (integrity — they feed generated columns); JSONB key-value for module settings (new modules need no migration).                                        | `03` §12 pure key-value store                                                                                                                                                                                                                                                    |
+| D8  | **Email OTP + Google OAuth.** No passwords.                                                                                                                                                                       | `03` §Security specifies OTP; current build uses passwords. Phone OTP deferred — needs an SMS provider and Indian DLT registration                                                                                                                                               |
+| D9  | **Per-organization timezone**, default `Asia/Kolkata`. All "today" comparisons resolve in org-local time.                                                                                                         | Not in any source doc — a genuine omission                                                                                                                                                                                                                                       |
+| D10 | **Balance rows locked `FOR UPDATE`** inside the submission transaction.                                                                                                                                           | Not in any source doc — D2 alone stops sequential overdraw but not concurrent                                                                                                                                                                                                    |
+| D11 | **CSV employee import and opening-balance entry in MVP.**                                                                                                                                                         | `03` §User Management lists bulk import; opening balances were unaddressed                                                                                                                                                                                                       |
+| D12 | **Balance rows created lazily** on first read for a financial year, not by a scheduled job.                                                                                                                       | Nothing in the PRD creates next year's rows                                                                                                                                                                                                                                      |
+| D13 | **Approval chain skips an approver who is the requester**, advancing to the next level; if no level resolves, the request fails with `APPROVER_UNRESOLVED` rather than auto-approving.                            | PRD does not define manager-applies-for-own-leave                                                                                                                                                                                                                                |
+| D14 | **Deactivating a user requires reassigning their reports and open approvals.**                                                                                                                                    | PRD does not define manager departure                                                                                                                                                                                                                                            |
+| D15 | **Branding and Theme services deferred.** Per-org theming is additive because every colour resolves through a CSS variable.                                                                                       | Principle 9 (White-Label Ready) — deliberate deferral, confirmed 28 Jul 2026                                                                                                                                                                                                     |
+| D16 | **Audit fields on every business table** — `created_at`, `updated_at`, `created_by`, `updated_by`, maintained by trigger, never by application code.                                                              | Not in any source doc — `created_by` cannot be backfilled once data exists                                                                                                                                                                                                       |
+| D17 | **Soft delete** — `deleted_at` on business tables, enforced **inside the RLS policy**, not by query convention.                                                                                                   | Not in any source doc — retrofitting means re-auditing every query and policy                                                                                                                                                                                                    |
+| D18 | **Overlapping leave prevented by a Postgres exclusion constraint**, not only by the handler check.                                                                                                                | PRD Rule 11 — the application check races; a constraint does not                                                                                                                                                                                                                 |
+| D19 | **Explicit `ON DELETE` on every foreign key.** No Postgres defaults.                                                                                                                                              | Not in any source doc                                                                                                                                                                                                                                                            |
+| D20 | **Per-organization session policy** — idle and absolute timeouts; sessions revoked on role change or deactivation.                                                                                                | `03` §Security mentions auto-logout but specifies nothing                                                                                                                                                                                                                        |
+| D21 | **TOTP MFA required for `org_admin` and `hr_admin`**; employees use email OTP alone.                                                                                                                              | Principle 7 names MFA; nothing specified it                                                                                                                                                                                                                                      |
+| D22 | **RPO ≤ 5 min, RTO 4 h, quarterly restore drill** that runs the harness against the restored copy.                                                                                                                | Not in any source doc                                                                                                                                                                                                                                                            |
+| D23 | **`erase_employee()` anonymises personal data and retains leave history.**                                                                                                                                        | `03` §Compliance promises erasure; deleting the row would break every balance and report                                                                                                                                                                                         |
+| D24 | **AI seams defined, no AI infrastructure built.** If retrieval is ever needed it is `pgvector` in the same database — never a separate vector service.                                                            | Principle 6 anticipates AI; Principle 5 forbids building it with no consumer                                                                                                                                                                                                     |
+| D25 | **Analytics events stored in-database**, not sent to a third-party SaaS.                                                                                                                                          | Not in any source doc — avoids adding a processor holding employee behavioural data                                                                                                                                                                                              |
+| D26 | **The emitter names the event; the engine names the recipients.** Modules emit `approval.submitted`, never "email the approver".                                                                                  | Not in any source doc — a module that named recipients would be edited every time an organisation wanted its HR admin copied in                                                                                                                                                  |
+| D27 | **Values substituted into templates are HTML-escaped.**                                                                                                                                                           | Not in any source doc — a leave reason is user input landing in an HTML email a manager opens                                                                                                                                                                                    |
+| D28 | **A notification never fails the transaction that caused it.** A missing template records a failed notification; it does not roll back the approval.                                                              | Not in any source doc — mail is not worth losing somebody's approved leave over                                                                                                                                                                                                  |
+| D29 | **A notification that failed for a reason that might not recur is retried with exponential backoff, up to a cap.** A reason that certainly will recur is terminal immediately.                                    | Not in any source doc — step 5 claimed this in a comment and did not implement it, so a momentary blip lost an approval email permanently                                                                                                                                        |
+| D30 | **A module reacts to platform events with a trigger it defines itself**, on a platform table. The platform never names a module.                                                                                  | Not in any source doc — a hook inside approval_decide naming 'leave_request' would invert the dependency, and application code would move balances outside the decision transaction                                                                                              |
+| D31 | **A balance cannot be overdrawn** — enforced by CHECK, not by remembering to look.                                                                                                                                | Found by sabotage: two locks were defending an invariant nothing asserted, and removing both left available_days at -3                                                                                                                                                           |
+| D32 | **Modules declare themselves; the platform reads manifests.** `src/modules/registry.ts` is the only file outside a module that names one, and CI proves a module can be deleted.                                  | Sada, 30 Jul 2026 — "only touch the individual module and not the entire code itself"                                                                                                                                                                                            |
+| D33 | **Cancellation releases days from whichever bucket actually holds them**, and exactly one thing moves them.                                                                                                       | Found by sabotage: the cancel branch decremented `reserved_days` unconditionally, so cancelling APPROVED leave subtracted from an empty bucket and stranded the days in `pending_days` forever                                                                                   |
+| D34 | **Next year's leave does not exist until shortly before next year.** A per-organisation setting, default one month.                                                                                               | Sada, 31 Jul 2026 — two unlabelled "Casual" cards read as a duplicate, because to an employee that is what they are                                                                                                                                                              |
+| D35 | **The approval timeline discloses the approver's NAME and nothing else about them.**                                                                                                                              | Employees cannot read an approver's profile, so the timeline said "Level 1 Approver"; widening the profiles policy would have handed over email, joined date, manager and department to fix a name                                                                               |
+| D36 | **A balance materialises when it is READ** — which is what D12 always said. Current financial year only, so D34 still holds.                                                                                      | `ensure_balance` was commented "created lazily on first read" and its only caller was `leave_submit`. Nothing read, so a configured workspace still showed "no leave balance yet"                                                                                                |
+| D37 | **An organisation is created with a default approval chain** — L1 reporting manager, L2 HR above three days.                                                                                                      | Sada's first request died with APPROVER_UNRESOLVED, rendered as "ask your administrator" — to the administrator. Test scenario 6 had always assumed a chain existed                                                                                                              |
+| D38 | **`leave_types.approval_required = false` means approved on submission**, with no approval request and nothing emitted.                                                                                           | The column shipped in step 6 and was read by nothing. A one-person workspace cannot book a day otherwise: D13 forbids self-approval and no level resolves                                                                                                                        |
+| D39 | **A workspace is entered by invitation only.** Neuvto provisions it and names the first administrator; there is no self-serve signup.                                                                             | Sada, 31 Jul 2026 — "let me decide who can be the admin for that particular workspace". Every sign-in was a signup, so an uninvited employee would create a rival tenant                                                                                                         |
+| D40 | **A duplicate inside the organisation is named to the admin; a clash across organisations is never disclosed to them.** The invitee is told, at acceptance.                                                       | Answering "already in another workspace" at invite time makes the invite box a staff-directory oracle — type addresses, watch which come back duplicate, enumerate a competitor's payroll                                                                                        |
+| D41 | **Phone is stored and unique within an organisation, and is NOT an identity key.**                                                                                                                                | The goal (one human, not one address) is right and phone is the correct key, but an admin types it and nothing verifies it. Real enforcement needs phone OTP, which D8 defers                                                                                                    |
+| D42 | **Platform admins provision and never read tenant data.** `platform_admins` has RLS on, no policy and no grant; bootstrap is one manual INSERT.                                                                   | Support access was considered and declined. It falls out of the design — staff have no profile, so `current_org_id()` is null and every tenant policy already refuses them                                                                                                       |
+| D43 | **Work that has to happen on a schedule is scheduled in a migration**, in `pg_cron`, with its credentials in Vault. A module schedules its own work in its own migration.                                         | Nothing in the repository ran on a schedule for four build steps, and three capabilities were written for one. A schedule clicked into a dashboard cannot be reviewed, cannot be restored after a rebuild, and cannot be found by the next person wondering why no email arrived |
+| D44 | **A module is granted by Neuvto and switched on by the customer** — two levels, both on `organization_modules`. Enforced by `module_enabled_for()` **inside the module's own functions**, not only in the router. | Test scenario 12 has said "routes _and functions_ refuse" since the first draft. Routes refused; `module_enabled()` was called by nothing at all, so a company with Leave switched off could still submit leave                                                                  |
+| D45 | **A customer's identity is theirs to set** — display name, logo, industry — and it appears in the shell and in the emails their own people receive. The logo bucket is private and org-scoped.                    | A provisioned workspace had no way to say who it was. A public bucket would make every customer's identity enumerable by anyone who can count, so reads go through short-lived signed URLs                                                                                       |
+| D46 | **Onboarding completion is derived from the data, never from a stored step counter.** `organizations.onboarding_completed_at` records only that they chose to stop being asked.                                   | A counter and the data it describes drift, and it is the counter that lies — parking somebody forever on a step they finished, or waving through one they never saw                                                                                                              |
+
+**D15 is unchanged and still deferred.** Company identity (D45) is not theming.
+A name and a logo are _facts about the customer_, stored as columns and rendered
+by components that already exist. Per-organisation colour is a _rendering
+strategy_ — it stays additive because every colour already resolves through a CSS
+variable, and it earns nothing until a customer asks for it. Shipping identity
+does not smuggle Branding and Theme services in by the back door.
 
 **Companion standards:** `docs/standards/NEUVTO_DATA_STANDARDS.md` (D16–D19, D23) ·
 `NEUVTO_SECURITY_POLICY.md` (D20–D22) · `NEUVTO_ANALYTICS.md` (D25) · `NEUVTO_AI_SEAMS.md` (D24)
@@ -154,8 +192,13 @@ current_org_id()                      → uuid
 has_role(_user_id, _role)             → boolean
 is_admin()                            → org_admin or hr_admin
 is_manager_of(_employee_id)           → boolean
-module_enabled(_module_key)           → boolean
+module_enabled_for(_org_id, _key)     → boolean   -- D44; takes the org, see 1.7
 ```
+
+`module_enabled(_key)` shipped here in phase 0, resolving the organisation from
+the caller's own profile. It is **dropped** in D44: any caller without a profile
+— which is every scheduled job — got `false` rather than an error, so it was
+silently wrong in exactly the situations that matter.
 
 ### Universal column set — D16, D17
 
@@ -293,11 +336,130 @@ Modules emit events. They never call Resend.
 
 **Gate:** the Approval Engine can drive a throwaway `entity_type` end to end with no leave tables present.
 
+## 1.5 Provisioning and invitations — how a customer comes to exist
+
+**`platform_admins`** — Neuvto staff. RLS on, **no policy and no grant**, so it is
+readable only by `SECURITY DEFINER` functions. Bootstrapping the first row is one
+manual INSERT, deliberately: the first god account should be a decision somebody
+made, not a side effect of a deploy. There is no self-service path into this
+table and there must never be one.
+
+**`invitations`** — `organization_id`, `email`, `phone`, `full_name`, `role`, `token`,
+`expires_at`, `accepted_at`, `revoked_at`.
+
+```
+platform_provision_organization(name, slug, admin_email, admin_name, industry)
+  → creates the organisation, its settings, its default approval chain (D37),
+    and one org_admin invitation. Emits member.invited.
+
+invitation_accept(token)
+  → creates the profile and role, marks the invitation accepted.
+    Refuses a second use, an expired token, a revoked token and a
+    wrong-recipient token with the IDENTICAL message.
+```
+
+**D39 — a workspace is entered by invitation only.** Before this existed every
+sign-in was a signup, so an employee arriving uninvited created a rival tenant
+containing one person. **D40** governs what the inviting admin is allowed to
+learn: a duplicate inside their own organisation is named to them; a clash across
+organisations is never disclosed, because answering it turns the invite box into
+a staff directory of a competitor.
+
+## 1.6 Scheduled work — D43
+
+The platform's own recurring work, scheduled **in a migration** so it is in git,
+reviewable, and restored by a rebuild.
+
+```sql
+create extension pg_cron;  create extension pg_net;
+
+platform_secret(name)          -- reads Vault; never granted to authenticated
+dispatch_notifications()       -- hands the pending queue to the edge dispatcher
+
+cron: neuvto-dispatch-notifications   '* * * * *'
+```
+
+**Unconfigured is loud, not silent.** An environment with no
+`notification_dispatch_url`/`_key` in Vault raises a `WARNING` naming both, every
+time it has mail it cannot send — rather than returning quietly and looking
+exactly like success. Silence is the shape the original defect took, so silence
+is what the harness refuses to accept.
+
+**Only platform work is scheduled here.** A module schedules its own, in its own
+migration — `neuvto-leave-mature-balances` lives with the Leave module. The first
+draft of this migration looped organisations calling `leave_mature_balances()`,
+which is platform code naming a module and the one thing D30 exists to forbid.
+
+Vault secrets are per-environment and set by hand once; a `db reset` clears them.
+See `docs/operations/DEPLOYMENT.md`.
+
+## 1.7 The module boundary — D44
+
+**`modules`** — the catalogue: `key`, `name`, `status` (`available`/`coming_soon`/`retired`).
+**`organization_modules`** — `organization_id`, `module_key`, `enabled`, `enabled_at`.
+
+Two levels, and they belong to different people:
+
+| Level            | Who                  | Meaning                                 |
+| ---------------- | -------------------- | --------------------------------------- |
+| the row exists   | Neuvto               | this customer is **granted** the module |
+| `enabled = true` | the customer's admin | they have **switched it on**            |
+
+```sql
+module_enabled_for(_org_id, _module_key) returns boolean
+  -- stable, security definer. Takes the org explicitly, so scheduled work
+  -- running as postgres gets a real answer rather than a silent false.
+
+platform_set_module(_org_id, _module_key, _granted)   -- Neuvto only
+platform_list_org_modules(_org_id)                    -- Neuvto only
+```
+
+**Enforced in the module's own functions**, which raise `MODULE_NOT_ENABLED` —
+not only in the router, which is all that was true before. A customer's admin
+holds `UPDATE (enabled, enabled_at)` and nothing else: granting `UPDATE` on the
+whole row let an admin rewrite `module_key`, turning a Leave grant into a Payroll
+one.
+
+`module_enabled(text)` — the convenience wrapper that read the caller's own org —
+is **dropped**. It answered `false` for any caller without a profile, which is
+every scheduled job, and it was silently wrong rather than loudly missing.
+
+## 1.8 Company identity and onboarding — D45, D46
+
+**`organizations`** gains `display_name`, `logo_path`, `logo_updated_at`,
+`onboarding_completed_at`. `industry_type` already existed and was unused.
+
+**Bucket `org-logos` — private**, 2 MB, `image/png|jpeg|webp` (no SVG: it is a
+script container). Path is `{organization_id}/…`, enforced by a CHECK on
+`logo_path` as well as by the storage policies, and reads go through a signed URL.
+Uploads are re-encoded through a canvas rather than trusted.
+
+`UPDATE` on `organizations` is granted **per column** — name, display name, logo,
+industry, onboarding — so an admin cannot reach `deleted_at` or `slug` and
+soft-delete the company they administer.
+
+`organization_display_name()` is what the invitation email carries, so the first
+message anyone at a customer receives names their own employer rather than ours.
+
+**The setup wizard** (`/app/setup`) — welcome → identity → calendar → modules →
+people → done. Every step saves as it goes and is resumable; abandoning it is
+expected rather than exceptional. **Completion is derived** (D46): the calendar
+step is always "done" because provisioning writes valid defaults and there is no
+observable difference between reviewing them and never looking — claiming to know
+would park somebody forever on a step for agreeing with it.
+
 ---
 
-# PHASE 2 — Leave Management module
+# PHASE 2 — The first module: Leave Management
 
-Registers itself in `modules` as `'leave'`. All screens and functions check `module_enabled('leave')`.
+**Leave is an instance of the module contract, not the destination.** Everything
+in this phase exists to prove the contract carries a real module: it registers
+itself in `modules` as `'leave'`, contributes its own screens, settings sections
+and dashboard cards through manifests, schedules its own recurring work, and
+CI proves the whole directory can be deleted without breaking the platform (D32).
+
+Its functions check `module_enabled_for(org, 'leave')` and raise
+`MODULE_NOT_ENABLED` (D44). The platform names no module anywhere (D30).
 
 ### Enums
 
@@ -375,6 +537,11 @@ Subscribes to `approval.completed` for `entity_type = 'leave_request'`:
 - **cancelled by employee** before start → `cancelled`; release from whichever bucket holds the days
 
 **Daily maturation:** approved requests past `to_date` move `pending_days → used_days`.
+`leave_mature_all_balances()` does the sweep for every organisation that has Leave,
+scheduled by **this module** at `30 18 * * *` — midnight in the default
+organisation timezone — in its own migration, never by the platform (D30/D43).
+Each organisation's own "today" is resolved inside, so a customer in another zone
+is still correct; the schedule decides only when the sweep runs.
 
 **Gate:** `available = entitled + carryforward − used − reserved − pending` holds after every operation, across multiple leave types.
 
@@ -403,9 +570,11 @@ Built in step 8 unless marked otherwise.
 - **Holiday calendar** (platform)
 - **Approval chain editor** (platform) — levels, approver rule, condition, threshold
 - **Org settings** — FY start month/day, weekend days, exclusion toggles, min notice, retroactive, D34's booking window
-- **Members** — invite by email, role and phone; pending invitations, revoke. Reporting lines and deactivation are step 9b
-- **Neuvto console** (`/admin`) — provision a customer workspace and name its first administrator (D39/D42)
-- **Module registry** — enable/disable modules per org — _not built_
+- **Company identity** (platform, D45) — display name, logo, industry. Shared with the wizard, so the form exists once
+- **Setup wizard** (`/app/setup`, platform, D46) — where an administrator lands on accepting their invitation
+- **Members** — invite by email, role and phone; pending invitations, revoke. Reporting lines and deactivation are step 11
+- **Neuvto console** (`/admin`) — provision a customer workspace, name its first administrator, and grant modules (D39/D42/D44)
+- **Module registry** — Neuvto grants; the customer switches on, in their own Settings (D44)
 - Notification toggles — _not built_
 - **CSV employee import** (D11) — upload, column mapping, dry-run preview showing what will be created and what will fail, per-row error reporting, partial success. Required columns: `email`, `full_name`, `joined_date`; optional: `manager_email`, `department`, `role`. Manager links resolve by email in a second pass so order in the file doesn't matter.
 - **Opening balances** (D11) — for customers onboarding mid-year: per employee per leave type, set `used_days` and `carryforward_days` directly. Available as a column in the same CSV and as an inline edit on the balance report. Every override writes an audit row with the previous value — this is `leave:balance:override` from `07`, and it must be traceable.
@@ -415,32 +584,47 @@ Built in step 8 unless marked otherwise.
 
 ## Build sequence
 
-**Progress as of 31 Jul 2026:** steps 0 through 8 are merged to `main`. The harness carries
-the RLS assertions, the invariant suite, the D10 concurrency guard and a first-run suite that
-seeds NOTHING — passing locally and in CI, and verified non-vacuous: every guard has been
-watched to fail under deliberate sabotage.
+**Progress as of 31 Jul 2026:** steps 0 through 8 are merged to `main`; step 9 is built and
+under verification. The harness carries the RLS assertions, the invariant suite, the D10
+concurrency guard, a first-run suite that seeds NOTHING, and a scheduled-work suite that
+**invokes nothing** — passing locally and in CI, and verified non-vacuous: every guard has
+been watched to fail under deliberate sabotage.
 
-**The lesson of step 8, worth keeping at the top of this section.** Steps 0–7 were green while
-four faults made a new workspace unusable, because `seed_test_data.sql` hands the harness two
-organisations that already have leave types, balances and approval chains. The suite had never
-once started where a customer starts. A test fixture that sets up the preconditions the product
-is supposed to create is not a test of the product.
+**The lesson of step 8.** Steps 0–7 were green while four faults made a new workspace
+unusable, because `seed_test_data.sql` hands the harness two organisations that already have
+leave types, balances and approval chains. The suite had never once started where a customer
+starts. A test fixture that sets up the preconditions the product is supposed to create is not
+a test of the product.
 
-| Status   | Step | Content                                                                            | Gate                                                                                                     |
-| -------- | ---- | ---------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **done** | 0    | Vitest + GitHub Actions CI                                                         | Lint, typecheck, unit tests, and the SQL harness run on every push                                       |
-| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                                  | Cross-org isolation verified by SQL as each role                                                         |
-| **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup      | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
-| **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                        | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
-| **done** | 4    | Phase 1 — Approval Engine                                                          | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
-| **done** | 5    | Phase 1 — Notification Engine + Resend                                             | Template renders, email delivers, `notifications` row marked sent                                        |
-| **done** | 6    | Phase 2 — Module SDK + Leave schema, entitlement, lazy balances, locked submission | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
-| **done** | 7    | Phase 3 — Employee UI                                                              | PRD AC1–AC3, AC5, AC7                                                                                    |
-| **done** | 8    | The first run — provisioning, invitations, admin config, PWA                       | A provisioned workspace is usable end to end with no SQL; platform admins read zero tenant rows          |
-| next     | 9    | Phase 3 — Manager UI + decision handling                                           | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |
-| —        | 9b   | Guarded deactivation + reporting lines                                             | PRD AC9; deactivating a manager with reports is blocked                                                  |
-| —        | 10   | CSV employee import + opening balances                                             | 50-row import dry-run reports per-row errors; overrides audited                                          |
-| —        | 11   | Reports 1, 3, 4 + CSV export                                                       | —                                                                                                        |
+**The lesson of step 9, which is the same lesson one layer down.** Step 8's suite was green
+while no email the product sends could be delivered at all, because every assertion invoked
+the dispatcher by hand before checking the outcome. A queue nobody drains is indistinguishable
+from a queue with nothing in it. Three capabilities had been written to run on a schedule and
+nothing in the repository ran on a schedule — including one, `module_enabled()`, that was
+called by nothing whatsoever.
+
+**So the recurring failure mode of this codebase is now named: a capability written,
+documented, granted, and wired to nothing.** It has happened four times — `ensure_balance`
+(D36), `approval_required` (D38), `leave_mature_balances` and `module_enabled` (D43/D44). It
+has its own CI check, `scripts/verify-functions-wired.sh`, which fails the build when a
+function our migrations define is referenced nowhere but its own definition.
+
+| Status   | Step | Content                                                                                             | Gate                                                                                                     |
+| -------- | ---- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
+| **done** | 0    | Vitest + GitHub Actions CI                                                                          | Lint, typecheck, unit tests, and the SQL harness run on every push                                       |
+| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                                                   | Cross-org isolation verified by SQL as each role                                                         |
+| **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup                       | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
+| **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                                         | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
+| **done** | 4    | Phase 1 — Approval Engine                                                                           | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
+| **done** | 5    | Phase 1 — Notification Engine + Resend                                                              | Template renders, email delivers, `notifications` row marked sent                                        |
+| **done** | 6    | Phase 2 — Module SDK + Leave schema, entitlement, lazy balances, locked submission                  | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
+| **done** | 7    | Phase 3 — Employee UI                                                                               | PRD AC1–AC3, AC5, AC7                                                                                    |
+| **done** | 8    | The first run — provisioning, invitations, admin config, PWA                                        | A provisioned workspace is usable end to end with no SQL; platform admins read zero tenant rows          |
+| **done** | 9    | **The platform is the product** — scheduled work, the module boundary, company identity, onboarding | The platform acceptance criteria below, in full                                                          |
+| next     | 10   | Phase 3 — Manager UI + decision handling                                                            | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |
+| —        | 11   | Guarded deactivation + reporting lines                                                              | PRD AC9; deactivating a manager with reports is blocked                                                  |
+| —        | 12   | CSV employee import + opening balances                                                              | 50-row import dry-run reports per-row errors; overrides audited                                          |
+| —        | 13   | Reports 1, 3, 4 + CSV export                                                                        | —                                                                                                        |
 
 ### Testing
 
@@ -452,12 +636,35 @@ is supposed to create is not a test of the product.
 - Balance transitions across submit → approve → reject → cancel
 - Approval resolution when the manager is missing, inactive, or is the requester
 - **A concurrency test** issuing two simultaneous submissions against a balance that only covers one — this is the D10 regression guard and cannot be verified by hand
+- **A scheduled-work test that invokes nothing**, because everything the product does on its own is invisible to a test that asks it to (D43)
 
-CI runs lint, typecheck, `vitest`, then the SQL harness. A red build blocks the next step.
+CI runs lint, typecheck, `vitest`, the SQL harness, and two structural checks:
+
+| Check                               | Fails when                                                                    |
+| ----------------------------------- | ----------------------------------------------------------------------------- |
+| `scripts/verify-module-removal.sh`  | deleting `src/modules/leave` breaks the build — i.e. D32 has been violated    |
+| `scripts/verify-functions-wired.sh` | a function our migrations define is referenced nowhere but its own definition |
+
+A red build blocks the next step. The second check has its own history worth
+knowing: it contained **three bugs of its own** when written — counting comments
+as callers, demanding callers for functions a later migration drops, and counting
+`to_regprocedure()` existence probes as calls. Each was found by refusing to
+accept a sabotage that produced no visible difference. **Verification tooling is
+the most defect-prone code in this repository**, which is the argument for
+sabotaging every guard rather than trusting a green tick.
 
 ### Verification gate
 
-**Every step above is gated by `neuvto-harness/`** — seed, then `verify_rls.sql`, then `verify_invariants.sql`. Both raise on the first violation; silence is a pass. No step is considered complete until the harness passes against it.
+**Every step above is gated by `neuvto-harness/`**, in this order — seed,
+`verify_rls.sql`, `verify_invariants.sql`, `verify_first_run.sql`,
+`verify_concurrency.sh`, `verify_scheduled_work.sh`. The SQL files raise on the
+first violation; silence is a pass. No step is complete until the whole suite
+passes against it.
+
+The last three exist because the first two cannot catch what they cannot reach:
+one needs two connections, one needs a workspace nobody seeded, and one needs
+nobody to invoke anything at all. Each was added after a green suite shipped a
+fault of exactly that shape.
 
 There is no separate staging environment during the MVP: production (`neuvto-wos-prod`) is empty and serving nobody, so Lovable Cloud _is_ the pre-production environment. A dedicated `neuvto-wos-staging` project is created at cutover, when Pro is required anyway. The harness is written to run unchanged against all three.
 
@@ -509,6 +716,37 @@ Omitting these turns a million-row `leave_requests` scan into a per-row function
 
 ---
 
+## Platform acceptance criteria
+
+The PRD's AC1–AC9 are all about leave, because the PRD is about leave. They can
+all pass on a platform no customer can be put onto. These are the ones that say
+the platform works.
+
+**The whole of it, in one sentence: a customer can be provisioned, onboarded,
+configured and given modules with no SQL run by anyone.** Every step below has a
+screen. If any of them needs somebody to open a database console, the platform is
+not finished, whatever the module does.
+
+| #    | A customer can…                                                                                                              | Proven by                                                                              |
+| ---- | ---------------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------- |
+| PA1  | **Be provisioned by Neuvto** at `/admin` — organisation, settings, default approval chain, and one administrator named by us | `verify_first_run.sql`, by hand at `/admin`                                            |
+| PA2  | **Receive their invitation without anyone pressing anything**, because the queue drains on a schedule                        | `verify_scheduled_work.sh`                                                             |
+| PA3  | **Accept it and land somewhere that welcomes them** — not a dashboard reporting they have no leave balance                   | by hand, invitation → `/app/setup`                                                     |
+| PA4  | **Say who they are** — display name, logo, industry — and see it in the shell and in the emails their own people receive     | `verify_rls.sql` storage block, by hand                                                |
+| PA5  | **Configure the workspace themselves** — working week, financial year, holidays, notice, booking window                      | `verify_invariants.sql` proves the config is _obeyed_; that it can be saved is by hand |
+| PA6  | **Switch on the modules Neuvto granted them**, and not one that we did not                                                   | `verify_rls.sql` module block                                                          |
+| PA7  | **Invite their own people**, with role and phone, and withdraw an invitation                                                 | `verify_first_run.sql` covers invite → accept; **withdrawal is by hand only**          |
+| PA8  | **Abandon setup half-way and come back to it**, with what they entered intact and nothing claimed as done that is not        | by hand — sign out mid-wizard, sign back in                                            |
+| PA9  | Be certain that **Neuvto staff can read none of it**                                                                         | `verify_rls.sql` — scenario 24                                                         |
+| PA10 | Be certain that **a module switched off refuses in the database**, not merely in the router                                  | `verify_rls.sql` — scenario 12                                                         |
+
+**PA2 is the one that gets skipped.** It is slow, it looks like infrastructure
+rather than product, and it is the only criterion here that was ever violated
+silently. An invitation that is rendered, queued, and never sent looks identical
+from every screen in the product to one that was never requested.
+
+---
+
 ## Test scenarios before demo
 
 1. Employee with 3 available days requests 5 → blocked, exact message
@@ -522,7 +760,7 @@ Omitting these turns a million-row `leave_requests` scan into a per-row function
 9. Org A admin queries Org B → zero rows
 10. Employee inserts own `user_roles` row as `org_admin` → denied by RLS
 11. Org sets FY start to 1 January → entitlement and `fy_label` both follow
-12. Disable the `leave` module for an org → routes and functions refuse
+12. **Disable the `leave` module for an org → the functions refuse, not only the routes.** `leave_submit` raises `MODULE_NOT_ENABLED` **as `service_role` too**, not merely as an ordinary caller — that is the gap that hid a missing `security definer` in step 5. `leave_cancel` runs its ownership check _first_, so a refusal tells the caller nothing about whether somebody else's request id exists (D44)
 13. Audit log `UPDATE`/`DELETE` attempted as `org_admin` → denied
 14. **Two simultaneous submissions against a 3-day balance, each for 3 days → exactly one succeeds** (D10)
 15. Employee at 23:00 IST applies for tomorrow → accepted, not rejected as retroactive (D9)
@@ -535,6 +773,11 @@ Omitting these turns a million-row `leave_requests` scan into a per-row function
 22. Invitation accepted → profile and role created; the same token refused a second time, and an expired, revoked or wrong-recipient token gives the identical message (D39)
 23. **An address already in another workspace is refused at acceptance, and the inviting admin's view carries no reason for it** (D40)
 24. **A platform admin selects `leave_requests`, `leave_balances`, `profiles` and `invitations` → zero rows in every case**, against a database that demonstrably holds them (D42)
+25. **Provision a customer, then touch nothing.** The administrator's invitation is delivered without anybody invoking a dispatcher, running a script, or opening a console. Sabotage by unscheduling the job: it must stay `pending` and the check must go red (D43)
+26. **An environment with no delivery configured says so.** Mail waiting plus no Vault secrets must produce a warning naming both keys — silent success is indistinguishable from the original fault (D43)
+27. **Onboarding survives being abandoned.** Complete identity and calendar, sign out mid-wizard, sign back in: the wizard resumes with what was entered intact, claims nothing as done that is not, and the shell header shows the new company name **without a reload** (D46)
+28. **An admin cannot widen what they were granted.** Rewriting `module_key` on their own `organization_modules` row, or reaching `organizations.deleted_at` or `slug`, is refused by column-level grant rather than by hoping the UI never sends it (D44/D45)
+29. **Org A's admin cannot read, write or list Org B's logo path**, and `org-logos` is not readable unauthenticated. Sabotage by making the bucket public: the check must go red (D45)
 
 ---
 
@@ -550,6 +793,8 @@ Not blockers for the MVP, but unowned. Recorded so they are decisions rather tha
 | **Error monitoring**                                 | No Sentry or equivalent. Production failures will be invisible.                                                                                                                                                                                                                                                                                                                    | At cutover                       |
 | **Customer data export**                             | `03` §Compliance promises it; DPDP and GDPR both require portability.                                                                                                                                                                                                                                                                                                              | Before first customer            |
 | ~~**Super Admin console**~~                          | **Closed in step 8.** `/admin` provisions a customer workspace and names its first administrator (D39/D42). Bootstrapping the first platform admin is still one manual INSERT, deliberately — the first god account should be a decision somebody made, not a side effect of a deploy.                                                                                             | Done                             |
+| **Vault secrets are per-environment and manual**     | D43. The cron job ships in a migration; the URL and key it needs cannot, because a migration is a file in git. Applying every migration to a fresh environment therefore produces one where all email queues and none sends. The dispatcher warns loudly and `verify_scheduled_work.sh` asserts it, but nothing can set them for you. See `docs/operations/DEPLOYMENT.md`.         | At every new environment         |
+| **Nothing watches the queue in production**          | The harness proves the queue drains when someone runs the harness. In production a backlog needs to page somebody, and there is no alerting — this is the same "who is watching" question the missing scheduler answered badly, one level up.                                                                                                                                      | With error monitoring            |
 | **Rate limiting**                                    | API standards define `429`; nothing enforces it.                                                                                                                                                                                                                                                                                                                                   | Post-MVP                         |
 | **Phone is captured but never verified**             | D41. Invitations record a phone and it is unique within an organisation, which is real — but an administrator types it, so it cannot yet do the job it was asked for: telling one human from another across workspaces. That needs phone OTP, which D8 defers pending an SMS provider and Indian DLT registration.                                                                 | With phone OTP                   |
 | **Sign-in email comes from Lovable, not Neuvto**     | Partly resolved 31 Jul 2026 — both templates now carry `{{ .Token }}` and the hosted OTP length is 6, so a code arrives and the form takes it. Still arrives from `no-reply@auth.lovable.cloud`: the first email a customer ever receives carries another company's domain. Needs custom SMTP on Resend in Lovable's backend settings. See `docs/operations/EMAIL_AND_DOMAINS.md`. | **Before any customer signs in** |
