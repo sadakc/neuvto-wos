@@ -155,6 +155,11 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   // be done, and both routes out are things an admin has a screen for.
   APPROVER_UNRESOLVED:
     "Nobody can approve this yet. Set a manager for this person under Members, or mark this leave type as needing no approval.",
+  // D44. The module is off for this workspace — either Neuvto has not granted
+  // it, or their own administrator switched it off. Deliberately does not say
+  // which: a customer's employee should hear this from their administrator, not
+  // infer their employer's commercial arrangements from an error message.
+  MODULE_NOT_ENABLED: "Leave isn't switched on for this workspace. Ask your administrator.",
   LEAVE_TYPE_NAME_TAKEN: "There's already a leave type with that name.",
   LEAVE_TYPE_IN_USE:
     "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",

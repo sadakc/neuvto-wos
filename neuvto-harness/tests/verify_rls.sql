@@ -43,6 +43,7 @@ declare
   ghost   uuid := '00000000-0000-0000-0000-0000000000ff';
   joiner  uuid := '00000000-0000-0000-0000-00000000a007';
   v_text  text;
+  v_refused boolean;
   n       bigint;
 begin
   ---------------------------------------------------------------- tenant isolation
@@ -707,6 +708,99 @@ begin
     delete from public.platform_admins where user_id = '00000000-0000-0000-0000-0000000000f0';
     delete from auth.users where email in ('staff@signup.test', 'provisioned@signup.test');
   end if;
+
+  ------------------------------------------------- the module boundary (step 9, D44)
+  -- Neuvto is a platform onto which modules are deployed multi-tenant, and
+  -- module_enabled() was called by nothing at all until step 9. Test scenario 12
+  -- has always said "routes AND functions refuse"; only the routes did.
+  --
+  -- Two levels, answering different questions:
+  --   the row exists  Neuvto sells this customer this module   platform admins
+  --   enabled = true  the customer switched it on              their admins
+  if to_regprocedure('public.module_enabled_for(uuid,text)') is not null then
+
+    -- ─────────────────────────────────────── a customer cannot sell to itself
+    -- The previous policy was FOR ALL, so an org_admin could INSERT their own
+    -- entitlement to any module in the registry.
+    perform pg_temp.as_user(alice);
+    begin
+      insert into public.organization_modules (organization_id, module_key, enabled, enabled_at)
+      values (acme, 'payroll', true, now());
+      raise exception 'RLS FAIL: a tenant admin granted themselves a module';
+    exception when insufficient_privilege then null;
+    end;
+
+    -- Column-level, this one. An UPDATE that rewrites module_key on a row they
+    -- legitimately hold turns a Leave grant into a Payroll grant — an
+    -- escalation wearing the clothes of an edit.
+    begin
+      update public.organization_modules set module_key = 'payroll'
+       where organization_id = acme and module_key = 'leave';
+      raise exception 'RLS FAIL: a tenant admin rewrote which module a grant is for';
+    exception when insufficient_privilege then null;
+    end;
+
+    begin
+      delete from public.organization_modules where organization_id = acme;
+      raise exception 'RLS FAIL: a tenant admin deleted a module grant';
+    exception when insufficient_privilege then null;
+    end;
+
+    begin
+      perform public.platform_set_module(acme, 'payroll', true);
+      raise exception 'RLS FAIL: a tenant admin called platform_set_module';
+    exception when insufficient_privilege then null;
+    end;
+    raise notice 'ok: only Neuvto grants a module; a customer cannot grant itself one';
+
+    -- ─────────────────────────────────────── but they own the switch
+    update public.organization_modules set enabled = false
+     where organization_id = acme and module_key = 'leave';
+
+    -- ─────────────────────────────────────── and OFF means off, in the database
+    --
+    -- Not merely absent from the router. This is the half of scenario 12 that
+    -- was never true.
+    -- The refusal is recorded in a flag rather than raised inside the block.
+    -- Raising the failure there means this handler catches it and reports the
+    -- assertion's own message as if the code had produced it — which is what
+    -- the first version did, turning a clear failure into a confusing one.
+    perform pg_temp.as_user(ravi);
+    v_refused := false;
+    begin
+      perform count(*) from public.leave_my_balances();
+    exception when raise_exception then
+      v_refused := (sqlerrm = 'MODULE_NOT_ENABLED');
+    end;
+    if not v_refused then
+      raise exception 'RLS FAIL: leave_my_balances did not refuse with the module switched off';
+    end if;
+
+    v_refused := false;
+    begin
+      perform public.leave_submit(
+        (select id from public.leave_types where organization_id = acme and deleted_at is null limit 1),
+        current_date + 30, current_date + 30, 'refused');
+    exception when raise_exception then
+      v_refused := (sqlerrm = 'MODULE_NOT_ENABLED');
+    end;
+    if not v_refused then
+      raise exception 'RLS FAIL: leave_submit did not refuse with the module switched off';
+    end if;
+    raise notice 'ok: a disabled module refuses in the database, not just in the router';
+
+    -- The sweep skips organisations that do not have Leave, rather than this
+    -- module reaching into a company that never bought it.
+    perform pg_temp.as_postgres();
+    if public.leave_mature_all_balances() <> 0 then
+      raise exception 'RLS FAIL: the nightly sweep touched an organisation with Leave switched off';
+    end if;
+    raise notice 'ok: the nightly sweep skips organisations without the module';
+
+    update public.organization_modules set enabled = true
+     where organization_id = acme and module_key = 'leave';
+  end if;
+
 
   ---------------------------------------------------------------- notification engine (step 5)
   if to_regprocedure('public.notify(text,uuid,jsonb)') is not null then

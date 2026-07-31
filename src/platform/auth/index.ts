@@ -18,8 +18,11 @@ export { acceptInvitation } from "./invitations";
 export {
   isPlatformAdmin,
   listOrganizations,
+  listOrganizationModules,
+  setOrganizationModule,
   provisionOrganization,
   type CustomerWorkspace,
+  type CustomerModule,
 } from "./platform";
 export {
   inviteMember,

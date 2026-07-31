@@ -107,40 +107,14 @@ comment on function public.dispatch_notifications is
 
 revoke all on function public.dispatch_notifications() from public, authenticated, anon;
 
--- ═══════════════════════════════════════════════════════ maturing balances
-
--- leave_mature_balances takes one organisation. Nothing iterated them, so
--- nothing ever ran it. Pure SQL, no external call, no configuration — which
--- means unlike the dispatcher this one is verifiable end to end in CI.
-create or replace function public.mature_all_balances()
-returns integer
-language plpgsql
-volatile
-security definer
-set search_path = public
-as $$
-declare
-  v_org   uuid;
-  v_total integer := 0;
-begin
-  for v_org in select id from public.organizations where deleted_at is null loop
-    begin
-      v_total := v_total + coalesce(public.leave_mature_balances(v_org), 0);
-    exception when others then
-      -- One organisation's bad data must not stop every other organisation's
-      -- balances from maturing.
-      raise warning 'mature_all_balances: organisation % failed: %', v_org, sqlerrm;
-    end;
-  end loop;
-  return v_total;
-end $$;
-
-comment on function public.mature_all_balances is
-  'D43 — matures approved past leave into used_days for every organisation. Scheduled daily; one tenant failing does not stop the rest.';
-
-revoke all on function public.mature_all_balances() from public, authenticated, anon;
-
 -- ═══════════════════════════════════════════════════════ the schedule itself
+--
+-- ONLY THE PLATFORM'S OWN WORK IS SCHEDULED HERE.
+--
+-- The first draft of this migration also defined mature_all_balances(), which
+-- looped organisations calling leave_mature_balances() — platform code naming a
+-- module, which is the one thing D30 exists to forbid. A module schedules its
+-- own work in its own migration; see 20260801120000_leave_module_guard.sql.
 
 do $$
 begin
@@ -148,8 +122,6 @@ begin
   -- already has the jobs, must not produce a second copy of either.
   perform cron.unschedule('neuvto-dispatch-notifications')
     where exists (select 1 from cron.job where jobname = 'neuvto-dispatch-notifications');
-  perform cron.unschedule('neuvto-mature-balances')
-    where exists (select 1 from cron.job where jobname = 'neuvto-mature-balances');
 
   -- Every minute. An invitation that takes a minute reads as "sent"; one that
   -- takes fifteen reads as broken, and the person is already emailing support.
@@ -157,15 +129,5 @@ begin
     'neuvto-dispatch-notifications',
     '* * * * *',
     $job$select public.dispatch_notifications()$job$
-  );
-
-  -- 18:30 UTC is midnight in Asia/Kolkata, the default organisation timezone
-  -- (D9). leave_mature_balances resolves each organisation's own today, so a
-  -- customer in another zone is still correct — this only decides when the
-  -- sweep runs, not what it considers to be past.
-  perform cron.schedule(
-    'neuvto-mature-balances',
-    '30 18 * * *',
-    $job$select public.mature_all_balances()$job$
   );
 end $$;

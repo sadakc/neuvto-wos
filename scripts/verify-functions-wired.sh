@@ -54,10 +54,27 @@ is_allowed() {
 # ---------------------------------------------------------------- the scan
 
 # Every function our migrations create.
-DEFINED=$(grep -rhoE 'create (or replace )?function public\.[a-z_]+' "$MIGRATIONS" \
-          | sed -E 's/.*public\.//' | sort -u)
+ALL_DEFINED=$(grep -rhoE 'create (or replace )?function public\.[a-z_]+' "$MIGRATIONS" \
+              | sed -E 's/.*public\.//' | sort -u)
 
-echo "Checking $(wc -w <<<"$DEFINED" | tr -d ' ') functions defined in $MIGRATIONS"
+# ...minus the ones a LATER migration drops.
+#
+# Migrations are a timeline, not a snapshot. module_enabled was created in
+# phase 0 and dropped in 20260801110000 once module_enabled_for replaced it,
+# and this check went on demanding a caller for a function that no longer
+# exists. Comparing filenames works because they are timestamp-prefixed and
+# applied in exactly that order.
+DEFINED=""
+for fn in $ALL_DEFINED; do
+  last_create=$(grep -rlE "create (or replace )?function public\.${fn}\b" "$MIGRATIONS" | sort | tail -1)
+  last_drop=$(grep -rlE "drop function( if exists)? public\.${fn}\b" "$MIGRATIONS" | sort | tail -1)
+  if [ -n "$last_drop" ] && [[ "$last_drop" > "$last_create" ]]; then
+    continue      # dropped after its last definition — correctly gone
+  fi
+  DEFINED="$DEFINED $fn"
+done
+
+echo "Checking $(wc -w <<<"$DEFINED" | tr -d ' ') live functions defined in $MIGRATIONS"
 echo
 
 for fn in $DEFINED; do
@@ -73,9 +90,17 @@ for fn in $DEFINED; do
   # Lines whose FIRST non-whitespace is a comment marker are dropped; a real
   # call carrying a trailing comment still counts, which is the behaviour we
   # want.
+  # NOR DOES ASKING WHETHER IT EXISTS.
+  #
+  # The phase-aware harness guards its blocks with
+  # `to_regprocedure('public.foo(...)') is not null`, and that probe was enough
+  # to make this check call foo wired. Found by unwiring module_enabled_for
+  # completely and watching the check stay green — which is the exact failure
+  # this whole script exists to prevent, committed by the script itself.
   refs=$(grep -rn "\b${fn}\b" "$MIGRATIONS" src neuvto-harness supabase/functions scripts 2>/dev/null \
          | grep -v "src/integrations/supabase/types.ts" \
          | grep -vE "^[^:]+:[0-9]+:[[:space:]]*(--|//|\*|#)" \
+         | grep -vE "to_regproc(edure)?\s*\(" \
          | grep -vE "(create (or replace )?function public\.${fn}\b|comment on function public\.${fn}\b|grant [^;]*public\.${fn}\b|revoke [^;]*public\.${fn}\b|drop function[^;]*public\.${fn}\b|scripts/verify-functions-wired\.sh)" \
          | wc -l | tr -d ' ')
 

@@ -26,3 +26,4 @@ export {
 } from "./contract";
 
 export { ModuleLink } from "./ModuleLink";
+export { OrgModules } from "./OrgModules";

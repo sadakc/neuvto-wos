@@ -12,7 +12,7 @@ import {
   type Holiday,
   type OrgSettings,
 } from "@/platform/calendar";
-import { getAdminSections, type ModuleAdminSection } from "@/platform/modules";
+import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platform/modules";
 
 export const Route = createFileRoute("/app/settings")({
   ssr: false,
@@ -470,6 +470,18 @@ function SettingsPage() {
             ))}
           </ul>
         )}
+      </section>
+
+      {/* ─────────────────────────────────────────────── modules */}
+      <section className="mt-12">
+        <h2 className="font-display text-lg font-semibold tracking-tight">Modules</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          What this workspace has, and what is switched on. Neuvto adds modules to your workspace;
+          switching them on and off is yours.
+        </p>
+        <div className="mt-4">
+          <OrgModules user={user} />
+        </div>
       </section>
 
       {/*

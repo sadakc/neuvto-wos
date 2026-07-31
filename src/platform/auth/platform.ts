@@ -41,6 +41,55 @@ export async function isPlatformAdmin(): Promise<boolean> {
   return data === true;
 }
 
+/**
+ * A module, and where this customer stands with it.
+ *
+ * Two booleans because they answer different questions (D44): `granted` is
+ * Neuvto's commercial decision, `enabled` is the customer's own switch. A
+ * module is live only when both are true.
+ */
+export interface CustomerModule {
+  key: string;
+  name: string;
+  status: "available" | "coming_soon" | "retired";
+  granted: boolean;
+  enabled: boolean;
+}
+
+export async function listOrganizationModules(organizationId: string): Promise<CustomerModule[]> {
+  const { data, error } = await supabase.rpc("platform_list_org_modules", {
+    _org_id: organizationId,
+  });
+  if (error) throw toAppError(error, "listOrganizationModules");
+
+  return (data ?? []).map((r) => ({
+    key: r.module_key,
+    name: r.name,
+    status: r.status as CustomerModule["status"],
+    granted: r.granted,
+    enabled: r.enabled,
+  }));
+}
+
+/** Grants or withdraws a module for a customer. Withdrawal is soft — their data stays. */
+export async function setOrganizationModule(
+  organizationId: string,
+  moduleKey: string,
+  granted: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("platform_set_module", {
+    _org_id: organizationId,
+    _module_key: moduleKey,
+    _granted: granted,
+  });
+  if (error) {
+    if (error.message.includes("FORBIDDEN")) {
+      throw new AppError("FORBIDDEN", "Only Neuvto staff can change a customer's modules.", 403);
+    }
+    throw toAppError(error, "setOrganizationModule");
+  }
+}
+
 export async function listOrganizations(): Promise<CustomerWorkspace[]> {
   const { data, error } = await supabase.rpc("platform_list_organizations");
   if (error) throw toAppError(error, "listOrganizations");

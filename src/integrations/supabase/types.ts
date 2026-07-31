@@ -1319,6 +1319,7 @@ export type Database = {
         Returns: boolean
       }
       current_org_id: { Args: never; Returns: string }
+      dispatch_notifications: { Args: never; Returns: undefined }
       emit_platform_event: {
         Args: { _event_key: string; _payload: Json }
         Returns: undefined
@@ -1389,6 +1390,7 @@ export type Database = {
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
       leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
+      leave_mature_all_balances: { Args: never; Returns: number }
       leave_mature_balances: { Args: { _org_id: string }; Returns: number }
       leave_my_balances: {
         Args: never
@@ -1418,6 +1420,10 @@ export type Database = {
         Returns: boolean
       }
       module_enabled: { Args: { _module_key: string }; Returns: boolean }
+      module_enabled_for: {
+        Args: { _module_key: string; _org_id: string }
+        Returns: boolean
+      }
       notification_claim_batch: {
         Args: { _limit?: number }
         Returns: {
@@ -1455,6 +1461,16 @@ export type Database = {
         Returns: string
       }
       org_today: { Args: { _org_id: string }; Returns: string }
+      platform_list_org_modules: {
+        Args: { _org_id: string }
+        Returns: {
+          enabled: boolean
+          granted: boolean
+          module_key: string
+          name: string
+          status: string
+        }[]
+      }
       platform_list_organizations: {
         Args: never
         Returns: {
@@ -1467,6 +1483,11 @@ export type Database = {
           name: string
           slug: string
         }[]
+      }
+      platform_secret: { Args: { _name: string }; Returns: string }
+      platform_set_module: {
+        Args: { _granted: boolean; _module_key: string; _org_id: string }
+        Returns: undefined
       }
       provision_organization: {
         Args: {

@@ -4,8 +4,11 @@ import {
   getUserId,
   isPlatformAdmin,
   listOrganizations,
+  listOrganizationModules,
+  setOrganizationModule,
   provisionOrganization,
   suggestSlug,
+  type CustomerModule,
   type CustomerWorkspace,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
@@ -50,6 +53,13 @@ function AdminConsole() {
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
 
+  // Which customer's modules are open, and what they are. Loaded on demand
+  // rather than for every row: the console lists every customer Neuvto has, and
+  // fetching each one's module grants up front would be a query per row for
+  // information almost nobody is looking at.
+  const [modulesFor, setModulesFor] = useState<string | null>(null);
+  const [modules, setModules] = useState<CustomerModule[] | null>(null);
+
   async function load() {
     setOrgs(await listOrganizations());
   }
@@ -90,6 +100,34 @@ function AdminConsole() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  async function openModules(orgId: string) {
+    if (modulesFor === orgId) {
+      setModulesFor(null);
+      return;
+    }
+    setModulesFor(orgId);
+    setModules(null);
+    try {
+      setModules(await listOrganizationModules(orgId));
+    } catch (e) {
+      setError(isAppError(e) ? e.message : "We couldn't load that customer's modules.");
+      setModulesFor(null);
+    }
+  }
+
+  async function toggleModule(orgId: string, key: string, granted: boolean) {
+    setError("");
+    try {
+      await setOrganizationModule(orgId, key, granted);
+      setModules(await listOrganizationModules(orgId));
+      // The member count is unchanged but the list is the cheapest way to keep
+      // everything else honest after a write.
+      await load();
+    } catch (e) {
+      setError(isAppError(e) ? e.message : "That module couldn't be changed.");
+    }
+  }
 
   async function onProvision(e: React.FormEvent) {
     e.preventDefault();
@@ -297,18 +335,71 @@ function AdminConsole() {
                 </span>
               </div>
 
-              {/* Only while unaccepted, and only so an invitation that never
-                  arrived can be handed over another way. */}
-              {o.adminInviteUrl && (
+              <div className="mt-3 flex flex-wrap gap-2">
+                {/* Only while unaccepted, and only so an invitation that never
+                    arrived can be handed over another way. */}
+                {o.adminInviteUrl && (
+                  <button
+                    onClick={() => {
+                      void navigator.clipboard?.writeText(o.adminInviteUrl!);
+                      setCopied(o.id);
+                    }}
+                    className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
+                  >
+                    {copied === o.id ? "Copied" : "Copy invitation link"}
+                  </button>
+                )}
                 <button
-                  onClick={() => {
-                    void navigator.clipboard?.writeText(o.adminInviteUrl!);
-                    setCopied(o.id);
-                  }}
-                  className="mt-3 inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
+                  onClick={() => void openModules(o.id)}
+                  data-testid="manage-modules"
+                  className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
                 >
-                  {copied === o.id ? "Copied" : "Copy invitation link"}
+                  {modulesFor === o.id ? "Hide modules" : "Modules"}
                 </button>
+              </div>
+
+              {/*
+                What this customer is entitled to. Granting is Neuvto's decision
+                and only Neuvto's — a customer's own administrator cannot insert
+                an entitlement, which the policy before D44 allowed outright.
+                What they CAN do is switch off something they hold, and that
+                switch lives in their Settings, not here.
+              */}
+              {modulesFor === o.id && (
+                <div className="mt-3 rounded-md border border-border bg-secondary/30 p-3">
+                  {modules === null ? (
+                    <div className="h-8 animate-pulse rounded bg-muted" />
+                  ) : (
+                    <ul className="space-y-2">
+                      {modules.map((m) => (
+                        <li key={m.key} className="flex items-center justify-between gap-4">
+                          <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium">{m.name}</span>
+                            <span className="block text-xs text-muted-foreground">
+                              {m.status === "coming_soon"
+                                ? "Not built yet"
+                                : m.status === "retired"
+                                  ? "Retired — off however this reads"
+                                  : m.granted
+                                    ? m.enabled
+                                      ? "Granted · switched on by the customer"
+                                      : "Granted · the customer has it switched off"
+                                    : "Not granted"}
+                            </span>
+                          </span>
+                          <button
+                            onClick={() => void toggleModule(o.id, m.key, !m.granted)}
+                            disabled={m.status !== "available"}
+                            data-testid="toggle-module"
+                            className="inline-flex h-12 shrink-0 items-center rounded-md border border-border px-3 text-sm disabled:opacity-40"
+                          >
+                            {m.granted ? "Withdraw" : "Grant"}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
               )}
             </li>
           ))}
