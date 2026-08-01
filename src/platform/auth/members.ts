@@ -236,6 +236,38 @@ export async function setJoinedDate(employeeId: string, joinedDate: string): Pro
   throw toAppError(error, "setJoinedDate");
 }
 
+/**
+ * Whether the signed-in person is active, deactivated, or has no profile.
+ *
+ * The sign-in screen needs this because it otherwise cannot tell the two apart.
+ * Once access follows `is_active`, a deactivated person's `current_org_id()` is
+ * null, so `getCurrentUser` finds no profile and the app shows "You're not in a
+ * workspace yet — ask your administrator to invite your address". That is wrong
+ * for somebody whose access was just removed, and the advice would waste their
+ * time: an invitation will not bring it back.
+ *
+ * Describes the caller and nobody else.
+ */
+export async function accountStatus(): Promise<"active" | "deactivated" | "none"> {
+  const { data, error } = await supabase.rpc("my_account_status");
+  if (error) return "none";
+  return (data as "active" | "deactivated" | "none") ?? "none";
+}
+
+/**
+ * Gives somebody their access back.
+ *
+ * Access and nothing else: what was handed to a successor stays with them, and
+ * cancelled leave stays cancelled. Reversing those weeks later would change who
+ * a third person reports to, decided by a click on somebody else's record.
+ */
+export async function reactivateMember(employeeId: string): Promise<void> {
+  const { error } = await supabase.rpc("reactivate_employee", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toAppError(error, "reactivateMember");
+}
+
 /** What deactivating this person would move, for the confirmation. */
 export async function deactivationImpact(employeeId: string): Promise<DeactivationImpact> {
   const { data, error } = await supabase.rpc("deactivation_impact", {
@@ -283,6 +315,13 @@ export async function deactivateMember(
     }
     if (raw.includes("SUCCESSOR_REQUIRED")) {
       throw new AppError("VALIDATION_FAILED", "Choose who takes over their work.", 400);
+    }
+    if (raw.includes("LAST_ADMIN")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "They're the only administrator left. Make somebody else an administrator first, or there will be nobody who can undo this.",
+        400,
+      );
     }
     if (raw.includes("SUCCESSOR_NOT_FOUND")) {
       throw new AppError("NOT_FOUND", "That person is no longer active in this workspace.", 404);

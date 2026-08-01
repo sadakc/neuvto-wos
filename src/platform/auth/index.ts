@@ -32,6 +32,8 @@ export {
   listDirectReports,
   setReportingLine,
   setJoinedDate,
+  accountStatus,
+  reactivateMember,
   deactivationImpact,
   deactivateMember,
   type Member,
