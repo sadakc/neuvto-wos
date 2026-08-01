@@ -40,6 +40,7 @@ declare
   dan     uuid := '00000000-0000-0000-0000-00000000a003';   -- Mark's manager
   alice   uuid := '00000000-0000-0000-0000-00000000a001';
   bob     uuid := '00000000-0000-0000-0000-00000000b001';
+  sara    uuid := '00000000-0000-0000-0000-00000000b002';   -- reports to Bob, in Vertex
   ghost   uuid := '00000000-0000-0000-0000-0000000000ff';
   joiner  uuid := '00000000-0000-0000-0000-00000000a007';
   v_text  text;
@@ -1091,6 +1092,88 @@ begin
     -- No cleanup: protect_delete() refuses direct deletion here too, and the
     -- inserts above are fixed names with ON CONFLICT DO NOTHING, so repeated
     -- runs leave exactly one object per organisation either way.
+  end if;
+
+  ------------------------------------- emails written in English (step 10b)
+  --
+  -- What a manager received from the first approval onwards:
+  --
+  --     Approval needed: leave_request
+  --     Your leave_request request was approved
+  --
+  -- A database column in a subject line. It was not a careless template: D30
+  -- forbids the platform naming a module, and `entity_type` was the only thing
+  -- to hand. A module now declares its own label in a row.
+  --
+  -- Asserted on the RENDERED text in `notifications`, not on the template,
+  -- because the template being right is not the claim — what reaches somebody's
+  -- inbox is.
+  if to_regprocedure('public.approval_entity_label(text)') is not null then
+    declare
+      v_subject text;
+      v_type    uuid;
+      v_off     int;
+      v_lr      uuid;
+    begin
+      perform pg_temp.as_postgres();
+      delete from public.leave_requests where employee_id = sara;
+      delete from public.notifications where organization_id = vertex;
+
+      -- Vertex, deliberately: Acme overrides approval.submitted in the seed, and
+      -- an organisation's own wording must keep winning. Asserting against Acme
+      -- would test the fixture instead of the product.
+      select id into v_type from public.leave_types
+       where organization_id = vertex and approval_required and status = 'active'
+       limit 1;
+      select g into v_off from generate_series(30, 90) g
+       where public.calculate_working_days(vertex,
+               public.org_today(vertex) + g, public.org_today(vertex) + g + 1) = 2
+       limit 1;
+
+      if v_type is not null and v_off is not null then
+        perform pg_temp.as_user(sara);
+        v_lr := public.leave_submit(v_type,
+                  public.org_today(vertex) + v_off,
+                  public.org_today(vertex) + v_off + 1, 'wording check');
+
+        perform pg_temp.as_postgres();
+        select subject into v_subject from public.notifications
+         where organization_id = vertex and event_key = 'approval.submitted'
+         order by created_at desc limit 1;
+
+        if v_subject is null then
+          raise exception 'RLS FAIL: no approval email was queued, so the wording assertion below would prove nothing';
+        end if;
+        if v_subject like '%leave\_request%' then
+          raise exception 'RLS FAIL: an approval email says "leave_request" — a column name reached somebody''s inbox: %', v_subject;
+        end if;
+        if v_subject not like '%leave request%' then
+          raise exception 'RLS FAIL: an approval email does not name what it is about: %', v_subject;
+        end if;
+        -- Belt and braces. render_template strips a placeholder its payload does
+        -- not supply, so a missing label shows up as the empty noun the check
+        -- above catches, not as this. This fires only if that stripping is ever
+        -- removed — at which point a customer would receive raw template syntax.
+        if v_subject like '%{{%' then
+          raise exception 'RLS FAIL: an approval email shipped an unrendered placeholder: %', v_subject;
+        end if;
+        raise notice 'ok: approval emails name the thing in English, not by column';
+
+        perform pg_temp.as_postgres();
+        delete from public.leave_requests where id = v_lr;
+      end if;
+
+      -- An entity type nobody registered falls back to a word, never to the
+      -- type name. This is what keeps a future module's oversight from quietly
+      -- reinstating the original defect.
+      if public.approval_entity_label('expense_claim') <> 'request' then
+        raise exception 'RLS FAIL: an unregistered entity type does not fall back to the generic word';
+      end if;
+      if public.approval_entity_label('leave_request') <> 'leave request' then
+        raise exception 'RLS FAIL: the leave module has not registered its own label';
+      end if;
+      raise notice 'ok: an unregistered entity type falls back to a word, not a column name';
+    end;
   end if;
 
 
