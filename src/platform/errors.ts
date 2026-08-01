@@ -19,6 +19,11 @@ export const ERROR_CODES = [
   "RATE_LIMITED",
   "INTERNAL_ERROR",
   "MODULE_NOT_ENABLED",
+  // approvals — a decision that arrived after somebody else's. Distinct from
+  // FORBIDDEN on purpose: nothing is wrong with the person, they are simply
+  // looking at a queue that has moved on, and the answer is "refresh", not
+  // "you may not".
+  "ALREADY_DECIDED",
   // auth
   "OTP_INVALID",
   "OTP_EXPIRED",

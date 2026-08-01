@@ -88,6 +88,20 @@ export default function LeaveCalendar() {
 
   return (
     <div className="mx-auto max-w-2xl">
+      {/* Reached from here rather than from the navigation bar: it is a view of
+          this calendar, and the mobile bar has room for five destinations. It
+          renders for everyone — a person with no reports sees a short, honest
+          "nobody reports to you yet" rather than a link that is missing for
+          reasons they cannot see. */}
+      <div className="mb-4">
+        <a
+          href="/app/leave/team"
+          className="text-sm text-muted-foreground underline underline-offset-4"
+        >
+          See my team&apos;s calendar
+        </a>
+      </div>
+
       <div className="flex items-center justify-between">
         <h1 className="font-display text-lg font-semibold">
           {month.toLocaleString(undefined, { month: "long", year: "numeric" })}

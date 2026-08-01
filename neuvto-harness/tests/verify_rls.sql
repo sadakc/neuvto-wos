@@ -325,12 +325,12 @@ begin
 
       -- The queue shows it to the approver, and to nobody else.
       perform pg_temp.as_user(mark);
-      select count(*) into n from public.approval_pending_for();
+      select count(*) into n from public.approval_queue();
       if n < 1 then raise exception 'RLS FAIL: the approval is not in its approver''s queue'; end if;
       raise notice 'ok: pending queue shows the approver their own work';
 
       perform pg_temp.as_user(alice);
-      select count(*) into n from public.approval_pending_for();
+      select count(*) into n from public.approval_queue();
       perform pg_temp.check('an uninvolved admin has nothing pending', n, 0);
 
       -- The requester may not decide their own request.
@@ -441,7 +441,7 @@ begin
       perform pg_temp.check('other tenant sees no acme approvals', n, 0);
       select count(*) into n from approval_steps where organization_id = acme;
       perform pg_temp.check('other tenant sees no acme approval steps', n, 0);
-      select count(*) into n from public.approval_pending_for();
+      select count(*) into n from public.approval_queue();
       perform pg_temp.check('other tenant has nothing pending from acme', n, 0);
 
       -- An uninvolved employee must not read someone else's approval.
@@ -455,6 +455,218 @@ begin
       perform pg_temp.as_postgres();
       delete from public.approval_requests
        where entity_type in ('harness_probe', 'admin_only_probe');
+    end;
+  end if;
+
+  ------------------------------------- the approval queue (step 10, D35 mirrored)
+  --
+  -- Dan Director is the case this whole step turns on. The ACME chain routes
+  -- level 2 to manager_of_manager above three days, so a four-day request from
+  -- Ravi reaches Dan — who holds `manager`, is not an admin, and is NOT Ravi's
+  -- manager. is_manager_of() is direct-reports-only.
+  --
+  -- Dan can therefore read the request and the steps, and can read neither
+  -- Ravi's profile nor Ravi's balance. Before approval_queue() he would have
+  -- been shown an unnamed request, for an unknown balance, and asked to decide.
+  --
+  -- The fix disclosed the NAME through a function instead of widening the
+  -- profiles policy — D35's reasoning, mirrored. Assertion 2 below is the one
+  -- that proves it was actually done that way: without it, everything here
+  -- passes just as happily with is_approver_on bolted onto both policies, which
+  -- is the shortcut this step exists to avoid.
+  if to_regprocedure('public.approval_queue()') is not null
+     and to_regprocedure('public.leave_approval_detail(uuid)') is not null then
+    declare
+      v_casual   uuid := '00000000-0000-0000-0000-0000000000c1';
+      v_off      int;
+      v_lr       uuid;
+      v_ar       uuid;
+      v_seen     text;
+      v_real     text;
+      v_rows     int;
+      v_types    int;
+      v_reserved numeric;
+      v_pending  numeric;
+      v_refused  boolean;
+      v_msg_real text;
+      v_msg_fake text;
+    begin
+      perform pg_temp.as_postgres();
+
+      -- A clean slate for Ravi: the D18 exclusion constraint would otherwise
+      -- reject the submission below for overlapping something an earlier block
+      -- left behind, and the failure would read as a defect in this one.
+      delete from public.leave_requests where employee_id = ravi;
+      update public.leave_balances
+         set entitled_days = 12, carryforward_days = 0, used_days = 0,
+             reserved_days = 0, pending_days = 0
+       where employee_id = ravi and leave_type_id = v_casual;
+
+      -- Near enough to stay inside the current financial year. A window in NEXT
+      -- year has no materialised balance row (D34), so the balance assertions
+      -- would compare against nulls and prove nothing.
+      select g into v_off from generate_series(30, 90) g
+       where public.calculate_working_days(acme,
+               public.org_today(acme) + g, public.org_today(acme) + g + 3) = 4
+       limit 1;
+
+      if v_off is null then
+        raise exception 'RLS FAIL: no four-working-day window exists in the next 90 days, so the two-level assertions below would be vacuous';
+      end if;
+
+      perform pg_temp.as_user(ravi);
+      v_lr := public.leave_submit(v_casual,
+                public.org_today(acme) + v_off,
+                public.org_today(acme) + v_off + 3, 'four days, two levels');
+
+      perform pg_temp.as_postgres();
+      select approval_request_id into v_ar from public.leave_requests where id = v_lr;
+      select required_levels into v_rows from public.approval_requests where id = v_ar;
+      perform pg_temp.check('a four-day request needs two levels (AC6)', v_rows, 2);
+
+      ---------------------------------------------------------- 1 · a name
+      -- Level 1 is in play, so it is Mark's and nobody else's yet.
+      perform pg_temp.as_user(dan);
+      select count(*) into v_rows from public.approval_queue() where approval_request_id = v_ar;
+      perform pg_temp.check('a later-level approver sees nothing until it is their turn', v_rows, 0);
+
+      perform pg_temp.as_user(mark);
+      select requester_name into v_seen from public.approval_queue() where approval_request_id = v_ar;
+      perform pg_temp.as_postgres();
+      select full_name into v_real from public.profiles where id = ravi;
+
+      if v_seen is null or v_real is null or v_seen is distinct from v_real then
+        raise exception 'RLS FAIL: the queue named the requester "%" when their profile says "%"',
+          coalesce(v_seen, '(null)'), coalesce(v_real, '(null)');
+      end if;
+      raise notice 'ok: the queue names the requester to the approver';
+
+      ------------------------------------------------- AC6 · levels in order
+      perform pg_temp.as_user(dan);
+      v_refused := false;
+      begin
+        perform public.approval_decide(v_ar, 'approved', 'jumping the queue');
+      exception when others then
+        v_refused := (sqlerrm = 'NOT_YOUR_APPROVAL');
+      end;
+      if not v_refused then
+        raise exception 'RLS FAIL: level 2 decided before level 1 had (AC6)';
+      end if;
+      raise notice 'ok: a later level cannot decide before an earlier one (AC6)';
+
+      perform pg_temp.as_user(mark);
+      perform public.approval_decide(v_ar, 'approved', 'ok from me');
+
+      perform pg_temp.as_user(dan);
+      select requester_name into v_seen from public.approval_queue() where approval_request_id = v_ar;
+      if v_seen is distinct from v_real then
+        raise exception 'RLS FAIL: level 2 approver does not see the request, or does not see the name';
+      end if;
+      raise notice 'ok: it reaches the second level, named';
+
+      ------------------------------------- 2 · and NOTHING beyond a name
+      --
+      -- The assertion that says the disclosure was minimal. Widening the
+      -- profiles or leave_balances policy would satisfy every other check here
+      -- and fail this one.
+      select count(*) into v_rows from public.profiles where id = ravi;
+      perform pg_temp.check('a level-2 approver still cannot read the requester''s profile', v_rows, 0);
+
+      select count(*) into v_rows from public.leave_balances where employee_id = ravi;
+      perform pg_temp.check('a level-2 approver still cannot read the requester''s balances', v_rows, 0);
+
+      ------------------------------------- 3 · one leave type, not all of them
+      perform pg_temp.as_postgres();
+      select count(*) into v_types from public.leave_balances where employee_id = ravi;
+      if v_types < 2 then
+        raise exception 'RLS FAIL: Ravi holds % balance row(s), so "one type, not all" would pass without disclosing anything', v_types;
+      end if;
+
+      perform pg_temp.as_user(dan);
+      select count(*) into v_rows from public.leave_approval_detail(v_ar);
+      perform pg_temp.check('the approver is given one leave type, not every one', v_rows, 1);
+
+      select count(*) into v_rows from public.leave_approval_detail(v_ar)
+       where leave_type_id = v_casual and available_days is not null;
+      perform pg_temp.check('and it is the type actually being requested, with its balance', v_rows, 1);
+
+      ------------------------------------- 4 · a stranger learns nothing at all
+      perform pg_temp.as_user('00000000-0000-0000-0000-00000000a006');   -- priya
+      begin
+        perform public.leave_approval_detail(v_ar);
+        raise exception 'RLS FAIL: an uninvolved colleague read the approval detail';
+      exception when others then
+        if sqlerrm like 'RLS FAIL%' then raise; end if;
+        v_msg_real := sqlerrm;
+      end;
+      begin
+        perform public.leave_approval_detail('11111111-1111-1111-1111-111111111111');
+        raise exception 'RLS FAIL: a fabricated approval id returned rows';
+      exception when others then
+        if sqlerrm like 'RLS FAIL%' then raise; end if;
+        v_msg_fake := sqlerrm;
+      end;
+      if v_msg_real is distinct from v_msg_fake then
+        raise exception 'RLS FAIL: a real request refuses with "%" and an invented one with "%" — guessing ids tells you which exist',
+          v_msg_real, v_msg_fake;
+      end if;
+      raise notice 'ok: a real and an invented approval id refuse identically';
+
+      ------------------------------------- 7 · a module that is off refuses (D44)
+      perform pg_temp.as_postgres();
+      update public.organization_modules set enabled = false
+       where organization_id = acme and module_key = 'leave';
+
+      perform pg_temp.as_user(dan);
+      v_refused := false;
+      begin
+        perform public.leave_approval_detail(v_ar);
+      exception when others then
+        v_refused := (sqlerrm = 'MODULE_NOT_ENABLED');
+      end;
+      if not v_refused then
+        raise exception 'RLS FAIL: the approval detail answered with the Leave module switched off (D44)';
+      end if;
+      raise notice 'ok: the approval detail refuses when the module is off';
+
+      perform pg_temp.as_postgres();
+      update public.organization_modules set enabled = true
+       where organization_id = acme and module_key = 'leave';
+
+      ------------------------------------- 6 · AC4 · and the days actually move
+      select reserved_days, pending_days into v_reserved, v_pending
+        from public.leave_balances
+       where employee_id = ravi and leave_type_id = v_casual;
+
+      if v_reserved <> 4 then
+        raise exception 'RLS FAIL: four days were submitted but reserved_days is % — the rest of this proves nothing', v_reserved;
+      end if;
+
+      perform pg_temp.as_user(dan);
+      perform public.approval_decide(v_ar, 'approved', 'and from me');
+
+      perform pg_temp.as_postgres();
+      select reserved_days, pending_days into v_reserved, v_pending
+        from public.leave_balances
+       where employee_id = ravi and leave_type_id = v_casual;
+
+      if v_reserved <> 0 or v_pending <> 4 then
+        raise exception 'RLS FAIL: after the final approval reserved=% pending=% — expected 0 and 4 (AC4)',
+          v_reserved, v_pending;
+      end if;
+      raise notice 'ok: the final approval moves the days from reserved to pending (AC4)';
+
+      select count(*) into v_rows from public.approval_queue() where approval_request_id = v_ar;
+      perform pg_temp.check('a decided request leaves every queue', v_rows, 0);
+
+      -- Re-runnable without a re-seed, like the block above.
+      perform pg_temp.as_postgres();
+      delete from public.leave_requests where employee_id = ravi;
+      delete from public.approval_requests where id = v_ar;
+      update public.leave_balances
+         set entitled_days = 12, carryforward_days = 0, used_days = 0,
+             reserved_days = 0, pending_days = 0
+       where employee_id = ravi and leave_type_id = v_casual;
     end;
   end if;
 

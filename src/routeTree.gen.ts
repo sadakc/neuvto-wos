@@ -19,6 +19,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppSetupRouteImport } from './routes/app/setup'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppMembersRouteImport } from './routes/app/members'
+import { Route as AppApprovalsRouteImport } from './routes/app/approvals'
 import { Route as AppApprovalRulesRouteImport } from './routes/app/approval-rules'
 import { Route as AppSplatRouteImport } from './routes/app/$'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
@@ -76,6 +77,11 @@ const AppMembersRoute = AppMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppApprovalsRoute = AppApprovalsRouteImport.update({
+  id: '/approvals',
+  path: '/approvals',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppApprovalRulesRoute = AppApprovalRulesRouteImport.update({
   id: '/approval-rules',
   path: '/approval-rules',
@@ -120,6 +126,7 @@ export interface FileRoutesByFullPath {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
+  '/app/approvals': typeof AppApprovalsRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
@@ -137,6 +144,7 @@ export interface FileRoutesByTo {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
+  '/app/approvals': typeof AppApprovalsRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
@@ -156,6 +164,7 @@ export interface FileRoutesById {
   '/.well-known/oauth-protected-resource': typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
+  '/app/approvals': typeof AppApprovalsRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
@@ -176,6 +185,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/app/$'
     | '/app/approval-rules'
+    | '/app/approvals'
     | '/app/members'
     | '/app/settings'
     | '/app/setup'
@@ -193,6 +203,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/app/$'
     | '/app/approval-rules'
+    | '/app/approvals'
     | '/app/members'
     | '/app/settings'
     | '/app/setup'
@@ -211,6 +222,7 @@ export interface FileRouteTypes {
     | '/.well-known/oauth-protected-resource'
     | '/app/$'
     | '/app/approval-rules'
+    | '/app/approvals'
     | '/app/members'
     | '/app/settings'
     | '/app/setup'
@@ -305,6 +317,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMembersRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/approvals': {
+      id: '/app/approvals'
+      path: '/approvals'
+      fullPath: '/app/approvals'
+      preLoaderRoute: typeof AppApprovalsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/approval-rules': {
       id: '/app/approval-rules'
       path: '/approval-rules'
@@ -353,6 +372,7 @@ declare module '@tanstack/react-router' {
 interface AppRouteRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppApprovalRulesRoute: typeof AppApprovalRulesRoute
+  AppApprovalsRoute: typeof AppApprovalsRoute
   AppMembersRoute: typeof AppMembersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
@@ -362,6 +382,7 @@ interface AppRouteRouteChildren {
 const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppApprovalRulesRoute: AppApprovalRulesRoute,
+  AppApprovalsRoute: AppApprovalsRoute,
   AppMembersRoute: AppMembersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,

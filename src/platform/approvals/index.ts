@@ -18,6 +18,99 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppError, toAppError } from "@/platform/errors";
 import type { AppRole } from "@/platform/auth";
 
+/** One thing waiting on the caller. `entityType` is opaque here, deliberately. */
+export interface ApprovalQueueItem {
+  approvalRequestId: string;
+  entityType: string;
+  entityId: string;
+  requesterId: string;
+  /** The one thing disclosed about them beyond the request itself — D35. */
+  requesterName: string;
+  level: number;
+  requiredLevels: number;
+  context: Record<string, unknown>;
+  createdAt: string;
+  /** Whole days since it was raised. What a queue is really sorted by in a manager's head. */
+  daysWaiting: number;
+}
+
+/**
+ * What is waiting on **you**.
+ *
+ * No user-id parameter, and that absence is the point. The function this
+ * replaces, `approval_pending_for(_user_id)`, was SECURITY DEFINER, granted to
+ * `authenticated`, and took the queue's owner as an argument. Every caller
+ * omitted it, so it read as "my queue" for four build steps — while anybody
+ * could pass a colleague's id, and an employee knows at least one: `manager_id`
+ * is on their own profile. Demonstrated on the seed: as an ordinary employee,
+ * `approval_pending_for('<my manager>')` returned another employee's leave
+ * request in full.
+ */
+export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
+  const { data, error } = await supabase.rpc("approval_queue");
+  if (error) throw toAppError(error, "listApprovalQueue");
+
+  const now = Date.now();
+  return (data ?? []).map((r) => ({
+    approvalRequestId: r.approval_request_id,
+    entityType: r.entity_type,
+    entityId: r.entity_id,
+    requesterId: r.requester_id,
+    requesterName: r.requester_name,
+    level: r.level,
+    requiredLevels: r.required_levels,
+    context: (r.context ?? {}) as Record<string, unknown>,
+    createdAt: r.created_at,
+    daysWaiting: Math.max(
+      0,
+      Math.floor((now - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24)),
+    ),
+  }));
+}
+
+/**
+ * Approve or reject one thing, at the level currently in play.
+ *
+ * The engine decides everything that matters — whether it is your turn, whether
+ * it was already decided, whether another level follows — and a module reacts to
+ * the outcome through its own trigger (D30). Nothing here moves a balance; the
+ * arithmetic has existed since step 6 and has simply never had a caller.
+ */
+export async function decideApproval(
+  approvalRequestId: string,
+  decision: "approved" | "rejected",
+  comments?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("approval_decide", {
+    _request_id: approvalRequestId,
+    _decision: decision,
+    _comments: comments?.trim() || undefined,
+  });
+  if (!error) return;
+
+  // The database raises bare codes. Each of these is a thing a manager can
+  // actually do something about, so each gets a sentence rather than a code.
+  const raw = error.message ?? "";
+  if (raw.includes("NOT_YOUR_APPROVAL")) {
+    throw new AppError(
+      "FORBIDDEN",
+      "This is waiting on somebody else at the moment — an earlier level hasn't been decided yet.",
+      403,
+    );
+  }
+  if (raw.includes("ALREADY_DECIDED")) {
+    throw new AppError(
+      "ALREADY_DECIDED",
+      "This has already been decided. Refresh to see where it ended up.",
+      409,
+    );
+  }
+  if (raw.includes("TENANT_MISMATCH") || raw.includes("NOT_FOUND")) {
+    throw new AppError("NOT_FOUND", "We couldn't find that request.", 404);
+  }
+  throw toAppError(error, "decideApproval");
+}
+
 export const APPROVER_RULES = ["reporting_manager", "manager_of_manager", "role"] as const;
 export type ApproverRule = (typeof APPROVER_RULES)[number];
 

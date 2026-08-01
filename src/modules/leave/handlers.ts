@@ -21,6 +21,7 @@ import {
   type LeaveStatus,
   type LeaveType,
   type ApprovalStep,
+  type LeaveApprovalDetail,
 } from "./contracts";
 
 /**
@@ -79,12 +80,37 @@ export async function getMyBalances(): Promise<LeaveBalance[]> {
   }));
 }
 
+/**
+ * The caller's OWN requests. The filter is the point.
+ *
+ * This read has no filter until now and leaned on RLS, following the rule used
+ * everywhere else here — "a filter in application code implies the policy cannot
+ * be trusted". That rule is right when the policy and the screen want the same
+ * rows. They do not here: `read leave requests in scope` deliberately returns
+ * own OR direct reports OR requests you are an approver on OR, for an admin,
+ * every one in the organisation. It is scoped for *tenancy*, not for *this
+ * screen*.
+ *
+ * So "My leave" listed other people's leave. Found by opening it as Dan
+ * Director, who has no leave at all and was shown Ravi's four approved days as
+ * his own — on My Leave, on the dashboard card ("Next leave 2026-08-31"), and on
+ * his personal calendar, all three of which read through here.
+ *
+ * Present since step 7 and invisible until step 10 gave anybody an approved
+ * request to see. An administrator would have seen the entire company's leave
+ * listed as their own.
+ */
 export async function getMyRequests(): Promise<LeaveRequest[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (!uid) return [];
+
   const { data, error } = await supabase
     .from("leave_requests")
     .select(
       "id, approval_request_id, leave_type_id, from_date, to_date, working_days, reason, status, submitted_at, decided_at, rejection_reason, leave_types(name)",
     )
+    .eq("employee_id", uid)
     .order("from_date", { ascending: false });
 
   if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load your leave requests.", 500);
@@ -138,6 +164,52 @@ export async function getApprovalTimeline(approvalRequestId: string): Promise<Ap
     comments: r.comments,
     decidedAt: r.decided_at,
   }));
+}
+
+/**
+ * Everything an approver needs to decide one leave request — and, deliberately,
+ * the balance for **that leave type only**.
+ *
+ * Why a database function rather than a join here: an approver reached by
+ * `manager_of_manager` can read the request (`is_approver_on` is in that policy)
+ * and cannot read the employee's `leave_balances` rows, because that policy has
+ * only own / `is_manager_of` / `is_admin`, and `is_manager_of` is
+ * direct-reports-only. A join would silently return no balance and the screen
+ * would show a decision with no numbers behind it.
+ *
+ * Widening the policy was the alternative and was declined with Sada. Deciding
+ * on three days of Casual is a question the Casual row answers; it is not a
+ * reason to hand somebody the employee's sick-leave consumption, which is a
+ * health signal. Same rule as D35.
+ */
+export async function getApprovalDetail(approvalRequestId: string): Promise<LeaveApprovalDetail> {
+  const { data, error } = await supabase.rpc("leave_approval_detail", {
+    _approval_request_id: approvalRequestId,
+  });
+
+  if (error) throw toLeaveError(error.message);
+
+  const r = (data ?? [])[0];
+  if (!r) throw new AppError("NOT_FOUND", "We couldn't find that leave request.", 404);
+
+  return {
+    leaveRequestId: r.leave_request_id,
+    employeeName: r.employee_name,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    fromDate: r.from_date,
+    toDate: r.to_date,
+    workingDays: Number(r.working_days),
+    reason: r.reason,
+    status: r.status as LeaveStatus,
+    // Null when no balance row exists for that year — a request booked into a
+    // year nobody has materialised yet. Shown as "not set up" rather than as a
+    // confident zero, which would read as "they have nothing left".
+    fyLabel: r.fy_label,
+    entitledDays: r.entitled_days === null ? null : Number(r.entitled_days),
+    usedDays: r.used_days === null ? null : Number(r.used_days),
+    availableDays: r.available_days === null ? null : Number(r.available_days),
+  };
 }
 
 export async function getLeaveTypes(): Promise<{ id: string; name: string }[]> {

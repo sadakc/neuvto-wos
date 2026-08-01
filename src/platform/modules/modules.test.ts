@@ -36,6 +36,7 @@ const {
   getEnabledModules,
   getModuleNavigation,
   getDashboardCards,
+  getApprovalViews,
   resolveModuleRoute,
 } = await import("./registry");
 
@@ -74,6 +75,7 @@ function noticeboard(overrides: Partial<ModuleDefinition> = {}): ModuleDefinitio
         : []),
     ],
     approvalEntityTypes: ["notice"],
+    approvalViews: () => [{ entityType: "notice", component: () => null }],
     eventKeys: ["notice.published"],
     settingsSchema: z.object({ pinnedLimit: z.number().int().min(1).max(10) }),
     ownedTables: ["notice_posts"],
@@ -108,6 +110,7 @@ describe("installing modules", () => {
       key: "bulletin",
       routes: [{ path: "noticeboard", component: () => null }],
       approvalEntityTypes: [],
+      approvalViews: undefined,
     });
     expect(() => installModules([noticeboard(), other])).toThrow(/claimed by more than one module/);
   });
@@ -120,6 +123,49 @@ describe("installing modules", () => {
       routes: [{ path: "bulletin", component: () => null }],
     });
     expect(() => installModules([noticeboard(), other])).toThrow(/entity type "notice"/);
+  });
+
+  it("rejects an approval view for an entity type the module never claimed", () => {
+    // It would never render — the queue looks views up by the entity_type the
+    // engine reports, and nothing would ever report this one. The manifest looks
+    // right, the queue quietly shows the fallback forever.
+    expect(() =>
+      installModules([
+        noticeboard({
+          approvalViews: () => [{ entityType: "expense_claim", component: () => null }],
+        }),
+      ]),
+    ).toThrow(/not in its approvalEntityTypes/);
+  });
+});
+
+describe("approval views", () => {
+  beforeEach(() => {
+    installModules([noticeboard()]);
+    enabledKeys.current = ["noticeboard"];
+  });
+
+  it("resolves an entity type to the module that renders it", async () => {
+    const views = await getApprovalViews(user(["manager"]));
+    expect(views.get("notice")?.moduleKey).toBe("noticeboard");
+  });
+
+  it("resolves nothing for an entity type no module claims", async () => {
+    // The queue must still render such a row through its fallback. A pending
+    // decision that vanishes from the only screen listing it is somebody's leave
+    // never being decided.
+    const views = await getApprovalViews(user(["manager"]));
+    expect(views.has("expense_claim")).toBe(false);
+  });
+
+  it("resolves nothing once the module is switched off", async () => {
+    enabledKeys.current = [];
+    expect((await getApprovalViews(user(["manager"]))).size).toBe(0);
+  });
+
+  it("tolerates a module that registers no view", async () => {
+    installModules([noticeboard({ approvalViews: undefined })]);
+    expect((await getApprovalViews(user(["manager"]))).size).toBe(0);
   });
 });
 
@@ -205,6 +251,7 @@ describe("dashboard cards", () => {
       key: "bulletin",
       routes: [{ path: "bulletin", component: () => null }],
       approvalEntityTypes: [],
+      approvalViews: undefined,
       dashboardCards: () => [{ id: "bulletin-card", component: () => null, order: 5 }],
     });
     installModules([noticeboard(), late]);
