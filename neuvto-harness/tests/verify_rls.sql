@@ -901,6 +901,108 @@ begin
     select count(*) into n from invitations;
     perform pg_temp.check('an employee reads no invitations at all', n, 0);
 
+    ------------------------------------- what somebody arrives with (step 13)
+    --
+    -- invitation_accept inserted (id, organization_id, full_name, email, phone)
+    -- and NOT joined_date, which defaults to CURRENT_DATE. Everyone seeded has
+    -- a sensible start date only because the seed writes it directly; anybody
+    -- arriving the way the product actually requires got today.
+    --
+    -- calculate_entitlement pro-rates the year from that date (D3). Measured on
+    -- this seed before the fix, for somebody who joined in 2022: 8 days instead
+    -- of 12. A third of their leave, silently.
+    declare
+      v_tok1   text;
+      v_tok2   text;
+      v_ent    numeric;
+      v_full   numeric;
+      v_joined date;
+      v_casual uuid := '00000000-0000-0000-0000-0000000000c1';
+      v_fy     text;
+    begin
+      perform pg_temp.as_postgres();
+      v_fy := public.get_financial_year(acme, public.org_today(acme));
+
+      -- Two people, and the REPORT is invited naming a manager who does not
+      -- exist yet. That is the ordering a customer's spreadsheet actually has,
+      -- and the half that is easy to get wrong.
+      perform pg_temp.as_user(alice);
+      perform public.invitation_create('import.report@acme.test', null, 'employee',
+        'Imported Report', date '2022-03-01', 'import.boss@acme.test', null);
+      perform public.invitation_create('import.boss@acme.test', null, 'manager',
+        'Imported Boss', date '2021-01-01', null, null);
+
+      perform pg_temp.as_postgres();
+      select token into v_tok1 from invitations where email = 'import.report@acme.test';
+      select token into v_tok2 from invitations where email = 'import.boss@acme.test';
+
+      insert into auth.users (id, instance_id, aud, role, email, encrypted_password,
+        email_confirmed_at, confirmation_token, recovery_token, email_change_token_new,
+        email_change, raw_app_meta_data, raw_user_meta_data, created_at, updated_at)
+      values
+        ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-000000000000',
+         'authenticated','authenticated','import.report@acme.test','', now(),'','','','',
+         '{"provider":"email"}','{}', now(), now()),
+        ('00000000-0000-0000-0000-0000000000d2','00000000-0000-0000-0000-000000000000',
+         'authenticated','authenticated','import.boss@acme.test','', now(),'','','','',
+         '{"provider":"email"}','{}', now(), now())
+      on conflict (id) do nothing;
+
+      insert into auth.identities (id, user_id, identity_data, provider, provider_id,
+        created_at, updated_at, last_sign_in_at)
+      select gen_random_uuid(), u.id,
+             jsonb_build_object('sub', u.id::text, 'email', u.email), 'email', u.email,
+             now(), now(), now()
+        from auth.users u
+       where u.id in ('00000000-0000-0000-0000-0000000000d1',
+                      '00000000-0000-0000-0000-0000000000d2')
+         and not exists (select 1 from auth.identities i where i.user_id = u.id);
+
+      -- The report accepts FIRST, when their manager has no profile at all.
+      perform pg_temp.as_user('00000000-0000-0000-0000-0000000000d1');
+      perform public.invitation_accept(v_tok1);
+
+      perform pg_temp.as_postgres();
+      select joined_date into v_joined from profiles where email = 'import.report@acme.test';
+      if v_joined <> date '2022-03-01' then
+        raise exception 'RLS FAIL: the start date became % rather than the one on the invitation', v_joined;
+      end if;
+
+      -- The number, not just the date. A full year here is what the leave type
+      -- allows; pro-rating from today would be a fraction of it.
+      select public.calculate_entitlement(id, v_casual, v_fy) into v_ent
+        from profiles where email = 'import.report@acme.test';
+      select max_days_per_year into v_full from leave_types where id = v_casual;
+      if v_ent <> v_full then
+        raise exception 'RLS FAIL: entitlement is % of a possible % — the start date is not reaching calculate_entitlement', v_ent, v_full;
+      end if;
+      raise notice 'ok: somebody joins on the date they actually joined, with the entitlement that follows';
+
+      perform pg_temp.check('their manager is unresolved until that person exists',
+        (select count(*) from profiles where email = 'import.report@acme.test'
+          and manager_id is not null), 0::bigint);
+
+      -- Now the manager arrives. The reverse pass is what makes file order stop
+      -- mattering; without it the report reports to nobody forever.
+      perform pg_temp.as_user('00000000-0000-0000-0000-0000000000d2');
+      perform public.invitation_accept(v_tok2);
+
+      perform pg_temp.as_postgres();
+      perform pg_temp.check('a manager arriving later picks up the reports waiting for them',
+        (select count(*) from profiles p join profiles m on m.id = p.manager_id
+          where p.email = 'import.report@acme.test'
+            and m.email = 'import.boss@acme.test'), 1::bigint);
+
+      delete from public.user_roles where user_id in
+        ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000d2');
+      delete from public.profiles where email in
+        ('import.report@acme.test','import.boss@acme.test');
+      delete from public.invitations where email in
+        ('import.report@acme.test','import.boss@acme.test');
+      delete from auth.users where id in
+        ('00000000-0000-0000-0000-0000000000d1','00000000-0000-0000-0000-0000000000d2');
+    end;
+
     -- ─────────────────────────────────────── cleanup
     perform pg_temp.as_postgres();
     delete from public.leave_requests where employee_id = ravi;
@@ -1377,6 +1479,128 @@ begin
          set entitled_days = 12, carryforward_days = 0, used_days = 0,
              reserved_days = 0, pending_days = 0
        where employee_id = ravi and leave_type_id = v_casual;
+    end;
+  end if;
+
+  ------------------------------------- leave already taken (step 13, D11)
+  --
+  -- A company adopting Neuvto in August has staff who have already taken six
+  -- days this year. The runbook is blunt about the consequence of nowhere to
+  -- say so: "an employee who has taken 6 days this year but shows a full
+  -- balance will be allowed to book leave they have not got."
+  if to_regprocedure('public.leave_set_opening_balance(uuid,uuid,numeric,numeric)') is not null then
+    declare
+      priya      uuid := '00000000-0000-0000-0000-00000000a006';
+      v_casual   uuid := '00000000-0000-0000-0000-0000000000c1';
+      v_avail0   numeric;
+      v_avail1   numeric;
+      v_ent0     numeric;
+      v_ent1     numeric;
+      v_refused  boolean;
+      v_audit    bigint;
+      -- Priya is seeded with only THREE days available on purpose: a later
+      -- assertion needs "requesting five is blocked" to fail for the right
+      -- reason. Zeroing her and restoring zeros left her flush, and that test
+      -- then failed with EXCEEDS_MAX_PER_REQUEST instead — a different refusal
+      -- proving a different thing. Whatever this block borrows, it puts back.
+      v_keep     public.leave_balances%rowtype;
+    begin
+      perform pg_temp.as_postgres();
+      select * into v_keep from public.leave_balances
+       where employee_id = priya and leave_type_id = v_casual;
+
+      update public.leave_balances
+         set used_days = 0, carryforward_days = 0, reserved_days = 0, pending_days = 0
+       where employee_id = priya and leave_type_id = v_casual;
+      select available_days, entitled_days into v_avail0, v_ent0
+        from public.leave_balances where employee_id = priya and leave_type_id = v_casual;
+
+      if v_avail0 < 4 then
+        raise exception 'RLS FAIL: Priya has only % days available, so "recording 4 already taken" would prove nothing', v_avail0;
+      end if;
+
+      perform pg_temp.as_user(alice);
+      perform public.leave_set_opening_balance(priya, v_casual, 4, 0);
+
+      perform pg_temp.as_postgres();
+      select available_days, entitled_days into v_avail1, v_ent1
+        from public.leave_balances where employee_id = priya and leave_type_id = v_casual;
+
+      if v_avail1 <> v_avail0 - 4 then
+        raise exception 'RLS FAIL: recording 4 days taken moved available from % to %, expected %',
+          v_avail0, v_avail1, v_avail0 - 4;
+      end if;
+      if v_ent1 <> v_ent0 then
+        raise exception 'RLS FAIL: an opening balance changed entitlement from % to % — it records history, it does not grant days',
+          v_ent0, v_ent1;
+      end if;
+      raise notice 'ok: leave already taken comes off what is available, and leaves entitlement alone';
+
+      -- D31 makes the bad state unrepresentable. This proves the refusal comes
+      -- from the constraint rather than from a check in the browser.
+      perform pg_temp.as_user(alice);
+      v_refused := false;
+      begin
+        perform public.leave_set_opening_balance(priya, v_casual, 9999, 0);
+      exception when others then
+        v_refused := (sqlerrm = 'OPENING_BALANCE_OVERDRAWN');
+      end;
+      if not v_refused then
+        raise exception 'RLS FAIL: an opening balance overdrew the account';
+      end if;
+      raise notice 'ok: an opening balance cannot overdraw';
+
+      -- Traceable, per `07`. Written by the trigger on leave_balances rather
+      -- than by the function, which is why the previous value is really there.
+      perform pg_temp.as_postgres();
+      select count(*) into v_audit from public.audit_logs
+       where entity_type = 'leave_balances' and entity_id =
+             (select id from public.leave_balances where employee_id = priya and leave_type_id = v_casual)
+         and (before->>'used_days')::numeric = 0
+         and (after->>'used_days')::numeric = 4;
+      if v_audit = 0 then
+        raise exception 'RLS FAIL: the override left no audit row carrying the previous value';
+      end if;
+      raise notice 'ok: an override is traceable, with the number it replaced';
+
+      -- Not an employee's to set, on themselves or anybody.
+      perform pg_temp.as_user(priya);
+      v_refused := false;
+      begin
+        perform public.leave_set_opening_balance(priya, v_casual, 0, 99);
+      exception when others then
+        v_refused := (sqlerrm = 'FORBIDDEN');
+      end;
+      if not v_refused then
+        raise exception 'RLS FAIL: an employee granted themselves carried-over days';
+      end if;
+      raise notice 'ok: only an administrator records an opening balance';
+
+      -- D44.
+      perform pg_temp.as_postgres();
+      update public.organization_modules set enabled = false
+       where organization_id = acme and module_key = 'leave';
+      perform pg_temp.as_user(alice);
+      v_refused := false;
+      begin
+        perform public.leave_set_opening_balance(priya, v_casual, 1, 0);
+      exception when others then
+        v_refused := (sqlerrm = 'MODULE_NOT_ENABLED');
+      end;
+      if not v_refused then
+        raise exception 'RLS FAIL: an opening balance was set with the Leave module switched off';
+      end if;
+      perform pg_temp.as_postgres();
+      update public.organization_modules set enabled = true
+       where organization_id = acme and module_key = 'leave';
+      raise notice 'ok: opening balances refuse when the module is off';
+
+      update public.leave_balances
+         set used_days         = v_keep.used_days,
+             carryforward_days = v_keep.carryforward_days,
+             reserved_days     = v_keep.reserved_days,
+             pending_days      = v_keep.pending_days
+       where employee_id = priya and leave_type_id = v_casual;
     end;
   end if;
 

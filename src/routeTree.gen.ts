@@ -19,6 +19,7 @@ import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppSetupRouteImport } from './routes/app/setup'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppMembersRouteImport } from './routes/app/members'
+import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppApprovalsRouteImport } from './routes/app/approvals'
 import { Route as AppApprovalRulesRouteImport } from './routes/app/approval-rules'
 import { Route as AppSplatRouteImport } from './routes/app/$'
@@ -77,6 +78,11 @@ const AppMembersRoute = AppMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AppRouteRoute,
 } as any)
+const AppImportRoute = AppImportRouteImport.update({
+  id: '/import',
+  path: '/import',
+  getParentRoute: () => AppRouteRoute,
+} as any)
 const AppApprovalsRoute = AppApprovalsRouteImport.update({
   id: '/approvals',
   path: '/approvals',
@@ -127,6 +133,7 @@ export interface FileRoutesByFullPath {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
@@ -145,6 +152,7 @@ export interface FileRoutesByTo {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
@@ -165,6 +173,7 @@ export interface FileRoutesById {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
@@ -186,6 +195,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
+    | '/app/import'
     | '/app/members'
     | '/app/settings'
     | '/app/setup'
@@ -204,6 +214,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
+    | '/app/import'
     | '/app/members'
     | '/app/settings'
     | '/app/setup'
@@ -223,6 +234,7 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
+    | '/app/import'
     | '/app/members'
     | '/app/settings'
     | '/app/setup'
@@ -317,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMembersRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/import': {
+      id: '/app/import'
+      path: '/import'
+      fullPath: '/app/import'
+      preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/approvals': {
       id: '/app/approvals'
       path: '/approvals'
@@ -373,6 +392,7 @@ interface AppRouteRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppApprovalRulesRoute: typeof AppApprovalRulesRoute
   AppApprovalsRoute: typeof AppApprovalsRoute
+  AppImportRoute: typeof AppImportRoute
   AppMembersRoute: typeof AppMembersRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
@@ -383,6 +403,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppApprovalRulesRoute: AppApprovalRulesRoute,
   AppApprovalsRoute: AppApprovalsRoute,
+  AppImportRoute: AppImportRoute,
   AppMembersRoute: AppMembersRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,

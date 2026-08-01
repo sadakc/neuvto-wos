@@ -55,6 +55,14 @@ export const leave: ModuleDefinition = {
   // same way the dashboard renders the balance card.
   adminSections: () => [
     {
+      id: "opening-balances",
+      title: "Opening balances",
+      description:
+        "Leave your people had already taken before Neuvto, and days carried over. Somebody who has taken six days but shows a full balance will be allowed to book leave they have not got.",
+      component: lazy(() => import("./components/OpeningBalances")),
+      order: 20,
+    },
+    {
       id: "leave-types",
       title: "Leave types",
       description:
