@@ -29,6 +29,7 @@ export {
   revokeInvitation,
   listInvitations,
   listMembers,
+  listDirectReports,
   type Member,
   type Invitation,
 } from "./members";

@@ -1277,31 +1277,19 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["approval_status"]
       }
-      approval_pending_for: {
-        Args: { _user_id?: string }
+      approval_queue: {
+        Args: never
         Returns: {
-          completed_at: string | null
+          approval_request_id: string
           context: Json
           created_at: string
-          created_by: string | null
-          current_level: number
-          deleted_at: string | null
           entity_id: string
           entity_type: string
-          id: string
-          organization_id: string
+          level: number
           requester_id: string
+          requester_name: string
           required_levels: number
-          status: Database["public"]["Enums"]["approval_status"]
-          updated_at: string
-          updated_by: string | null
         }[]
-        SetofOptions: {
-          from: "*"
-          to: "approval_requests"
-          isOneToOne: false
-          isSetofReturn: true
-        }
       }
       approval_submit: {
         Args: { _context?: Json; _entity_id: string; _entity_type: string }
@@ -1400,6 +1388,27 @@ export type Database = {
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
+      leave_approval_detail: {
+        Args: { _approval_request_id: string }
+        Returns: {
+          available_days: number
+          carryforward_days: number
+          employee_name: string
+          entitled_days: number
+          from_date: string
+          fy_label: string
+          leave_request_id: string
+          leave_type_id: string
+          leave_type_name: string
+          pending_days: number
+          reason: string
+          reserved_days: number
+          status: Database["public"]["Enums"]["leave_status"]
+          to_date: string
+          used_days: number
+          working_days: number
+        }[]
+      }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
       leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_all_balances: { Args: never; Returns: number }

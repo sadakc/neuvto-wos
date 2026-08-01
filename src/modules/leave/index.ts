@@ -19,19 +19,24 @@ export const leave: ModuleDefinition = {
   name: "Leave Management",
   version: "1.0.0",
 
-  navigation: () => [
+  navigation: (user) => [
     { label: "Apply", to: "/app/leave/apply" },
     { label: "My leave", to: "/app/leave" },
     { label: "Calendar", to: "/app/leave/calendar" },
-    // Arrives in step 8. Declared here rather than in a shared navigation file,
-    // so the module owns its own roadmap.
-    { label: "Approvals", soon: "step 8", roles: ["manager", "hr_admin", "org_admin"] },
+    // A manager's view of the same calendar: who on their team is away, and
+    // when. "Approvals" used to be declared here too, as `soon: "step 8"` — a
+    // module laying claim to a platform screen. It now lives in the platform's
+    // own navigation, and this module contributes only how to render its rows.
+    ...(user?.roles.some((r) => r === "manager" || r === "hr_admin" || r === "org_admin")
+      ? [{ label: "Team", to: "/app/leave/team" }]
+      : []),
   ],
 
   routes: [
     { path: "leave", component: lazy(() => import("./components/MyLeave")) },
     { path: "leave/apply", component: lazy(() => import("./components/ApplyLeave")) },
     { path: "leave/calendar", component: lazy(() => import("./components/LeaveCalendar")) },
+    { path: "leave/team", component: lazy(() => import("./components/TeamCalendar")) },
   ],
 
   dashboardCards: () => [
@@ -60,6 +65,17 @@ export const leave: ModuleDefinition = {
   // would happily let a second module claim the same string.
   approvalEntityTypes: ["leave_request"],
 
+  // How a leave request looks in the platform's approvals queue. The queue is
+  // handed `entity_type` as an opaque string and asks whoever claimed it to
+  // render the row — so the screen shows a balance, a leave type and a date
+  // range without the platform knowing any of those words.
+  approvalViews: () => [
+    {
+      entityType: "leave_request",
+      component: lazy(() => import("./components/LeaveApprovalCard")),
+    },
+  ],
+
   // Emitted through the platform. This module never sends an email.
   eventKeys: ["approval.submitted", "approval.decided", "approval.completed"],
 
@@ -72,6 +88,7 @@ export {
   submitLeave,
   getMyBalances,
   getMyRequests,
+  getApprovalDetail,
   getLeaveTypes,
   listLeaveTypes,
   saveLeaveType,
@@ -89,4 +106,5 @@ export {
   type LeaveBalance,
   type LeaveRequest,
   type ApprovalStep,
+  type LeaveApprovalDetail,
 } from "./contracts";

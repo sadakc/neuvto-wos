@@ -159,3 +159,31 @@ export async function listMembers(): Promise<Member[]> {
     roles: byUser.get(r.id) ?? [],
   }));
 }
+
+/**
+ * The people who report directly to the caller.
+ *
+ * A platform service rather than a query inside a module, because "who reports
+ * to whom" is not Leave's idea — Attendance and Shift Planning will ask the same
+ * question, and `manager_id` lives on `profiles`, which no module owns.
+ *
+ * Direct reports only, matching `is_manager_of()` in the database exactly. That
+ * function is what the RLS policies use, so anything broader here would render a
+ * team the policies then refuse to populate — a screen full of names and no data.
+ */
+export async function listDirectReports(): Promise<Pick<Member, "id" | "fullName" | "email">[]> {
+  const { data, error } = await supabase.auth.getUser();
+  const uid = data?.user?.id;
+  if (error || !uid) return [];
+
+  const { data: reports, error: failed } = await supabase
+    .from("profiles")
+    .select("id, full_name, email")
+    .eq("manager_id", uid)
+    .eq("is_active", true)
+    .order("full_name");
+
+  if (failed) throw new AppError("INTERNAL_ERROR", "We couldn't load your team.", 500);
+
+  return (reports ?? []).map((r) => ({ id: r.id, fullName: r.full_name, email: r.email }));
+}

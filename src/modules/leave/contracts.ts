@@ -129,6 +129,31 @@ export interface LeaveRequest {
 }
 
 /**
+ * One leave request as an approver sees it.
+ *
+ * The balance fields are for the **requested type only** — see
+ * `getApprovalDetail`. They are nullable because a request booked into a
+ * financial year nobody has materialised yet has no balance row, and a confident
+ * `0` there would read as "this person has nothing left" rather than "we have
+ * not worked it out".
+ */
+export interface LeaveApprovalDetail {
+  leaveRequestId: string;
+  employeeName: string;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  fromDate: string;
+  toDate: string;
+  workingDays: number;
+  reason: string | null;
+  status: LeaveStatus;
+  fyLabel: string | null;
+  entitledDays: number | null;
+  usedDays: number | null;
+  availableDays: number | null;
+}
+
+/**
  * Every refusal leave_submit() can raise, mapped to something a person can act
  * on. The database raises a stable code precisely so this mapping can exist —
  * showing a raw Postgres message to an employee is how a product loses trust in

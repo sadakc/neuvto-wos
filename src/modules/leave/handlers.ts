@@ -21,6 +21,7 @@ import {
   type LeaveStatus,
   type LeaveType,
   type ApprovalStep,
+  type LeaveApprovalDetail,
 } from "./contracts";
 
 /**
@@ -138,6 +139,52 @@ export async function getApprovalTimeline(approvalRequestId: string): Promise<Ap
     comments: r.comments,
     decidedAt: r.decided_at,
   }));
+}
+
+/**
+ * Everything an approver needs to decide one leave request — and, deliberately,
+ * the balance for **that leave type only**.
+ *
+ * Why a database function rather than a join here: an approver reached by
+ * `manager_of_manager` can read the request (`is_approver_on` is in that policy)
+ * and cannot read the employee's `leave_balances` rows, because that policy has
+ * only own / `is_manager_of` / `is_admin`, and `is_manager_of` is
+ * direct-reports-only. A join would silently return no balance and the screen
+ * would show a decision with no numbers behind it.
+ *
+ * Widening the policy was the alternative and was declined with Sada. Deciding
+ * on three days of Casual is a question the Casual row answers; it is not a
+ * reason to hand somebody the employee's sick-leave consumption, which is a
+ * health signal. Same rule as D35.
+ */
+export async function getApprovalDetail(approvalRequestId: string): Promise<LeaveApprovalDetail> {
+  const { data, error } = await supabase.rpc("leave_approval_detail", {
+    _approval_request_id: approvalRequestId,
+  });
+
+  if (error) throw toLeaveError(error.message);
+
+  const r = (data ?? [])[0];
+  if (!r) throw new AppError("NOT_FOUND", "We couldn't find that leave request.", 404);
+
+  return {
+    leaveRequestId: r.leave_request_id,
+    employeeName: r.employee_name,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    fromDate: r.from_date,
+    toDate: r.to_date,
+    workingDays: Number(r.working_days),
+    reason: r.reason,
+    status: r.status as LeaveStatus,
+    // Null when no balance row exists for that year — a request booked into a
+    // year nobody has materialised yet. Shown as "not set up" rather than as a
+    // confident zero, which would read as "they have nothing left".
+    fyLabel: r.fy_label,
+    entitledDays: r.entitled_days === null ? null : Number(r.entitled_days),
+    usedDays: r.used_days === null ? null : Number(r.used_days),
+    availableDays: r.available_days === null ? null : Number(r.available_days),
+  };
 }
 
 export async function getLeaveTypes(): Promise<{ id: string; name: string }[]> {

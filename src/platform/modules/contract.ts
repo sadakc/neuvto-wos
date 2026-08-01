@@ -23,6 +23,7 @@
 import { z } from "zod";
 import type { ComponentType, LazyExoticComponent } from "react";
 import type { AppRole, CurrentUser } from "@/platform/auth";
+import type { ApprovalQueueItem } from "@/platform/approvals";
 
 /**
  * A destination in the shell's navigation. `soon` renders it as visibly
@@ -82,6 +83,55 @@ export interface ModuleRoute {
 }
 
 /**
+ * How a module renders one thing awaiting a decision.
+ *
+ * The approvals queue belongs to the platform: it is one screen listing
+ * everything waiting on you, whatever raised it, because a manager should not
+ * have to visit a different queue per module to find out what they are holding
+ * up. The Approval Engine has been entity-agnostic since step 4 — it drove a
+ * throwaway entity type end to end before a leave table existed — and this keeps
+ * the screen above it the same way.
+ *
+ * So `approval_queue()` hands the screen an `entity_type` it treats as an opaque
+ * string, and whichever module claimed that string in `approvalEntityTypes`
+ * renders the row. Leave knows what a leave request looks like; the platform
+ * never finds out.
+ *
+ * The alternative — an approvals screen inside Leave — was considered and
+ * declined with Sada. It is less work exactly once, and then Attendance arrives
+ * and either builds a second queue or this gets written anyway.
+ */
+/**
+ * What the queue hands a module's renderer.
+ *
+ * The platform defines this, because the platform is what passes it — the module
+ * decides what to *do* with a row, not what a row is. `item.context` is the
+ * module's own jsonb from `approval_submit`, opaque to everything above.
+ */
+export interface ModuleApprovalViewProps {
+  item: ApprovalQueueItem;
+  /** Call after a decision lands, so the queue can refresh itself. */
+  onDecided: () => void;
+}
+
+export interface ModuleApprovalView {
+  /**
+   * Must be one of this module's own `approvalEntityTypes`. The registry checks
+   * it, because a view registered for a string the module never claimed would
+   * silently never render.
+   */
+  entityType: string;
+  /**
+   * Receives one queue row. Renders the summary and, expanded, whatever the
+   * approver needs to decide — for Leave that means a balance the platform has
+   * no business knowing the shape of.
+   */
+  component:
+    | ComponentType<ModuleApprovalViewProps>
+    | LazyExoticComponent<ComponentType<ModuleApprovalViewProps>>;
+}
+
+/**
  * Declared, not wired.
  *
  * Everything here is data the platform can read, validate and render without
@@ -127,6 +177,13 @@ export interface ModuleDefinition {
    */
   approvalEntityTypes: readonly string[];
 
+  /**
+   * How this module renders its own entities in the platform's approvals queue.
+   * A function of the user for the same reason the others are: what a manager
+   * may act on is not what an administrator may.
+   */
+  approvalViews?: (user: CurrentUser | null) => ModuleApprovalView[];
+
   /** Event keys this module emits. The Notification Engine templates these. */
   eventKeys: readonly string[];
 
@@ -166,6 +223,7 @@ export const ModuleDefinitionSchema = z.object({
   ),
   dashboardCards: z.function().optional(),
   adminSections: z.function().optional(),
+  approvalViews: z.function().optional(),
   approvalEntityTypes: z.array(z.string().regex(/^[a-z_]+$/)).readonly(),
   eventKeys: z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/)).readonly(),
   settingsSchema: z.any(),

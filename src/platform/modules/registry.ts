@@ -15,6 +15,7 @@ import { supabase } from "@/integrations/supabase/client";
 import type { CurrentUser } from "@/platform/auth";
 import {
   ModuleDefinitionSchema,
+  type ModuleApprovalView,
   type ModuleDefinition,
   type ModuleAdminSection,
   type ModuleDashboardCard,
@@ -58,6 +59,21 @@ export function installModules(modules: readonly ModuleDefinition[]): void {
         throw new Error(`Approval entity type "${t}" is claimed by more than one module.`);
       }
       entityTypes.add(t);
+    }
+
+    // A view for an entity type the module never claimed would simply never be
+    // reached: the queue looks views up by the `entity_type` the engine reports,
+    // and nothing would ever report this one. The symptom is an approvals queue
+    // that renders the neutral fallback forever while the manifest looks correct,
+    // so it fails at boot instead.
+    const claimed = new Set(m.approvalEntityTypes);
+    for (const v of m.approvalViews?.(null) ?? []) {
+      if (!claimed.has(v.entityType)) {
+        throw new Error(
+          `Module "${m.key}" registers an approval view for "${v.entityType}", ` +
+            `which is not in its approvalEntityTypes.`,
+        );
+      }
     }
   }
 
@@ -146,6 +162,33 @@ export async function getAdminSections(
   return enabled
     .flatMap((m) => (m.adminSections?.(user) ?? []).map((s) => ({ ...s, moduleKey: m.key })))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/**
+ * How to render each entity type currently awaiting decisions, keyed by the
+ * string `approval_queue()` reports.
+ *
+ * Returns a Map rather than a list because the queue's question is always "what
+ * renders THIS row", asked once per row.
+ *
+ * A row whose module is disabled — or removed from the build entirely — resolves
+ * to nothing here, and the queue is required to render it anyway through its
+ * fallback. A pending decision that disappears from the only screen that would
+ * surface it is somebody's leave silently never being decided, which is the
+ * whole failure this step exists to end.
+ */
+export async function getApprovalViews(
+  user: CurrentUser | null,
+): Promise<Map<string, ModuleApprovalView & { moduleKey: string }>> {
+  const enabled = await getEnabledModules();
+  const views = new Map<string, ModuleApprovalView & { moduleKey: string }>();
+
+  for (const m of enabled) {
+    for (const v of m.approvalViews?.(user) ?? []) {
+      views.set(v.entityType, { ...v, moduleKey: m.key });
+    }
+  }
+  return views;
 }
 
 /** Resolves a path below /app to the module route that serves it, if any. */

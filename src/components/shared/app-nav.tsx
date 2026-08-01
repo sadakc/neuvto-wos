@@ -32,6 +32,18 @@ type NavItem = ModuleNavItem;
  */
 export function platformNavItems(user: CurrentUser | null): NavItem[] {
   const items: NavItem[] = [{ label: "Dashboard", to: "/app" }];
+
+  // Approvals is the platform's, not Leave's — and it used to be Leave's, sitting
+  // in that manifest as `{ label: "Approvals", soon: "step 8" }`. A module
+  // claiming this screen would have meant a manager running two modules visiting
+  // two queues to find out what they were holding up. One queue lists everything
+  // waiting on you; each module renders its own rows through `approvalViews`.
+  //
+  // Managers are not administrators, so this cannot hang off isAdmin().
+  if (user?.roles.some((r) => r === "manager" || r === "hr_admin" || r === "org_admin")) {
+    items.push({ label: "Approvals", to: "/app/approvals" });
+  }
+
   if (isAdmin(user)) {
     // People and Approval rules are platform concerns, not Leave's: who is in
     // the workspace and who signs things off are the same questions whatever
