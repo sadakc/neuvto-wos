@@ -131,6 +131,27 @@ export type Database = {
           },
         ]
       }
+      approval_entity_labels: {
+        Row: {
+          created_at: string
+          entity_type: string
+          label: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          entity_type: string
+          label: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          entity_type?: string
+          label?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       approval_requests: {
         Row: {
           completed_at: string | null
@@ -1268,6 +1289,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_joined_date: {
+        Args: { _employee_id: string; _joined_date: string }
+        Returns: undefined
+      }
+      admin_set_reporting_line: {
+        Args: { _employee_id: string; _manager_id: string }
+        Returns: undefined
+      }
       app_base_url: { Args: never; Returns: string }
       approval_decide: {
         Args: {
@@ -1277,6 +1306,7 @@ export type Database = {
         }
         Returns: Database["public"]["Enums"]["approval_status"]
       }
+      approval_entity_label: { Args: { _entity_type: string }; Returns: string }
       approval_queue: {
         Args: never
         Returns: {
@@ -1319,6 +1349,11 @@ export type Database = {
         Returns: boolean
       }
       current_org_id: { Args: never; Returns: string }
+      deactivate_employee: {
+        Args: { _employee_id: string; _successor_id: string }
+        Returns: Json
+      }
+      deactivation_impact: { Args: { _employee_id: string }; Returns: Json }
       dispatch_notifications: { Args: never; Returns: undefined }
       emit_platform_event: {
         Args: { _event_key: string; _payload: Json }

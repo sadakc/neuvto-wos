@@ -30,8 +30,13 @@ export {
   listInvitations,
   listMembers,
   listDirectReports,
+  setReportingLine,
+  setJoinedDate,
+  deactivationImpact,
+  deactivateMember,
   type Member,
   type Invitation,
+  type DeactivationImpact,
 } from "./members";
 
 export {
