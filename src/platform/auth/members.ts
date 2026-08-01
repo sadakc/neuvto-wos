@@ -25,7 +25,15 @@ export interface Member {
   phone: string | null;
   joinedDate: string;
   isActive: boolean;
+  /** Null means they report to nobody — an owner, or somebody not yet placed. */
+  managerId: string | null;
   roles: AppRole[];
+}
+
+/** What deactivating somebody would move. Counts, so the confirmation states facts. */
+export interface DeactivationImpact {
+  reports: number;
+  approvals: number;
 }
 
 export interface Invitation {
@@ -133,7 +141,7 @@ export async function listMembers(): Promise<Member[]> {
   const [people, roles] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email, phone, joined_date, is_active")
+      .select("id, full_name, email, phone, joined_date, is_active, manager_id")
       .order("full_name"),
     supabase.from("user_roles").select("user_id, role"),
   ]);
@@ -156,8 +164,142 @@ export async function listMembers(): Promise<Member[]> {
     phone: r.phone,
     joinedDate: r.joined_date,
     isActive: r.is_active,
+    managerId: r.manager_id,
     roles: byUser.get(r.id) ?? [],
   }));
+}
+
+/**
+ * Sets who somebody reports to. `null` clears it.
+ *
+ * A function rather than an update, because reporting lines are the one profile
+ * edit that can corrupt approval routing — a cycle makes `manager_of_manager`
+ * resolve to the requester, which D13 then skips, quietly costing the request a
+ * level. The database refuses the cycle; this maps the refusal to a sentence.
+ */
+export async function setReportingLine(
+  employeeId: string,
+  managerId: string | null,
+): Promise<void> {
+  // The generated types declare every RPC argument non-nullable, because
+  // Postgres does not distinguish "has no default" from "may not be null".
+  // `_manager_id` genuinely accepts null — that is how somebody is set to report
+  // to nobody — so the cast is describing the database accurately, not evading
+  // it.
+  const { error } = await supabase.rpc("admin_set_reporting_line", {
+    _employee_id: employeeId,
+    _manager_id: managerId,
+  } as unknown as { _employee_id: string; _manager_id: string });
+  if (!error) return;
+
+  const raw = error.message ?? "";
+  if (raw.includes("REPORTING_CYCLE")) {
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "That would make two people report to each other, directly or through their managers.",
+      400,
+    );
+  }
+  if (raw.includes("SELF_MANAGED")) {
+    throw new AppError("VALIDATION_FAILED", "Somebody cannot report to themselves.", 400);
+  }
+  if (raw.includes("MANAGER_NOT_FOUND")) {
+    throw new AppError("NOT_FOUND", "That manager is no longer in this workspace.", 404);
+  }
+  throw toAppError(error, "setReportingLine");
+}
+
+/**
+ * Corrects somebody's start date.
+ *
+ * Admin-only, because it is the number `calculate_entitlement` works from — an
+ * employee editing their own turned 6 days into 12 on the seed, which is what
+ * closed the blanket UPDATE grant on `profiles`. Kept editable rather than
+ * frozen because a typo caught at onboarding is common and the alternative is a
+ * support ticket; the existing `write_audit_log` trigger records the whole row
+ * before and after, so a balance that moves later can be traced to who moved it.
+ */
+export async function setJoinedDate(employeeId: string, joinedDate: string): Promise<void> {
+  const { error } = await supabase.rpc("admin_set_joined_date", {
+    _employee_id: employeeId,
+    _joined_date: joinedDate,
+  });
+  if (!error) return;
+
+  const raw = error.message ?? "";
+  if (raw.includes("JOINED_DATE_UNREASONABLE")) {
+    throw new AppError("VALIDATION_FAILED", "That start date is too far in the future.", 400);
+  }
+  if (raw.includes("JOINED_DATE_REQUIRED")) {
+    throw new AppError("VALIDATION_FAILED", "A start date is needed.", 400);
+  }
+  throw toAppError(error, "setJoinedDate");
+}
+
+/** What deactivating this person would move, for the confirmation. */
+export async function deactivationImpact(employeeId: string): Promise<DeactivationImpact> {
+  const { data, error } = await supabase.rpc("deactivation_impact", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toAppError(error, "deactivationImpact");
+
+  const d = (data ?? {}) as { reports?: number; approvals?: number };
+  return { reports: Number(d.reports ?? 0), approvals: Number(d.approvals ?? 0) };
+}
+
+/**
+ * Deactivates somebody and hands their work to a named successor, in one
+ * transaction (D14).
+ *
+ * Deliberately not a flag flip. Before this existed an administrator could set
+ * `is_active = false` in one statement, stranding every approval routed to that
+ * person — which is what D14 has forbidden since the first draft and what
+ * nothing enforced.
+ */
+export async function deactivateMember(
+  employeeId: string,
+  successorId: string,
+): Promise<DeactivationImpact & { levelsCollapsed: number }> {
+  const { data, error } = await supabase.rpc("deactivate_employee", {
+    _employee_id: employeeId,
+    _successor_id: successorId,
+  });
+
+  if (error) {
+    const raw = error.message ?? "";
+    if (raw.includes("CANNOT_DEACTIVATE_SELF")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "You can't deactivate yourself. Ask another administrator.",
+        400,
+      );
+    }
+    if (raw.includes("SUCCESSOR_IS_REQUESTER")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "That person has a request of their own waiting here, so they can't take over these approvals. Choose somebody else.",
+        400,
+      );
+    }
+    if (raw.includes("SUCCESSOR_REQUIRED")) {
+      throw new AppError("VALIDATION_FAILED", "Choose who takes over their work.", 400);
+    }
+    if (raw.includes("SUCCESSOR_NOT_FOUND")) {
+      throw new AppError("NOT_FOUND", "That person is no longer active in this workspace.", 404);
+    }
+    throw toAppError(error, "deactivateMember");
+  }
+
+  const d = (data ?? {}) as {
+    reports_moved?: number;
+    approvals_moved?: number;
+    levels_collapsed?: number;
+  };
+  return {
+    reports: Number(d.reports_moved ?? 0),
+    approvals: Number(d.approvals_moved ?? 0),
+    levelsCollapsed: Number(d.levels_collapsed ?? 0),
+  };
 }
 
 /**

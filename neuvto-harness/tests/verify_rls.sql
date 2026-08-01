@@ -1094,6 +1094,188 @@ begin
     -- runs leave exactly one object per organisation either way.
   end if;
 
+  ------------------------------------- leaving properly (step 11, D14/AC9)
+  --
+  -- Two defects sat here, both demonstrated on the seed before the fix.
+  --
+  -- ONE. `authenticated` held UPDATE on every column of `profiles`. Policies
+  -- filter rows, grants filter columns, and `update own profile` lets a person
+  -- update their own row — so every employee could write `joined_date`, which is
+  -- the number their entitlement is calculated from. New Joiner turned 6 days
+  -- into 12 with a single statement about themselves.
+  --
+  -- TWO. Deactivation was that same UPDATE. Mark — three direct reports and a
+  -- pending approval — went inactive with no error and nothing reassigned, and
+  -- every approval routed to him stranded. D14 has forbidden exactly this since
+  -- the first draft and nothing enforced it.
+  if to_regprocedure('public.deactivate_employee(uuid,uuid)') is not null then
+    declare
+      v_before_ent numeric;
+      v_after_ent  numeric;
+      v_moved      jsonb;
+      v_reports    int;
+      v_steps      int;
+      v_casual     uuid := '00000000-0000-0000-0000-0000000000c1';
+      v_fy         text;
+      v_off        int;
+      v_lr         uuid;
+      v_ar         uuid;
+    begin
+      ---------------------------------------------------- 1 · nobody edits their own entitlement
+      perform pg_temp.as_postgres();
+      v_fy := public.get_financial_year(acme, public.org_today(acme));
+      v_before_ent := public.calculate_entitlement(joiner, v_casual, v_fy);
+
+      perform pg_temp.as_user(joiner);
+      begin
+        update public.profiles set joined_date = '2020-01-01' where id = joiner;
+        raise exception 'RLS FAIL: an employee rewrote their own joined_date — the number their leave is calculated from';
+      exception when insufficient_privilege then null;
+      end;
+
+      perform pg_temp.as_postgres();
+      v_after_ent := public.calculate_entitlement(joiner, v_casual, v_fy);
+      -- Belt and braces: the refusal above is the mechanism, this is the effect.
+      -- A mid-year joiner is the fixture on purpose — for somebody who joined
+      -- before the year started the number cannot move, so the assertion would
+      -- pass without proving anything.
+      if v_before_ent <> v_after_ent then
+        raise exception 'RLS FAIL: entitlement moved from % to % after a self-edit', v_before_ent, v_after_ent;
+      end if;
+      if v_before_ent >= 12 then
+        raise exception 'RLS FAIL: the fixture is not a mid-year joiner (entitlement %), so this proves nothing', v_before_ent;
+      end if;
+      raise notice 'ok: an employee cannot rewrite the date their entitlement comes from';
+
+      ---------------------------------------------------- 2 · nor is deactivation a flag flip
+      perform pg_temp.as_user(alice);
+      begin
+        update public.profiles set is_active = false where id = mark;
+        raise exception 'RLS FAIL: an admin deactivated somebody with a bare UPDATE — D14 says this is a guarded operation';
+      exception when insufficient_privilege then null;
+      end;
+      begin
+        update public.profiles set deleted_at = now() where id = mark;
+        raise exception 'RLS FAIL: an admin soft-deleted a colleague directly';
+      exception when insufficient_privilege then null;
+      end;
+      raise notice 'ok: deactivation is not something a plain UPDATE can do';
+
+      ---------------------------------------------------- 3 · cycles
+      perform pg_temp.as_user(alice);
+      begin
+        perform public.admin_set_reporting_line(dan, ravi);   -- ravi → mark → dan → ravi
+        raise exception 'RLS FAIL: a reporting cycle was accepted';
+      exception when others then
+        if sqlerrm not like '%REPORTING_CYCLE%' then raise; end if;
+      end;
+      raise notice 'ok: a reporting line that closes a loop is refused';
+
+      ---------------------------------------------------- 4 · AC9, and the collapse
+      perform pg_temp.as_postgres();
+      delete from public.leave_requests where employee_id = ravi;
+      update public.leave_balances
+         set entitled_days = 12, carryforward_days = 0, used_days = 0,
+             reserved_days = 0, pending_days = 0
+       where employee_id = ravi and leave_type_id = v_casual;
+
+      select g into v_off from generate_series(30, 90) g
+       where public.calculate_working_days(acme,
+               public.org_today(acme) + g, public.org_today(acme) + g + 3) = 4
+       limit 1;
+
+      -- Four days, so the chain needs level 2 = manager_of_manager = Dan, while
+      -- level 1 is Mark. Deactivating Mark TO Dan is the duplicate-approver case.
+      perform pg_temp.as_user(ravi);
+      v_lr := public.leave_submit(v_casual,
+                public.org_today(acme) + v_off,
+                public.org_today(acme) + v_off + 3, 'step 11');
+
+      perform pg_temp.as_postgres();
+      select approval_request_id into v_ar from public.leave_requests where id = v_lr;
+      select required_levels into v_steps from public.approval_requests where id = v_ar;
+      if v_steps <> 2 then
+        raise exception 'RLS FAIL: the fixture needs two approval levels, got % — the collapse below would prove nothing', v_steps;
+      end if;
+
+      select count(*) into v_reports from public.profiles
+       where manager_id = mark and deleted_at is null;
+      if v_reports = 0 then
+        raise exception 'RLS FAIL: Mark has no reports, so "reports move" would pass vacuously';
+      end if;
+
+      perform pg_temp.as_user(alice);
+      v_moved := public.deactivate_employee(mark, dan);
+
+      perform pg_temp.as_postgres();
+      perform pg_temp.check('every direct report moved to the successor',
+        (v_moved->>'reports_moved')::bigint, v_reports::bigint);
+      perform pg_temp.check('the waiting approval moved too',
+        (v_moved->>'approvals_moved')::bigint, 1::bigint);
+      perform pg_temp.check('nobody still reports to the person who left',
+        (select count(*) from public.profiles where manager_id = mark and deleted_at is null), 0::bigint);
+      perform pg_temp.check('and they are inactive',
+        (select count(*) from public.profiles where id = mark and is_active), 0::bigint);
+
+      -- The collapse. Dan held level 2 already; inheriting level 1 would leave
+      -- him approving the same request twice, which approval_submit takes care
+      -- never to produce at submission.
+      perform pg_temp.check('the successor approves it once, not twice',
+        (select count(*) from public.approval_steps
+          where approval_request_id = v_ar and decision = 'pending' and deleted_at is null), 1::bigint);
+      select required_levels into v_steps from public.approval_requests where id = v_ar;
+      perform pg_temp.check('and the request says so', v_steps::bigint, 1::bigint);
+      if (select current_level from public.approval_requests where id = v_ar) > v_steps then
+        raise exception 'RLS FAIL: current_level is past required_levels — the request can never complete';
+      end if;
+      raise notice 'ok: deactivation hands over reports and approvals in one operation (AC9)';
+
+      ---------------------------------------------------- 5 · the module cancelled its own
+      -- Ravi still has the pending request; deactivating HIM must cancel it and
+      -- return the days, through Leave's own trigger. The platform names no
+      -- module, so if this fails the days are stranded and nothing says so.
+      perform pg_temp.as_postgres();
+      select available_days into v_before_ent from public.leave_balances
+       where employee_id = ravi and leave_type_id = v_casual;
+
+      perform pg_temp.as_user(alice);
+      perform public.deactivate_employee(ravi, dan);
+
+      perform pg_temp.as_postgres();
+      perform pg_temp.check('their pending leave is cancelled when they go',
+        (select count(*) from public.leave_requests where id = v_lr and status = 'cancelled'), 1::bigint);
+      select available_days into v_after_ent from public.leave_balances
+       where employee_id = ravi and leave_type_id = v_casual;
+      if v_after_ent <> v_before_ent + 4 then
+        raise exception 'RLS FAIL: cancelling on deactivation did not return the days — available % → %, expected %',
+          v_before_ent, v_after_ent, v_before_ent + 4;
+      end if;
+      raise notice 'ok: the module cancels its own work and the days come back';
+
+      ---------------------------------------------------- 6 · self-deactivation
+      perform pg_temp.as_user(alice);
+      begin
+        perform public.deactivate_employee(alice, dan);
+        raise exception 'RLS FAIL: an administrator deactivated themselves';
+      exception when others then
+        if sqlerrm not like '%CANNOT_DEACTIVATE_SELF%' then raise; end if;
+      end;
+      raise notice 'ok: an administrator cannot deactivate themselves';
+
+      -- Re-runnable: put the seed back the way it was found.
+      perform pg_temp.as_postgres();
+      delete from public.leave_requests where employee_id = ravi;
+      delete from public.approval_requests where id = v_ar;
+      update public.profiles set is_active = true where id in (mark, ravi);
+      update public.profiles set manager_id = mark where id in (ravi, joiner, '00000000-0000-0000-0000-00000000a006');
+      update public.profiles set manager_id = dan  where id = mark;
+      update public.leave_balances
+         set entitled_days = 12, carryforward_days = 0, used_days = 0,
+             reserved_days = 0, pending_days = 0
+       where employee_id = ravi and leave_type_id = v_casual;
+    end;
+  end if;
+
   ------------------------------------- emails written in English (step 10b)
   --
   -- What a manager received from the first approval onwards:
