@@ -78,6 +78,28 @@ curl -s "http://127.0.0.1:54324/api/v1/message/$ID" \
 > hosted app can only be signed into via the magic link. Recorded as a launch
 > blocker in `docs/product/NEUVTO_MVP_BUILD_SPEC.md`.
 
+### Driving the app from an automated browser
+
+`limit=1` on the Mailpit API is **not** newest-first. Search by recipient
+instead, or you will keep reading somebody else's code from an hour ago:
+
+```bash
+curl -s "http://127.0.0.1:54324/api/v1/search?query=to%3Aalice.admin%40acme.test&limit=1"
+```
+
+**Click the field before typing into it.** Setting a text input's `value`
+programmatically — which is what most automation helpers do — updates the DOM and
+never fires React's `onChange`, so the component's state stays empty. The form
+then submits nothing, shows no error, and looks broken for reasons that are
+nowhere in the application.
+
+This cost step 11 its by-hand verification, and the PR shipped with three screens
+unexercised. The symptom is exact and worth recognising: text is visibly in the
+field, the submit button is enabled, and **no network request is made at all**.
+
+Select elements do not have the problem — setting `value` on a `<select>` does
+notify React. It is text inputs specifically.
+
 ## Testing on a real phone
 
 ```bash

@@ -1479,6 +1479,7 @@ export type Database = {
         Args: { _module_key: string; _org_id: string }
         Returns: boolean
       }
+      my_account_status: { Args: never; Returns: string }
       notification_claim_batch: {
         Args: { _limit?: number }
         Returns: {
@@ -1554,6 +1555,10 @@ export type Database = {
           _slug: string
         }
         Returns: string
+      }
+      reactivate_employee: {
+        Args: { _employee_id: string }
+        Returns: undefined
       }
       render_template: {
         Args: { _payload: Json; _template: string }

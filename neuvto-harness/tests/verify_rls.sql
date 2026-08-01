@@ -41,6 +41,7 @@ declare
   alice   uuid := '00000000-0000-0000-0000-00000000a001';
   bob     uuid := '00000000-0000-0000-0000-00000000b001';
   sara    uuid := '00000000-0000-0000-0000-00000000b002';   -- reports to Bob, in Vertex
+  hema    uuid := '00000000-0000-0000-0000-00000000a002';   -- hr_admin, not org_admin
   ghost   uuid := '00000000-0000-0000-0000-0000000000ff';
   joiner  uuid := '00000000-0000-0000-0000-00000000a007';
   v_text  text;
@@ -1115,6 +1116,8 @@ begin
       v_moved      jsonb;
       v_reports    int;
       v_steps      int;
+      v_rows       int;      -- step 12: counts that must be non-zero to mean anything
+      v_refused    boolean;
       v_casual     uuid := '00000000-0000-0000-0000-0000000000c1';
       v_fy         text;
       v_off        int;
@@ -1261,6 +1264,107 @@ begin
         if sqlerrm not like '%CANNOT_DEACTIVATE_SELF%' then raise; end if;
       end;
       raise notice 'ok: an administrator cannot deactivate themselves';
+
+      ---------------------------------------- 7 · deactivation removes ACCESS (step 12)
+      --
+      -- Step 11 moved their work and left them using the product. Demonstrated
+      -- on the seed: after being deactivated, Ravi read his profile, read his
+      -- balances, and submitted a leave request. current_org_id() checked
+      -- deleted_at and not is_active, so "deactivated" meant "cannot be resolved
+      -- as an approver" and nothing else.
+      --
+      -- Ravi is deactivated at this point in the block, which is why these sit
+      -- here rather than in a section of their own.
+      perform pg_temp.as_postgres();
+      select count(*) into v_rows from public.leave_balances where employee_id = ravi;
+      if v_rows = 0 then
+        raise exception 'RLS FAIL: Ravi holds no balances, so "a deactivated person reads nothing" would pass without refusing anything';
+      end if;
+
+      perform pg_temp.as_user(ravi);
+      perform pg_temp.check('a deactivated person reads no profiles',
+        (select count(*) from public.profiles), 0::bigint);
+      perform pg_temp.check('a deactivated person reads no balances',
+        (select count(*) from public.leave_balances), 0::bigint);
+      perform pg_temp.check('a deactivated person reads no leave requests',
+        (select count(*) from public.leave_requests), 0::bigint);
+
+      -- The exact call that succeeded in step 11.
+      v_refused := false;
+      begin
+        perform public.leave_submit(v_casual,
+          '2099-06-01'::date, '2099-06-02'::date, 'after deactivation');
+      exception when others then
+        v_refused := (sqlerrm = 'NO_ORGANIZATION');
+      end;
+      if not v_refused then
+        raise exception 'RLS FAIL: a deactivated person submitted leave — deactivation is not removing access';
+      end if;
+      raise notice 'ok: a deactivated person reads nothing and can do nothing';
+
+      -- And can be told why, rather than being shown the never-invited screen.
+      if public.my_account_status() <> 'deactivated' then
+        raise exception 'RLS FAIL: a deactivated person is told "%" rather than deactivated', public.my_account_status();
+      end if;
+      perform pg_temp.as_user(alice);
+      if public.my_account_status() <> 'active' then
+        raise exception 'RLS FAIL: an active administrator is not reported as active';
+      end if;
+      perform pg_temp.as_user(ghost);
+      if public.my_account_status() <> 'none' then
+        raise exception 'RLS FAIL: somebody with no profile is not reported as none';
+      end if;
+      raise notice 'ok: the sign-in screen can tell deactivated apart from never-invited';
+
+      ---------------------------------------- 8 · and there is a way back
+      perform pg_temp.as_postgres();
+      select count(*) into v_reports from public.profiles
+       where manager_id = dan and deleted_at is null;
+      -- Non-vacuity: if nothing had moved to Dan, "reactivation does not take
+      -- the reports back" would hold trivially and prove nothing.
+      if v_reports = 0 then
+        raise exception 'RLS FAIL: the successor holds no reports, so the assertion below is empty';
+      end if;
+
+      perform pg_temp.as_user(alice);
+      perform public.reactivate_employee(ravi);
+
+      perform pg_temp.as_user(ravi);
+      perform pg_temp.check('reactivation gives access back',
+        (select count(*) from public.leave_balances), v_rows::bigint);
+      if public.my_account_status() <> 'active' then
+        raise exception 'RLS FAIL: a reactivated person is still reported as deactivated';
+      end if;
+
+      -- And gives nothing else back. What moved to the successor is theirs now;
+      -- taking it back weeks later would change who a third person reports to,
+      -- decided by a click on somebody else's record.
+      perform pg_temp.as_postgres();
+      perform pg_temp.check('reactivation does not take the reports back off the successor',
+        (select count(*) from public.profiles where manager_id = dan and deleted_at is null),
+        v_reports::bigint);
+      raise notice 'ok: reactivation restores access and nothing else';
+
+      ---------------------------------------- 9 · the last one out
+      -- Alice is the only org_admin in the seed. Deactivating her would leave
+      -- nobody able to administer the workspace AND nobody able to undo it,
+      -- because reactivation above is admin-only.
+      select count(*) into v_rows
+        from public.user_roles ur join public.profiles p on p.id = ur.user_id
+       where ur.organization_id = acme and ur.role = 'org_admin'
+         and ur.deleted_at is null and p.deleted_at is null and p.is_active;
+      if v_rows <> 1 then
+        raise exception 'RLS FAIL: acme has % active administrators, so the last-admin guard would prove nothing', v_rows;
+      end if;
+
+      perform pg_temp.as_user(hema);          -- hr_admin, so is_admin() but not org_admin
+      begin
+        perform public.deactivate_employee(alice, dan);
+        raise exception 'RLS FAIL: the last administrator was deactivated, locking the workspace out';
+      exception when others then
+        if sqlerrm not like '%LAST_ADMIN%' then raise; end if;
+      end;
+      raise notice 'ok: the last administrator cannot be deactivated';
 
       -- Re-runnable: put the seed back the way it was found.
       perform pg_temp.as_postgres();

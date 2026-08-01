@@ -7,6 +7,7 @@ import {
   isAdmin,
   listInvitations,
   listMembers,
+  reactivateMember,
   revokeInvitation,
   setJoinedDate,
   setReportingLine,
@@ -127,6 +128,21 @@ function MembersPage() {
     } catch (err) {
       setError(isAppError(err) ? err.message : "That start date couldn't be saved.");
       await load();
+    }
+  }
+
+  async function onReactivate(employeeId: string) {
+    setError("");
+    setNotice("");
+    setBusy(true);
+    try {
+      await reactivateMember(employeeId);
+      setNotice("Access restored. Their reports and approvals stayed with whoever took them over.");
+      await load();
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That person couldn't be brought back.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -413,17 +429,23 @@ function MembersPage() {
                   </select>
 
                   <div className="mt-3 flex gap-2">
+                    {/* min-h rather than h: at 280px this label wraps to three
+                        lines, and a fixed 48px box clipped the last word — the
+                        primary action read "Deactivate and hand" with "over"
+                        cut off. Found by looking at it on a phone-width screen;
+                        it renders fine on a desktop. The 48px floor the design
+                        system asks for is preserved. */}
                     <button
                       onClick={() => onDeactivate(m.id)}
                       disabled={!successor || busy}
                       data-testid="confirm-deactivate"
-                      className="inline-flex h-12 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                      className="inline-flex min-h-12 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                     >
                       {busy ? "Deactivating…" : "Deactivate and hand over"}
                     </button>
                     <button
                       onClick={() => setLeaving(null)}
-                      className="inline-flex h-12 items-center rounded-md border border-border px-4 text-sm"
+                      className="inline-flex min-h-12 items-center rounded-md border border-border px-4 py-2 text-sm"
                     >
                       Cancel
                     </button>
@@ -444,17 +466,32 @@ function MembersPage() {
           <h2 className="font-display text-base font-semibold">No longer active</h2>
           <ul className="mt-4 divide-y divide-border rounded-lg border border-dashed border-border">
             {inactive.map((m) => (
-              <li key={m.id} data-testid="inactive-row" className="p-4">
-                <span className="block truncate text-sm text-muted-foreground">
-                  {m.fullName || m.email}
+              <li
+                key={m.id}
+                data-testid="inactive-row"
+                className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between"
+              >
+                <span className="min-w-0">
+                  <span className="block truncate text-sm text-muted-foreground">
+                    {m.fullName || m.email}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">{m.email}</span>
                 </span>
-                <span className="block truncate text-xs text-muted-foreground">{m.email}</span>
+                <button
+                  onClick={() => onReactivate(m.id)}
+                  disabled={busy}
+                  data-testid="reactivate"
+                  className="inline-flex min-h-12 shrink-0 items-center rounded-md border border-border px-3 py-2 text-sm disabled:opacity-50"
+                >
+                  Bring back
+                </button>
               </li>
             ))}
           </ul>
           <p className="mt-3 text-xs text-muted-foreground">
-            Their history stays. Bringing somebody back is not built yet — ask for it if you need
-            it.
+            Their history stays. Bringing somebody back restores their access — the people and
+            approvals that moved to somebody else stay where they were moved, and leave that was
+            cancelled stays cancelled.
           </p>
         </section>
       )}

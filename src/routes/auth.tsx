@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  accountStatus,
   requestOtp,
   verifyOtp,
   getCurrentUser,
@@ -51,7 +52,7 @@ function safeNext(next: string) {
  * `joining` is where an invited person lands: the link identified the
  * invitation, the code proved the address, and this redeems the two together.
  */
-type Step = "email" | "code" | "joining" | "orphan";
+type Step = "email" | "code" | "joining" | "orphan" | "deactivated";
 
 function AuthPage() {
   const { next, invite } = Route.useSearch();
@@ -149,13 +150,24 @@ function AuthPage() {
         if (await routeWorkspacelessUser()) return;
         if (cancelled) return;
         setChecking(false);
-        setStep("orphan");
+        setStep(await workspacelessStep());
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [next, invite]);
+
+  /**
+   * Which "you are nowhere" screen this person should see.
+   *
+   * Deactivated and never-invited look identical from getCurrentUser — both
+   * raise NO_ORGANIZATION, because current_org_id() is null either way. Only the
+   * database can tell them apart, and only about the caller themselves.
+   */
+  async function workspacelessStep(): Promise<Step> {
+    return (await accountStatus()) === "deactivated" ? "deactivated" : "orphan";
+  }
 
   function fail(e: unknown) {
     toast.error(isAppError(e) ? e.message : "Something went wrong. Please try again.");
@@ -188,7 +200,7 @@ function AuthPage() {
       // Signed in, but in no workspace yet — redeem the invitation, send staff
       // to the console, or explain.
       if (invite) await finish();
-      else if (!(await routeWorkspacelessUser())) setStep("orphan");
+      else if (!(await routeWorkspacelessUser())) setStep(await workspacelessStep());
     } catch (err) {
       fail(err);
     } finally {
@@ -308,6 +320,31 @@ function AuthPage() {
               Adding you to your workspace. This only takes a moment.
             </p>
           )}
+        </>
+      )}
+
+      {/*
+        Signed in, and their access was removed.
+
+        Separated from "orphan" deliberately. Once access follows `is_active`,
+        a deactivated person's current_org_id() is null, so getCurrentUser finds
+        no profile and they landed on the screen below — which tells them they
+        were never here and to seek an invitation. Both parts are untrue, and
+        the advice would waste their time and their administrator's.
+      */}
+      {step === "deactivated" && (
+        <>
+          <h1 className="font-display text-2xl font-semibold tracking-tight">
+            Your access has been removed
+          </h1>
+          <p className="mt-2 text-sm text-muted-foreground">
+            <span className="text-foreground">{email || "This account"}</span> no longer has access
+            to its workspace. Your leave history has not been deleted.
+          </p>
+          <p className="mt-4 text-sm text-muted-foreground">
+            If this is a mistake, your administrator can restore it — they do not need to invite you
+            again.
+          </p>
         </>
       )}
 
