@@ -1768,6 +1768,7 @@ begin
       casual uuid := '00000000-0000-0000-0000-0000000000c1';
       priya  uuid := '00000000-0000-0000-0000-00000000a006';
       d0     date;
+      v_off  int;    -- offset to a window that really is four working days
       v_req  uuid;
       v_appr uuid;
       v_bad  boolean;
@@ -1778,7 +1779,33 @@ begin
       perform pg_temp.as_postgres();
       delete from leave_requests;
       update leave_balances set reserved_days = 0, pending_days = 0;
-      d0 := public.org_today(acme) + 45;
+
+      -- A WINDOW THAT IS FOUR WORKING DAYS, FOUND RATHER THAN ASSUMED.
+      --
+      -- This was `org_today(acme) + 45`, and the assertions below need the
+      -- request to be MORE THAN THREE working days — that is what makes the
+      -- seeded chain require a second level (D5, the threshold as a row).
+      --
+      -- A fixed offset does not give a fixed number of working days. It gives
+      -- whatever the weekday alignment happens to produce, and the alignment
+      -- moves every day. On 2 Aug 2026 the offset landed on a Wednesday, so
+      -- d0..d0+4 spanned Wed–Sun: three working days, one approval level, and
+      -- "leave went to approved after only the first of two approvals" — the
+      -- product behaving correctly and the fixture being wrong.
+      --
+      -- It had been latent since this block was written and turned red on a
+      -- Sunday, on main, straight after a merge whose own CI was green a few
+      -- hours earlier. Nothing changed but the day of the week.
+      select g into v_off
+        from generate_series(40, 100) g
+       where public.calculate_working_days(acme,
+               public.org_today(acme) + g, public.org_today(acme) + g + 4) = 4
+       limit 1;
+
+      if v_off is null then
+        raise exception 'RLS FAIL: no five-day window in the next 100 days contains four working days — the level assertions below would be testing the calendar, not the engine';
+      end if;
+      d0 := public.org_today(acme) + v_off;
 
       ------------------------------------------------- submission reserves
       select available_days into v_before from leave_balances
