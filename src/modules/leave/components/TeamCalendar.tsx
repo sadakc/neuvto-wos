@@ -126,6 +126,14 @@ export default function TeamCalendar() {
   if (team.length === 0) {
     return (
       <div className="mx-auto max-w-2xl">
+        <div className="mb-4">
+          <a
+            href="/app/leave/calendar"
+            className="text-sm text-muted-foreground underline underline-offset-4"
+          >
+            ← My own calendar
+          </a>
+        </div>
         <h1 className="font-display text-lg font-semibold">Your team</h1>
         <p className="mt-4 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Nobody reports to you yet. Once your administrator sets reporting lines, your team&apos;s
@@ -139,6 +147,15 @@ export default function TeamCalendar() {
 
   return (
     <div className="mx-auto max-w-4xl">
+      <div className="mb-4">
+        <a
+          href="/app/leave/calendar"
+          className="text-sm text-muted-foreground underline underline-offset-4"
+        >
+          ← My own calendar
+        </a>
+      </div>
+
       <div className="flex items-center justify-between">
         <h1 className="font-display text-lg font-semibold">
           {month.toLocaleString(undefined, { month: "long", year: "numeric" })}

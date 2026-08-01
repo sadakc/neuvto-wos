@@ -80,12 +80,37 @@ export async function getMyBalances(): Promise<LeaveBalance[]> {
   }));
 }
 
+/**
+ * The caller's OWN requests. The filter is the point.
+ *
+ * This read has no filter until now and leaned on RLS, following the rule used
+ * everywhere else here — "a filter in application code implies the policy cannot
+ * be trusted". That rule is right when the policy and the screen want the same
+ * rows. They do not here: `read leave requests in scope` deliberately returns
+ * own OR direct reports OR requests you are an approver on OR, for an admin,
+ * every one in the organisation. It is scoped for *tenancy*, not for *this
+ * screen*.
+ *
+ * So "My leave" listed other people's leave. Found by opening it as Dan
+ * Director, who has no leave at all and was shown Ravi's four approved days as
+ * his own — on My Leave, on the dashboard card ("Next leave 2026-08-31"), and on
+ * his personal calendar, all three of which read through here.
+ *
+ * Present since step 7 and invisible until step 10 gave anybody an approved
+ * request to see. An administrator would have seen the entire company's leave
+ * listed as their own.
+ */
 export async function getMyRequests(): Promise<LeaveRequest[]> {
+  const { data: auth } = await supabase.auth.getUser();
+  const uid = auth?.user?.id;
+  if (!uid) return [];
+
   const { data, error } = await supabase
     .from("leave_requests")
     .select(
       "id, approval_request_id, leave_type_id, from_date, to_date, working_days, reason, status, submitted_at, decided_at, rejection_reason, leave_types(name)",
     )
+    .eq("employee_id", uid)
     .order("from_date", { ascending: false });
 
   if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load your leave requests.", 500);

@@ -19,17 +19,20 @@ export const leave: ModuleDefinition = {
   name: "Leave Management",
   version: "1.0.0",
 
-  navigation: (user) => [
+  // "Approvals" used to be declared here, as `soon: "step 8"` — a module laying
+  // claim to a platform screen. It now lives in the platform's own navigation,
+  // and this module contributes only how to render its rows.
+  //
+  // The team calendar deliberately gets NO nav entry. It is reached from the
+  // Calendar screen, because it is a view of that calendar rather than a peer
+  // destination — and because the mobile bar shows five items and nothing else.
+  // Adding a sixth pushed "Approvals" off it, so a manager on a phone could not
+  // reach the one screen they are needed on. Found by opening it at 280px wide;
+  // the desktop sidebar showed all six and looked perfect.
+  navigation: () => [
     { label: "Apply", to: "/app/leave/apply" },
     { label: "My leave", to: "/app/leave" },
     { label: "Calendar", to: "/app/leave/calendar" },
-    // A manager's view of the same calendar: who on their team is away, and
-    // when. "Approvals" used to be declared here too, as `soon: "step 8"` — a
-    // module laying claim to a platform screen. It now lives in the platform's
-    // own navigation, and this module contributes only how to render its rows.
-    ...(user?.roles.some((r) => r === "manager" || r === "hr_admin" || r === "org_admin")
-      ? [{ label: "Team", to: "/app/leave/team" }]
-      : []),
   ],
 
   routes: [
