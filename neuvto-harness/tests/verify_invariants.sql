@@ -168,6 +168,82 @@ begin
       raise notice 'ok: seed contains a holiday that genuinely tests exclusion';
     end if;
 
+    --------------------------------------------- a report counts in org-local days
+    --
+    -- `days_waiting` on the pending report is org_today minus the submission
+    -- date, and the submission date has to be resolved in the ORGANISATION's
+    -- timezone. `submitted_at::date` resolves in the session's, which is UTC —
+    -- so a request submitted at 19:00 UTC, half past midnight in Kolkata, was
+    -- reported as one day old the moment it arrived.
+    --
+    -- Asserted against the boundary rather than "now", because at most times of
+    -- day the two dates agree and the bug is invisible. Acme is Asia/Kolkata in
+    -- the seed, which is the point of the fixture.
+    if to_regprocedure('public.leave_pending_report()') is not null then
+      declare
+        v_tz      text;
+        v_admin   uuid;
+        v_req     uuid;
+        v_at      timestamptz;
+        v_waiting int;
+      begin
+        select coalesce(s.timezone,'UTC') into v_tz
+          from public.organization_settings s
+         where s.organization_id = '00000000-0000-0000-0000-0000000000a0';
+
+        -- The fixture has to be capable of showing the fault, or the assertion
+        -- below passes for the wrong reason.
+        if v_tz = 'UTC' then
+          raise exception
+            'INVARIANT FAIL: Acme''s timezone is UTC, so this cannot detect a UTC/org-local mix-up';
+        end if;
+
+        -- A SOURCE check, deliberately, and not because behaviour is beside the
+        -- point. Behaviour cannot be asserted here without a pending request,
+        -- and the suite that precedes this one clears them — so a behavioural
+        -- test would skip silently on most runs and report green. This one
+        -- cannot pass vacuously: the function either contains the naive cast or
+        -- it does not.
+        -- Comments stripped first. The first version of this check matched the
+        -- COMMENT that explains the bug and failed against the corrected
+        -- function — a source assertion cannot tell code from prose about code
+        -- unless you make it.
+        if regexp_replace(
+             pg_get_functiondef(to_regprocedure('public.leave_pending_report()')),
+             '--[^\n]*', '', 'g') ~ 'submitted_at::date' then
+          raise exception
+            'INVARIANT FAIL: leave_pending_report ages a request with submitted_at::date, which resolves in the SESSION timezone (UTC), not the organisation''s — every request submitted after 18:30 UTC reads a day older than it is';
+        end if;
+        raise notice 'ok: a report ages a request in the organisation''s own days';
+
+        -- And over whatever pending rows happen to exist, which is the real
+        -- thing when there are any.
+        select id into v_admin from public.profiles
+         where email = 'alice.admin@acme.test';
+
+        if v_admin is not null then
+          perform set_config('request.jwt.claims',
+                   json_build_object('sub', v_admin, 'role','authenticated')::text, true);
+          perform set_config('role', 'authenticated', true);
+
+          select count(*) into n
+            from public.leave_pending_report() rep
+            join public.leave_requests r on r.id = rep.leave_request_id
+           where rep.days_waiting
+                 <> (public.org_today('00000000-0000-0000-0000-0000000000a0'::uuid)
+                     - (r.submitted_at at time zone v_tz)::date);
+
+          perform set_config('role', 'postgres', true);
+          perform set_config('request.jwt.claims', null, true);
+
+          if n > 0 then
+            raise exception
+              'INVARIANT FAIL: % pending row(s) report an age that is not the organisation''s own', n;
+          end if;
+        end if;
+      end;
+    end if;
+
     ------------------------------------------- nothing is reachable anonymously
     --
     -- On 2 Aug 2026, minutes after the cutover, `notify_address` was callable on
