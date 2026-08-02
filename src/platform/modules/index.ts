@@ -14,6 +14,7 @@ export {
   resolveModuleRoute,
   getDashboardCards,
   getAdminSections,
+  getModuleReports,
   getApprovalViews,
 } from "./registry";
 
@@ -24,6 +25,7 @@ export {
   type ModuleRoute,
   type ModuleDashboardCard,
   type ModuleAdminSection,
+  type ModuleReport,
   type ModuleApprovalView,
   type ModuleApprovalViewProps,
 } from "./contract";

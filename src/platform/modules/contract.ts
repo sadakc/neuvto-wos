@@ -76,6 +76,39 @@ export interface ModuleAdminSection {
   order?: number;
 }
 
+/**
+ * A report a module contributes to the platform's Reports screen.
+ *
+ * The spec calls reports "module-local in MVP; generalise when a second module
+ * reports" — this IS that generalisation, arriving early because the alternative
+ * was worse. A `/app/leave/reports` route would need a navigation entry, and
+ * that is where it becomes a platform problem:
+ *
+ * `mergeNavItems` places module items at positions 2–4, and the mobile bar shows
+ * the first FIVE. A fifth module item pushes "Approvals" off the bar for an
+ * administrator — the identical bug the team calendar caused in step 10, found
+ * only by opening the app at 280px wide. Reports belong with People and Settings,
+ * which sit past position five deliberately, because admin work is desktop-first.
+ *
+ * So the platform owns a Reports destination and modules fill it, exactly as
+ * they fill Settings and the dashboard. D30 holds: the platform renders a page
+ * of reports without knowing that any of them concern leave.
+ *
+ * Rendered only for administrators. That is presentation — every report function
+ * behind these raises FORBIDDEN for a non-admin itself, because a screen that is
+ * merely not linked is not a permission.
+ */
+export interface ModuleReport {
+  /** Stable across renders; used as the React key, for ordering, and in the URL hash. */
+  id: string;
+  title: string;
+  /** One line under the heading: what question this answers, for whom. */
+  description?: string;
+  component: ComponentType | LazyExoticComponent<ComponentType>;
+  /** Lower sorts first. */
+  order?: number;
+}
+
 export interface ModuleRoute {
   /** Relative to /app, no leading slash. "leave/apply" serves /app/leave/apply. */
   path: string;
@@ -171,6 +204,15 @@ export interface ModuleDefinition {
   adminSections?: (user: CurrentUser | null) => ModuleAdminSection[];
 
   /**
+   * Reports this module contributes to the platform's Reports screen.
+   *
+   * A function of the user for the same reason the others are: a module decides
+   * what it is willing to show whom, and the platform does not need to know the
+   * rule.
+   */
+  reports?: (user: CurrentUser | null) => ModuleReport[];
+
+  /**
    * Entity types this module registers with the Approval Engine. Declared so
    * two modules cannot silently claim the same one — the engine is
    * entity-agnostic and would happily let them.
@@ -223,6 +265,7 @@ export const ModuleDefinitionSchema = z.object({
   ),
   dashboardCards: z.function().optional(),
   adminSections: z.function().optional(),
+  reports: z.function().optional(),
   approvalViews: z.function().optional(),
   approvalEntityTypes: z.array(z.string().regex(/^[a-z_]+$/)).readonly(),
   eventKeys: z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/)).readonly(),
