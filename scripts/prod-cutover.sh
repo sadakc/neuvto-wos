@@ -195,11 +195,52 @@ echo
 # ---------------------------------------------------------------- edge function
 echo "── deploying notification-dispatch"
 supabase functions deploy notification-dispatch --project-ref "$REF"
-echo
-echo "  The dispatcher needs its Vault secrets, which are NOT in this repo and"
-echo "  never will be — a migration is a file in git. Set them in the dashboard:"
-echo "    SQL Editor → select vault.create_secret('<key>', 'resend_api_key');"
-echo "  See docs/operations/DEPLOYMENT.md."
+
+# THE ARGUMENT ORDER IS THE WHOLE WARNING.
+#
+# An earlier version of this message read:
+#
+#     select vault.create_secret('<key>', 'resend_api_key');
+#
+# It was wrong twice over, and Sada ran it against production on 2 Aug 2026.
+# `resend_api_key` is not a Vault secret at all — it is an EDGE FUNCTION secret,
+# set with `supabase secrets set`, a different mechanism entirely. And the
+# signature is create_secret(VALUE, NAME), which reads backwards to anybody who
+# has ever used a key-value store, so the arguments went in reversed and a live
+# `sb_secret_…` key was written into vault.secrets.NAME — a column that is not
+# encrypted. The value is encrypted; the name is not. That key had to be rotated.
+#
+# Hence: both names spelled out, the order labelled, and no placeholder that
+# could be mistaken for the other field.
+cat <<'VAULT'
+  ── one thing left, and email is silent until it is done
+
+  The dispatcher reads two secrets from Vault. They are NOT in this repo and
+  never will be — a migration is a file in git. Without them every notification
+  queues and none is delivered.
+
+  In the SQL editor of THIS project. Note the order: value first, name second.
+
+    select vault.create_secret(
+      'https://<project-ref>.supabase.co/functions/v1/notification-dispatch',
+      'notification_dispatch_url', 'set at cutover');
+
+    select vault.create_secret(
+      '<service role key>',
+      'notification_dispatch_key', 'set at cutover');
+
+  vault.secrets.name is NOT encrypted. Putting a key in the second argument
+  stores it in the clear — check with:
+
+    select name from vault.secrets;
+
+  Both names should appear there and nothing else. If a key does, rotate it.
+
+  RESEND_API_KEY is a different mechanism — an edge function secret:
+    supabase secrets set RESEND_API_KEY=re_... --project-ref <ref>
+
+  See docs/operations/DEPLOYMENT.md.
+VAULT
 echo
 
 # --------------------------------------------------------------------- harness
