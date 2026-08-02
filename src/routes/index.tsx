@@ -63,12 +63,23 @@ function Nav() {
             Request Demo
           </a>
         </nav>
-        <a
-          href="#demo"
-          className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-        >
-          Request Demo
-        </a>
+        {/* Sign in sits outside the `md:flex` row above: that row is hidden on
+            mobile, and someone who has lost their invitation email arrives on a
+            phone. It is the only way into the product from this page. */}
+        <div className="flex items-center gap-3 sm:gap-4">
+          <a
+            href="/auth"
+            className="inline-flex items-center px-1 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+          >
+            Sign in
+          </a>
+          <a
+            href="#demo"
+            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+          >
+            Request Demo
+          </a>
+        </div>
       </div>
     </header>
   );
@@ -405,6 +416,12 @@ function Footer() {
     <footer className="border-t border-border bg-secondary/40 py-10">
       <div className="mx-auto flex max-w-6xl flex-col items-center justify-between gap-4 px-6 text-sm text-muted-foreground md:flex-row">
         <p>© {new Date().getFullYear()} Neuvto. All rights reserved.</p>
+        <a
+          href="/auth"
+          className="inline-flex items-center py-3.5 font-medium hover:text-foreground"
+        >
+          Sign in to your workspace
+        </a>
         <p className="font-display">
           neuvto<span className="text-primary">.</span>com
         </p>
