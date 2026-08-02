@@ -234,7 +234,11 @@ cat <<'VAULT'
 
     select name from vault.secrets;
 
-  Both names should appear there and nothing else. If a key does, rotate it.
+  Both names should appear there and nothing else. If a key is listed, it is in
+  the clear: issue a replacement key, delete the exposed one, then redo the
+  create_secret above with the new value. There is no "rotate" button on an
+  sb_secret_… key — Project Settings → API Keys only creates and deletes, and
+  those two steps together ARE the rotation.
 
   RESEND_API_KEY is a different mechanism — an edge function secret:
     supabase secrets set RESEND_API_KEY=re_... --project-ref <ref>

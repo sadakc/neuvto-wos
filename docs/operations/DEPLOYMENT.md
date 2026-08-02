@@ -198,6 +198,18 @@ that is throttling, not a network change — wait rather than reconfigure.
 > **Dashboard → Project Settings → Database → Reset database password.**
 > The old one stops working immediately, which is the point.
 
+**The two credentials rotate differently, and only one has a button.**
+
+| Credential            | How to rotate                                                                    |
+| --------------------- | -------------------------------------------------------------------------------- |
+| Database password     | Project Settings → Database → **Reset database password** — one action, in place |
+| `sb_secret_…` API key | Project Settings → API Keys → **create a new one, then delete the old one**      |
+
+There is no rotate action on an API key; the UI offers only create and delete.
+Create the replacement first when anything is using the old key, so there is no
+window where nothing works. At cutover nothing is using it yet, so the order does
+not matter and deleting first is less confusing.
+
 ### The harness against prod
 
 `scripts/harness.sh` seeds by **truncating every table it owns**. Two guards
