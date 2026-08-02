@@ -168,6 +168,69 @@ begin
       raise notice 'ok: seed contains a holiday that genuinely tests exclusion';
     end if;
 
+    ------------------------------------------- nothing is reachable anonymously
+    --
+    -- On 2 Aug 2026, minutes after the cutover, `notify_address` was callable on
+    -- production by anyone holding the publishable key — which ships in the
+    -- client bundle. It takes an arbitrary recipient and queues mail, and cron
+    -- delivers it from a verified domain. An open relay.
+    --
+    -- The migrations looked correct. `revoke ... from public` secures a local
+    -- database and does nothing to a hosted one, because the two disagree about
+    -- what a new function is granted, and `anon` holds an EXPLICIT grant there
+    -- that a revoke from PUBLIC never touches.
+    select count(*) into n
+      from pg_proc p
+      join pg_namespace ns on ns.oid = p.pronamespace
+     where ns.nspname = 'public'
+       and p.prosecdef
+       and has_function_privilege('anon', p.oid, 'EXECUTE');
+    if n > 0 then
+      raise exception
+        'INVARIANT FAIL: % SECURITY DEFINER function(s) are executable by anon — they bypass RLS by definition', n;
+    end if;
+    raise notice 'ok: no SECURITY DEFINER function is executable without signing in';
+
+    -- NON-VACUITY. The check above passes trivially on a database where anon
+    -- was never granted anything, which is exactly the local one — so on its own
+    -- it would have gone green throughout the window in which production was
+    -- exposed. Grant a probe and confirm the check can actually see it.
+    declare
+      v_seen int;
+    begin
+      create function public.__anon_probe() returns int
+        language sql security definer as 'select 1';
+      grant execute on function public.__anon_probe() to anon;
+
+      select count(*) into v_seen
+        from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+       where ns.nspname = 'public' and p.prosecdef
+         and has_function_privilege('anon', p.oid, 'EXECUTE');
+
+      drop function public.__anon_probe();
+
+      if v_seen <> 1 then
+        raise exception
+          'INVARIANT FAIL: the anon-executable check cannot see a function that IS anon-executable';
+      end if;
+      raise notice 'ok: that check can see an exposure when there is one';
+    end;
+
+    -- And the default that caused it. This is the assertion that would have
+    -- caught the divergence: production granted `anon` EXECUTE on every new
+    -- function automatically, local did not, and no test compared them.
+    select count(*) into n
+      from pg_default_acl d
+     where d.defaclnamespace = 'public'::regnamespace
+       and d.defaclobjtype = 'f'
+       and pg_get_userbyid(d.defaclrole) = 'postgres'
+       and array_to_string(d.defaclacl, ',') ~ '\manon=';
+    if n > 0 then
+      raise exception
+        'INVARIANT FAIL: default privileges grant anon EXECUTE on new functions — every future migration ships exposed';
+    end if;
+    raise notice 'ok: a new function is granted to nobody until something says otherwise';
+
     ------------------------------------------------- the count explains itself
     -- working_days_excluded is the complement of calculate_working_days. If the
     -- two ever drift, the apply screen tells an employee that five days were
