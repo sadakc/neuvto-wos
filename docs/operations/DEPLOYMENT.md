@@ -286,14 +286,51 @@ Set them once per environment, in the SQL editor:
 
 ```sql
 select vault.create_secret(
-  'https://<project-ref>.supabase.co/functions/v1/notification-dispatch',
+  'https://udrzhfgwqgolvyimbwto.supabase.co/functions/v1/notification-dispatch',
   'notification_dispatch_url', 'set at cutover');
 select vault.create_secret(
-  '<service role key>', 'notification_dispatch_key', 'set at cutover');
+  PASTE_KEY_HERE, 'notification_dispatch_key', 'set at cutover');
 ```
 
 **Never paste the service role key into a chat, a PR, or a file.** Read it from
 the project's API settings and paste it into the SQL editor directly.
+
+> ## ⚠️ Two ways to get this wrong, both of which still look set
+>
+> **The argument order reads backwards.** It is `create_secret(VALUE, NAME)`, not
+> name-then-value, and **`vault.secrets.name` is not encrypted** — only the value
+> is. Reversed, your key is written into a plaintext column. It happened on 2 Aug
+> 2026 and the key had to be replaced.
+>
+> **Angle-bracket placeholders get pasted.** The earlier version of this block
+> said `'<service role key>'`; the words were replaced and the brackets kept,
+> storing a 43-character `<sb_secret_…>` where 41 were wanted. It resolves, it
+> reads as configured, and every delivery 401s silently. Hence `PASTE_KEY_HERE` —
+> a bare word that leaves no punctuation behind.
+>
+> So verify rather than trust:
+>
+> ```sql
+> select name,
+>        public.platform_secret(name) is not null as resolves,
+>        case name
+>          when 'notification_dispatch_key'
+>            then public.platform_secret(name) like 'sb_secret_%'
+>          when 'notification_dispatch_url'
+>            then public.platform_secret(name)
+>                 = 'https://udrzhfgwqgolvyimbwto.supabase.co/functions/v1/notification-dispatch'
+>        end as correct
+>   from vault.secrets order by name;
+> ```
+>
+> Two rows, both `true`, no third row. To repair a bracketed value **without the
+> key travelling again** — no clipboard, no second paste:
+>
+> ```sql
+> select vault.update_secret(
+>   (select id from vault.secrets where name = 'notification_dispatch_key'),
+>   btrim(public.platform_secret('notification_dispatch_key'), '<>'));
+> ```
 
 **A `db reset` clears Vault**, so a local machine needs them again afterwards —
 `scripts/dev-mail.sh` does that for you, along with starting the dispatcher and

@@ -212,36 +212,60 @@ supabase functions deploy notification-dispatch --project-ref "$REF"
 #
 # Hence: both names spelled out, the order labelled, and no placeholder that
 # could be mistaken for the other field.
-cat <<'VAULT'
+# ANGLE BRACKETS GET PASTED. Twice now.
+#
+# The first version of this message used '<service role key>'. Sada replaced the
+# words and kept the brackets, storing `<sb_secret_…>` — 43 characters where 41
+# were wanted. It resolves, it looks set, and every delivery would have sent a
+# malformed Authorization header and 401'd silently.
+#
+# So: the URL is printed fully resolved, because this script knows the ref and a
+# placeholder it can fill in itself is a placeholder it should not print. The key
+# cannot be filled in — nothing here should ever hold it — so its marker is a
+# bare word with no punctuation to leave behind, and the message ends with the
+# check that catches a bad paste rather than trusting the paste.
+cat <<VAULT
   ── one thing left, and email is silent until it is done
 
   The dispatcher reads two secrets from Vault. They are NOT in this repo and
   never will be — a migration is a file in git. Without them every notification
   queues and none is delivered.
 
-  In the SQL editor of THIS project. Note the order: value first, name second.
+  In the SQL editor of THIS project. The order is value first, name second —
+  which reads backwards, and vault.secrets.name is NOT encrypted, so getting it
+  the wrong way round writes your key into a plaintext column.
 
     select vault.create_secret(
-      'https://<project-ref>.supabase.co/functions/v1/notification-dispatch',
+      'https://${REF}.supabase.co/functions/v1/notification-dispatch',
       'notification_dispatch_url', 'set at cutover');
 
     select vault.create_secret(
-      '<service role key>',
+      PASTE_KEY_HERE,
       'notification_dispatch_key', 'set at cutover');
 
-  vault.secrets.name is NOT encrypted. Putting a key in the second argument
-  stores it in the clear — check with:
+  Replace PASTE_KEY_HERE with the key in single quotes and nothing else:
+  no angle brackets, no spaces. It is 41 characters and starts sb_secret_.
 
-    select name from vault.secrets;
+  ── then verify, because every way of getting this wrong still looks set
 
-  Both names should appear there and nothing else. If a key is listed, it is in
-  the clear: issue a replacement key, delete the exposed one, then redo the
-  create_secret above with the new value. There is no "rotate" button on an
-  sb_secret_… key — Project Settings → API Keys only creates and deletes, and
-  those two steps together ARE the rotation.
+    select name,
+           public.platform_secret(name) is not null as resolves,
+           case name
+             when 'notification_dispatch_key'
+               then public.platform_secret(name) like 'sb_secret_%'
+             when 'notification_dispatch_url'
+               then public.platform_secret(name)
+                    = 'https://${REF}.supabase.co/functions/v1/notification-dispatch'
+           end as correct
+      from vault.secrets order by name;
+
+  Two rows, both true, and no third row. A key listed under 'name' is a key in
+  the clear — issue a replacement, delete the exposed one, and set it again.
+  There is no rotate button on an sb_secret_… key: Project Settings → API Keys
+  only creates and deletes, and doing both IS the rotation.
 
   RESEND_API_KEY is a different mechanism — an edge function secret:
-    supabase secrets set RESEND_API_KEY=re_... --project-ref <ref>
+    supabase secrets set RESEND_API_KEY=re_... --project-ref ${REF}
 
   See docs/operations/DEPLOYMENT.md.
 VAULT
