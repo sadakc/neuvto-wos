@@ -74,6 +74,14 @@ describe("what Lovable may never do", () => {
     // — which Lovable has every reason to do — would repoint the live site.
     ["the app's database target", ".env", /database the published app/],
     ["a per-environment env file", ".env.production", /database the published app/],
+    // Offered for real on 2 Aug 2026: Lovable read the schema off pre-production,
+    // found types.ts "missing" invitations and approval_queue, and proposed
+    // regenerating it — which would have deleted them.
+    [
+      "generated database types",
+      "src/integrations/supabase/types.ts",
+      /deletes types rather than adding/,
+    ],
   ])("blocks %s", (_label, file, expected) => {
     const r = evaluate({ authors: LOVABLE, changedFiles: [file] });
     expect(r.verdict).toBe("blocked");

@@ -110,3 +110,37 @@ bun scripts/lovable-gate-ci.mjs
 ```
 
 Run with **bun**, not node — there is no node on PATH here.
+
+---
+
+## ⚠️ Lovable reads a different database, and will tell you your types are wrong
+
+On 2 Aug 2026 Lovable reported that the hosted database was 19 migrations behind
+and that `src/integrations/supabase/types.ts` was therefore "lacking
+`invitations`, `leave_my_balances`, `approval_queue`", offering to apply the
+migrations and regenerate the types.
+
+**The first half was true. The second was exactly backwards.**
+
+`types.ts` was correct and `tsc` was clean — it had been regenerated from the
+local database, which carries every migration. What was behind was **Lovable
+Cloud**, the only database Lovable's sandbox can reach. `supabase gen types`
+describes whichever database it is pointed at, so regenerating from there would
+have **deleted** every type added since step 8 and broken the build for
+everything that uses them.
+
+This is the shape to watch for: Lovable is not wrong about what it can see. It is
+wrong about which database is authoritative, and a generated file makes that
+mistake invisible — the diff is enormous and mechanical, nobody reads it, and the
+failure surfaces as type errors in code nobody touched.
+
+`scripts/lovable-gate.mjs` now blocks `types.ts` outright for this reason.
+Regenerate it from a database that has every migration: locally after
+`supabase db reset`, or from production.
+
+**And check what the offer is really solving.** The genuine problem behind that
+warning was not the schema drift — it was `.env` still pointing the published app
+at pre-production, so the live site ran current code against a database seven
+steps old. Repointing `.env` fixed it in one line. Applying 19 migrations
+by hand into a database about to be demoted to pre-production would have taken an
+hour and fixed nothing that mattered.
