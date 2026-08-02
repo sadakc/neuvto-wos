@@ -40,6 +40,18 @@ const MESSAGES: Record<string, string> = {
 
 export default function OpeningBalances() {
   const [rows, setRows] = useState<Row[]>([]);
+  /**
+   * Bumped by every load, and part of each form's key so a reload REMOUNTS it.
+   *
+   * Without this the reload below is decorative. The inputs are uncontrolled —
+   * `defaultValue` applies once, at mount — and the row key is stable, so React
+   * keeps whatever is in the field. Watched by hand: entering 20 days against a
+   * 12-day entitlement, the database refuses it, the heading correctly reads
+   * "6 of 12 available", and the field goes on showing 20. Which is precisely
+   * the state the reload was written to prevent — a number that looks saved and
+   * is not.
+   */
+  const [version, setVersion] = useState(0);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -61,6 +73,7 @@ export default function OpeningBalances() {
         availableDays: Number(r.available_days),
       })),
     );
+    setVersion((v) => v + 1);
   }
 
   useEffect(() => {
@@ -165,6 +178,7 @@ export default function OpeningBalances() {
             </div>
 
             <form
+              key={`${r.employeeId}:${r.leaveTypeId}:${version}`}
               className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
               onSubmit={(e) => {
                 e.preventDefault();

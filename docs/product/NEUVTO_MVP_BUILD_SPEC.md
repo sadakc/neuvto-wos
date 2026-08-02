@@ -125,6 +125,8 @@ These override the source docs where they conflict. Deviations are deliberate an
 
 | D52 | **Access follows `is_active`.** `current_org_id()` returns null for a deactivated person, so every RLS policy refuses them; their token stays valid and buys nothing. `reactivate_employee` restores **access only**. The last administrator cannot be deactivated. | Deactivation removed their work and not their access — after being deactivated, a person read their profile, read their balances, and submitted a leave request. Session rows in `auth.sessions` are left alone deliberately: deleting them couples our migrations to GoTrue's internal schema |
 
+| D53 | **An invitation carries what somebody arrives with** — start date, reporting line (by email) and department, applied to the profile on acceptance. An import therefore creates **invitations, not people**, and manager links resolve in both directions so order in the file does not matter. An unknown manager warns and imports; it does not fail the row. | `invitation_accept` never set `joined_date`, so the column defaulted to `CURRENT_DATE` — the server's date, not the organisation's (D9). Measured on a real acceptance: somebody who joined in 2021 was given 8.0 and 5.3 days where the file's own date gives 12.0 and 8.0. Every seeded person looked right only because the seed writes profiles directly; anybody arriving the way D39 requires got today. `profiles.id` references `auth.users`, so no import can shortcut the invitation |
+
 **D15 is unchanged and still deferred.** Company identity (D45) is not theming.
 A name and a logo are _facts about the customer_, stored as columns and rendered
 by components that already exist. Per-organisation colour is a _rendering
@@ -630,23 +632,23 @@ documented, granted, and wired to nothing.** It has happened four times — `ens
 has its own CI check, `scripts/verify-functions-wired.sh`, which fails the build when a
 function our migrations define is referenced nowhere but its own definition.
 
-| Status   | Step | Content                                                                                             | Gate                                                                                                     |
-| -------- | ---- | --------------------------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------- |
-| **done** | 0    | Vitest + GitHub Actions CI                                                                          | Lint, typecheck, unit tests, and the SQL harness run on every push                                       |
-| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                                                   | Cross-org isolation verified by SQL as each role                                                         |
-| **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup                       | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                   |
-| **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                                         | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary |
-| **done** | 4    | Phase 1 — Approval Engine                                                                           | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                |
-| **done** | 5    | Phase 1 — Notification Engine + Resend                                                              | Template renders, email delivers, `notifications` row marked sent                                        |
-| **done** | 6    | Phase 2 — Module SDK + Leave schema, entitlement, lazy balances, locked submission                  | Balance invariant holds under **concurrent** submission; engine creates correct levels                   |
-| **done** | 7    | Phase 3 — Employee UI                                                                               | PRD AC1–AC3, AC5, AC7                                                                                    |
-| **done** | 8    | The first run — provisioning, invitations, admin config, PWA                                        | A provisioned workspace is usable end to end with no SQL; platform admins read zero tenant rows          |
-| **done** | 9    | **The platform is the product** — scheduled work, the module boundary, company identity, onboarding | The platform acceptance criteria below, in full                                                          |
-| **done** | 10   | Phase 3 — Manager UI + decision handling                                                            | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                           |
-| **done** | 11   | Guarded deactivation + reporting lines                                                              | PRD AC9; deactivating a manager with reports is blocked                                                  |
-| **done** | 12   | Access follows deactivation, and a way back                                                         | A deactivated person reads nothing and can do nothing; reactivation restores access only (D52)           |
-| —        | 13   | CSV employee import + opening balances                                                              | 50-row import dry-run reports per-row errors; overrides audited                                          |
-| —        | 14   | Reports 1, 3, 4 + CSV export                                                                        | —                                                                                                        |
+| Status   | Step | Content                                                                                             | Gate                                                                                                                                                 |
+| -------- | ---- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **done** | 0    | Vitest + GitHub Actions CI                                                                          | Lint, typecheck, unit tests, and the SQL harness run on every push                                                                                   |
+| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                                                   | Cross-org isolation verified by SQL as each role                                                                                                     |
+| **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup                       | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                                                               |
+| **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                                         | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary                                             |
+| **done** | 4    | Phase 1 — Approval Engine                                                                           | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                                                            |
+| **done** | 5    | Phase 1 — Notification Engine + Resend                                                              | Template renders, email delivers, `notifications` row marked sent                                                                                    |
+| **done** | 6    | Phase 2 — Module SDK + Leave schema, entitlement, lazy balances, locked submission                  | Balance invariant holds under **concurrent** submission; engine creates correct levels                                                               |
+| **done** | 7    | Phase 3 — Employee UI                                                                               | PRD AC1–AC3, AC5, AC7                                                                                                                                |
+| **done** | 8    | The first run — provisioning, invitations, admin config, PWA                                        | A provisioned workspace is usable end to end with no SQL; platform admins read zero tenant rows                                                      |
+| **done** | 9    | **The platform is the product** — scheduled work, the module boundary, company identity, onboarding | The platform acceptance criteria below, in full                                                                                                      |
+| **done** | 10   | Phase 3 — Manager UI + decision handling                                                            | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                                                                       |
+| **done** | 11   | Guarded deactivation + reporting lines                                                              | PRD AC9; deactivating a manager with reports is blocked                                                                                              |
+| **done** | 12   | Access follows deactivation, and a way back                                                         | A deactivated person reads nothing and can do nothing; reactivation restores access only (D52)                                                       |
+| **done** | 13   | Bringing a company's existing staff in — CSV import + opening balances                              | A row that fails is reported **and leaves nothing behind**; a start date in the file survives to the profile (D53); overrides audited by the trigger |
+| —        | 14   | Reports 1, 3, 4 + CSV export                                                                        | —                                                                                                                                                    |
 
 ### Testing
 
@@ -790,7 +792,7 @@ from every screen in the product to one that was never requested.
 17. Org with no manager configured submits → `APPROVER_UNRESOLVED`, never silently approved (D13)
 18. First balance read on 1 April of a new financial year → row created with correct pro-rated entitlement (D12)
 19. Deactivating a manager who still has direct reports → blocked with a clear error (D14)
-20. CSV import where row 7 has a bad email → rows 1–6 and 8+ import, row 7 reported, no partial employee created
+20. **CSV import where row 7 has a bad email** → rows 1–6 and 8+ import, row 7 reported, and **no invitation exists for row 7** — asserted as a count, because "reported an error" and "left nothing behind" are different claims and only the second one protects the customer's next import
 21. **A workspace provisioned five minutes ago is usable**: default chain exists, a leave type created by the admin produces a balance on first READ, and a request against a no-approval type comes back approved with the days moved (D36/D37/D38)
 22. Invitation accepted → profile and role created; the same token refused a second time, and an expired, revoked or wrong-recipient token gives the identical message (D39)
 23. **An address already in another workspace is refused at acceptance, and the inviting admin's view carries no reason for it** (D40)
@@ -815,6 +817,10 @@ from every screen in the product to one that was never requested.
 41. **The sign-in screen can tell deactivated apart from never-invited.** `my_account_status()` answers `deactivated`, `active` and `none` for the three cases, so somebody whose access was removed is not told to seek an invitation that will not help
 42. **Reactivation restores access and nothing else.** Their balances are readable again; the reports that moved to the successor stay with the successor, asserted by count before and after (D52)
 43. **The last administrator cannot be deactivated** — `LAST_ADMIN`. Without it a workspace can be left with nobody able to administer it and nobody able to undo that, because reactivation is admin-only
+44. **A start date in the file reaches the profile.** Accept an invitation carrying 2021 and the entitlement is a full year; the same person with the old behaviour gets today's date pro-rated. Asserted as both numbers with a guard that they genuinely differ, because an assertion that only checks the new number passes just as happily when nothing is pro-rated at all (D53)
+45. **Order in the file does not matter.** A report accepts _before_ their manager exists and is attached when the manager arrives. Sabotage by removing the reverse pass — the assertion must go red, since the forward pass alone still makes the ordinary case pass (D53)
+46. **An unknown manager warns and imports** — `manager_id` stays null and the person joins, rather than the row failing. Consistent with D13, which refuses their first leave request rather than crashing
+47. **An opening balance moves what it should and cannot overdraw.** `used_days` reduces `available_days` by exactly that much and leaves `entitled_days` alone; a number beyond entitlement is refused by `balance_not_overdrawn` (D31), not by a check in the browser. The override is traceable through `audit_logs` carrying the previous value, written by the trigger rather than by the function
 
 ---
 

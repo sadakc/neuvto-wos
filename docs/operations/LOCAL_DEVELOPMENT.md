@@ -100,6 +100,32 @@ field, the submit button is enabled, and **no network request is made at all**.
 Select elements do not have the problem — setting `value` on a `<select>` does
 notify React. It is text inputs specifically.
 
+**Click the submit button too.** Pressing Enter in the field, or ending a `type`
+with a newline, does not submit through this tooling. The form simply sits there
+and it reads as a broken screen.
+
+**File inputs have no upload tool in the in-app browser.** Hand the input a
+constructed `File` instead — this fires a real `change` event, so React sees it:
+
+```js
+const dt = new DataTransfer();
+dt.items.add(new File([csv], "staff.csv", { type: "text/csv" }));
+input.files = dt.files;
+input.dispatchEvent(new Event("change", { bubbles: true }));
+```
+
+**The mobile navigation bar overlays the bottom of the viewport.** A button whose
+coordinates fall in the last ~55px is behind it, and the click lands on a nav
+link instead — the page navigates away and the action never happens. Scroll the
+control clear of the bar before clicking rather than trusting the coordinates a
+`getBoundingClientRect()` returns.
+
+**Screenshot pixels are not CSS pixels.** The screenshot comes back at 2× the
+viewport, and `computer` clicks in screenshot space. Coordinates read from the
+DOM must be doubled, and a click by a `ref` captured before the last re-render
+lands wherever that element used to be — which once cost an accidental approval.
+Re-read the page after anything that re-renders.
+
 ## Testing on a real phone
 
 ```bash
