@@ -14,7 +14,7 @@ build against a broken database.
 | --------------------- | ---------------------- | --------------------------------------------------------------- | ------------------------------ |
 | **Local**             | —                      | `supabase start` · `.env.local` · `bun run harness`             | Whatever your migrations build |
 | **Lovable Cloud**     | `vkyvzhgigncranprhidn` | `neuvto.lovable.app` and `bun run dev` **without** `.env.local` | Real data — treat as shared    |
-| **`neuvto-wos-prod`** | ap-south-1 (Mumbai)    | nothing yet                                                     | Cutover target, still empty    |
+| **`neuvto-wos-prod`** | `udrzhfgwqgolvyimbwto` | `bash scripts/prod-cutover.sh` — the repo is linked to this one | Cutover target, still empty    |
 
 > ## ⚠️ The Supabase dashboard shows you the WRONG project
 >
@@ -50,7 +50,7 @@ trap — the default `.env` points at the **shared** database.
 
 ---
 
-## Why `supabase db push` does not work here
+## Why `supabase db push` does not work **for Lovable Cloud**
 
 The Lovable Cloud project is not in Sada's own Supabase organisation. The CLI
 cannot authenticate against it, so `supabase link` + `supabase db push` — the
@@ -58,6 +58,11 @@ normal path, and the one assumed by every Supabase tutorial — is unavailable.
 
 Migrations reach Lovable Cloud one way only: **executing the SQL through
 Lovable's own database tool**, then recording that it happened.
+
+**This limitation is about Lovable Cloud alone.** `neuvto-wos-prod` _is_ in
+Sada's organisation, the CLI can authenticate against it, and `db push` is the
+correct way to reach it — see "Cutting over to `neuvto-wos-prod`" below. Reading
+this section as "the CLI never works" is what left the cutover parked.
 
 ---
 
@@ -98,6 +103,91 @@ It is the `version` that prevents re-application.
 **4 · Confirm the published site still loads.** `neuvto.lovable.app` — the
 landing page uses `demo_requests`, which no platform migration touches, so a
 broken landing page means something unexpected happened.
+
+---
+
+## Cutting over to `neuvto-wos-prod`
+
+One command, because doing it by hand failed three times for three unrelated
+reasons and each error pointed away from its own cause:
+
+```bash
+bash scripts/prod-cutover.sh --check
+```
+
+`--check` connects, names the project it is pointed at, reports table and
+migration counts, and changes nothing. Run it first, every time. Then:
+
+```bash
+bash scripts/prod-cutover.sh
+```
+
+which pushes migrations and deploys `notification-dispatch`. Add `--harness` to
+seed and verify afterwards — that flag refuses on any database holding data.
+
+### The three things that went wrong by hand
+
+**1 · zsh eats a password containing `*`.** `*`, `?` and `[` are glob patterns.
+Typed unquoted, the shell tries to expand them, finds no matching file, and
+**refuses to run the command at all**:
+
+```
+zsh: no matches found: postgresql://postgres:Secret*Pass@db...
+```
+
+Nothing connected. Nothing was wrong with the password. Single-quoting fixes it;
+the script avoids the question entirely by reading the password with `read -rs`,
+so it is never a shell word, never in `argv`, never in `ps`, and never in
+`~/.zsh_history`.
+
+**2 · The direct database host is IPv6-only.** `db.<ref>.supabase.co` has an
+AAAA record and **no A record**. It resolves and connects from a Mac with IPv6
+egress — verified — and is unreachable from anything routing over IPv4, which
+includes Docker containers and many corporate and hotel networks. The symptom is
+a bare "failed to connect" that reads exactly like a wrong password. Use
+`--pooler` for an IPv4 route; note that `neuvto-wos-prod` currently has **no
+pooler tenant provisioned**, so the direct host is the only route today.
+
+**3 · `supabase db push --linked` 403s on "Initialising login role".**
+`SUPABASE_DB_PASSWORD` in the environment bypasses that path, which is what the
+script sets.
+
+### Telling the three apart
+
+The script distinguishes them, because they need opposite responses:
+
+| psql says                        | Means                                                     | Do                            |
+| -------------------------------- | --------------------------------------------------------- | ----------------------------- |
+| `password authentication failed` | The network is **fine** — it got far enough to be told no | Check the password is current |
+| `Connection refused` / timeout   | Never reached the host                                    | IPv4? try `--pooler`          |
+| `tenant/user ... not found`      | Reached the pooler; it has no tenant here                 | Drop `--pooler`               |
+
+Repeated failed attempts make the direct host start refusing connections
+outright for a while. If a wrong password suddenly becomes `Connection refused`,
+that is throttling, not a network change — wait rather than reconfigure.
+
+### Rotate first
+
+> The database password was pasted into a chat transcript on 2 Aug 2026 and must
+> be treated as compromised. Rotate it before the cutover:
+> **Dashboard → Project Settings → Database → Reset database password.**
+> The old one stops working immediately, which is the point.
+
+### The harness against prod
+
+`scripts/harness.sh` seeds by **truncating every table it owns**. Two guards
+stand in front of that, and the second exists because the first is one flag away
+from being defeated:
+
+1. A non-local target refuses without `--allow-remote`.
+2. A non-local target that **holds any profile or organisation rows** refuses
+   **even with** `--allow-remote`. Emptiness is a fact the database can be asked
+   for; no flag can talk it out of the answer.
+
+Run it against prod once, while prod is empty, to prove the schema behaves in
+the environment customers will use. Then clear the seed data before provisioning
+anybody — the harness leaves it behind deliberately, so a failure can be
+inspected.
 
 ---
 

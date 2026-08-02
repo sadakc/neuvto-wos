@@ -88,6 +88,35 @@ echo "Neuvto WOS harness"
 echo "psql:   $PSQL"
 echo "target: ${DB_URL%%\?*}"
 
+# ------------------------------------------------- a remote target must be EMPTY
+#
+# The guard above asks whether the target is local, and takes --allow-remote as
+# the answer. That makes one mistyped flag the only thing between a customer's
+# data and a truncate — and the flag is exactly what somebody adds when the
+# script refuses and they are in a hurry.
+#
+# So ask the database instead of the operator. Emptiness is a fact it can be
+# queried for, and no flag can talk it out of the answer. A staging environment
+# is empty and passes; a workspace with one real person in it does not.
+if [[ "$DB_URL" != *"127.0.0.1"* && "$DB_URL" != *"localhost"* ]]; then
+  OCCUPIED=$("$PSQL" "$DB_URL" -tAc \
+    "select coalesce((select count(*) from public.profiles),0)
+          + coalesce((select count(*) from public.organizations),0);" 2>/dev/null || echo "0")
+  if [[ "${OCCUPIED//[[:space:]]/}" != "0" ]]; then
+    cat >&2 <<MSG
+
+  REFUSING TO RUN — and --allow-remote does not override this.
+
+  The target holds ${OCCUPIED} profile/organisation rows, and the seed truncates
+  every table it owns. If this is genuinely a throwaway environment, empty it
+  first; the refusal is about what is IN the database, not what you meant.
+
+MSG
+    exit 1
+  fi
+  echo "remote target is empty — safe to seed"
+fi
+
 # ---------------------------------------------------------------- schema present?
 # Until build step 1 creates the platform tables there is genuinely nothing to
 # verify, and failing would block every PR for no reason. Skip cleanly instead —
