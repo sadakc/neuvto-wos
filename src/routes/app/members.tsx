@@ -234,6 +234,15 @@ function MembersPage() {
         <div className="mt-4">
           <InviteTeam onInvited={() => void load()} />
         </div>
+
+        <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
+          Bringing a whole team across?{" "}
+          <a href="/app/import" className="text-foreground underline underline-offset-4">
+            Import them from a spreadsheet
+          </a>{" "}
+          — with the start dates they actually joined on, which is what their leave for the year is
+          worked out from.
+        </p>
       </section>
 
       {error && (

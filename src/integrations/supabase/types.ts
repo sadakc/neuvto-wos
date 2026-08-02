@@ -465,10 +465,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           deleted_at: string | null
+          department_id: string | null
           email: string
           expires_at: string
           full_name: string | null
           id: string
+          joined_date: string | null
+          manager_email: string | null
           organization_id: string
           phone: string | null
           phone_normalized: string | null
@@ -484,10 +487,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          department_id?: string | null
           email: string
           expires_at?: string
           full_name?: string | null
           id?: string
+          joined_date?: string | null
+          manager_email?: string | null
           organization_id: string
           phone?: string | null
           phone_normalized?: string | null
@@ -503,10 +509,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
+          department_id?: string | null
           email?: string
           expires_at?: string
           full_name?: string | null
           id?: string
+          joined_date?: string | null
+          manager_email?: string | null
           organization_id?: string
           phone?: string | null
           phone_normalized?: string | null
@@ -517,6 +526,13 @@ export type Database = {
           updated_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "invitations_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "invitations_organization_id_fkey"
             columns: ["organization_id"]
@@ -1410,8 +1426,11 @@ export type Database = {
       invitation_accept: { Args: { _token: string }; Returns: string }
       invitation_create: {
         Args: {
+          _department_id?: string
           _email: string
           _full_name?: string
+          _joined_date?: string
+          _manager_email?: string
           _phone?: string
           _role?: Database["public"]["Enums"]["app_role"]
         }
@@ -1423,6 +1442,20 @@ export type Database = {
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
+      leave_all_balances: {
+        Args: never
+        Returns: {
+          available_days: number
+          carryforward_days: number
+          employee_id: string
+          employee_name: string
+          entitled_days: number
+          fy_label: string
+          leave_type_id: string
+          leave_type_name: string
+          used_days: number
+        }[]
+      }
       leave_approval_detail: {
         Args: { _approval_request_id: string }
         Returns: {
@@ -1461,6 +1494,15 @@ export type Database = {
           reserved_days: number
           used_days: number
         }[]
+      }
+      leave_set_opening_balance: {
+        Args: {
+          _carryforward: number
+          _employee_id: string
+          _leave_type_id: string
+          _used: number
+        }
+        Returns: undefined
       }
       leave_submit: {
         Args: {
@@ -1583,6 +1625,14 @@ export type Database = {
       resolve_notification_recipients: {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
+      }
+      working_days_excluded: {
+        Args: { _from: string; _org_id: string; _to: string }
+        Returns: {
+          day: string
+          label: string
+          reason: string
+        }[]
       }
     }
     Enums: {

@@ -12,7 +12,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
-import { getWorkingDays } from "@/platform/calendar";
+import {
+  getWorkingDays,
+  getExcludedDays,
+  describeExcludedDays,
+  type ExcludedDay,
+} from "@/platform/calendar";
 import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { getLeaveTypes, getMyBalances, submitLeave } from "../handlers";
@@ -40,6 +45,7 @@ export default function ApplyLeave() {
   const [reason, setReason] = useState("");
 
   const [workingDays, setWorkingDays] = useState<number | null>(null);
+  const [excluded, setExcluded] = useState<ExcludedDay[]>([]);
   const [countingDays, setCountingDays] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState("");
@@ -69,17 +75,29 @@ export default function ApplyLeave() {
   useEffect(() => {
     if (!user || !fromDate || !toDate || toDate < fromDate) {
       setWorkingDays(null);
+      setExcluded([]);
       return;
     }
     let cancelled = false;
     setCountingDays(true);
     const timer = setTimeout(() => {
-      getWorkingDays(user.organizationId, fromDate, toDate)
-        .then((d) => {
-          if (!cancelled) setWorkingDays(d);
+      // The count and the reason together. If the explanation fails the count
+      // still shows — a missing sentence is worse than nothing, but a missing
+      // number stops the form.
+      Promise.all([
+        getWorkingDays(user.organizationId, fromDate, toDate),
+        getExcludedDays(user.organizationId, fromDate, toDate).catch(() => []),
+      ])
+        .then(([d, x]) => {
+          if (cancelled) return;
+          setWorkingDays(d);
+          setExcluded(x);
         })
         .catch(() => {
-          if (!cancelled) setWorkingDays(null);
+          if (!cancelled) {
+            setWorkingDays(null);
+            setExcluded([]);
+          }
         })
         .finally(() => {
           if (!cancelled) setCountingDays(false);
@@ -90,6 +108,9 @@ export default function ApplyLeave() {
       clearTimeout(timer);
     };
   }, [user, fromDate, toDate]);
+
+  /** "10 to 15 August is 6 days — why am I charged 5?" See describeExcludedDays. */
+  const exclusionNote = useMemo(() => describeExcludedDays(excluded), [excluded]);
 
   const available = balance?.availableDays ?? null;
   const remaining = available !== null && workingDays !== null ? available - workingDays : null;
@@ -279,6 +300,11 @@ export default function ApplyLeave() {
                 Remaining: <strong className="tabular-nums">{remaining}</strong>
               </span>
             </span>
+          )}
+          {exclusionNote && !countingDays && (
+            <p data-testid="exclusion-note" className="mt-2 text-xs text-muted-foreground">
+              {exclusionNote}
+            </p>
           )}
         </div>
       )}

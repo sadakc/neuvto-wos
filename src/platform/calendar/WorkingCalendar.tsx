@@ -114,6 +114,22 @@ export function WorkingCalendar({
   const s = settings!;
   const workingDays = DAYS.filter((_, i) => !s.weekendDays.includes(i)).length;
 
+  /**
+   * What a long weekend actually costs under the days currently selected.
+   *
+   * This read "Friday to Monday costs 2 days rather than 4" — hardcoded, and
+   * true only for a Saturday/Sunday week. Sada switched Acme to a six-day week
+   * (Sunday only) and the line went on claiming 2 when the answer is 3: Friday,
+   * Saturday and Monday are all worked, and only Sunday is not.
+   *
+   * Counted here rather than stated, over the same four calendar days the
+   * sentence names — Friday, Saturday, Sunday, Monday, which are indices
+   * 5, 6, 0, 1. An administrator changing the week is the one person who most
+   * needs this number to be theirs.
+   */
+  const FRI_TO_MON = [5, 6, 0, 1];
+  const longWeekendCost = FRI_TO_MON.filter((i) => !s.weekendDays.includes(i)).length;
+
   return (
     <div className="space-y-8">
       <section>
@@ -161,7 +177,11 @@ export function WorkingCalendar({
               Don&apos;t count non-working days as leave
             </span>
             <span className="block text-xs text-muted-foreground">
-              Friday to Monday costs 2 days rather than 4
+              {longWeekendCost === 4
+                ? "Nothing is excluded — every day of the week is worked"
+                : `Friday to Monday costs ${longWeekendCost} ${
+                    longWeekendCost === 1 ? "day" : "days"
+                  } rather than 4`}
             </span>
           </span>
         </label>
