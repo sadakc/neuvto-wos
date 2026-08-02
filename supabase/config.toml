@@ -1,4 +1,16 @@
-project_id = "vkyvzhgigncranprhidn"
+# Names the LOCAL Docker containers and nothing else — it targets no remote
+# project. It used to read `vkyvzhgigncranprhidn`, the Lovable Cloud project,
+# which made this the single most misleading line in the repo: it read like a
+# deployment target, and Sada reasonably concluded that work was being pushed
+# into a database he does not own.
+#
+# What actually decides a remote target:
+#   supabase/.temp/project-ref   `--linked` obeys this — gitignored, per-machine
+#   --project-ref <ref>          an explicit flag, which beats everything
+#   .env                         which database the APP talks to
+#
+# A neutral name here can never be mistaken for any of them.
+project_id = "neuvto-wos"
 
 # Local-development configuration. `supabase start` reads this; it is not pushed
 # to the hosted project, so anything here must also be configured there before

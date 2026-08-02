@@ -52,6 +52,23 @@ export const FORBIDDEN_PATHS = [
     test: (f) => f.startsWith("docs/standards/"),
     reason: "changed the standards it is meant to follow",
   },
+  {
+    // `.env` is committed, and it is the ONLY thing that decides which database
+    // the published app talks to — `src/integrations/supabase/client.ts` reads
+    // VITE_SUPABASE_URL and nothing else. Since production moved to a project
+    // Lovable does not own, a regenerated `.env` in a Lovable pull request
+    // would silently point the live site back at Lovable Cloud, and every
+    // symptom of that is a data problem rather than a config one: real
+    // customers signing in to an empty workspace, or writing into the wrong
+    // database entirely.
+    //
+    // Lovable has legitimate reasons to want to write this file — it is how its
+    // own Cloud integration wires itself up. That is exactly why the change has
+    // to be seen rather than trusted.
+    test: (f) => f === ".env" || f.startsWith(".env."),
+    reason:
+      "changed .env — that file alone decides which database the published app talks to, and production is no longer a project Lovable owns",
+  },
 ];
 
 /**

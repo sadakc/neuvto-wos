@@ -2,15 +2,25 @@
 
 ## The one thing that will catch you
 
-**`.env` points at the hosted Lovable Cloud database, not your machine.**
+**`.env` points at PRODUCTION, not your machine.**
 
-Lovable commits `.env` with the hosted project's URL and publishable key. So a
-plain `bun run dev` talks to the **shared** database that also serves
-`neuvto.lovable.app`. Signing up there creates real auth users and triggers real
-OTP emails — I did exactly this once and had to delete a stray account.
+`.env` is committed and names the database that serves `neuvto.lovable.app`. It
+used to name Lovable Cloud — shared, but not production — and a stray signup there
+cost nothing worse than deleting an account. Since the cutover it names real
+customer data, so `bun run dev` runs `scripts/guard-dev-target.sh` first and
+**refuses to start** when nothing overrides `.env`:
 
-Create a `.env.local` (gitignored via `*.local`, and read by Vite in preference
-to `.env`):
+```
+REFUSING TO START.
+.env points the dev server at PRODUCTION
+```
+
+The override, if you genuinely mean it — reproducing something that only happens
+there, with nobody else on it — is `I_MEAN_PRODUCTION=1 bun run dev`. It prints a
+warning and proceeds.
+
+For ordinary work, create a `.env.local` (gitignored via `*.local`, and read by
+Vite in preference to `.env`):
 
 ```bash
 supabase start                    # prints PUBLISHABLE_KEY
@@ -24,10 +34,19 @@ SUPABASE_PUBLISHABLE_KEY="<same key>"
 EOF
 ```
 
-**Do not put `SUPABASE_PROJECT_ID` in there.** The Supabase CLI reads `.env`
-files from the working directory, so it changes which local project `supabase
-start` and `supabase stop` operate on — leaving orphaned containers holding
+**Do not put `SUPABASE_PROJECT_ID` in there — or in `.env`.** The Supabase CLI
+reads `.env` files from the working directory, and the unprefixed variable
+**silently overrides `project_id` in `supabase/config.toml`**, which is what
+names the local Docker containers. `supabase stop` then filters on one name while
+the running containers hold another, so nothing stops and the old stack keeps
 port 54322.
+
+This warning existed here for `.env.local` while the committed `.env` was doing
+exactly what it warns against: it carried `SUPABASE_PROJECT_ID="vkyvzhgigncranprhidn"`,
+so the local stack ran as `supabase_db_vkyvzhgigncranprhidn` no matter what
+`config.toml` said — and the repo looked, convincingly, like it was pointed at
+the Lovable-owned project. Nothing in the application reads the unprefixed
+variable; `src/lib/mcp/index.ts` uses the `VITE_`-prefixed one.
 
 ## Getting started
 

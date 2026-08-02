@@ -52,6 +52,78 @@ monitors the mailbox, forward it to Sada.
 
 ---
 
+## ⚠️ Sending and receiving are separate. `neuvto.com` only sends.
+
+Checked on 2 Aug 2026 against both Google's and Cloudflare's resolvers:
+**`neuvto.com` has no MX record at all.** Mail addressed to the domain is
+rejected — there is nowhere for it to go.
+
+Everything above still works. Resend needs DKIM, SPF and DMARC, all of which are
+present and correct, and **MX has no bearing on outbound delivery**. What breaks
+is everything inbound, and the product depends on inbound in two places it does
+not look like it does:
+
+| Address                    | Who writes to it                                            | Today   |
+| -------------------------- | ----------------------------------------------------------- | ------- |
+| `hello@neuvto.com`         | Anyone signing in with no workspace — `src/routes/auth.tsx` | bounces |
+| `notifications@neuvto.com` | Any customer replying to a notification                     | bounces |
+
+The first is the worse one. That screen is shown to a prospective customer, or to
+an employee whose invitation went astray — people with **no other route to us** —
+and it tells them, in as many words, to get in touch at an address that cannot
+receive their message. We never learn they tried.
+
+The second is the one this document already promised: `noreply@` was rejected on
+purpose, precisely so replies would reach a person. Without MX they never did.
+
+### The fix is DNS, and it is not in this repo
+
+**Nothing here costs money.** GoDaddy runs the zone
+(`ns65/ns66.domaincontrol.com`), but its own email forwarding is bundled with a
+paid Email plan — rejected on 2 Aug 2026, because nothing is paid for before the
+MVP ships. Records go into GoDaddy's DNS panel; the mailbox lives elsewhere.
+
+| Option                      | Cost | Receives | Sends as `hello@` | Nameserver move |
+| --------------------------- | ---- | -------- | ----------------- | --------------- |
+| **Zoho Mail free tier**     | free | yes      | **yes**           | no              |
+| ImprovMX / forwardemail.net | free | yes      | no                | no              |
+| Cloudflare Email Routing    | free | yes      | no                | **yes**         |
+| GoDaddy Email               | paid | yes      | yes               | no              |
+
+Zoho is the one to take: a real mailbox, replies leaving from the domain rather
+than a personal Gmail, and DNS stays where it is. Cloudflare's is excellent and
+free but means moving nameservers off GoDaddy, which puts the Resend records at
+risk for an address that has no mail in it yet.
+
+**Use the records the provider's own wizard shows you.** Zoho runs regional data
+centres with different hostnames — an Indian signup lands on `zoho.in`
+(`mx.zoho.in`, `mx2.zoho.in`, `mx3.zoho.in`), not the `zoho.com` set that most
+blog posts and most of this industry's documentation assume. Copying the wrong
+region's MX produces a domain that verifies and never delivers.
+
+**Do not touch `resend._domainkey`, `send`, or `_dmarc`.** They are what make
+outbound work, and MX at the root does not collide with any of them.
+
+**If you also want to send as `hello@`**, two more records and one interaction:
+
+- **SPF at the root**, which does not exist today — add the provider's include at
+  `@`. It does not disturb Resend, whose return-path is `send.neuvto.com` with
+  its own SPF.
+- **The provider's DKIM.** Required, not optional, because `_dmarc` is
+  `p=quarantine`: mail from `hello@` passing neither SPF nor DKIM alignment is
+  quarantined. Half-configured sending is worse than forwarding, because it
+  silently lands in spam instead of visibly bouncing.
+
+Pure forwarding needs neither — it changes nothing about who may send.
+
+Verify from anywhere, no credentials and no account needed:
+
+```bash
+dig +short MX neuvto.com
+```
+
+---
+
 ## Two email systems, doing different jobs
 
 |                             | Sign-in codes (OTP)                   | Notifications                                              |
@@ -90,8 +162,13 @@ never placed in `.env`, and never exposed to the browser — anything prefixed
 `VITE_` is compiled into the client bundle and is effectively public.
 
 ```bash
-supabase secrets set RESEND_API_KEY=re_... --project-ref vkyvzhgigncranprhidn
+# production
+supabase secrets set RESEND_API_KEY=re_... --project-ref udrzhfgwqgolvyimbwto
 ```
+
+Pre-production (`vkyvzhgigncranprhidn`) is Lovable-owned and invisible to the
+CLI — set its secret through Lovable → project → Cloud/Backend → secrets instead.
+Each environment needs its own; a key set on one does nothing for the other.
 
 If the key is ever pasted into a chat, a commit, or a support ticket, revoke it
 in Resend and issue a new one. Revocation is instant and free; a leaked sending
@@ -128,7 +205,8 @@ the first claims nothing.
 ### Running it
 
 ```bash
-supabase functions deploy notification-dispatch --project-ref vkyvzhgigncranprhidn
+# production — or just run scripts/prod-cutover.sh, which does this
+supabase functions deploy notification-dispatch --project-ref udrzhfgwqgolvyimbwto
 ```
 
 It requires `Authorization: Bearer <service role key>` — without that the queue
