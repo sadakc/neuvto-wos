@@ -1626,6 +1626,14 @@ export type Database = {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
       }
+      working_days_excluded: {
+        Args: { _from: string; _org_id: string; _to: string }
+        Returns: {
+          day: string
+          label: string
+          reason: string
+        }[]
+      }
     }
     Enums: {
       app_role: "org_admin" | "hr_admin" | "manager" | "employee"

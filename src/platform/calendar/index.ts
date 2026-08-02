@@ -21,8 +21,9 @@ export interface Holiday {
 
 /**
  * Working days between two dates, inclusive, honouring the organisation's
- * weekend and holiday configuration. Friday to Monday is 2 days when weekends
- * are excluded, not 4 (PRD Case 4).
+ * weekend and holiday configuration. Friday to Monday costs 2 days on a
+ * Saturday/Sunday week and 3 on a six-day one (PRD Case 4) — which is the point
+ * of asking the database rather than counting here.
  */
 export async function getWorkingDays(
   organizationId: string,
@@ -36,6 +37,74 @@ export async function getWorkingDays(
   });
   if (error) throw mapCalendarError(error, "getWorkingDays");
   return Number(data ?? 0);
+}
+
+/** A day in the range that costs nothing, and why. */
+export interface ExcludedDay {
+  day: string;
+  reason: "weekend" | "holiday";
+  label: string;
+}
+
+/**
+ * Which days in a range don't cost leave, and why.
+ *
+ * Sada applied for 10–15 August, counted six days, was charged five, and
+ * reported it as broken arithmetic. Five was right — Acme works six days, so
+ * Saturday the 15th is worked, but it is Independence Day. The screen never
+ * said so, and no employee is going to reason their way from "Requested: 5" to
+ * a public holiday; they conclude the product cannot count.
+ *
+ * Deliberately a second round trip rather than a widened `calculate_working_days`:
+ * that function is called by `leave_submit` and the invariant suite on every
+ * request, and this is presentation.
+ */
+export async function getExcludedDays(
+  organizationId: string,
+  from: string,
+  to: string,
+): Promise<ExcludedDay[]> {
+  const { data, error } = await supabase.rpc("working_days_excluded", {
+    _org_id: organizationId,
+    _from: from,
+    _to: to,
+  });
+  if (error) throw mapCalendarError(error, "getExcludedDays");
+  return (data ?? []).map((r) => ({
+    day: r.day,
+    reason: r.reason as ExcludedDay["reason"],
+    label: r.label,
+  }));
+}
+
+/**
+ * The excluded days as a sentence an employee can act on.
+ *
+ * A pure function, and separate from the component, because this is the exact
+ * string that decides whether somebody believes the number next to it. The
+ * cases below are the ones that actually occur, and each has a test.
+ *
+ * Holidays are named first: a weekend is a rule the employee already knows, and
+ * a public holiday landing inside their leave is the surprise. Individual
+ * weekend days are named while there is one — "15 Aug is a Saturday" — and
+ * collapsed to a count beyond that, because listing six Sundays explains
+ * nothing that "6 non-working days" doesn't.
+ */
+export function describeExcludedDays(
+  excluded: ExcludedDay[],
+  format: (iso: string) => string = (iso) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString(undefined, { day: "numeric", month: "short" }),
+): string {
+  if (excluded.length === 0) return "";
+
+  const holidays = excluded.filter((e) => e.reason === "holiday");
+  const weekends = excluded.filter((e) => e.reason === "weekend");
+
+  const parts = holidays.map((h) => `${format(h.day)} is ${h.label}`);
+  if (weekends.length === 1) parts.push(`${format(weekends[0].day)} is a ${weekends[0].label}`);
+  else if (weekends.length > 1) parts.push(`${weekends.length} non-working days`);
+
+  return `Not counted: ${parts.join(", ")}.`;
 }
 
 /** Financial-year label, e.g. `2026-27` for an April start or `2026` for January. */

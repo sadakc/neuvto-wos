@@ -168,6 +168,43 @@ begin
       raise notice 'ok: seed contains a holiday that genuinely tests exclusion';
     end if;
 
+    ------------------------------------------------- the count explains itself
+    -- working_days_excluded is the complement of calculate_working_days. If the
+    -- two ever drift, the apply screen tells an employee that five days were
+    -- charged for reasons that do not add up to the days they lost — worse than
+    -- saying nothing, because it looks authoritative.
+    --
+    -- Asserted as a partition over every window in a year rather than on one
+    -- example: counted + excluded must equal the calendar days, always. A single
+    -- example passes happily when one of the two ignores holidays entirely.
+    if to_regprocedure('public.working_days_excluded(uuid,date,date)') is not null then
+      select count(*) into n
+      from generate_series('2026-04-01'::date,'2027-03-01'::date,'1 day') f,
+           lateral (select (f + (i||' days')::interval)::date as t
+                      from generate_series(0,20) i) g
+      where public.calculate_working_days('00000000-0000-0000-0000-0000000000a0', f::date, g.t)
+          + (select count(*) from public.working_days_excluded(
+               '00000000-0000-0000-0000-0000000000a0', f::date, g.t))
+         <> (g.t - f::date + 1);
+      if n > 0 then
+        raise exception
+          'INVARIANT FAIL: % windows where the days counted and the days explained do not add up', n;
+      end if;
+      raise notice 'ok: every day is either counted or explained, over a year of windows';
+
+      -- The reason has to be the RIGHT one. Sat 15 Aug 2026 is Independence Day
+      -- AND a weekend under the seed's five-day week, so it must be reported as
+      -- the weekend — the structural rule, which would have excluded it anyway.
+      -- Reported as the holiday, an administrator would believe deleting the
+      -- holiday gives the day back.
+      if (select reason from public.working_days_excluded(
+            '00000000-0000-0000-0000-0000000000a0','2026-08-15','2026-08-15')) <> 'weekend' then
+        raise exception
+          'INVARIANT FAIL: a day that is both a holiday and a non-working day must be reported as the non-working day';
+      end if;
+      raise notice 'ok: a day that is both is explained by the rule that would have excluded it anyway';
+    end if;
+
     ---------------------------------------------------------------- empty ranges
     if public.calculate_working_days('00000000-0000-0000-0000-0000000000a0','2026-08-08','2026-08-09') <> 0 then
       raise exception 'INVARIANT FAIL: a weekend-only range must be 0 working days';
