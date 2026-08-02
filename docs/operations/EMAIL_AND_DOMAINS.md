@@ -52,6 +52,62 @@ monitors the mailbox, forward it to Sada.
 
 ---
 
+## ⚠️ Sending and receiving are separate. `neuvto.com` only sends.
+
+Checked on 2 Aug 2026 against both Google's and Cloudflare's resolvers:
+**`neuvto.com` has no MX record at all.** Mail addressed to the domain is
+rejected — there is nowhere for it to go.
+
+Everything above still works. Resend needs DKIM, SPF and DMARC, all of which are
+present and correct, and **MX has no bearing on outbound delivery**. What breaks
+is everything inbound, and the product depends on inbound in two places it does
+not look like it does:
+
+| Address                    | Who writes to it                                            | Today   |
+| -------------------------- | ----------------------------------------------------------- | ------- |
+| `hello@neuvto.com`         | Anyone signing in with no workspace — `src/routes/auth.tsx` | bounces |
+| `notifications@neuvto.com` | Any customer replying to a notification                     | bounces |
+
+The first is the worse one. That screen is shown to a prospective customer, or to
+an employee whose invitation went astray — people with **no other route to us** —
+and it tells them, in as many words, to get in touch at an address that cannot
+receive their message. We never learn they tried.
+
+The second is the one this document already promised: `noreply@` was rejected on
+purpose, precisely so replies would reach a person. Without MX they never did.
+
+### The fix is DNS, and it is not in this repo
+
+GoDaddy runs the zone (`ns65/ns66.domaincontrol.com`), and its email-forwarding
+product writes the MX records itself — set up the forward through **My Products →
+neuvto.com → Email**, rather than hand-adding MX alongside it, which produces
+duplicates that half-work.
+
+Only if the UI does not do it:
+
+| Type | Name | Value                         | Priority |
+| ---- | ---- | ----------------------------- | -------- |
+| MX   | `@`  | `smtp.secureserver.net`       | 0        |
+| MX   | `@`  | `mailstore1.secureserver.net` | 10       |
+
+**Do not touch `resend._domainkey`, `send`, or `_dmarc`.** They are what make
+outbound work, and MX at the root does not collide with any of them.
+
+**Forwarding receives; it does not let you reply as the address.** Replies leave
+from whatever inbox they land in. Gmail's _Send mail as_ with Resend's SMTP
+(`smtp.resend.com:587`, user `resend`, password an API key) closes that, at the
+cost of spending transactional quota on human mail and putting a sending key in
+Gmail's settings. Acceptable for a founder inbox; revisit before there is a
+support team.
+
+Verify from anywhere, no credentials needed:
+
+```bash
+dig +short MX neuvto.com
+```
+
+---
+
 ## Two email systems, doing different jobs
 
 |                             | Sign-in codes (OTP)                   | Notifications                                              |
