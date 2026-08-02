@@ -69,6 +69,24 @@ export const FORBIDDEN_PATHS = [
     reason:
       "changed .env — that file alone decides which database the published app talks to, and production is no longer a project Lovable owns",
   },
+  {
+    // `types.ts` is GENERATED, which is exactly why it needs a rule.
+    //
+    // `supabase gen types` reads whatever database it is pointed at. Lovable's
+    // sandbox reaches Lovable Cloud, which is pre-production and behind, so a
+    // regeneration there DELETES every type added since — on 2 Aug 2026 that was
+    // invitations, approval_queue, leave_my_balances and eighteen migrations'
+    // worth besides. Lovable offered to do precisely this, describing the
+    // correct file as the broken one.
+    //
+    // The damage is quiet. Nobody reviews a generated file, the diff is enormous
+    // and mechanical, and the failure surfaces as `tsc` errors in code that was
+    // never touched. Regenerate from a database that has every migration —
+    // locally after `db reset`, or from production.
+    test: (f) => f === "src/integrations/supabase/types.ts",
+    reason:
+      "regenerated src/integrations/supabase/types.ts — that file is generated from whatever database the generator can reach, and Lovable's reaches a pre-production one that is behind, so this deletes types rather than adding them",
+  },
 ];
 
 /**
