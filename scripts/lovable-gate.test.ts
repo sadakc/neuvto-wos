@@ -69,6 +69,11 @@ describe("what Lovable may never do", () => {
     ["a guardrail script", "scripts/harness.sh", /guardrail/],
     ["its own instructions", "AGENTS.md", /own instructions/],
     ["the standards", "docs/standards/NEUVTO_CODING_STANDARDS.md", /standards/],
+    // Production is a project Lovable does not own. `.env` is the only thing
+    // that decides which database the published app reaches, so regenerating it
+    // — which Lovable has every reason to do — would repoint the live site.
+    ["the app's database target", ".env", /database the published app/],
+    ["a per-environment env file", ".env.production", /database the published app/],
   ])("blocks %s", (_label, file, expected) => {
     const r = evaluate({ authors: LOVABLE, changedFiles: [file] });
     expect(r.verdict).toBe("blocked");

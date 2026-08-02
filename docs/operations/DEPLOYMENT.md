@@ -10,47 +10,71 @@ build against a broken database.
 
 ## The three environments
 
-| Environment           | Project ref            | Reached by                                                      | Contains                       |
-| --------------------- | ---------------------- | --------------------------------------------------------------- | ------------------------------ |
-| **Local**             | —                      | `supabase start` · `.env.local` · `bun run harness`             | Whatever your migrations build |
-| **Lovable Cloud**     | `vkyvzhgigncranprhidn` | `neuvto.lovable.app` and `bun run dev` **without** `.env.local` | Real data — treat as shared    |
-| **`neuvto-wos-prod`** | `udrzhfgwqgolvyimbwto` | `bash scripts/prod-cutover.sh` — the repo is linked to this one | Cutover target, still empty    |
+| Environment        | Project ref            | Reached by                                                                   | Contains                       |
+| ------------------ | ---------------------- | ---------------------------------------------------------------------------- | ------------------------------ |
+| **Local**          | —                      | `supabase start` · `.env.local` · `bun run harness`                          | Whatever your migrations build |
+| **Pre-production** | `vkyvzhgigncranprhidn` | Lovable's own database tool · Lovable previews                               | Lovable Cloud — Sada's testing |
+| **Production**     | `udrzhfgwqgolvyimbwto` | `bash scripts/prod-cutover.sh` · `psql` · the harness · `neuvto.lovable.app` | Real customer data             |
 
-> ## ⚠️ The Supabase dashboard shows you the WRONG project
->
-> Signing in at supabase.com shows **`udrzhfgwqgolvyimbwto` (neuvto-wos-prod)**,
-> because that is the only one in your own Supabase organisation. **It is empty
-> and nothing uses it** — 0 tables as of 30 Jul 2026.
->
-> Everything real lives in **`vkyvzhgigncranprhidn`**, which belongs to
-> Lovable's organisation and therefore **never appears in your Supabase
-> dashboard at all**. Reach it through the Lovable project's own backend
-> settings.
->
-> | You want             | Correct project        | Where to get it                              |
-> | -------------------- | ---------------------- | -------------------------------------------- |
-> | Service role key     | `vkyvzhgigncranprhidn` | Lovable → project → Cloud/Backend → API keys |
-> | Set `RESEND_API_KEY` | `vkyvzhgigncranprhidn` | Lovable → project → Cloud/Backend → secrets  |
-> | Run SQL              | `vkyvzhgigncranprhidn` | Lovable's database tool                      |
->
-> This has already cost an afternoon once: a service role key copied from
-> `neuvto-wos-prod` was used against the function deployed on Lovable Cloud, and
-> the resulting `unauthorized` looked exactly like a broken function. **A key
-> from the wrong project is indistinguishable from a wrong key.** If something
-> returns 401, check which project the credential came from before changing any
-> code.
+**Hosting and database are separate choices**, and this is the fact the whole
+arrangement rests on. Lovable builds and publishes `neuvto.lovable.app`, but the
+app is plain `supabase-js` reading `VITE_SUPABASE_URL` — `src/integrations/lovable/index.ts`
+is auto-generated and imported by nothing. So the published site talks to
+whichever database `.env` names, and that is a project Sada owns.
 
-Because production is empty and serving nobody, **Lovable Cloud is the
-pre-production environment** for the MVP. A dedicated staging project is created
-at cutover, when the Supabase Pro plan is needed anyway. The harness is written
-to run unchanged against all three.
+> ## Why production is not Lovable Cloud
+>
+> The Supabase CLI **cannot see `vkyvzhgigncranprhidn` at all** — it belongs to
+> Lovable's organisation, so `supabase projects list` does not include it and no
+> password for it is obtainable. A production database on the far side of that
+> boundary would mean:
+>
+> - every migration hand-pasted into Lovable's SQL tool and manually recorded in
+>   `schema_migrations`, forever
+> - the harness **never** able to run against production
+> - no psql, no MCP, no automated verification of the one environment that matters
+> - Lovable's own agent holding schema write access to production
+>
+> So production moved to `udrzhfgwqgolvyimbwto`, where `db push` works, the
+> harness runs, and backups are Sada's.
+
+> ## ⚠️ A credential from the wrong project looks exactly like a broken one
+>
+> Two projects, two sets of keys, and the failure mode is identical either way.
+> This already cost an afternoon: a service role key from one project used
+> against a function deployed on the other returned `unauthorized`, which looked
+> precisely like a broken function.
+>
+> | You want                    | Take it from                      |
+> | --------------------------- | --------------------------------- |
+> | Anything for **production** | Sada's Supabase dashboard         |
+> | Anything for pre-production | Lovable → project → Cloud/Backend |
+>
+> If something returns 401, check which project the credential came from before
+> changing any code.
+
+> ## ⚠️ `.env` decides which database the published app talks to
+>
+> It is committed, and it is the **only** thing that decides. `scripts/lovable-gate.mjs`
+> therefore blocks any Lovable pull request touching it — a regenerated `.env`
+> would silently repoint the live site, and every symptom of that is a data
+> problem rather than a config one.
+>
+> **`SUPABASE_PROJECT_ID` must not be set in `.env`.** The unprefixed variable is
+> read by nothing in the app, but the Supabase CLI honours it and it **silently
+> overrides `project_id` in `supabase/config.toml`**, which is what names local
+> Docker containers. It is why the local stack ran as
+> `supabase_db_vkyvzhgigncranprhidn` long after `config.toml` said otherwise, and
+> why the repo appeared to be pointed at the Lovable project. The app uses the
+> `VITE_`-prefixed one; keep that, drop the other.
 
 See [LOCAL_DEVELOPMENT.md](LOCAL_DEVELOPMENT.md) for the `.env` / `.env.local`
-trap — the default `.env` points at the **shared** database.
+trap — the default `.env` points at **production**, and `bun run dev` refuses to
+start against it unless `.env.local` says otherwise.
 
 ---
 
-## Why `supabase db push` does not work **for Lovable Cloud**
+## Why `supabase db push` does not work **for pre-production**
 
 The Lovable Cloud project is not in Sada's own Supabase organisation. The CLI
 cannot authenticate against it, so `supabase link` + `supabase db push` — the
@@ -59,14 +83,15 @@ normal path, and the one assumed by every Supabase tutorial — is unavailable.
 Migrations reach Lovable Cloud one way only: **executing the SQL through
 Lovable's own database tool**, then recording that it happened.
 
-**This limitation is about Lovable Cloud alone.** `neuvto-wos-prod` _is_ in
-Sada's organisation, the CLI can authenticate against it, and `db push` is the
-correct way to reach it — see "Cutting over to `neuvto-wos-prod`" below. Reading
-this section as "the CLI never works" is what left the cutover parked.
+**This limitation is about pre-production alone.** Production _is_ in Sada's
+organisation, the CLI authenticates against it, and `db push` is the correct way
+to reach it — see "Cutting over to production" below. Reading this section as
+"the CLI never works here" is what left the cutover parked for a week, and it is
+the reason production is not the environment behind this boundary.
 
 ---
 
-## Applying a migration to Lovable Cloud
+## Applying a migration to pre-production (Lovable Cloud)
 
 Do this only after the migration is merged to `main` and CI is green. CI applies
 every migration to a clean database from scratch, which is the real proof it
@@ -106,7 +131,7 @@ broken landing page means something unexpected happened.
 
 ---
 
-## Cutting over to `neuvto-wos-prod`
+## Cutting over to production
 
 One command, because doing it by hand failed three times for three unrelated
 reasons and each error pointed away from its own cause:
@@ -184,10 +209,46 @@ from being defeated:
    **even with** `--allow-remote`. Emptiness is a fact the database can be asked
    for; no flag can talk it out of the answer.
 
-Run it against prod once, while prod is empty, to prove the schema behaves in
-the environment customers will use. Then clear the seed data before provisioning
-anybody — the harness leaves it behind deliberately, so a failure can be
-inspected.
+Run it against production once, while production is empty, to prove the schema
+behaves in the environment customers will use. Then clear the seed data before
+provisioning anybody — the harness leaves it behind deliberately, so a failure
+can be inspected. Acme and Vertex are not customers.
+
+### Two auth settings, or sign-in looks broken
+
+Neither is a migration, and both fail in a way that points at the application:
+
+- **The email template must contain `{{ .Token }}`.** Supabase's default carries
+  only a magic link, so the 6-digit code screen can never be completed — the user
+  waits for a code that was never sent. Dashboard → Authentication → Email
+  Templates.
+- **Site URL and the redirect allow-list must include `https://neuvto.lovable.app`.**
+  Otherwise every link in every email lands somewhere useless.
+
+### Last: repoint the app
+
+`.env` is what makes production real. Until this changes, migrations are in
+production and the published site is still talking to pre-production:
+
+```
+VITE_SUPABASE_URL="https://udrzhfgwqgolvyimbwto.supabase.co"
+VITE_SUPABASE_PUBLISHABLE_KEY="<from Sada's own dashboard>"
+SUPABASE_URL="https://udrzhfgwqgolvyimbwto.supabase.co"
+SUPABASE_PUBLISHABLE_KEY="<the same>"
+VITE_SUPABASE_PROJECT_ID="udrzhfgwqgolvyimbwto"
+```
+
+Do **not** add `SUPABASE_PROJECT_ID` — see the warning above about it hijacking
+local container naming.
+
+Before doing it, confirm nothing on `neuvto.lovable.app` matters: repointing
+means the accounts and data there stop being visible to the live site.
+Provisioning is invitation-only and Sada names every administrator, so this
+should be his own testing — but check rather than assume.
+
+Afterwards, **watch that Lovable does not put it back.** `.env` carries no
+"auto-generated" marker, but Lovable writes to this repo, and the gate blocks it
+in a pull request rather than in a direct push.
 
 ---
 

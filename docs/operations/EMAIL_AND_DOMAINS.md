@@ -90,8 +90,13 @@ never placed in `.env`, and never exposed to the browser — anything prefixed
 `VITE_` is compiled into the client bundle and is effectively public.
 
 ```bash
-supabase secrets set RESEND_API_KEY=re_... --project-ref vkyvzhgigncranprhidn
+# production
+supabase secrets set RESEND_API_KEY=re_... --project-ref udrzhfgwqgolvyimbwto
 ```
+
+Pre-production (`vkyvzhgigncranprhidn`) is Lovable-owned and invisible to the
+CLI — set its secret through Lovable → project → Cloud/Backend → secrets instead.
+Each environment needs its own; a key set on one does nothing for the other.
 
 If the key is ever pasted into a chat, a commit, or a support ticket, revoke it
 in Resend and issue a new one. Revocation is instant and free; a leaked sending
@@ -128,7 +133,8 @@ the first claims nothing.
 ### Running it
 
 ```bash
-supabase functions deploy notification-dispatch --project-ref vkyvzhgigncranprhidn
+# production — or just run scripts/prod-cutover.sh, which does this
+supabase functions deploy notification-dispatch --project-ref udrzhfgwqgolvyimbwto
 ```
 
 It requires `Authorization: Bearer <service role key>` — without that the queue
