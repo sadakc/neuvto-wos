@@ -78,29 +78,45 @@ purpose, precisely so replies would reach a person. Without MX they never did.
 
 ### The fix is DNS, and it is not in this repo
 
-GoDaddy runs the zone (`ns65/ns66.domaincontrol.com`), and its email-forwarding
-product writes the MX records itself — set up the forward through **My Products →
-neuvto.com → Email**, rather than hand-adding MX alongside it, which produces
-duplicates that half-work.
+**Nothing here costs money.** GoDaddy runs the zone
+(`ns65/ns66.domaincontrol.com`), but its own email forwarding is bundled with a
+paid Email plan — rejected on 2 Aug 2026, because nothing is paid for before the
+MVP ships. Records go into GoDaddy's DNS panel; the mailbox lives elsewhere.
 
-Only if the UI does not do it:
+| Option                      | Cost | Receives | Sends as `hello@` | Nameserver move |
+| --------------------------- | ---- | -------- | ----------------- | --------------- |
+| **Zoho Mail free tier**     | free | yes      | **yes**           | no              |
+| ImprovMX / forwardemail.net | free | yes      | no                | no              |
+| Cloudflare Email Routing    | free | yes      | no                | **yes**         |
+| GoDaddy Email               | paid | yes      | yes               | no              |
 
-| Type | Name | Value                         | Priority |
-| ---- | ---- | ----------------------------- | -------- |
-| MX   | `@`  | `smtp.secureserver.net`       | 0        |
-| MX   | `@`  | `mailstore1.secureserver.net` | 10       |
+Zoho is the one to take: a real mailbox, replies leaving from the domain rather
+than a personal Gmail, and DNS stays where it is. Cloudflare's is excellent and
+free but means moving nameservers off GoDaddy, which puts the Resend records at
+risk for an address that has no mail in it yet.
+
+**Use the records the provider's own wizard shows you.** Zoho runs regional data
+centres with different hostnames — an Indian signup lands on `zoho.in`
+(`mx.zoho.in`, `mx2.zoho.in`, `mx3.zoho.in`), not the `zoho.com` set that most
+blog posts and most of this industry's documentation assume. Copying the wrong
+region's MX produces a domain that verifies and never delivers.
 
 **Do not touch `resend._domainkey`, `send`, or `_dmarc`.** They are what make
 outbound work, and MX at the root does not collide with any of them.
 
-**Forwarding receives; it does not let you reply as the address.** Replies leave
-from whatever inbox they land in. Gmail's _Send mail as_ with Resend's SMTP
-(`smtp.resend.com:587`, user `resend`, password an API key) closes that, at the
-cost of spending transactional quota on human mail and putting a sending key in
-Gmail's settings. Acceptable for a founder inbox; revisit before there is a
-support team.
+**If you also want to send as `hello@`**, two more records and one interaction:
 
-Verify from anywhere, no credentials needed:
+- **SPF at the root**, which does not exist today — add the provider's include at
+  `@`. It does not disturb Resend, whose return-path is `send.neuvto.com` with
+  its own SPF.
+- **The provider's DKIM.** Required, not optional, because `_dmarc` is
+  `p=quarantine`: mail from `hello@` passing neither SPF nor DKIM alignment is
+  quarantined. Half-configured sending is worse than forwarding, because it
+  silently lands in spam instead of visibly bouncing.
+
+Pure forwarding needs neither — it changes nothing about who may send.
+
+Verify from anywhere, no credentials and no account needed:
 
 ```bash
 dig +short MX neuvto.com
