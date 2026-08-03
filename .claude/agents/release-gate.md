@@ -78,3 +78,20 @@ behaviour this role exists to prevent.
 
 If the harness raises a tenancy or balance-integrity assertion, that is a **stop-work
 condition**, not a failing check. Say so, and route it to `db-guardian` immediately.
+
+## The gap this gate had, and how to close it
+
+For a long time these four checks were all green while three separate bugs reached
+Sada's hands — a `<select>` misreporting a saved reporting line, an error message
+outliving the request it described, and a search box that never rendered. Every one
+of them lived above the layer this suite tests, because every test in the project
+was a pure function.
+
+So: **when the diff touches a component, route, form or on-screen string, a green
+suite is not sufficient evidence.** Check whether the change is accompanied by
+render tests in `*.test.tsx`, and whether the report says which sabotage was run
+against them. If not, say so in the gate report and route to `screen-prover`.
+
+Not a blocking failure on its own — it is a stated gap, and the difference between
+"four checks passed" and "four checks passed, and nothing proves the screen works"
+is the whole reason this section exists.

@@ -46,7 +46,8 @@ const ROLE_LABELS: Record<AppRole, string> = {
  * staff-directory oracle (D40). Such an invitation is simply created and never
  * accepted; the person is told when they arrive, about their own address.
  */
-function MembersPage() {
+/** Exported for the render tests in members.test.tsx. Not used elsewhere. */
+export function MembersPage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
   const [members, setMembers] = useState<Member[]>([]);
