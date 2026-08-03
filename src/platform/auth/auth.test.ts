@@ -14,44 +14,56 @@ function user(roles: CurrentUser["roles"]): CurrentUser {
   };
 }
 
-describe("PhoneInput", () => {
-  // Every rejection here was accepted before, and was found by typing into the
-  // invite form rather than by reading the rule.
-  it("refuses letters", () => {
-    // The old rule stripped non-digits and then counted, so this asked only
-    // "are there six digits in here somewhere" — and this string says yes.
-    expect(() => PhoneInput.parse("abc123456xyz")).toThrow();
-    expect(() => PhoneInput.parse("98765ABCDE")).toThrow();
-  });
-
-  it("refuses more digits than a phone number can have", () => {
-    // E.164 allows 15 digits including the country code. Sixteen is not a long
-    // phone number, it is a typo or a different field's contents.
-    expect(() => PhoneInput.parse("1234567890123456")).toThrow();
-  });
-
-  it("accepts the formats an administrator actually types", () => {
-    for (const v of [
-      "+91 98765 43210",
-      "+919876543210",
-      "9876543210",
-      "(020) 7946-0958",
-      "+44 20 7946 0958",
-    ]) {
-      expect(PhoneInput.parse(v)).toBe(v);
+describe("PhoneInput — India only, by decision", () => {
+  it("accepts the ways an administrator types the same number", () => {
+    // All four are one person. The point of the test is the right-hand side:
+    // they must come out identical, or the uniqueness index on
+    // phone_normalized is comparing three different strings for one human.
+    for (const typed of ["9876543210", "+919876543210", "+91 98765 43210", "09876543210"]) {
+      expect(PhoneInput.parse(typed)).toBe("+919876543210");
     }
   });
 
-  it("accepts empty, because phone is optional", () => {
-    // D41: captured, not verified, and not an identity key. Requiring it would
-    // block an invitation over a field that does no work yet.
-    expect(PhoneInput.parse("")).toBe("");
+  it("strips the separators people actually type", () => {
+    expect(PhoneInput.parse("(98765) 43210")).toBe("+919876543210");
+    expect(PhoneInput.parse("98765-43210")).toBe("+919876543210");
+    expect(PhoneInput.parse("  +91 98765 43210  ")).toBe("+919876543210");
   });
 
-  it("accepts exactly 15 digits and refuses 5", () => {
-    // The boundaries, stated once so a later tightening has to argue with them.
-    expect(PhoneInput.parse("+123456789012345")).toBe("+123456789012345");
-    expect(() => PhoneInput.parse("12345")).toThrow();
+  it("refuses letters", () => {
+    // The rule this replaced stripped non-digits and then counted, so it asked
+    // only "are there ten digits in here somewhere" — and both of these said
+    // yes. Letters are deliberately NOT stripped before the check.
+    expect(() => PhoneInput.parse("abc9876543210xyz")).toThrow();
+    expect(() => PhoneInput.parse("98765ABCDE")).toThrow();
+  });
+
+  it("refuses the wrong number of digits", () => {
+    expect(() => PhoneInput.parse("987654321")).toThrow(); // nine
+    expect(() => PhoneInput.parse("98765432101")).toThrow(); // eleven
+    expect(() => PhoneInput.parse("1234567890123456")).toThrow();
+  });
+
+  it("refuses a number that cannot be an Indian mobile", () => {
+    // Mobiles open 6-9. A landline reaches a desk, and this field exists to
+    // reach a person — and to carry a phone OTP when D8 lands.
+    expect(() => PhoneInput.parse("1234567890")).toThrow();
+    expect(() => PhoneInput.parse("5876543210")).toThrow();
+    expect(PhoneInput.parse("6876543210")).toBe("+916876543210");
+  });
+
+  it("refuses a foreign number, which is the whole point of this round", () => {
+    // Both were ACCEPTED by the previous rule. When Neuvto goes global these
+    // are the tests that have to be deleted on purpose rather than quietly
+    // stop being true.
+    expect(() => PhoneInput.parse("+44 20 7946 0958")).toThrow();
+    expect(() => PhoneInput.parse("+1 415 555 0132")).toThrow();
+  });
+
+  it("accepts empty, because phone is optional", () => {
+    // D41: captured, not verified, not an identity key. Requiring it would
+    // block an invitation over a field that does no work yet.
+    expect(PhoneInput.parse("")).toBe("");
   });
 });
 

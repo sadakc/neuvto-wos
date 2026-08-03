@@ -91,7 +91,8 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
             className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
           />
           <p className="mt-1 text-xs text-muted-foreground">
-            Tells one person from another when they have several addresses
+            Indian mobile, 10 digits. Tells one person from another when they have several
+            addresses.
           </p>
         </div>
       </div>
