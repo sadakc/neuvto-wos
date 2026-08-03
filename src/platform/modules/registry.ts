@@ -18,6 +18,7 @@ import {
   type ModuleApprovalView,
   type ModuleDefinition,
   type ModuleAdminSection,
+  type ModuleReport,
   type ModuleDashboardCard,
   type ModuleNavItem,
 } from "./contract";
@@ -161,6 +162,24 @@ export async function getAdminSections(
 
   return enabled
     .flatMap((m) => (m.adminSections?.(user) ?? []).map((s) => ({ ...s, moduleKey: m.key })))
+    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+}
+
+/**
+ * Every report the enabled modules contribute, in order.
+ *
+ * Same shape as `getAdminSections`, and for the same reason: `/app/reports`
+ * renders these without importing a module or knowing one exists. A workspace
+ * with no modules enabled gets an empty Reports screen rather than a broken one
+ * — the module-removal check exercises precisely that path.
+ */
+export async function getModuleReports(
+  user: CurrentUser | null,
+): Promise<(ModuleReport & { moduleKey: string })[]> {
+  const enabled = await getEnabledModules();
+
+  return enabled
+    .flatMap((m) => (m.reports?.(user) ?? []).map((r) => ({ ...r, moduleKey: m.key })))
     .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
 }
 

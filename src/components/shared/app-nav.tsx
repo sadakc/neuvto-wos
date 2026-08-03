@@ -49,6 +49,15 @@ export function platformNavItems(user: CurrentUser | null): NavItem[] {
     // the workspace and who signs things off are the same questions whatever
     // modules are switched on.
     items.push({ label: "People", to: "/app/members" });
+    // Reports is a PLATFORM destination that modules fill, not Leave's own.
+    //
+    // Not merely tidiness. A module nav item lands at position 2–4 (see
+    // mergeNavItems), and the mobile bar shows the first five — so a fourth
+    // Leave entry would push "Approvals" off the bar for an administrator,
+    // which is exactly what the team calendar did in step 10. Here it sits
+    // sixth and falls off deliberately: admin work is desktop-first, and the
+    // sidebar shows everything.
+    items.push({ label: "Reports", to: "/app/reports" });
     items.push({ label: "Approval rules", to: "/app/approval-rules" });
     items.push({ label: "Settings", to: "/app/settings" });
   }

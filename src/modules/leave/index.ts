@@ -72,6 +72,43 @@ export const leave: ModuleDefinition = {
     },
   ],
 
+  // What an administrator can take away and open in Excel. Contributed, like
+  // the settings sections above, so the platform's Reports screen renders them
+  // without importing anything here or knowing that any of it concerns leave.
+  //
+  // Administrators only, agreed with Sada. Managers already have Approvals and
+  // the Team Calendar; these three are every person in the workspace at once,
+  // and widening them would put a colleague's sick-leave consumption in front of
+  // more people than D35 allows elsewhere. The rule is not enforced here — each
+  // function raises FORBIDDEN itself, because a screen that is merely not linked
+  // is not a permission.
+  reports: () => [
+    {
+      id: "leave-balances",
+      title: "Leave balances",
+      description:
+        "Who has what left. Every active person against every active leave type, for the current leave year.",
+      component: lazy(() => import("./components/LeaveBalancesReport")),
+      order: 10,
+    },
+    {
+      id: "leave-taken",
+      title: "Leave taken",
+      description:
+        "What happened. Every request overlapping the dates you choose, including the rejected and cancelled ones.",
+      component: lazy(() => import("./components/LeaveTakenReport")),
+      order: 20,
+    },
+    {
+      id: "leave-pending",
+      title: "Pending approvals",
+      description:
+        "What is stuck. Everything awaiting a decision, longest wait first, and everyone who can act on it now.",
+      component: lazy(() => import("./components/LeavePendingReport")),
+      order: 30,
+    },
+  ],
+
   // Registered with the Approval Engine, which knows nothing about leave and
   // would happily let a second module claim the same string.
   approvalEntityTypes: ["leave_request"],
@@ -104,6 +141,9 @@ export {
   listLeaveTypes,
   saveLeaveType,
   setLeaveTypeStatus,
+  getLeaveBalancesReport,
+  getLeaveTakenReport,
+  getLeavePendingReport,
 } from "./handlers";
 
 export {
@@ -118,4 +158,7 @@ export {
   type LeaveRequest,
   type ApprovalStep,
   type LeaveApprovalDetail,
+  type LeaveBalanceReportRow,
+  type LeaveTakenReportRow,
+  type LeavePendingReportRow,
 } from "./contracts";

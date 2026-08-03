@@ -1447,6 +1447,7 @@ export type Database = {
         Returns: {
           available_days: number
           carryforward_days: number
+          department_name: string
           employee_id: string
           employee_name: string
           entitled_days: number
@@ -1495,6 +1496,23 @@ export type Database = {
           used_days: number
         }[]
       }
+      leave_pending_report: {
+        Args: never
+        Returns: {
+          current_level: number
+          days_waiting: number
+          department_name: string
+          employee_name: string
+          from_date: string
+          leave_request_id: string
+          leave_type_name: string
+          required_levels: number
+          submitted_at: string
+          to_date: string
+          waiting_on: string
+          working_days: number
+        }[]
+      }
       leave_set_opening_balance: {
         Args: {
           _carryforward: number
@@ -1512,6 +1530,24 @@ export type Database = {
           _to_date: string
         }
         Returns: string
+      }
+      leave_taken_report: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          decided_at: string
+          decided_by: string
+          decision_note: string
+          department_name: string
+          employee_name: string
+          from_date: string
+          leave_request_id: string
+          leave_type_name: string
+          reason: string
+          status: string
+          submitted_at: string
+          to_date: string
+          working_days: number
+        }[]
       }
       leave_year_open: {
         Args: { _org_id: string; _ref: string }

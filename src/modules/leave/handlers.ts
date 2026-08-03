@@ -22,6 +22,9 @@ import {
   type LeaveType,
   type ApprovalStep,
   type LeaveApprovalDetail,
+  type LeaveBalanceReportRow,
+  type LeaveTakenReportRow,
+  type LeavePendingReportRow,
 } from "./contracts";
 
 /**
@@ -301,4 +304,94 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
 export async function setLeaveTypeStatus(id: string, status: "active" | "archived"): Promise<void> {
   const { error } = await supabase.from("leave_types").update({ status }).eq("id", id);
   if (error) throw toLeaveError(error.message);
+}
+
+// ─────────────────────────────────────────────────────────────────── reports
+//
+// Three wrappers, and nothing else. The reports are SQL functions — see
+// 20260808110000_leave_reports.sql for why they are functions rather than
+// PostgREST selects — and every rule they enforce, including who may run them,
+// is enforced there.
+//
+// Each raises FORBIDDEN for a non-admin instead of returning no rows. That
+// distinction only survives to the screen if these wrappers let the error
+// through, so none of them swallows one into an empty array.
+
+/** Everybody's balance for the current financial year, entitlement included for rows not yet materialised. */
+export async function getLeaveBalancesReport(): Promise<LeaveBalanceReportRow[]> {
+  const { data, error } = await supabase.rpc("leave_all_balances");
+  if (error) throw toLeaveError(error.message);
+
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    fyLabel: r.fy_label,
+    entitledDays: Number(r.entitled_days),
+    carryforwardDays: Number(r.carryforward_days),
+    usedDays: Number(r.used_days),
+    availableDays: Number(r.available_days),
+  }));
+}
+
+/**
+ * Every request OVERLAPPING the window — not every request starting inside it.
+ * Leave running from the 28th to the 3rd belongs in both months' reports, and
+ * the one that straddles a boundary is exactly the one payroll asks about.
+ *
+ * Includes rejected and cancelled requests deliberately: "we have no record of
+ * that" is the answer this report exists to prevent.
+ */
+export async function getLeaveTakenReport(
+  from: string,
+  to: string,
+): Promise<LeaveTakenReportRow[]> {
+  const { data, error } = await supabase.rpc("leave_taken_report", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+
+  return (data ?? []).map((r) => ({
+    leaveRequestId: r.leave_request_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeName: r.leave_type_name,
+    fromDate: r.from_date,
+    toDate: r.to_date,
+    workingDays: Number(r.working_days),
+    status: r.status as LeaveStatus,
+    submittedAt: r.submitted_at ?? null,
+    decidedAt: r.decided_at ?? null,
+    decidedBy: r.decided_by ?? null,
+    decisionNote: r.decision_note ?? null,
+    reason: r.reason ?? null,
+  }));
+}
+
+/**
+ * What is stuck and on whose desk, oldest first.
+ *
+ * `approval_queue()` answers this for the caller — it is an approver's own
+ * inbox. This is the administrator's view of everybody's, which is a different
+ * question: "why has nothing moved for nine days" is not answerable from your
+ * own queue.
+ */
+export async function getLeavePendingReport(): Promise<LeavePendingReportRow[]> {
+  const { data, error } = await supabase.rpc("leave_pending_report");
+  if (error) throw toLeaveError(error.message);
+
+  return (data ?? []).map((r) => ({
+    leaveRequestId: r.leave_request_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeName: r.leave_type_name,
+    fromDate: r.from_date,
+    toDate: r.to_date,
+    workingDays: Number(r.working_days),
+    submittedAt: r.submitted_at ?? null,
+    daysWaiting: Number(r.days_waiting),
+    currentLevel: Number(r.current_level),
+    requiredLevels: Number(r.required_levels),
+    waitingOn: r.waiting_on ?? null,
+  }));
 }

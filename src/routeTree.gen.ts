@@ -18,6 +18,7 @@ import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppSetupRouteImport } from './routes/app/setup'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
+import { Route as AppReportsRouteImport } from './routes/app/reports'
 import { Route as AppMembersRouteImport } from './routes/app/members'
 import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppApprovalsRouteImport } from './routes/app/approvals'
@@ -71,6 +72,11 @@ const AppSetupRoute = AppSetupRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppReportsRoute = AppReportsRouteImport.update({
+  id: '/reports',
+  path: '/reports',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppMembersRoute = AppMembersRouteImport.update({
@@ -135,6 +141,7 @@ export interface FileRoutesByFullPath {
   '/app/approvals': typeof AppApprovalsRoute
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
   '/admin/': typeof AdminIndexRoute
@@ -154,6 +161,7 @@ export interface FileRoutesByTo {
   '/app/approvals': typeof AppApprovalsRoute
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
   '/admin': typeof AdminIndexRoute
@@ -175,6 +183,7 @@ export interface FileRoutesById {
   '/app/approvals': typeof AppApprovalsRoute
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
+  '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
   '/admin/': typeof AdminIndexRoute
@@ -197,6 +206,7 @@ export interface FileRouteTypes {
     | '/app/approvals'
     | '/app/import'
     | '/app/members'
+    | '/app/reports'
     | '/app/settings'
     | '/app/setup'
     | '/admin/'
@@ -216,6 +226,7 @@ export interface FileRouteTypes {
     | '/app/approvals'
     | '/app/import'
     | '/app/members'
+    | '/app/reports'
     | '/app/settings'
     | '/app/setup'
     | '/admin'
@@ -236,6 +247,7 @@ export interface FileRouteTypes {
     | '/app/approvals'
     | '/app/import'
     | '/app/members'
+    | '/app/reports'
     | '/app/settings'
     | '/app/setup'
     | '/admin/'
@@ -322,6 +334,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/reports': {
+      id: '/app/reports'
+      path: '/reports'
+      fullPath: '/app/reports'
+      preLoaderRoute: typeof AppReportsRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/members': {
       id: '/app/members'
       path: '/members'
@@ -394,6 +413,7 @@ interface AppRouteRouteChildren {
   AppApprovalsRoute: typeof AppApprovalsRoute
   AppImportRoute: typeof AppImportRoute
   AppMembersRoute: typeof AppMembersRoute
+  AppReportsRoute: typeof AppReportsRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -405,6 +425,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppApprovalsRoute: AppApprovalsRoute,
   AppImportRoute: AppImportRoute,
   AppMembersRoute: AppMembersRoute,
+  AppReportsRoute: AppReportsRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,
   AppIndexRoute: AppIndexRoute,
