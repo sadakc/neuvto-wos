@@ -289,24 +289,25 @@ function MembersPage() {
 
       {/* ─────────────────────────────────────────────── find */}
       {/* Filters what is already loaded, so it is instant and needs no debounce.
-          Hidden until the workspace is big enough to need it: a search box above
-          four people is clutter that implies the list is longer than it is. */}
-      {members.length + invitations.length > 8 && (
-        <div className="mt-8">
-          <label htmlFor="people-search" className="block text-sm font-medium">
-            Find somebody
-          </label>
-          <input
-            id="people-search"
-            type="search"
-            value={query}
-            onChange={(e) => setQuery(e.target.value)}
-            placeholder="Name, email, phone, or role…"
-            data-testid="people-search"
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </div>
-      )}
+          Always rendered. It was briefly hidden below nine people, on the theory
+          that a search box above a short list is clutter — which put it one
+          person below the threshold in the first workspace it met, where it read
+          as the feature simply not being there. A control that appears at a size
+          nobody can predict costs more in confusion than it saves in pixels. */}
+      <div className="mt-8">
+        <label htmlFor="people-search" className="block text-sm font-medium">
+          Find somebody
+        </label>
+        <input
+          id="people-search"
+          type="search"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+          placeholder="Name, email, phone, or role…"
+          data-testid="people-search"
+          className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+        />
+      </div>
 
       {nothingMatches && (
         <p
