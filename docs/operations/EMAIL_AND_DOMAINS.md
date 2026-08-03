@@ -372,3 +372,82 @@ credential going into a form, which is not something to hand to an assistant or
 paste into a chat. Once SMTP is set, the template push stops returning 400 and
 can be applied from this repository — `supabase/templates/magic_link.html` is
 already correct and already carries `{{ .Token }}`.
+
+---
+
+## Turning on custom SMTP
+
+**Nothing here costs anything.** Checked against both providers' own pages on
+3 Aug 2026, because "free tier" is a claim that ages:
+
+|                      | Free?                 | What you get                                                           |
+| -------------------- | --------------------- | ---------------------------------------------------------------------- |
+| Supabase custom SMTP | yes, on the Free plan | it is the alternative the API's own error offers, instead of upgrading |
+| Resend SMTP relay    | yes, on the Free plan | "All plans include: RESTful API, **SMTP relay**, official SDKs"        |
+| Resend Free volume   | —                     | **3,000/month, 100/day, 1 domain**                                     |
+
+The 100/day is the number to watch, and it is **shared**: sign-in codes and
+notification emails both leave through Resend on the same key. A pilot workspace
+of forty people invited on a Monday spends forty of them before anyone has
+requested leave.
+
+### 1 · A key for this, separate from the notifications one
+
+`RESEND_API_KEY` already exists as an Edge Function secret on
+`neuvto-wos-prod` (set 2 Aug 2026) and the notification dispatcher uses it. Make
+a **second** key for auth email rather than reusing that one — Resend → API Keys
+→ Create, sending access on `neuvto.com` only, named for the purpose.
+
+The reason is revocation. One key doing two jobs cannot be rolled without
+stopping both, so the day the auth key needs replacing is the day notifications
+stop as well.
+
+### 2 · The SMTP settings
+
+Dashboard → Authentication → **Emails** → SMTP Settings → Enable custom SMTP:
+
+| Field        | Value                                             |
+| ------------ | ------------------------------------------------- |
+| Host         | `smtp.resend.com`                                 |
+| Port         | `465`                                             |
+| Username     | `resend` — the literal word, not an email address |
+| Password     | the API key from step 1 (`re_…`)                  |
+| Sender email | `notifications@neuvto.com`                        |
+| Sender name  | `Neuvto`                                          |
+
+Port 465 is implicit TLS. Resend also accepts 25, 587, 2465 and 2587; 587 is
+STARTTLS and is the one to try if a network blocks 465.
+
+The sender **must** be on a domain verified in Resend. `neuvto.com` is verified —
+DKIM, SPF and DMARC are all present and correct — so this address works today.
+Note that replies to it still bounce, because the domain has no MX record; that
+is the separate gap above, and it does not block sign-in.
+
+### 3 · Everything else, in one command
+
+```bash
+bash scripts/apply-auth-email-config.sh
+```
+
+It pushes the template, sets the subject, raises the hourly limit, and then reads
+all of it back rather than trusting the `200`. It refuses to run at all until
+SMTP is set, so it cannot leave you with half of it applied.
+
+**The rate limit is the trap.** Supabase's built-in sender caps auth email at
+**2 per hour** and does not let you change it — which is what
+`neuvto-wos-prod` sits at today. Custom SMTP raises the default to 30, still low
+for onboarding a company; the script sets 100. Miss this and sign-in works
+perfectly for two people and then stops, with no error that names the cause.
+
+### 4 · Prove it, do not assume it
+
+Request a code on the sign-in screen and read the email. Three things have to be
+true at once, and only the last is visible from the config:
+
+- it arrives **from `neuvto.com`**, not `auth.lovable.cloud`
+- it contains a **six-digit code**, not only a link
+- the code is **accepted** by the form
+
+Until the published site is rebuilt against `neuvto-wos-prod` this proves the
+project is correct, not that a customer's sign-in works — `neuvto.com` still
+serves a bundle wired to Lovable's backend. See "Where this stands" above.
