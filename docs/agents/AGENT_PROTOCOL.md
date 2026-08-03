@@ -140,6 +140,41 @@ platform services. Both SQL scripts raise on the first violation — silence is 
 
 Never run the seed against production. It truncates.
 
+### UI work goes through `screen-prover`. Always.
+
+**Standing instruction from Sada, 3 Aug 2026.** Any change to a component, route,
+form, or on-screen string is routed through the `screen-prover` agent before it is
+reported as done. Not on request — by default.
+
+Four green checks are not evidence that a screen works. In one week three bugs
+reached Sada's hands with lint, typecheck, 123 tests and the full SQL harness all
+passing:
+
+- a `<select>` rendering "Nobody" for every reporting line, because a search box had
+  narrowed the list its options were built from;
+- an overlap refusal still on screen under a corrected set of dates;
+- a search box hidden below nine people, in a workspace of eight.
+
+All three were invisible to every check in this file, because until `screen-prover`
+existed every test in the project was a pure function and the entire class lived
+above them.
+
+The rule is therefore about *evidence*, not ceremony:
+
+- Render tests live in `*.test.tsx` with `// @vitest-environment happy-dom`.
+- Every one must be **watched failing** before it is trusted — reintroduce the bug,
+  read the failure, restore. A test that has never failed is not evidence.
+- Report the **failure output**, not the phrase "sabotage-tested".
+- State what was not covered. Anything needing a real browser — downloads, date
+  pickers, focus traps — is named as a gap rather than approximated.
+
+`src/routes/app/members.test.tsx` is the worked example.
+
+Two things this does not mean. It is not a request for a coverage number: six tests
+that each pin a real promise beat sixty asserting the DOM exists. And it does not
+apply to a pure-function change with no screen in it — `screen-prover` writes render
+tests, and inventing one to satisfy a rule is the failure this is meant to prevent.
+
 ---
 
 ## 5. Architecture rules you must not break
