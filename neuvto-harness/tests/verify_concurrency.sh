@@ -35,12 +35,38 @@ if ! "$PSQL" "$DB_URL" -tAc "select to_regprocedure('public.leave_submit(uuid,da
   exit 0
 fi
 
-W=$("$PSQL" "$DB_URL" -tAc "
-  select public.calculate_working_days('$ACME',
-    public.org_today('$ACME') + 60, public.org_today('$ACME') + 62);" | tr -d '[:space:]')
+# The two windows are CHOSEN, not hardcoded.
+#
+# They used to be a fixed +60 and +90. Both assumptions in that were wrong on
+# some days of the year and correct on most, which is the worst way for a test
+# to be wrong:
+#
+#   * +60 has to contain a working day at all. Run on 3 Aug 2026 it lands on
+#     2 Oct — Gandhi Jayanti in the seed — followed by a Saturday and a Sunday,
+#     so the window held nothing and the whole harness failed on a date.
+#   * the two windows have to contain the SAME number of working days. The
+#     balance is set from the first and both requests are meant to be exactly
+#     affordable alone; if the second window were shorter it would fit in what
+#     the first left behind, and the race would pass without ever being run.
+#
+# So: the first pair of non-overlapping three-day windows, at least ten days
+# apart, with equal and non-zero working days. Nothing about the race depends on
+# which pair — only that both are affordable alone and not together.
+read -r OFF_A OFF_B W <<<"$("$PSQL" "$DB_URL" -tAF' ' -c "
+  with w as (
+    select g as off,
+           public.calculate_working_days('$ACME',
+             public.org_today('$ACME') + g, public.org_today('$ACME') + g + 2) as d
+      from generate_series(60, 240) g
+  )
+  select a.off, b.off, a.d
+    from w a join w b on b.off >= a.off + 10 and b.d = a.d
+   where a.d > 0
+   order by a.off, b.off
+   limit 1;")"
 
-if [[ -z "$W" || "$W" == "0" ]]; then
-  echo "    FAILED — the chosen window contains no working days, so the race would be untestable"
+if [[ -z "${W:-}" || "$W" == "0" ]]; then
+  echo "    FAILED — no two comparable windows with working days, so the race would be untestable"
   exit 1
 fi
 
@@ -64,9 +90,9 @@ SQL
 }
 
 # A holds the row open; B arrives while it is still uncommitted.
-submit 60 3 &
+submit "$OFF_A" 3 &
 sleep 1
-submit 90 0 &
+submit "$OFF_B" 0 &
 wait
 
 ACCEPTED=$("$PSQL" "$DB_URL" -tAc \

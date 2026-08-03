@@ -244,6 +244,226 @@ begin
       end;
     end if;
 
+    -------------------------------------- a report refuses, and never crosses a tenant
+    --
+    -- Two properties, and the fixture that makes both of them mean something.
+    --
+    -- FIRST: a non-admin must be REFUSED, not handed an empty set. On screen the
+    -- two are the same picture — a table with nothing in it — and only one of
+    -- them is a bug. A check that merely counted rows would pass just as happily
+    -- against a report that had quietly started returning nothing to everybody,
+    -- which is why what is asserted here is that an exception was RAISED.
+    --
+    -- SECOND: tenancy. These are SECURITY DEFINER functions, so RLS does not
+    -- apply inside them and `current_org_id()` is the only thing standing
+    -- between Acme's leave and Vertex's administrator. Nothing else in this file
+    -- covers that, because everywhere else the policies do the work.
+    --
+    -- Both need leave to exist in BOTH organisations. Every suite that runs
+    -- before this one cleans up after itself, so the taken and pending reports
+    -- would otherwise be compared across two empty sets — green, and proving
+    -- nothing whatsoever. This block creates its own leave and takes it away
+    -- again.
+    if to_regprocedure('public.leave_taken_report(date,date)') is not null then
+      declare
+        acme       uuid := '00000000-0000-0000-0000-0000000000a0';
+        vertex     uuid := '00000000-0000-0000-0000-0000000000b0';
+        alice      uuid;
+        bob        uuid;
+        ravi       uuid;
+        sara       uuid;
+        d_acme     date;
+        d_vertex   date;
+        req_acme   uuid;
+        req_vertex uuid;
+        ar_acme    uuid;
+        ar_vertex  uuid;
+        fn         text;
+        raised     boolean;
+        cnt        bigint;
+      begin
+        select id into alice from public.profiles where email = 'alice.admin@acme.test';
+        select id into bob   from public.profiles where email = 'bob.admin@vertex.test';
+        select id into ravi  from public.profiles where email = 'ravi.emp@acme.test';
+        select id into sara  from public.profiles where email = 'sara.emp@vertex.test';
+
+        if alice is null or bob is null or ravi is null or sara is null then
+          raise exception
+            'INVARIANT FAIL: the two-tenant fixture is missing, so report isolation cannot be tested';
+        end if;
+
+        -- A working day in each organisation's own calendar. They keep different
+        -- weekends and holidays in the seed, so one date does not serve both.
+        select g::date into d_acme
+          from generate_series(public.org_today(acme) + 20,
+                               public.org_today(acme) + 140, '1 day') g
+         where public.calculate_working_days(acme, g::date, g::date) = 1
+         limit 1;
+
+        select g::date into d_vertex
+          from generate_series(public.org_today(vertex) + 20,
+                               public.org_today(vertex) + 140, '1 day') g
+         where public.calculate_working_days(vertex, g::date, g::date) = 1
+         limit 1;
+
+        if d_acme is null or d_vertex is null then
+          raise exception
+            'INVARIANT FAIL: no working day found in one of the two calendars, so the fixture cannot be built';
+        end if;
+
+        perform set_config('role', 'authenticated', true);
+
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', ravi, 'role','authenticated')::text, true);
+        req_acme := public.leave_submit(
+          '00000000-0000-0000-0000-0000000000c1', d_acme, d_acme, 'acme fixture');
+
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', sara, 'role','authenticated')::text, true);
+        req_vertex := public.leave_submit(
+          '00000000-0000-0000-0000-0000000000c4', d_vertex, d_vertex, 'vertex fixture');
+
+        select approval_request_id into ar_acme
+          from public.leave_requests where id = req_acme;
+        select approval_request_id into ar_vertex
+          from public.leave_requests where id = req_vertex;
+
+        -- ── refused, not empty ────────────────────────────────────────────────
+        --
+        -- Ravi holds `employee` and nothing else. Were he somehow an admin the
+        -- calls would succeed and this would fail, which is the right way round.
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', ravi, 'role','authenticated')::text, true);
+
+        foreach fn in array array[
+          'public.leave_all_balances()',
+          'public.leave_taken_report(date ''2000-01-01'', date ''2099-12-31'')',
+          'public.leave_pending_report()'
+        ] loop
+          raised := false;
+          begin
+            execute format('select count(*) from %s', fn) into cnt;
+          exception when others then
+            -- Only FORBIDDEN counts. Anything else — a missing column, a broken
+            -- join — would otherwise be swallowed and reported as a refusal.
+            if sqlerrm not like '%FORBIDDEN%' then raise; end if;
+            raised := true;
+          end;
+
+          if not raised then
+            raise exception
+              'INVARIANT FAIL: % returned % row(s) to a non-admin instead of raising FORBIDDEN — an empty report and a forbidden report are the same picture on screen, and only one of them is a bug',
+              fn, cnt;
+          end if;
+        end loop;
+        raise notice 'ok: every report refuses a non-admin rather than returning an empty set';
+
+        -- The refusal above has to be about the ROLE. If these functions raised
+        -- for everybody the loop would pass and mean nothing.
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', alice, 'role','authenticated')::text, true);
+        select count(*) into cnt from public.leave_all_balances();
+        if cnt = 0 then
+          raise exception
+            'INVARIANT FAIL: leave_all_balances returns nothing to an administrator, so the refusal above proves nothing about roles';
+        end if;
+
+        -- ── one tenant at a time ──────────────────────────────────────────────
+        select count(*) into cnt
+          from public.leave_all_balances() rep
+          join public.profiles p on p.id = rep.employee_id
+         where p.organization_id <> acme;
+        if cnt > 0 then
+          raise exception
+            'INVARIANT FAIL: leave_all_balances handed Acme''s administrator % row(s) belonging to another organisation', cnt;
+        end if;
+
+        select count(*) into cnt
+          from public.leave_taken_report(date '2000-01-01', date '2099-12-31')
+         where leave_request_id = req_vertex;
+        if cnt > 0 then
+          raise exception
+            'INVARIANT FAIL: leave_taken_report showed Acme''s administrator a Vertex leave request';
+        end if;
+
+        -- ...and it does see its OWN, so the absence above is isolation rather
+        -- than an empty report.
+        select count(*) into cnt
+          from public.leave_taken_report(date '2000-01-01', date '2099-12-31')
+         where leave_request_id = req_acme;
+        if cnt <> 1 then
+          raise exception
+            'INVARIANT FAIL: leave_taken_report did not return Acme''s own request, so its tenant isolation is untested';
+        end if;
+
+        select count(*) into cnt
+          from public.leave_pending_report() where leave_request_id = req_vertex;
+        if cnt > 0 then
+          raise exception
+            'INVARIANT FAIL: leave_pending_report showed Acme''s administrator a Vertex leave request';
+        end if;
+
+        select count(*) into cnt
+          from public.leave_pending_report() where leave_request_id = req_acme;
+        if cnt <> 1 then
+          raise exception
+            'INVARIANT FAIL: leave_pending_report did not return Acme''s own pending request, so its tenant isolation is untested';
+        end if;
+
+        -- And the same from the other side, because a function that returned
+        -- only Acme's rows to everybody would pass every assertion above.
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', bob, 'role','authenticated')::text, true);
+
+        select count(*) into cnt
+          from public.leave_taken_report(date '2000-01-01', date '2099-12-31')
+         where leave_request_id = req_acme;
+        if cnt > 0 then
+          raise exception
+            'INVARIANT FAIL: leave_taken_report showed Vertex''s administrator an Acme leave request';
+        end if;
+
+        select count(*) into cnt
+          from public.leave_pending_report() where leave_request_id = req_vertex;
+        if cnt <> 1 then
+          raise exception
+            'INVARIANT FAIL: leave_pending_report did not return Vertex''s own pending request';
+        end if;
+
+        select count(*) into cnt
+          from public.leave_all_balances() rep
+          join public.profiles p on p.id = rep.employee_id
+         where p.organization_id <> vertex;
+        if cnt > 0 then
+          raise exception
+            'INVARIANT FAIL: leave_all_balances handed Vertex''s administrator % row(s) belonging to another organisation', cnt;
+        end if;
+
+        raise notice 'ok: no report crosses a tenant boundary, in either direction';
+
+        -- ── put the database back ─────────────────────────────────────────────
+        --
+        -- Cancelled first, as the employee, so the reserved days go back where
+        -- they came from — the balance reconciliation later in this file would
+        -- otherwise fail on this block's own fixture. Then removed outright, so
+        -- nothing downstream sees leave that a test invented.
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', ravi, 'role','authenticated')::text, true);
+        perform public.leave_cancel(req_acme);
+        perform set_config('request.jwt.claims',
+                 json_build_object('sub', sara, 'role','authenticated')::text, true);
+        perform public.leave_cancel(req_vertex);
+
+        perform set_config('role', 'postgres', true);
+        perform set_config('request.jwt.claims', null, true);
+
+        delete from public.leave_requests where id in (req_acme, req_vertex);
+        delete from public.approval_steps
+         where approval_request_id in (ar_acme, ar_vertex);
+        delete from public.approval_requests where id in (ar_acme, ar_vertex);
+      end;
+    end if;
+
     ------------------------------------------- nothing is reachable anonymously
     --
     -- On 2 Aug 2026, minutes after the cutover, `notify_address` was callable on
