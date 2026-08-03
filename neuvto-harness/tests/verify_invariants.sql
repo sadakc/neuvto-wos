@@ -13,6 +13,7 @@ do $$
 declare
   bad record;
   n   bigint;
+  offenders text;
 begin
   -- ══════════════════════════════════════════════════ PHASE 0 — platform
 
@@ -756,6 +757,41 @@ begin
     end if;
     raise notice 'ok: no self-approvals';
   end if;
+
+  -- ══════════════════════════════ PHASE 2 — every function pins its search_path
+  --
+  -- Supabase linter 0011 already catches this, on a dashboard nobody opens on
+  -- the day it starts mattering. Asserted here so it fails on the run that
+  -- introduces it instead.
+  --
+  -- Why it matters depends on the function. SECURITY DEFINER + mutable
+  -- search_path is privilege escalation: the function runs as its owner, so
+  -- bending what `profiles` resolves to executes the caller's code as postgres.
+  -- IMMUTABLE + mutable search_path is a lie to the planner, which is entitled
+  -- to constant-fold and index on that promise. Neither is a thing to leave to a
+  -- linter somebody remembers to read.
+  --
+  -- Extension-owned functions are excluded: btree_gist installs into public, its
+  -- several hundred gbt_* helpers set no search_path, and none of them are ours
+  -- to alter. Anything NOT owned by an extension is ours and has no excuse.
+  select coalesce(string_agg(p.proname, ', ' order by p.proname), '')
+    into offenders
+  from pg_proc p
+  join pg_namespace nsp on nsp.oid = p.pronamespace
+  where nsp.nspname = 'public'
+    and p.prokind = 'f'
+    and not exists (
+      select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e'
+    )
+    and (p.proconfig is null
+         or not exists (
+           select 1 from unnest(p.proconfig) c where c like 'search\_path=%'
+         ));
+  if offenders <> '' then
+    raise exception
+      'INVARIANT FAIL: these functions do not pin search_path: %', offenders;
+  end if;
+  raise notice 'ok: every function in public pins its search_path';
 
   raise notice '--- invariant verification passed ---';
 end $$;
