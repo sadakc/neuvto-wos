@@ -62,6 +62,7 @@ function MembersPage() {
   const [successor, setSuccessor] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
+  const [query, setQuery] = useState("");
 
   const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
 
@@ -212,9 +213,34 @@ function MembersPage() {
     );
   }
 
-  const pending = invitations.filter((i) => !i.acceptedAt && !i.revokedAt);
-  const active = members.filter((m) => m.isActive);
-  const inactive = members.filter((m) => !m.isActive);
+  /**
+   * Filters every list, not just the active one.
+   *
+   * Somebody looking for a name does not know which of the three the person is
+   * in — that is usually the question. Searching only "In this workspace" would
+   * answer "no such person" for somebody who is sitting in Waiting to join,
+   * which is worse than not searching at all.
+   *
+   * Roles are matched through their LABELS, because "Administrator" is the word
+   * on screen; `org_admin` is a database value nobody typing into a search box
+   * is thinking of.
+   */
+  const q = query.trim().toLowerCase();
+  const hits = (...fields: (string | null | undefined)[]) =>
+    q === "" || fields.some((f) => f && f.toLowerCase().includes(q));
+
+  const pending = invitations
+    .filter((i) => !i.acceptedAt && !i.revokedAt)
+    .filter((i) => hits(i.email, i.fullName, i.phone, ROLE_LABELS[i.role]));
+  const active = members
+    .filter((m) => m.isActive)
+    .filter((m) => hits(m.email, m.fullName, m.phone, ...m.roles.map((r) => ROLE_LABELS[r])));
+  const inactive = members
+    .filter((m) => !m.isActive)
+    .filter((m) => hits(m.email, m.fullName, m.phone, ...m.roles.map((r) => ROLE_LABELS[r])));
+
+  const searching = q !== "";
+  const nothingMatches = searching && !pending.length && !active.length && !inactive.length;
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
@@ -258,6 +284,37 @@ function MembersPage() {
           className="mt-4 text-sm text-muted-foreground"
         >
           {notice}
+        </p>
+      )}
+
+      {/* ─────────────────────────────────────────────── find */}
+      {/* Filters what is already loaded, so it is instant and needs no debounce.
+          Hidden until the workspace is big enough to need it: a search box above
+          four people is clutter that implies the list is longer than it is. */}
+      {members.length + invitations.length > 8 && (
+        <div className="mt-8">
+          <label htmlFor="people-search" className="block text-sm font-medium">
+            Find somebody
+          </label>
+          <input
+            id="people-search"
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, email, phone, or role…"
+            data-testid="people-search"
+            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+          />
+        </div>
+      )}
+
+      {nothingMatches && (
+        <p
+          data-testid="people-no-match"
+          className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
+        >
+          Nobody here matches “{query.trim()}”. Somebody who has never been invited will not appear
+          — invite them above.
         </p>
       )}
 
@@ -313,121 +370,74 @@ function MembersPage() {
       )}
 
       {/* ─────────────────────────────────────────────── members */}
-      <section className="mt-10">
-        <h2 className="font-display text-base font-semibold">In this workspace</h2>
-        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-          Who reports to whom decides who approves what — the approval chain resolves the reporting
-          manager, so a person with nobody above them has nowhere to send a request.
-        </p>
-        <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
-          {active.map((m) => (
-            <li key={m.id} data-testid="member-row" className="p-4">
-              <div className="flex items-baseline justify-between gap-4">
-                <span className="min-w-0">
-                  <span className="block truncate text-sm font-medium">
-                    {m.fullName || m.email}
-                    {m.id === user?.id && (
-                      <span className="ml-2 text-xs font-normal text-muted-foreground">you</span>
-                    )}
+      {/* Hidden while a search is narrowing things and nothing here matched.
+          An empty bordered list under "Nobody matches" reads as a second,
+          contradictory answer to the same question. */}
+      {(active.length > 0 || !searching) && (
+        <section className="mt-10">
+          <h2 className="font-display text-base font-semibold">In this workspace</h2>
+          <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+            Who reports to whom decides who approves what — the approval chain resolves the
+            reporting manager, so a person with nobody above them has nowhere to send a request.
+          </p>
+          <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+            {active.map((m) => (
+              <li key={m.id} data-testid="member-row" className="p-4">
+                <div className="flex items-baseline justify-between gap-4">
+                  <span className="min-w-0">
+                    <span className="block truncate text-sm font-medium">
+                      {m.fullName || m.email}
+                      {m.id === user?.id && (
+                        <span className="ml-2 text-xs font-normal text-muted-foreground">you</span>
+                      )}
+                    </span>
+                    <span className="block truncate text-xs text-muted-foreground">
+                      {m.email}
+                      {m.phone ? ` · ${m.phone}` : ""}
+                    </span>
                   </span>
-                  <span className="block truncate text-xs text-muted-foreground">
-                    {m.email}
-                    {m.phone ? ` · ${m.phone}` : ""}
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {m.roles.map((r) => ROLE_LABELS[r]).join(", ") || "Employee"}
                   </span>
-                </span>
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {m.roles.map((r) => ROLE_LABELS[r]).join(", ") || "Employee"}
-                </span>
-              </div>
+                </div>
 
-              {/* The start date drives pro-rated entitlement (D3), so changing
+                {/* The start date drives pro-rated entitlement (D3), so changing
                   it changes how much leave this person gets for the year. Kept
                   editable — a typo at onboarding is common — and every change is
                   recorded with the row before and after. */}
-              <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label htmlFor={`joined-${m.id}`} className="text-xs text-muted-foreground sm:w-28">
-                  Started
-                </label>
-                <input
-                  id={`joined-${m.id}`}
-                  type="date"
-                  data-testid="joined-date"
-                  defaultValue={m.joinedDate}
-                  onBlur={(e) => {
-                    if (e.target.value && e.target.value !== m.joinedDate) {
-                      void onSetJoinedDate(m.id, e.target.value);
-                    }
-                  }}
-                  className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-                />
-              </div>
-
-              <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
-                <label htmlFor={`mgr-${m.id}`} className="text-xs text-muted-foreground sm:w-28">
-                  Reports to
-                </label>
-                <select
-                  id={`mgr-${m.id}`}
-                  data-testid="reporting-line"
-                  value={m.managerId ?? ""}
-                  onChange={(e) => onSetManager(m.id, e.target.value || null)}
-                  className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-                >
-                  <option value="">Nobody</option>
-                  {active
-                    .filter((c) => c.id !== m.id)
-                    .map((c) => (
-                      <option key={c.id} value={c.id}>
-                        {c.fullName || c.email}
-                      </option>
-                    ))}
-                </select>
-
-                {m.id !== user?.id && (
-                  <button
-                    onClick={() => onAskDeactivate(m)}
-                    data-testid="deactivate"
-                    className="inline-flex h-12 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
+                <div className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label
+                    htmlFor={`joined-${m.id}`}
+                    className="text-xs text-muted-foreground sm:w-28"
                   >
-                    Deactivate
-                  </button>
-                )}
-              </div>
+                    Started
+                  </label>
+                  <input
+                    id={`joined-${m.id}`}
+                    type="date"
+                    data-testid="joined-date"
+                    defaultValue={m.joinedDate}
+                    onBlur={(e) => {
+                      if (e.target.value && e.target.value !== m.joinedDate) {
+                        void onSetJoinedDate(m.id, e.target.value);
+                      }
+                    }}
+                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                  />
+                </div>
 
-              {/* The confirmation, inline rather than a modal: it has to name what
-                  moves, and a person deciding that wants the list in front of
-                  them, not behind a dialog. */}
-              {leaving?.id === m.id && (
-                <div
-                  data-testid="deactivate-confirm"
-                  className="mt-3 rounded-md border border-border bg-secondary/30 p-4"
-                >
-                  <p className="text-sm font-medium">Deactivate {m.fullName || m.email}?</p>
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {impact === null
-                      ? "Checking what they hold…"
-                      : impact.reports === 0 && impact.approvals === 0
-                        ? "They hold no reports and no waiting approvals."
-                        : `${impact.reports} direct report${impact.reports === 1 ? "" : "s"} and ` +
-                          `${impact.approvals} waiting approval${impact.approvals === 1 ? "" : "s"} ` +
-                          `will move to whoever you choose.`}
-                  </p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Their own leave that is still awaiting approval is cancelled and the days go
-                    back. Leave already approved is left alone.
-                  </p>
-
-                  <label htmlFor={`succ-${m.id}`} className="mt-3 block text-sm font-medium">
-                    Hand their work to
+                <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                  <label htmlFor={`mgr-${m.id}`} className="text-xs text-muted-foreground sm:w-28">
+                    Reports to
                   </label>
                   <select
-                    id={`succ-${m.id}`}
-                    data-testid="successor"
-                    value={successor}
-                    onChange={(e) => setSuccessor(e.target.value)}
-                    className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                    id={`mgr-${m.id}`}
+                    data-testid="reporting-line"
+                    value={m.managerId ?? ""}
+                    onChange={(e) => onSetManager(m.id, e.target.value || null)}
+                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
                   >
-                    <option value="">Choose somebody…</option>
+                    <option value="">Nobody</option>
                     {active
                       .filter((c) => c.id !== m.id)
                       .map((c) => (
@@ -437,34 +447,89 @@ function MembersPage() {
                       ))}
                   </select>
 
-                  <div className="mt-3 flex gap-2">
-                    {/* min-h rather than h: at 280px this label wraps to three
+                  {m.id !== user?.id && (
+                    <button
+                      onClick={() => onAskDeactivate(m)}
+                      data-testid="deactivate"
+                      className="inline-flex h-12 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
+                    >
+                      Deactivate
+                    </button>
+                  )}
+                </div>
+
+                {/* The confirmation, inline rather than a modal: it has to name what
+                  moves, and a person deciding that wants the list in front of
+                  them, not behind a dialog. */}
+                {leaving?.id === m.id && (
+                  <div
+                    data-testid="deactivate-confirm"
+                    className="mt-3 rounded-md border border-border bg-secondary/30 p-4"
+                  >
+                    <p className="text-sm font-medium">Deactivate {m.fullName || m.email}?</p>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                      {impact === null
+                        ? "Checking what they hold…"
+                        : impact.reports === 0 && impact.approvals === 0
+                          ? "They hold no reports and no waiting approvals."
+                          : `${impact.reports} direct report${impact.reports === 1 ? "" : "s"} and ` +
+                            `${impact.approvals} waiting approval${impact.approvals === 1 ? "" : "s"} ` +
+                            `will move to whoever you choose.`}
+                    </p>
+                    <p className="mt-1 text-xs text-muted-foreground">
+                      Their own leave that is still awaiting approval is cancelled and the days go
+                      back. Leave already approved is left alone.
+                    </p>
+
+                    <label htmlFor={`succ-${m.id}`} className="mt-3 block text-sm font-medium">
+                      Hand their work to
+                    </label>
+                    <select
+                      id={`succ-${m.id}`}
+                      data-testid="successor"
+                      value={successor}
+                      onChange={(e) => setSuccessor(e.target.value)}
+                      className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                    >
+                      <option value="">Choose somebody…</option>
+                      {active
+                        .filter((c) => c.id !== m.id)
+                        .map((c) => (
+                          <option key={c.id} value={c.id}>
+                            {c.fullName || c.email}
+                          </option>
+                        ))}
+                    </select>
+
+                    <div className="mt-3 flex gap-2">
+                      {/* min-h rather than h: at 280px this label wraps to three
                         lines, and a fixed 48px box clipped the last word — the
                         primary action read "Deactivate and hand" with "over"
                         cut off. Found by looking at it on a phone-width screen;
                         it renders fine on a desktop. The 48px floor the design
                         system asks for is preserved. */}
-                    <button
-                      onClick={() => onDeactivate(m.id)}
-                      disabled={!successor || busy}
-                      data-testid="confirm-deactivate"
-                      className="inline-flex min-h-12 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
-                    >
-                      {busy ? "Deactivating…" : "Deactivate and hand over"}
-                    </button>
-                    <button
-                      onClick={() => setLeaving(null)}
-                      className="inline-flex min-h-12 items-center rounded-md border border-border px-4 py-2 text-sm"
-                    >
-                      Cancel
-                    </button>
+                      <button
+                        onClick={() => onDeactivate(m.id)}
+                        disabled={!successor || busy}
+                        data-testid="confirm-deactivate"
+                        className="inline-flex min-h-12 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                      >
+                        {busy ? "Deactivating…" : "Deactivate and hand over"}
+                      </button>
+                      <button
+                        onClick={() => setLeaving(null)}
+                        className="inline-flex min-h-12 items-center rounded-md border border-border px-4 py-2 text-sm"
+                      >
+                        Cancel
+                      </button>
+                    </div>
                   </div>
-                </div>
-              )}
-            </li>
-          ))}
-        </ul>
-      </section>
+                )}
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
 
       {/* ─────────────────────────────────────────────── inactive
           Listed rather than hidden. Somebody who has left is still on last

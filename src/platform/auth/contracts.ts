@@ -63,10 +63,22 @@ export type SignupInput = z.infer<typeof SignupInput>;
 export const PhoneInput = z
   .string()
   .trim()
+  // Permissive about SHAPE, not about content. The previous rule stripped every
+  // non-digit before counting, so it asked "are there six digits in here
+  // somewhere" — and `abc123456xyz` answered yes. Separators people genuinely
+  // type are allowed; letters are not, because no phone number contains one.
   .refine(
-    (v) => v === "" || v.replace(/\D/g, "").length >= 6,
-    "That doesn't look like a phone number",
+    (v) => v === "" || /^\+?[\d\s().-]+$/.test(v),
+    "A phone number can only contain digits, spaces, and + ( ) - .",
   )
+  // E.164 caps a full international number at 15 digits, country code included.
+  // The old rule bounded the STRING at 32 characters and the digits not at all,
+  // which is how a 15-digit number typed twice got through.
+  .refine((v) => {
+    if (v === "") return true;
+    const digits = v.replace(/\D/g, "").length;
+    return digits >= 6 && digits <= 15;
+  }, "That doesn't look like a phone number — it should be 6 to 15 digits")
   .refine((v) => v.length <= 32, "That phone number is too long");
 
 /** Provisioning a customer workspace. Platform admins only — see `platform.ts`. */

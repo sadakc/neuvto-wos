@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { EmailInput, VerifyOtpInput, SignupInput, suggestSlug } from "./contracts";
+import { EmailInput, VerifyOtpInput, SignupInput, PhoneInput, suggestSlug } from "./contracts";
 import { hasRole, isAdmin, canApprove } from "./session";
 import type { CurrentUser } from "./contracts";
 
@@ -13,6 +13,47 @@ function user(roles: CurrentUser["roles"]): CurrentUser {
     roles,
   };
 }
+
+describe("PhoneInput", () => {
+  // Every rejection here was accepted before, and was found by typing into the
+  // invite form rather than by reading the rule.
+  it("refuses letters", () => {
+    // The old rule stripped non-digits and then counted, so this asked only
+    // "are there six digits in here somewhere" — and this string says yes.
+    expect(() => PhoneInput.parse("abc123456xyz")).toThrow();
+    expect(() => PhoneInput.parse("98765ABCDE")).toThrow();
+  });
+
+  it("refuses more digits than a phone number can have", () => {
+    // E.164 allows 15 digits including the country code. Sixteen is not a long
+    // phone number, it is a typo or a different field's contents.
+    expect(() => PhoneInput.parse("1234567890123456")).toThrow();
+  });
+
+  it("accepts the formats an administrator actually types", () => {
+    for (const v of [
+      "+91 98765 43210",
+      "+919876543210",
+      "9876543210",
+      "(020) 7946-0958",
+      "+44 20 7946 0958",
+    ]) {
+      expect(PhoneInput.parse(v)).toBe(v);
+    }
+  });
+
+  it("accepts empty, because phone is optional", () => {
+    // D41: captured, not verified, and not an identity key. Requiring it would
+    // block an invitation over a field that does no work yet.
+    expect(PhoneInput.parse("")).toBe("");
+  });
+
+  it("accepts exactly 15 digits and refuses 5", () => {
+    // The boundaries, stated once so a later tightening has to argue with them.
+    expect(PhoneInput.parse("+123456789012345")).toBe("+123456789012345");
+    expect(() => PhoneInput.parse("12345")).toThrow();
+  });
+});
 
 describe("EmailInput", () => {
   it("normalises case and whitespace so the same person is one account", () => {
