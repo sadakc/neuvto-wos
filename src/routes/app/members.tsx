@@ -229,15 +229,34 @@ function MembersPage() {
   const hits = (...fields: (string | null | undefined)[]) =>
     q === "" || fields.some((f) => f && f.toLowerCase().includes(q));
 
+  /**
+   * Two lists, and the difference between them is load-bearing.
+   *
+   * `allActive` is everybody. It is what the "Reports to" and successor dropdowns
+   * are built from, and it must never be narrowed by the search box.
+   *
+   * Getting this wrong once was instructive. When those dropdowns were built
+   * from the FILTERED list, searching "ravi" left Ravi as the only candidate, so
+   * the option for his actual manager no longer existed — and a <select> whose
+   * value is absent from its options falls back to rendering the first one.
+   * Every row read "Reports to: Nobody". Nothing had changed in the database;
+   * the control was simply describing a list it had been given instead of the
+   * person it belongs to. A field that misreports saved state is worse than one
+   * that fails, because there is nothing to notice.
+   *
+   * The search narrows which people are LISTED. It has no opinion about who can
+   * be somebody's manager.
+   */
+  const matchesQuery = (m: Member) =>
+    hits(m.email, m.fullName, m.phone, ...m.roles.map((r) => ROLE_LABELS[r]));
+
+  const allActive = members.filter((m) => m.isActive);
+
   const pending = invitations
     .filter((i) => !i.acceptedAt && !i.revokedAt)
     .filter((i) => hits(i.email, i.fullName, i.phone, ROLE_LABELS[i.role]));
-  const active = members
-    .filter((m) => m.isActive)
-    .filter((m) => hits(m.email, m.fullName, m.phone, ...m.roles.map((r) => ROLE_LABELS[r])));
-  const inactive = members
-    .filter((m) => !m.isActive)
-    .filter((m) => hits(m.email, m.fullName, m.phone, ...m.roles.map((r) => ROLE_LABELS[r])));
+  const active = allActive.filter(matchesQuery);
+  const inactive = members.filter((m) => !m.isActive).filter(matchesQuery);
 
   const searching = q !== "";
   const nothingMatches = searching && !pending.length && !active.length && !inactive.length;
@@ -439,7 +458,8 @@ function MembersPage() {
                     className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
                   >
                     <option value="">Nobody</option>
-                    {active
+                    {/* allActive, never the filtered list — see the note above it. */}
+                    {allActive
                       .filter((c) => c.id !== m.id)
                       .map((c) => (
                         <option key={c.id} value={c.id}>
@@ -493,7 +513,11 @@ function MembersPage() {
                       className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
                     >
                       <option value="">Choose somebody…</option>
-                      {active
+                      {/* allActive too. Handing somebody's reports and approvals
+                          over is a decision about the whole workspace, and the
+                          right successor is very often somebody the search that
+                          found this person has filtered out. */}
+                      {allActive
                         .filter((c) => c.id !== m.id)
                         .map((c) => (
                           <option key={c.id} value={c.id}>
