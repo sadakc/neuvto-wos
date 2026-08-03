@@ -429,9 +429,30 @@ is the separate gap above, and it does not block sign-in.
 bash scripts/apply-auth-email-config.sh
 ```
 
-It pushes the template, sets the subject, raises the hourly limit, and then reads
-all of it back rather than trusting the `200`. It refuses to run at all until
-SMTP is set, so it cannot leave you with half of it applied.
+It pushes **both** sign-in templates, sets their subjects, raises the hourly
+limit, and then reads all of it back rather than trusting the `200`. It refuses
+to run at all until SMTP is set, so it cannot leave you with half of it applied.
+
+**Both, because the second one is the one that actually fires.** `signInWithOtp()`
+against an address GoTrue has never seen creates the user and sends **Confirm
+signup**, not Magic Link — fault 3 above, which this document has recorded since
+31 July. On a project with no profiles in it yet, that is _every_ person, not an
+edge case.
+
+The first version of this script pushed only Magic Link. It printed
+`ok template carries {{ .Token }}` and a first-time signup still received a bare
+link, because the template it checked was not the template being sent. A
+verification that reads back the wrong field is worse than none: it converts an
+open question into a settled one. Both are now pushed, and both are checked
+separately.
+
+> **Open, and a decision rather than a defect:** `mailer_autoconfirm` is `false`
+> on `neuvto-wos-prod`, so the Confirm-signup path stays live. `config.toml`
+> declares `enable_confirmations = false`, which is why the local stack only ever
+> uses Magic Link — the two environments take different routes to the same
+> screen. Both templates now carry the code, so either route works and nothing is
+> broken. Aligning them is worth doing deliberately, not as a side effect of an
+> email fix.
 
 **The rate limit is the trap.** Supabase's built-in sender caps auth email at
 **2 per hour** and does not let you change it — which is what
@@ -448,6 +469,30 @@ true at once, and only the last is visible from the config:
 - it contains a **six-digit code**, not only a link
 - the code is **accepted** by the form
 
+Test with an address **that has never signed in before**, and then with one that
+has. They take different routes — Confirm signup and Magic Link — and for months
+only one of them was ever checked.
+
 Until the published site is rebuilt against `neuvto-wos-prod` this proves the
 project is correct, not that a customer's sign-in works — `neuvto.com` still
 serves a bundle wired to Lovable's backend. See "Where this stands" above.
+
+### Applied to `neuvto-wos-prod`, 3 Aug 2026
+
+SMTP on, and the script run against it. Read back from the API afterwards rather
+than taken from the script's own output:
+
+|                                         |                                                         |
+| --------------------------------------- | ------------------------------------------------------- |
+| `smtp_host` / `smtp_port` / `smtp_user` | `smtp.resend.com` / `465` / `resend`                    |
+| sender                                  | `Neuvto <notifications@neuvto.com>`                     |
+| `mailer_subjects_magic_link`            | `Your Neuvto sign-in code`                              |
+| `mailer_subjects_confirmation`          | `Your Neuvto sign-in code`                              |
+| Magic Link template                     | carries `{{ .Token }}` **and** `{{ .ConfirmationURL }}` |
+| Confirm signup template                 | carries `{{ .Token }}` **and** `{{ .ConfirmationURL }}` |
+| `rate_limit_email_sent`                 | 100/hour                                                |
+| `mailer_otp_length` / `mailer_otp_exp`  | 6 / 3600s                                               |
+
+What this does **not** prove: that the SMTP password is right. Nothing readable
+from the config can — a wrong key produces a configuration that looks exactly
+like this one and an inbox that stays empty. Only a real send settles it.

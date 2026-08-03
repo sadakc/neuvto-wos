@@ -108,9 +108,29 @@ echo "── SMTP is configured ($SMTP_HOST) — the template can be set"
 PAYLOAD=$(mktemp); trap 'rm -f "$PAYLOAD"' EXIT
 TEMPLATE_PATH="$TEMPLATE" SUBJECT="$SUBJECT" RATE_LIMIT="$RATE_LIMIT" python3 - "$PAYLOAD" <<'PY'
 import json, os, sys, pathlib
+
+body = pathlib.Path(os.environ["TEMPLATE_PATH"]).read_text()
+subject = os.environ["SUBJECT"]
+
 json.dump({
-    "mailer_templates_magic_link_content": pathlib.Path(os.environ["TEMPLATE_PATH"]).read_text(),
-    "mailer_subjects_magic_link": os.environ["SUBJECT"],
+    # BOTH templates, and the second one is the one that actually fires.
+    #
+    # signInWithOtp() against an address GoTrue has never seen creates the user
+    # and sends "Confirm signup" — not "Magic Link". So the first person ever to
+    # use a workspace gets the one template nobody thinks to check, and on a
+    # project with no profiles in it yet that is every single person.
+    #
+    # This script pushed only magic_link when it was written, which read as
+    # green and fixed nothing for a new signup: the config said the template
+    # carried {{ .Token }}, and the email that actually arrived did not.
+    #
+    # The same body serves both. From the reader's side there is no difference
+    # worth drawing — they asked to sign in and a code arrived — and one body
+    # cannot drift from the other.
+    "mailer_templates_magic_link_content": body,
+    "mailer_subjects_magic_link": subject,
+    "mailer_templates_confirmation_content": body,
+    "mailer_subjects_confirmation": subject,
     "rate_limit_email_sent": int(os.environ["RATE_LIMIT"]),
 }, open(sys.argv[1], "w"))
 PY
@@ -133,7 +153,6 @@ fi
 api_get | RATE_LIMIT="$RATE_LIMIT" SUBJECT="$SUBJECT" python3 -c "
 import json, os, sys
 c = json.load(sys.stdin)
-t = c.get('mailer_templates_magic_link_content') or ''
 ok = True
 def check(label, actual, expected):
     global ok
@@ -142,11 +161,21 @@ def check(label, actual, expected):
     print(f\"   {'ok ' if good else 'BAD'} {label}: {actual!r}\")
 
 print('── reading it back')
-check('subject', c.get('mailer_subjects_magic_link'), os.environ['SUBJECT'])
+check('subject (magic link)', c.get('mailer_subjects_magic_link'), os.environ['SUBJECT'])
+check('subject (confirm signup)', c.get('mailer_subjects_confirmation'), os.environ['SUBJECT'])
 check('rate limit (emails/hour)', c.get('rate_limit_email_sent'), int(os.environ['RATE_LIMIT']))
 check('OTP length', c.get('mailer_otp_length'), 6)
-print(f\"   {'ok ' if '{{ .Token }}' in t else 'BAD'} template carries {{{{ .Token }}}}\")
-ok = ok and '{{ .Token }}' in t
+
+# Both, separately. A new address gets 'confirmation'; only a returning one gets
+# 'magic_link'. Checking whichever happens to be handy is how this script
+# reported success while a first-time signup still received a bare link.
+for label, key in (('magic link', 'mailer_templates_magic_link_content'),
+                   ('confirm signup', 'mailer_templates_confirmation_content')):
+    body = c.get(key) or ''
+    good = '{{ .Token }}' in body
+    ok = ok and good
+    print(f\"   {'ok ' if good else 'BAD'} {label} template carries {{{{ .Token }}}}\")
+
 sys.exit(0 if ok else 1)
 " || { echo "── one or more settings did not stick." >&2; exit 1; }
 
