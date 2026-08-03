@@ -601,7 +601,47 @@ Built in step 8 unless marked otherwise.
 - Notification toggles — _not built_
 - **CSV employee import** (D11) — upload, column mapping, dry-run preview showing what will be created and what will fail, per-row error reporting, partial success. Required columns: `email`, `full_name`, `joined_date`; optional: `manager_email`, `department`, `role`. Manager links resolve by email in a second pass so order in the file doesn't matter.
 - **Opening balances** (D11) — for customers onboarding mid-year: per employee per leave type, set `used_days` and `carryforward_days` directly. Available as a column in the same CSV and as an inline edit on the balance report. Every override writes an audit row with the previous value — this is `leave:balance:override` from `07`, and it must be traceable.
-- Reports 1, 3, 4 with CSV export
+- **Reports** (platform destination, filled by modules) — the three below
+
+### Reports — step 14
+
+Until now this document said "Reports 1, 3, 4", numbers that refer to a PRD which is not in
+this repository. Nobody could tell from here what report 3 was, so the three had to be agreed
+in conversation before step 14 could start. They are written down here so that never has to
+happen again.
+
+Each answers a question somebody asks out loud, which is the only test a report passes or
+fails.
+
+| #   | Report                | The question                                                                                                                                                                                                                                                                                                | Filters                                                                                        |
+| --- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| 1   | **Leave balances**    | Who has what left? Employee × leave type, entitled / carried over / used / available, for the current leave year. Includes people whose balance row does not exist yet, showing what they _would_ get — otherwise the person most needing an opening balance is the one missing from the list.              | Department, leave type                                                                         |
+| 2   | **Leave taken**       | What happened? Every request **overlapping** the window — not starting within it — including **rejected and cancelled** ones. "We have no record of that" is the answer this report exists to prevent, and a refused request is precisely the one somebody later disputes.                                  | Date range, defaulting to the current month in the **organisation's** timezone                 |
+| 3   | **Pending approvals** | What is stuck? Everything awaiting a decision, **longest wait first**, with which level it sits at and **everyone** who can act now — a level can have more than one approver and any of them unblocks it. `approval_queue()` answers this for the caller; this is the administrator's view of everybody's. | None. A list of everything stuck is short by definition, and if it is not, that is the finding |
+
+All three export to CSV, with a UTF-8 BOM so Excel on Windows does not mangle a name like
+`Priyā`, and a filename carrying the **organisation's** day rather than the browser's (D9) —
+these files are emailed and filed, and two exports a month apart are otherwise
+indistinguishable.
+
+**Access: administrators only** (`org_admin`, `hr_admin`). Managers already have Approvals and
+the Team Calendar; these three are every person in the workspace at once, and widening them
+would put a colleague's sick-leave consumption in front of more people than D35 permits
+elsewhere.
+
+Every report function **raises FORBIDDEN rather than returning an empty set**. An empty report
+and a forbidden report are the same picture on screen and only one of them is a bug. The screen
+is not the permission: `/app/reports` also refuses a non-admin, but that is presentation, and a
+screen that is merely not linked has never been a permission.
+
+**Reports is a PLATFORM destination that modules fill**, not a Leave nav item — the constraint
+that shaped the rest. `mergeNavItems` puts module items at positions 2–4 and the mobile bar
+shows the first **five**. A fourth Leave entry pushes "Approvals" off the bar for an
+administrator: the identical bug the team calendar caused in step 10, found only by opening the
+app at 280px wide. Reports sits with People and Settings, which fall off the bar deliberately,
+because admin work is desktop-first. A module contributes reports through
+`ModuleDefinition.reports` and the platform renders them without knowing any of them concern
+leave (D30).
 
 ---
 
@@ -632,23 +672,23 @@ documented, granted, and wired to nothing.** It has happened four times — `ens
 has its own CI check, `scripts/verify-functions-wired.sh`, which fails the build when a
 function our migrations define is referenced nowhere but its own definition.
 
-| Status   | Step | Content                                                                                             | Gate                                                                                                                                                 |
-| -------- | ---- | --------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **done** | 0    | Vitest + GitHub Actions CI                                                                          | Lint, typecheck, unit tests, and the SQL harness run on every push                                                                                   |
-| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                                                   | Cross-org isolation verified by SQL as each role                                                                                                     |
-| **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup                       | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                                                               |
-| **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                                         | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary                                             |
-| **done** | 4    | Phase 1 — Approval Engine                                                                           | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                                                            |
-| **done** | 5    | Phase 1 — Notification Engine + Resend                                                              | Template renders, email delivers, `notifications` row marked sent                                                                                    |
-| **done** | 6    | Phase 2 — Module SDK + Leave schema, entitlement, lazy balances, locked submission                  | Balance invariant holds under **concurrent** submission; engine creates correct levels                                                               |
-| **done** | 7    | Phase 3 — Employee UI                                                                               | PRD AC1–AC3, AC5, AC7                                                                                                                                |
-| **done** | 8    | The first run — provisioning, invitations, admin config, PWA                                        | A provisioned workspace is usable end to end with no SQL; platform admins read zero tenant rows                                                      |
-| **done** | 9    | **The platform is the product** — scheduled work, the module boundary, company identity, onboarding | The platform acceptance criteria below, in full                                                                                                      |
-| **done** | 10   | Phase 3 — Manager UI + decision handling                                                            | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                                                                       |
-| **done** | 11   | Guarded deactivation + reporting lines                                                              | PRD AC9; deactivating a manager with reports is blocked                                                                                              |
-| **done** | 12   | Access follows deactivation, and a way back                                                         | A deactivated person reads nothing and can do nothing; reactivation restores access only (D52)                                                       |
-| **done** | 13   | Bringing a company's existing staff in — CSV import + opening balances                              | A row that fails is reported **and leaves nothing behind**; a start date in the file survives to the profile (D53); overrides audited by the trigger |
-| —        | 14   | Reports 1, 3, 4 + CSV export                                                                        | —                                                                                                                                                    |
+| Status   | Step | Content                                                                                             | Gate                                                                                                                                                                                             |
+| -------- | ---- | --------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| **done** | 0    | Vitest + GitHub Actions CI                                                                          | Lint, typecheck, unit tests, and the SQL harness run on every push                                                                                                                               |
+| **done** | 1    | Phase 0 — schema, RLS, security-definer functions                                                   | Cross-org isolation verified by SQL as each role                                                                                                                                                 |
+| **done** | 2    | Phase 0 — email OTP auth, auth wrapper, app shell, role-aware nav, org signup                       | Sign up → `/app` with correct nav per role; no `lovable` import outside the quarantine                                                                                                           |
+| **done** | 3    | Phase 1 — Audit Log + Working Calendar (incl. org timezone)                                         | Day math matches PRD Case 4; audit rows immutable; org-local "today" correct across the IST/UTC boundary                                                                                         |
+| **done** | 4    | Phase 1 — Approval Engine                                                                           | Drives a dummy entity type end to end, no leave tables; self-approval skips to next level                                                                                                        |
+| **done** | 5    | Phase 1 — Notification Engine + Resend                                                              | Template renders, email delivers, `notifications` row marked sent                                                                                                                                |
+| **done** | 6    | Phase 2 — Module SDK + Leave schema, entitlement, lazy balances, locked submission                  | Balance invariant holds under **concurrent** submission; engine creates correct levels                                                                                                           |
+| **done** | 7    | Phase 3 — Employee UI                                                                               | PRD AC1–AC3, AC5, AC7                                                                                                                                                                            |
+| **done** | 8    | The first run — provisioning, invitations, admin config, PWA                                        | A provisioned workspace is usable end to end with no SQL; platform admins read zero tenant rows                                                                                                  |
+| **done** | 9    | **The platform is the product** — scheduled work, the module boundary, company identity, onboarding | The platform acceptance criteria below, in full                                                                                                                                                  |
+| **done** | 10   | Phase 3 — Manager UI + decision handling                                                            | PRD AC4, AC6; Cases 1, 2, 3, 6                                                                                                                                                                   |
+| **done** | 11   | Guarded deactivation + reporting lines                                                              | PRD AC9; deactivating a manager with reports is blocked                                                                                                                                          |
+| **done** | 12   | Access follows deactivation, and a way back                                                         | A deactivated person reads nothing and can do nothing; reactivation restores access only (D52)                                                                                                   |
+| **done** | 13   | Bringing a company's existing staff in — CSV import + opening balances                              | A row that fails is reported **and leaves nothing behind**; a start date in the file survives to the profile (D53); overrides audited by the trigger                                             |
+| **done** | 14   | The three reports + CSV export — defined under "Reports — step 14" above                            | A non-admin is refused rather than shown an empty table by every report; no report crosses a tenant, asserted from both sides; the export is named for the organisation's day, not the browser's |
 
 ### Testing
 
