@@ -154,6 +154,63 @@ export interface LeaveApprovalDetail {
 }
 
 /**
+ * A row of each of the three reports, in this module's own vocabulary.
+ *
+ * `departmentName`, `decidedBy`, `waitingOn` and `reason` are nullable and the
+ * generated database types say otherwise — Supabase declares every column a
+ * function returns as non-null, and three of these are outer joins or scalar
+ * subqueries that legitimately produce nothing. Somebody with no department is
+ * the common case in a workspace that has not configured any.
+ */
+export interface LeaveBalanceReportRow {
+  employeeId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  fyLabel: string;
+  entitledDays: number;
+  carryforwardDays: number;
+  usedDays: number;
+  availableDays: number;
+}
+
+export interface LeaveTakenReportRow {
+  leaveRequestId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeName: string;
+  fromDate: string;
+  toDate: string;
+  workingDays: number;
+  status: LeaveStatus;
+  submittedAt: string | null;
+  decidedAt: string | null;
+  /** The last person to act. Null while it is still pending, which is the honest answer. */
+  decidedBy: string | null;
+  /** What the approver said. Distinct from `reason`, which is what the employee said. */
+  decisionNote: string | null;
+  reason: string | null;
+}
+
+export interface LeavePendingReportRow {
+  leaveRequestId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeName: string;
+  fromDate: string;
+  toDate: string;
+  workingDays: number;
+  submittedAt: string | null;
+  /** Counted in the organisation's own days, not the server's — see the migration. */
+  daysWaiting: number;
+  currentLevel: number;
+  requiredLevels: number;
+  /** Everyone who could act right now; a level can have more than one approver. */
+  waitingOn: string | null;
+}
+
+/**
  * Every refusal leave_submit() can raise, mapped to something a person can act
  * on. The database raises a stable code precisely so this mapping can exist —
  * showing a raw Postgres message to an employee is how a product loses trust in
@@ -185,6 +242,10 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   // which: a customer's employee should hear this from their administrator, not
   // infer their employer's commercial arrangements from an error message.
   MODULE_NOT_ENABLED: "Leave isn't switched on for this workspace. Ask your administrator.",
+  // The three reports raise this rather than returning an empty set, so that a
+  // report somebody may not see cannot be mistaken for a report with nothing in
+  // it. This message is what makes that distinction visible.
+  FORBIDDEN: "Reports cover everybody in the workspace, so they're limited to administrators.",
   LEAVE_TYPE_NAME_TAKEN: "There's already a leave type with that name.",
   LEAVE_TYPE_IN_USE:
     "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",
