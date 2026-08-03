@@ -13,7 +13,7 @@
  * they asked not to see.
  */
 
-import type { ReactNode } from "react";
+import { useMemo, useState, type ReactNode } from "react";
 import { downloadCsv, reportFilename } from "./csv";
 import { reportHeaders, reportMatrix, type ReportColumn } from "./table";
 
@@ -46,19 +46,74 @@ export function ReportView<T>({
   filters,
   today,
 }: ReportViewProps<T>) {
+  const [query, setQuery] = useState("");
+
   // Built once and used for both, so the file cannot disagree with the table.
   const headers = reportHeaders(columns);
-  const matrix = reportMatrix(columns, rows);
+  const fullMatrix = useMemo(() => reportMatrix(columns, rows), [columns, rows]);
 
-  const canExport = state === "ready" && rows.length > 0 && today !== null;
+  /**
+   * Search runs over the RENDERED cells, not the underlying row.
+   *
+   * That is the point rather than a shortcut: an administrator typing "finance"
+   * means the word they can see, and matching the source objects would quietly
+   * search fields the table does not show — finding a row for a reason nobody
+   * can point at is worse than not finding it.
+   *
+   * It also keeps the export honest. This component's contract is that the
+   * button writes exactly what is on screen, so the search has to narrow the
+   * matrix the file is built from, not just the rows the table draws.
+   */
+  const { visibleRows, matrix } = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    if (!q) return { visibleRows: rows, matrix: fullMatrix };
+
+    const keep: number[] = [];
+    fullMatrix.forEach((cells, i) => {
+      const hit = cells.some(
+        (c) => c !== null && c !== undefined && String(c).toLowerCase().includes(q),
+      );
+      if (hit) keep.push(i);
+    });
+    return { visibleRows: keep.map((i) => rows[i]), matrix: keep.map((i) => fullMatrix[i]) };
+  }, [query, rows, fullMatrix]);
+
+  const searching = query.trim() !== "";
+  const canExport = state === "ready" && visibleRows.length > 0 && today !== null;
 
   return (
     <div>
-      {filters && <div className="flex flex-wrap items-end gap-3">{filters}</div>}
+      <div className="flex flex-wrap items-end gap-3">
+        {filters}
+        {/* Narrows what is already on screen, so it needs no round trip and no
+            debounce — the rows are here. A report an administrator has to read
+            top to bottom to find one person is a report they stop opening. */}
+        <div className="min-w-48 flex-1">
+          <label htmlFor={`${slug}-search`} className="block text-sm font-medium">
+            Find somebody
+          </label>
+          <input
+            id={`${slug}-search`}
+            type="search"
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Name, department, type…"
+            data-testid={`${slug}-search`}
+            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+          />
+        </div>
+      </div>
 
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground" data-testid={`${slug}-count`}>
-          {state === "ready" ? `${rows.length} ${rows.length === 1 ? "row" : "rows"}` : " "}
+          {state === "ready"
+            ? searching
+              ? // Both numbers, because "3 rows" under a search box leaves the
+                // administrator wondering whether the rest are filtered out or
+                // were never there.
+                `${visibleRows.length} of ${rows.length} ${rows.length === 1 ? "row" : "rows"}`
+              : `${rows.length} ${rows.length === 1 ? "row" : "rows"}`
+            : " "}
         </p>
         <button
           type="button"
@@ -87,13 +142,27 @@ export function ReportView<T>({
 
       {state === "loading" && <div className="mt-4 h-64 animate-pulse rounded-lg bg-muted" />}
 
+      {/* Two different nothings. "No pending approvals" is good news about the
+          workspace; "nothing matches Priya" is a fact about the search box, and
+          quite possibly a typo. Showing the report's own empty message to
+          somebody who has just typed a name would answer a question they did
+          not ask. */}
       {state === "ready" && rows.length === 0 && (
         <p className="mt-4 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           {empty}
         </p>
       )}
 
-      {state === "ready" && rows.length > 0 && (
+      {state === "ready" && rows.length > 0 && visibleRows.length === 0 && (
+        <p
+          data-testid={`${slug}-no-match`}
+          className="mt-4 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
+        >
+          Nothing here matches “{query.trim()}”.
+        </p>
+      )}
+
+      {state === "ready" && visibleRows.length > 0 && (
         // Reports are wide by nature and admin work is desktop-first, which is
         // why Reports sits past position five in the navigation. On a narrow
         // screen the table scrolls sideways rather than reflowing: a row of a
@@ -117,7 +186,7 @@ export function ReportView<T>({
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
-              {rows.map((row, i) => (
+              {visibleRows.map((row, i) => (
                 <tr key={rowKey(row, i)} data-testid={`${slug}-row`}>
                   {matrix[i].map((cell, j) => (
                     <td

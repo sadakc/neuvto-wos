@@ -26,7 +26,14 @@ export default defineConfig({
     },
   },
   test: {
+    // Node by default; a component test opts into a DOM with
+    // `// @vitest-environment happy-dom` at the top of the file.
+    //
+    // Per-file rather than global so the 120-odd pure-function tests keep
+    // running in node — they are the fast majority, and paying for a DOM to
+    // assert that a CSV quotes a comma is waste that compounds.
     environment: "node",
+    setupFiles: ["./src/test/setup.ts"],
     // `scripts/` is included deliberately. The guardrail scripts that decide
     // what may merge need tests more than most application code does, and an
     // src-only pattern silently skipped them — a suite of tests that never runs

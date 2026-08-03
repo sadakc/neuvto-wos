@@ -82,6 +82,16 @@ describe("what Lovable may never do", () => {
       "src/integrations/supabase/types.ts",
       /deletes types rather than adding/,
     ],
+    // Added when screen-prover and CLAUDE.md became the rules that decide whether
+    // a screen has been proved. A change to the reviewing apparatus, arriving
+    // inside the change it would review, is the one edit nobody is positioned to
+    // judge — the same reason the CI workflow and the guardrail scripts are here.
+    ["the working agreement", "CLAUDE.md", /must not be editable by what they judge/],
+    [
+      "an agent definition",
+      ".claude/agents/screen-prover.md",
+      /must not be editable by what they judge/,
+    ],
   ])("blocks %s", (_label, file, expected) => {
     const r = evaluate({ authors: LOVABLE, changedFiles: [file] });
     expect(r.verdict).toBe("blocked");

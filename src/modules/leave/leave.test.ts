@@ -20,6 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { leaveErrorMessage } from "./contracts";
 
 const calls = vi.hoisted(() => ({ eq: [] as [string, unknown][], uid: "ravi" as string | null }));
 
@@ -61,5 +62,33 @@ describe("getMyRequests", () => {
     calls.uid = null;
     expect(await getMyRequests()).toEqual([]);
     expect(calls.eq).toEqual([]);
+  });
+});
+
+describe("leaveErrorMessage — INSUFFICIENT_NOTICE", () => {
+  // The number comes back from leave_submit because it is the one that was
+  // actually enforced: v_notice resolves the leave type's own min_notice_days
+  // and falls back to the organisation's default, so a type inheriting the
+  // default would be described wrongly by anything read off the form.
+  it("says how many days were needed", () => {
+    expect(leaveErrorMessage("INSUFFICIENT_NOTICE: 5 days required")).toBe(
+      "This leave type needs at least 5 days of notice before you apply.",
+    );
+  });
+
+  it("says day, not days, for one", () => {
+    // Postgres formats the raise with a bare %, so the code always reads
+    // "1 days required". Fixing that in the message is this function's job.
+    expect(leaveErrorMessage("INSUFFICIENT_NOTICE: 1 days required")).toBe(
+      "This leave type needs at least 1 day of notice before you apply.",
+    );
+  });
+
+  it("falls back when the number is missing", () => {
+    // A database that has not had the migration applied still raises the bare
+    // code, and a released UI has to survive meeting one.
+    expect(leaveErrorMessage("INSUFFICIENT_NOTICE")).toBe(
+      "This leave type needs more notice than that.",
+    );
   });
 });

@@ -49,6 +49,15 @@ export const FORBIDDEN_PATHS = [
     reason: "rewrote its own instructions",
   },
   {
+    // Same principle as the workflow and the scripts, extended to the rules that
+    // now decide whether a screen has been proved. CLAUDE.md and the agent
+    // definitions are the reviewing apparatus; a change to them arriving inside
+    // the change they would review is the one edit nobody is positioned to judge.
+    test: (f) => f === "CLAUDE.md" || f.startsWith(".claude/"),
+    reason:
+      "changed the agent instructions or CLAUDE.md — the rules that decide whether work is proved must not be editable by what they judge",
+  },
+  {
     test: (f) => f.startsWith("docs/standards/"),
     reason: "changed the standards it is meant to follow",
   },

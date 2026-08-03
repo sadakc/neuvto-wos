@@ -50,24 +50,64 @@ export const SignupInput = z.object({
 export type SignupInput = z.infer<typeof SignupInput>;
 
 /**
- * A phone number as an administrator types it.
+ * An Indian mobile number, stored in one canonical shape.
  *
- * Deliberately permissive about shape: international formats vary far more than
- * any regex written in one country accounts for, and rejecting a valid number is
- * worse than storing an odd-looking one. The database normalises to digits and a
- * leading + for its uniqueness rule.
+ * India only, by decision — Sada, 3 Aug 2026: "I need India specific
+ * restriction on phone number right now and I will think about going global
+ * later." The country rule therefore lives HERE and nowhere else. Deliberately
+ * not a check constraint in the database: going global later should be an edit
+ * to one file, not a migration against every customer's data.
  *
- * This is NOT verified, and is not an identity key (D41). Making it one needs
- * phone OTP, which D8 defers.
+ * ── the shape
+ *
+ * Ten digits opening 6, 7, 8 or 9, which is every Indian mobile. An optional
+ * +91, 91 or leading 0 is accepted because administrators type all three, and
+ * discarded because they all mean the same number.
+ *
+ * Landlines are refused. That is a consequence worth stating rather than
+ * discovering: this field exists to tell one human from another and to carry a
+ * phone OTP when D8 lands, and an OTP to a desk phone reaches a desk.
+ *
+ * ── why it CANONICALISES rather than just validating
+ *
+ * `profiles.phone_normalized` is `regexp_replace(phone, '[^0-9+]', '', 'g')`,
+ * and a unique index sits on it. That strips punctuation but not the country
+ * code, so the same person typed three ways produced three different keys:
+ *
+ *     9876543210      -> 9876543210
+ *     +91 98765 43210 -> +919876543210
+ *     09876543210     -> 09876543210
+ *
+ * The index was doing nothing for the case it exists to catch — inviting one
+ * human twice. Everything now leaves here as `+919876543210`, so the stored
+ * value is the same string whichever way it was typed, and the uniqueness rule
+ * means what D41 says it means.
+ *
+ * Done now because there are currently zero phone numbers in any environment.
+ * The same change against real data is a backfill and a duplicate-resolution
+ * problem.
+ *
+ * Still NOT verified, and still not an identity key (D41). Making it one needs
+ * phone OTP, which D8 defers pending a provider and Indian DLT registration.
  */
+const INDIAN_MOBILE = /^(?:\+?91|0)?([6-9]\d{9})$/;
 export const PhoneInput = z
   .string()
   .trim()
+  // Separators are stripped BEFORE the shape is judged, so "98765 43210" and
+  // "(98765) 43210" are the same number rather than two rejections. Letters are
+  // not stripped — removing them would silently turn `abc9876543210` into a
+  // valid number, which is how the previous rule came to accept it.
+  .transform((v) => v.replace(/[\s().-]/g, ""))
   .refine(
-    (v) => v === "" || v.replace(/\D/g, "").length >= 6,
-    "That doesn't look like a phone number",
+    (v) => v === "" || INDIAN_MOBILE.test(v),
+    "Enter a 10-digit Indian mobile number — it should start with 6, 7, 8 or 9",
   )
-  .refine((v) => v.length <= 32, "That phone number is too long");
+  // One shape out, whatever went in. See the note above the regex.
+  .transform((v) => {
+    const m = v.match(INDIAN_MOBILE);
+    return m ? `+91${m[1]}` : "";
+  });
 
 /** Provisioning a customer workspace. Platform admins only — see `platform.ts`. */
 export const ProvisionInput = SignupInput.extend({

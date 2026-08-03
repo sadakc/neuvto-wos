@@ -222,6 +222,9 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   LEAVE_TYPE_NOT_FOUND: "That leave type is no longer available.",
   INVALID_DATE_RANGE: "The end date cannot be before the start date.",
   PAST_DATE: "You can't apply for leave in the past.",
+  // Kept as the fallback only. leave_submit raises the required number with the
+  // code, so the message below is built in leaveErrorMessage() — see there for
+  // why the number comes from the database rather than from the form.
   INSUFFICIENT_NOTICE: "This leave type needs more notice than that.",
   NO_WORKING_DAYS: "Those dates are all weekend or holiday — there's nothing to book.",
   OVERLAPPING_REQUEST: "You already have leave booked over some of those dates.",
@@ -235,8 +238,11 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   // Reworded after Sada met it as the only person in his own workspace, being
   // told to ask an administrator — about himself. It now says what can actually
   // be done, and both routes out are things an admin has a screen for.
+  // "Members" was the route (/app/members), not the screen. The sidebar says
+  // People, so that is what somebody goes looking for — an error that names a
+  // destination the navigation does not have is a dead end with extra steps.
   APPROVER_UNRESOLVED:
-    "Nobody can approve this yet. Set a manager for this person under Members, or mark this leave type as needing no approval.",
+    "Nobody can approve this yet. Set a manager for this person under People, or mark this leave type as needing no approval.",
   // D44. The module is off for this workspace — either Neuvto has not granted
   // it, or their own administrator switched it off. Deliberately does not say
   // which: a customer's employee should hear this from their administrator, not
@@ -251,8 +257,19 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
     "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",
 };
 
-/** INSUFFICIENT_BALANCE carries the numbers, so it is matched by prefix. */
+/** INSUFFICIENT_BALANCE and INSUFFICIENT_NOTICE carry numbers, so both match by prefix. */
 export function leaveErrorMessage(code: string): string {
+  // The required notice comes back from leave_submit rather than being read off
+  // the form, because the form's copy of min_notice_days is as old as the page.
+  // An administrator who changes a leave type from 1 day to 5 while somebody has
+  // the form open would otherwise produce a refusal explaining the wrong number
+  // — and the number is the whole point of the message.
+  if (code.startsWith("INSUFFICIENT_NOTICE")) {
+    const m = code.match(/(\d+)\s*days?\s*required/i);
+    if (!m) return LEAVE_ERROR_MESSAGES.INSUFFICIENT_NOTICE;
+    const days = Number(m[1]);
+    return `This leave type needs at least ${days} ${days === 1 ? "day" : "days"} of notice before you apply.`;
+  }
   if (code.startsWith("INSUFFICIENT_BALANCE")) {
     const m = code.match(/requested\s+([\d.]+),\s+available\s+([\d.]+)/);
     return m

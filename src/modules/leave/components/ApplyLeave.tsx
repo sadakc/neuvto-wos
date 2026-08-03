@@ -109,6 +109,22 @@ export default function ApplyLeave() {
     };
   }, [user, fromDate, toDate]);
 
+  // A refusal from the server describes the request that was refused, so it stops
+  // being true the moment that request changes.
+  //
+  // Found by applying over dates that clashed, being told so correctly, then
+  // moving to free dates and still being told. The error was only ever cleared
+  // at the top of onSubmit, so it survived every edit until the next send — and
+  // "you already have leave booked over some of those dates" sitting under a set
+  // of dates that are perfectly free reads as the form being broken, or worse,
+  // as the clash being real and the employee not seeing why.
+  //
+  // Keyed on the three fields the server actually judges. The reason is not one
+  // of them: nothing about editing it can make a refusal wrong.
+  useEffect(() => {
+    setError("");
+  }, [typeId, fromDate, toDate]);
+
   /** "10 to 15 August is 6 days — why am I charged 5?" See describeExcludedDays. */
   const exclusionNote = useMemo(() => describeExcludedDays(excluded), [excluded]);
 
