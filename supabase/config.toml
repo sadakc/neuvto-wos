@@ -54,8 +54,27 @@ content_path = "./supabase/templates/magic_link.html"
 # that asks for a 6-digit code therefore cannot be completed, because the code
 # is never sent. The template above fixes that locally.
 #
-# The hosted database uses its own template, configured in the Supabase
-# dashboard rather than from this file. Until that template includes
-# {{ .Token }}, the hosted app must rely on the magic link.
+# It does NOT reach the hosted project, and the reason is not the one this
+# comment used to give. `supabase config push` exists and would carry this
+# file's [auth] block to the linked project — but the push is refused:
+#
+#     Email template modification is not available for free tier projects
+#     using the default email provider.
+#
+# So this is not a dashboard setting somebody forgot to change. It is locked
+# until custom SMTP is configured on Resend, which is free and also stops the
+# sign-in email arriving from another company's domain. See
+# docs/operations/EMAIL_AND_DOMAINS.md, "Where this stands".
+#
+# ── AND DO NOT PUSH THIS FILE AS IT STANDS ──────────────────────────────────
+# `supabase config push` sends the WHOLE [auth] block, including the two values
+# below, which are local-only:
+#
+#     site_url                 = http://localhost:8080
+#     additional_redirect_urls = [http://localhost:8080]
+#
+# Pushing them would point the hosted project's magic links at a developer's
+# laptop. The hosted values are set directly and recorded in EMAIL_AND_DOMAINS
+# .md; make this file environment-aware before anyone runs that command.
 #
 # Tracked as a launch blocker in NEUVTO_MVP_BUILD_SPEC.md.

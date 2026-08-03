@@ -306,9 +306,69 @@ Either add `{{ .Token }}` to both, or turn off email confirmation so the OTP
 template is always the one used. Adding it to both is the smaller change and
 keeps confirmation available.
 
-### Where this stands
+### Where this stands — re-checked against the live config, 3 Aug 2026
 
-Signing in works by the intended route: a six-digit code arrives and the form
-takes it. What remains is **fault 1** — it arrives from `auth.lovable.cloud`, so
-the first email a customer ever gets from this product carries another company's
-domain. That is a launch blocker, not a bug: custom SMTP on the table above.
+Everything above describes the **Lovable Cloud** project, and it is still true of
+that one. It is no longer the whole picture, because there are now two backends
+and they are in different states. Both were read from the Management API rather
+than assumed.
+
+**There are two projects, and the app you can reach is not the one this repo
+points at.**
+
+|                                   | `neuvto-wos-prod`                                              | the Lovable Cloud project                                |
+| --------------------------------- | -------------------------------------------------------------- | -------------------------------------------------------- |
+| ref                               | `udrzhfgwqgolvyimbwto`                                         | `vkyvzhgigncranprhidn`                                   |
+| who owns it                       | Sada's own Supabase org                                        | Lovable; a Supabase token for our org gets **403** on it |
+| what the repo says                | `.env`, and the CLI link, name this one                        | named nowhere in this repository                         |
+| what `neuvto.com` actually serves | **not this** — the deployed bundle contains no reference to it | **this one**, in the JS bundle served today              |
+| business data                     | all migrations, **zero rows** in every table                   | whatever is live                                         |
+
+PR #32 ("the published app talks to the database we own") changed `.env`, and its
+premise — "`.env` is the only thing that decides which database the app reaches"
+— does not hold for the **published** artifact. Lovable builds the site and
+supplies its own backend variables, so the bundle at `neuvto.com` still resolves
+to `vkyvzhgigncranprhidn`. **The repoint is merged but not live.** Until the site
+is rebuilt against our own project, anything configured on `neuvto-wos-prod`
+changes nothing a customer would experience.
+
+**Fixed on `neuvto-wos-prod` today**, all three verified by reading the config
+back:
+
+| Setting             | Was                     | Now                                                                      |
+| ------------------- | ----------------------- | ------------------------------------------------------------------------ |
+| `mailer_otp_length` | **8**                   | 6                                                                        |
+| `site_url`          | `http://localhost:3000` | `https://neuvto.com`                                                     |
+| `uri_allow_list`    | _(empty)_               | `https://neuvto.com`, `https://neuvto.lovable.app`, and `/**` under each |
+
+The OTP length was the one nobody had written down. The form validates
+`/^\d{6}$/` and the input caps at six characters, so an eight-digit code could
+not have been entered even once the template started sending one — the sign-in
+screen would have been uncompletable for a second, independent reason.
+
+**Still broken there, and it is not a dashboard setting.** The magic-link
+template on `neuvto-wos-prod` carries no `{{ .Token }}`, and it cannot be given
+one. The Management API refuses:
+
+```
+Email template modification is not available for free tier projects
+using the default email provider.
+```
+
+So the note that has been carried in the handover for days — "dashboard-only,
+Sada's action" — is wrong about the mechanism. There is no toggle to find. The
+template is locked until one of two things happens:
+
+1. **Custom SMTP on Resend** — the free path, and the one to take. It also closes
+   **fault 1** in the same move, because the sign-in email then comes from
+   `neuvto.com` instead of `auth.lovable.cloud`. The domain is already verified
+   and the API key already exists for notifications.
+2. Upgrading the plan — ruled out by the standing constraint that nothing is paid
+   for until the MVP ships.
+
+**This one is Sada's, and genuinely so:** switching on custom SMTP means entering
+the Resend API key as the SMTP password in the Supabase dashboard. That is a
+credential going into a form, which is not something to hand to an assistant or
+paste into a chat. Once SMTP is set, the template push stops returning 400 and
+can be applied from this repository — `supabase/templates/magic_link.html` is
+already correct and already carries `{{ .Token }}`.
