@@ -14,8 +14,8 @@ import { Route as McpRouteImport } from './routes/mcp'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as AppRouteRouteImport } from './routes/app/route'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as NeuvtoHqIndexRouteImport } from './routes/neuvto-hq/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
-import { Route as AdminIndexRouteImport } from './routes/admin/index'
 import { Route as AppSetupRouteImport } from './routes/app/setup'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppReportsRouteImport } from './routes/app/reports'
@@ -54,15 +54,15 @@ const IndexRoute = IndexRouteImport.update({
   path: '/',
   getParentRoute: () => rootRouteImport,
 } as any)
+const NeuvtoHqIndexRoute = NeuvtoHqIndexRouteImport.update({
+  id: '/neuvto-hq/',
+  path: '/neuvto-hq/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AppIndexRoute = AppIndexRouteImport.update({
   id: '/',
   path: '/',
   getParentRoute: () => AppRouteRoute,
-} as any)
-const AdminIndexRoute = AdminIndexRouteImport.update({
-  id: '/admin/',
-  path: '/admin/',
-  getParentRoute: () => rootRouteImport,
 } as any)
 const AppSetupRoute = AppSetupRouteImport.update({
   id: '/setup',
@@ -144,8 +144,8 @@ export interface FileRoutesByFullPath {
   '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
-  '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/neuvto-hq/': typeof NeuvtoHqIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
 }
@@ -164,8 +164,8 @@ export interface FileRoutesByTo {
   '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
-  '/admin': typeof AdminIndexRoute
   '/app': typeof AppIndexRoute
+  '/neuvto-hq': typeof NeuvtoHqIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
 }
@@ -186,8 +186,8 @@ export interface FileRoutesById {
   '/app/reports': typeof AppReportsRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
-  '/admin/': typeof AdminIndexRoute
   '/app/': typeof AppIndexRoute
+  '/neuvto-hq/': typeof NeuvtoHqIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
 }
@@ -209,8 +209,8 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/settings'
     | '/app/setup'
-    | '/admin/'
     | '/app/'
+    | '/neuvto-hq/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
   fileRoutesByTo: FileRoutesByTo
@@ -229,8 +229,8 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/settings'
     | '/app/setup'
-    | '/admin'
     | '/app'
+    | '/neuvto-hq'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
   id:
@@ -250,8 +250,8 @@ export interface FileRouteTypes {
     | '/app/reports'
     | '/app/settings'
     | '/app/setup'
-    | '/admin/'
     | '/app/'
+    | '/neuvto-hq/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
   fileRoutesById: FileRoutesById
@@ -264,7 +264,7 @@ export interface RootRouteChildren {
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
   Char91DotmcpChar93ListToolsRoute: typeof Char91DotmcpChar93ListToolsRoute
   Char91DotwellKnownChar93OauthProtectedResourceRoute: typeof Char91DotwellKnownChar93OauthProtectedResourceRoute
-  AdminIndexRoute: typeof AdminIndexRoute
+  NeuvtoHqIndexRoute: typeof NeuvtoHqIndexRoute
   DotlovableOauthConsentRoute: typeof DotlovableOauthConsentRoute
   Char91DotmcpChar93InvokeToolToolRoute: typeof Char91DotmcpChar93InvokeToolToolRoute
 }
@@ -306,19 +306,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/neuvto-hq/': {
+      id: '/neuvto-hq/'
+      path: '/neuvto-hq'
+      fullPath: '/neuvto-hq/'
+      preLoaderRoute: typeof NeuvtoHqIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/app/': {
       id: '/app/'
       path: '/'
       fullPath: '/app/'
       preLoaderRoute: typeof AppIndexRouteImport
       parentRoute: typeof AppRouteRoute
-    }
-    '/admin/': {
-      id: '/admin/'
-      path: '/admin'
-      fullPath: '/admin/'
-      preLoaderRoute: typeof AdminIndexRouteImport
-      parentRoute: typeof rootRouteImport
     }
     '/app/setup': {
       id: '/app/setup'
@@ -444,7 +444,7 @@ const rootRouteChildren: RootRouteChildren = {
   Char91DotmcpChar93ListToolsRoute: Char91DotmcpChar93ListToolsRoute,
   Char91DotwellKnownChar93OauthProtectedResourceRoute:
     Char91DotwellKnownChar93OauthProtectedResourceRoute,
-  AdminIndexRoute: AdminIndexRoute,
+  NeuvtoHqIndexRoute: NeuvtoHqIndexRoute,
   DotlovableOauthConsentRoute: DotlovableOauthConsentRoute,
   Char91DotmcpChar93InvokeToolToolRoute: Char91DotmcpChar93InvokeToolToolRoute,
 }

@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { CONSOLE_PATH } from "./neuvto-hq/index";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -98,7 +99,7 @@ function AuthPage() {
    */
   async function routeWorkspacelessUser() {
     if (await isPlatformAdmin().catch(() => false)) {
-      window.location.href = "/admin";
+      window.location.href = CONSOLE_PATH;
       return true;
     }
     return false;
