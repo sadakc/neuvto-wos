@@ -273,6 +273,82 @@ elif [[ -n "$PHANTOM" ]]; then
   exit 1
 fi
 
+# ─────────────────────────────────────────── functions a replay cannot replace
+#
+# The second thing that stopped the 4 Aug cutover, after the ledger.
+#
+# `create or replace function` is idempotent re-run against the SAME state. It is
+# NOT idempotent when the current state is a LATER version with a different
+# signature — Postgres refuses to change a function's return type, and says so
+# in a way the CLI reports only as "Failed to execute statement".
+#
+# That is exactly what a repaired replay produces. Production held
+# `leave_taken_report` with 13 columns, from the decision-note migration.
+# Replaying the migrations in order starts with the 12-column version that
+# preceded it, which is a downgrade, and the push died on statement 4.
+#
+# The end state was never in doubt: replaying both migrations lands on the same
+# 13 columns production already had. Only the intermediate step is impossible.
+# Dropping first makes the sequence replayable — the very next statements
+# recreate it, and the migrations that follow bring it to its final shape.
+#
+# Checked before it was trusted: every one of these functions had zero dependent
+# objects, so nothing cascades, and production held no customer data at the time.
+# If either stops being true, read this again before running it.
+if [[ "$REPAIR" == true ]]; then
+  PENDING_FNS="$(
+    for f in supabase/migrations/*.sql; do
+      v="$(basename "$f" | cut -d_ -f1)"
+      "$PSQL" "$DB_URL" -tAc \
+        "select 1 from supabase_migrations.schema_migrations where version='$v'" 2>/dev/null \
+        | grep -q 1 && continue
+      grep -oE 'create or replace function public\.[a-z_]+' "$f" | sed 's/.*public\.//'
+    done | sort -u
+  )"
+
+  DROPPABLE=""
+  while IFS= read -r fn; do
+    [[ -z "$fn" ]] && continue
+    SIGS="$("$PSQL" "$DB_URL" -tAc "
+      select 'public.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = '$fn'" 2>/dev/null | sed '/^$/d')"
+    [[ -n "$SIGS" ]] && DROPPABLE="${DROPPABLE}${SIGS}"$'\n'
+  done <<<"$PENDING_FNS"
+  DROPPABLE="$(printf '%s' "$DROPPABLE" | sed '/^$/d')"
+
+  if [[ -n "$DROPPABLE" ]]; then
+    echo "── functions the replay will recreate"
+    echo "     These already exist, and the migrations about to run redefine them."
+    echo "     Any whose signature the replay would SHRINK will refuse to replace,"
+    echo "     so they are dropped and immediately recreated by the push:"
+    echo
+    printf '       %s\n' $(printf '%s\n' "$DROPPABLE")
+    echo
+    DEPS="$("$PSQL" "$DB_URL" -tAc "
+      select count(*) from pg_depend d
+        join pg_proc p on p.oid = d.refobjid
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname='public' and d.deptype='n'
+         and p.proname = any(string_to_array('$(printf '%s' "$PENDING_FNS" | tr '\n' ',' | sed 's/,$//')', ','))" 2>/dev/null || echo 0)"
+    echo "     dependent objects: ${DEPS:-0}  (anything above 0 would cascade — stop and look)"
+    echo
+    if [[ "${DEPS:-0}" != "0" ]]; then
+      echo "  REFUSING: something depends on these. Dropping would take it with them." >&2
+      exit 1
+    fi
+    printf '     Type "drop" to continue: '
+    read -r reply
+    [[ "$reply" == "drop" ]] || { echo "     Nothing was changed."; exit 1; }
+    while IFS= read -r sig; do
+      [[ -z "$sig" ]] && continue
+      "$PSQL" "$DB_URL" -q -c "drop function if exists $sig" >/dev/null
+      echo "     dropped $sig"
+    done <<<"$DROPPABLE"
+    echo
+  fi
+fi
+
 # ------------------------------------------------------------------- migrations
 echo "── pushing migrations"
 supabase db push --linked
