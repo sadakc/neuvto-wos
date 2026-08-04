@@ -60,10 +60,12 @@ function Nav() {
           <a href="#roadmap" className="hover:text-foreground">
             Roadmap
           </a>
-          <a href="#demo" className="hover:text-foreground">
-            Request Demo
-          </a>
         </nav>
+        {/* No "Request Demo" in this nav row. It used to sit here next to
+            Roadmap AND as the filled button on the right, so the header offered
+            the same action twice, three inches apart — which reads as two
+            different things and makes the primary call to action compete with a
+            muted text link for the same click. The button below is the one. */}
         {/* Sign in sits outside the `md:flex` row above: that row is hidden on
             mobile, and someone who has lost their invitation email arrives on a
             phone. It is the only way into the product from this page. */}
