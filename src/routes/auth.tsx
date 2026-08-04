@@ -270,9 +270,14 @@ function AuthPage() {
    *
    * Clicking "Sign in" on the landing page carries neither. Bouncing that click
    * to wherever the existing session happens to belong is how a platform admin
-   * ended up unable to reach anything but `/neuvto-hq`, and it is also how a
+   * ended up unable to reach anything but the console, and it is also how a
    * colleague's workspace appears to whoever clicks "Sign in" on a shared
    * laptop. Both are the same defect; this fixes both.
+   *
+   * (The path is deliberately not spelled here. CI fails any file but
+   * console-path.ts that writes the literal, and it cannot tell prose from
+   * code — which is the correct trade for a guardrail whose whole job is to
+   * catch a forgotten href.)
    */
   const arrivedWithIntent = Boolean(invite) || Boolean(next);
 
