@@ -208,8 +208,8 @@ export default function TeamCalendar() {
                   const tone = !l
                     ? "bg-background"
                     : l.status === "approved"
-                      ? "bg-leave-approved-muted"
-                      : "bg-leave-pending-muted";
+                      ? "bg-info-muted"
+                      : "bg-warning-muted";
                   return (
                     <td key={iso(d)} className="p-0.5">
                       <div
@@ -228,10 +228,10 @@ export default function TeamCalendar() {
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-leave-approved" /> Approved
+          <span className="h-3 w-3 rounded-sm bg-info" /> Approved
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-leave-pending" /> Awaiting approval
+          <span className="h-3 w-3 rounded-sm bg-warning" /> Awaiting approval
         </span>
       </div>
     </div>

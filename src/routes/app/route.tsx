@@ -10,6 +10,7 @@ import {
 } from "@/platform/organization";
 import { isAppError } from "@/platform/errors";
 import { AppNav } from "@/components/shared/app-nav";
+import { ThemeToggle } from "@/components/shared/theme-toggle";
 
 export const Route = createFileRoute("/app")({
   ssr: false,
@@ -139,15 +140,18 @@ function AppShell() {
             <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
           </div>
         </div>
-        <button
-          onClick={async () => {
-            await signOut();
-            window.location.href = "/auth";
-          }}
-          className="inline-flex h-12 shrink-0 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
-        >
-          Sign out
-        </button>
+        <div className="flex shrink-0 items-center gap-1">
+          <ThemeToggle />
+          <button
+            onClick={async () => {
+              await signOut();
+              window.location.href = "/auth";
+            }}
+            className="inline-flex h-12 shrink-0 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+          >
+            Sign out
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1">

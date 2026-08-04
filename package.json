@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "harness": "bash scripts/harness.sh",
     "format:check": "find . -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.mjs' -o -name '*.css' -o -name '*.json' -o -name '*.md' \\) -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 prettier --check --ignore-unknown",
-    "dev:lan": "bash scripts/dev-lan.sh"
+    "dev:lan": "bash scripts/dev-lan.sh",
+    "tokens": "bun scripts/generate-tokens.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { toast } from "sonner";
 import { submitDemoRequest } from "@/lib/demo.functions";
 import mobileMockup from "@/assets/mobile-mockup.png";
+import { NeuvtoLockup, NeuvtoMark } from "@/components/shared/neuvto-mark";
 import adminMockup from "@/assets/admin-mockup.png";
 
 export const Route = createFileRoute("/")({
@@ -46,8 +47,8 @@ function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <a href="#top" className="font-display text-xl font-bold tracking-tight">
-          neuvto<span className="text-primary">.</span>
+        <a href="#top" aria-label="Neuvto — home">
+          <NeuvtoLockup />
         </a>
         <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
           <a href="#vision" className="hover:text-foreground">
@@ -95,7 +96,7 @@ function Hero() {
             <span className="h-1.5 w-1.5 rounded-full bg-primary" />
             Now raising · Investor preview
           </span>
-          <h1 className="mt-6 font-display text-5xl font-bold tracking-tight text-ink lg:text-6xl">
+          <h1 className="mt-6 font-display text-5xl font-bold tracking-tight text-foreground lg:text-6xl">
             The Workforce <span className="text-primary">Operating System</span> your teams actually
             open.
           </h1>
@@ -422,8 +423,11 @@ function Footer() {
         >
           Sign in to your workspace
         </a>
-        <p className="font-display">
-          neuvto<span className="text-primary">.</span>com
+        <p className="inline-flex items-center gap-2.5 font-display">
+          <NeuvtoMark />
+          <span>
+            neuvto<span className="text-primary">.</span>com
+          </span>
         </p>
       </div>
     </footer>
