@@ -22,7 +22,14 @@ import { useEffect, useState } from "react";
 import type { CurrentUser } from "@/platform/auth";
 import { isAdmin } from "@/platform/auth";
 import { getModuleNavigation, type ModuleNavItem } from "@/platform/modules";
+import { MAX_VISIBLE_TABS } from "@/platform/design/tokens";
 import { cn } from "@/lib/utils";
+
+/**
+ * One tab. `h-14` is 56px — comfortably over the 48px minimum touch target,
+ * with the extra going to the safe area above the home indicator.
+ */
+const TAB = "flex h-14 flex-1 items-center justify-center px-1 text-xs font-medium";
 
 type NavItem = ModuleNavItem;
 
@@ -83,8 +90,35 @@ export function mergeNavItems(platform: NavItem[], modules: NavItem[]): NavItem[
   ];
 }
 
+/**
+ * Splits the destinations into the ones on the bar and the ones behind "More".
+ *
+ * The bar used to be `items.slice(0, 5)` — everything past the fifth was not
+ * moved anywhere, it was **deleted from the interface**. An administrator on a
+ * phone had no route to Approval rules or Settings at all, and nothing on
+ * screen suggested anything was missing. That is the failure mode this guards:
+ * silent truncation reads as "that feature doesn't exist".
+ *
+ * `MAX_VISIBLE_TABS` is five because iOS caps a `UITabBar` at five and spills
+ * the rest into its own "More" — matching it means the web and the eventual
+ * native app break at the same place, so somebody who uses both is not learning
+ * two navigations.
+ *
+ * The arithmetic worth stating: with six items you show FOUR plus "More", not
+ * five, because "More" occupies a slot. Off by one here and the sixth item
+ * vanishes again — which is the original bug wearing a hat.
+ */
+export function splitNavItems(items: NavItem[]): { visible: NavItem[]; overflow: NavItem[] } {
+  if (items.length <= MAX_VISIBLE_TABS) return { visible: items, overflow: [] };
+  return {
+    visible: items.slice(0, MAX_VISIBLE_TABS - 1),
+    overflow: items.slice(MAX_VISIBLE_TABS - 1),
+  };
+}
+
 export function AppNav({ user }: { user: CurrentUser | null }) {
   const [moduleItems, setModuleItems] = useState<NavItem[]>([]);
+  const [moreOpen, setMoreOpen] = useState(false);
   const { pathname } = useLocation();
 
   useEffect(() => {
@@ -105,6 +139,15 @@ export function AppNav({ user }: { user: CurrentUser | null }) {
   }, [user]);
 
   const items = mergeNavItems(platformNavItems(user), moduleItems);
+  const { visible, overflow } = splitNavItems(items);
+  const overflowIsActive = overflow.some((i) => i.to === pathname);
+
+  // Closed on navigation. Without this the sheet stays open over the page the
+  // person just asked for, and on iOS the backdrop swallows the first tap they
+  // make to get rid of it.
+  useEffect(() => {
+    setMoreOpen(false);
+  }, [pathname]);
 
   return (
     <>
@@ -134,7 +177,7 @@ export function AppNav({ user }: { user: CurrentUser | null }) {
               className="flex items-center justify-between rounded-md px-3 py-2 text-sm text-muted-foreground/60"
             >
               {item.label}
-              <span className="text-[0.65rem] uppercase tracking-wide">soon</span>
+              <span className="text-2xs uppercase tracking-wide">soon</span>
             </span>
           ),
         )}
@@ -145,28 +188,80 @@ export function AppNav({ user }: { user: CurrentUser | null }) {
         aria-label="Main"
         className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background md:hidden"
       >
-        {items.slice(0, 5).map((item) =>
+        {visible.map((item) =>
           item.to ? (
             <Link
               key={item.label}
               to={item.to}
-              className={cn(
-                "flex h-14 flex-1 items-center justify-center px-1 text-xs font-medium",
-                pathname === item.to ? "text-primary" : "text-muted-foreground",
-              )}
+              className={cn(TAB, pathname === item.to ? "text-primary" : "text-muted-foreground")}
             >
               {item.label}
             </Link>
           ) : (
-            <span
-              key={item.label}
-              className="flex h-14 flex-1 items-center justify-center px-1 text-xs text-muted-foreground/50"
-            >
+            <span key={item.label} className={cn(TAB, "text-muted-foreground/50")}>
               {item.label}
             </span>
           ),
         )}
+
+        {overflow.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            aria-expanded={moreOpen}
+            aria-controls="nav-more"
+            data-testid="nav-more"
+            className={cn(
+              TAB,
+              overflowIsActive || moreOpen ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            More
+          </button>
+        )}
       </nav>
+
+      {/* The overflow sheet. Rendered as a sibling of the bar rather than inside
+          it so it is not clipped by the bar's own height, and dismissed by the
+          backdrop as well as by choosing something — a menu with no way out
+          except the right answer is a trap on a touchscreen. */}
+      {moreOpen && overflow.length > 0 && (
+        <div className="fixed inset-0 z-20 md:hidden">
+          <button
+            aria-label="Close menu"
+            onClick={() => setMoreOpen(false)}
+            className="absolute inset-0 bg-ink/60"
+          />
+          <div
+            id="nav-more"
+            className="absolute inset-x-0 bottom-14 border-t border-border bg-popover p-2 pb-3"
+          >
+            {overflow.map((item) =>
+              item.to ? (
+                <Link
+                  key={item.label}
+                  to={item.to}
+                  onClick={() => setMoreOpen(false)}
+                  className={cn(
+                    "flex h-12 items-center rounded-md px-4 text-sm font-medium",
+                    pathname === item.to ? "bg-secondary text-foreground" : "text-muted-foreground",
+                  )}
+                >
+                  {item.label}
+                </Link>
+              ) : (
+                <span
+                  key={item.label}
+                  className="flex h-12 items-center justify-between rounded-md px-4 text-sm text-muted-foreground/60"
+                >
+                  {item.label}
+                  <span className="text-2xs uppercase tracking-wide">soon</span>
+                </span>
+              ),
+            )}
+          </div>
+        </div>
+      )}
     </>
   );
 }

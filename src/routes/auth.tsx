@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { CONSOLE_PATH } from "./neuvto-hq/index";
+import { CONSOLE_PATH } from "@/platform/console-path";
+import { NeuvtoLockup } from "@/components/shared/neuvto-mark";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -275,6 +276,12 @@ function AuthPage() {
 
   return (
     <main className="mx-auto flex min-h-screen w-full max-w-md flex-col justify-center px-6 py-12">
+      {/* Shown above every step. For an invited employee this is the first
+          Neuvto screen they ever see, and an unbranded page asking for an
+          email address after an emailed link is exactly what a phishing page
+          looks like. */}
+      <NeuvtoLockup className="mb-8" size="md" />
+
       {step === "email" && (
         <>
           <h1 className="font-display text-2xl font-semibold tracking-tight">

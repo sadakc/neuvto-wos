@@ -23,6 +23,12 @@ A hex code in a component is a bug. It won't respond to dark mode, it can't be r
 per tenant, and it will drift. Tenant white-labelling (`03` §Branding Service) is only
 possible because every colour resolves through a variable.
 
+**Colours are authored in `src/platform/design/tokens.ts`, not in `src/styles.css`.**
+The stylesheet is generated — `bun run tokens` — and CI fails if the two disagree. Editing
+the generated block appears to work and is silently reverted the next time anyone
+regenerates. The TypeScript file is also what a React Native build imports, which is the
+reason it, rather than the CSS, is the source of truth.
+
 ---
 
 ## 2. Token architecture — three tiers
@@ -43,9 +49,14 @@ Components consume **Tier 2 only**. Naming a token for its meaning rather than i
 is what lets a tenant set their brand to green without every class in the codebase being
 named `blue`.
 
-Tokens live in `src/styles.css` as CSS custom properties in **OKLCH**, exposed to Tailwind
-through `@theme inline`. OKLCH is deliberate: it's perceptually uniform, so lightening a
-colour by 10% looks like 10% to the eye across every hue.
+Tokens are authored in `src/platform/design/tokens.ts` in **OKLCH** and generated into
+`src/styles.css` as CSS custom properties, exposed to Tailwind through `@theme inline`.
+OKLCH is deliberate: it's perceptually uniform, so lightening a colour by 10% looks like
+10% to the eye across every hue.
+
+`oklchToHex` in `design/color.ts` converts for consumers that cannot parse OKLCH — React
+Native, iOS colour sets, Android `colors.xml`. A token is therefore the same colour on
+every platform by construction rather than by transcription.
 
 ---
 
@@ -71,21 +82,29 @@ colour by 10% looks like 10% to the eye across every hue.
 > teal. Brand teal, if used, is `--brand-accent` and is reserved for accents and data
 > visualisation — never for a button fill or body text (it fails contrast at `text-sm`).
 
-### Status — required, currently missing
+### Status
 
-Leave management is a status-driven product. These tokens do not exist in `src/styles.css`
-today and must be added before any leave UI is built.
+Leave management is a status-driven product. Added 4 Aug 2026 — until then a status was
+drawn as grey text, so approved, declined and awaiting all looked identical.
 
-| Token                      | Colour               | Meaning                                 |
-| -------------------------- | -------------------- | --------------------------------------- |
-| `--success`                | `#22C55E` green      | Approved, sufficient balance, healthy   |
-| `--success-foreground`     | white                |                                         |
-| `--warning`                | `#F59E0B` amber      | Pending approval, low balance, expiring |
-| `--warning-foreground`     | `#1A1A1A`            | Amber needs dark text for contrast      |
-| `--destructive`            | `#EF4444` red        | Rejected, error, over-balance           |
-| `--destructive-foreground` | white                |                                         |
-| `--info`                   | = primary            | Informational, upcoming leave           |
-| `--neutral`                | `--muted-foreground` | Draft, cancelled, inactive              |
+Each has a solid fill, a foreground, and a `-muted` tint for badges and calendar cells.
+
+| Token           | Light fill      | Meaning                                 |
+| --------------- | --------------- | --------------------------------------- |
+| `--success`     | `#22C55E` green | Approved, sufficient balance, healthy   |
+| `--warning`     | `#F59E0B` amber | Pending approval, low balance, expiring |
+| `--destructive` | `#EF4444` red   | Rejected, error, over-balance           |
+| `--info`        | = `--primary`   | Informational, upcoming leave           |
+| `--neutral`     | grey            | Draft, cancelled, inactive              |
+
+> **Every `-foreground` is near-black, including on red — and this replaced "white".**
+> White on `#0EA5E9` measures **2.77:1**; AA for body text is 4.5:1. The same held for
+> green (2.28:1) and amber (2.15:1). The published fills are preserved exactly and the
+> label on top changed instead, because darkening the fills until white passed would have
+> been a brand change made silently to satisfy a contrast rule.
+>
+> None of this is anyone's judgement now: `src/platform/design/tokens.test.ts` computes
+> every pairing and fails the build under 4.5:1. Change a colour and watch it fail.
 
 **Leave status → token. This mapping is fixed; do not improvise per screen.**
 
@@ -114,10 +133,30 @@ today and must be added before any leave UI is built.
 
 **Never** use `--border` for text or `--muted-foreground` for a border. Roles don't cross.
 
-### Dark mode
+### Dark mode — Nocturne
 
 Every token has a `.dark` value. Dark mode is not optional and not a later phase — a
 component that only works in light mode is incomplete. Test both before calling anything done.
+
+**Which surface gets which theme** is decided by `resolveTheme` in
+`src/platform/design/theme.ts`, not by the operating system alone:
+
+| Surface                       | Theme                     | Why                                                                         |
+| ----------------------------- | ------------------------- | --------------------------------------------------------------------------- |
+| `/app/*` — the employee app   | **dark**, overridable     | Leave gets checked late at night, on a phone. A toggle in the header wins.   |
+| `/neuvto-hq` — the console    | **light, always**         | A platform admin must never mistake the console for a tenant workspace (D42). |
+| everything else               | follows the OS            | A stranger's system preference is the only signal available.                 |
+
+Nocturne, adopted 4 Aug 2026, is dark-*first* rather than dark-mode-second. Four decisions
+follow from that premise:
+
+- **`--radius` is 8px**, down from 12. Dense status lists read better with less rounding.
+- **Status colours are desaturated on dark** (~20% less chroma). Full-chroma green glares
+  against near-black at night. Asserted by test, so it cannot drift back.
+- **Elevation is border-only on dark.** A shadow on a near-black surface is invisible, so
+  a shadow-only affordance does not exist for these users.
+- **Dark borders are opaque values, not `white / 12%`.** A translucent border composites
+  differently over the page than over a card — only one of the two was ever checked.
 
 ---
 
@@ -160,14 +199,15 @@ Nothing off-scale. No `p-[13px]`.
 - Between page sections: `space-y-8`
 - Related elements (label → input): `space-y-2`
 
-**Radius** — from `--radius: 0.75rem`:
+**Radius** — from `RADIUS_BASE = 8` in `design/tokens.ts` (`--radius: 0.5rem`). Nocturne
+tightened this from 12px; everything else derives, so it is one number to change.
 
 | Token          | Value | Use                         |
 | -------------- | ----- | --------------------------- |
-| `rounded-sm`   | 8px   | Badges, chips, small inputs |
-| `rounded-md`   | 10px  | Buttons, inputs             |
-| `rounded-lg`   | 12px  | Cards, panels               |
-| `rounded-xl`   | 16px  | Modals, sheets              |
+| `rounded-sm`   | 4px   | Badges, chips, small inputs |
+| `rounded-md`   | 6px   | Buttons, inputs             |
+| `rounded-lg`   | 8px   | Cards, panels               |
+| `rounded-xl`   | 12px  | Modals, sheets              |
 | `rounded-full` | —     | Avatars, icon-only buttons  |
 
 **Elevation:** borders first, shadows sparingly. `shadow-sm` for resting cards,

@@ -12,6 +12,8 @@ import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { CONSOLE_PATH } from "@/platform/console-path";
+import { resolveTheme, THEME_STORAGE_KEY } from "@/platform/design/theme";
 
 function NotFoundComponent() {
   return (
@@ -120,11 +122,14 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "apple-mobile-web-app-capable", content: "yes" },
       { name: "apple-mobile-web-app-title", content: "Neuvto" },
       { name: "apple-mobile-web-app-status-bar-style", content: "default" },
-      { name: "theme-color", content: "#00b0ed" },
+      { name: "theme-color", content: "#0ea5e9" },
     ],
     links: [
       { rel: "stylesheet", href: appCss },
       { rel: "icon", href: "/favicon.ico", type: "image/x-icon" },
+      // Preferred by every current browser; the .ico stays for the ones that
+      // ask for /favicon.ico without reading the document at all.
+      { rel: "icon", href: "/favicon-32.png", type: "image/png", sizes: "32x32" },
       { rel: "manifest", href: "/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
@@ -142,19 +147,37 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 /**
- * The design system defines dark tokens under a `.dark` class, but nothing was
- * ever setting it — so dark mode was defined and never reachable, and every
- * screen rendered light regardless of the viewer's preference.
+ * Applies the theme before the first paint.
  *
- * Runs before paint, inline in <head>, so the correct theme is applied on the
- * first frame. Doing this in a React effect instead produces a white flash on
- * every load for dark-mode users.
+ * Inline in <head> and not in a React effect, because an effect runs after the
+ * browser has already painted — which is a white flash on every load for every
+ * dark-mode user, and the app now defaults to dark.
+ *
+ * The rule itself is `resolveTheme`, stringified rather than rewritten. It used
+ * to be written twice: once in TypeScript where it could be tested, once by
+ * hand inside this template string where it could not. Two copies of a rule
+ * that must agree is one copy plus a bug waiting for someone to edit only the
+ * first. Stringifying keeps a single tested implementation, at the cost of one
+ * constraint — `resolveTheme` may not reference anything outside itself, which
+ * theme.test.ts asserts by reading its own source.
+ *
+ * `matchMedia` is still watched, but only matters where the OS is what decides
+ * (the landing page, sign-in): an explicit choice and the app's Nocturne
+ * default both ignore it, and `resolveTheme` is what knows that.
  */
 const APPLY_THEME = `(function(){try{
+  var resolve=${resolveTheme.toString()};
+  var consolePath=${JSON.stringify(CONSOLE_PATH)};
+  var key=${JSON.stringify(THEME_STORAGE_KEY)};
+  var read=function(){try{return localStorage.getItem(key)}catch(e){return null}};
   var m=window.matchMedia('(prefers-color-scheme: dark)');
-  var set=function(dark){document.documentElement.classList.toggle('dark',dark)};
-  set(m.matches);
-  m.addEventListener('change',function(e){set(e.matches)});
+  var set=function(){
+    var t=resolve(location.pathname,read(),m.matches,consolePath);
+    document.documentElement.classList.toggle('dark',t==='dark');
+    document.documentElement.style.colorScheme=t;
+  };
+  set();
+  m.addEventListener('change',set);
 }catch(e){}})();`;
 
 function RootShell({ children }: { children: ReactNode }) {

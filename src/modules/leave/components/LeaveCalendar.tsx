@@ -145,8 +145,8 @@ export default function LeaveCalendar() {
           const tone = !req
             ? "bg-background"
             : req.status === "approved"
-              ? "bg-leave-approved-muted text-leave-approved-foreground"
-              : "bg-leave-pending-muted text-leave-pending-foreground";
+              ? "bg-info-muted text-foreground"
+              : "bg-warning-muted text-foreground";
 
           return (
             <button
@@ -165,10 +165,10 @@ export default function LeaveCalendar() {
 
       <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-leave-approved" /> Approved
+          <span className="h-3 w-3 rounded-sm bg-info" /> Approved
         </span>
         <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-leave-pending" /> Awaiting approval
+          <span className="h-3 w-3 rounded-sm bg-warning" /> Awaiting approval
         </span>
         <span className="flex items-center gap-2">
           <span className="h-3 w-3 rounded-sm border border-foreground" /> Today

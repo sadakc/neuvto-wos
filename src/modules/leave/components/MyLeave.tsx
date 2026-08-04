@@ -18,15 +18,9 @@ import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import { cancelLeave, getApprovalTimeline, getMyBalances, getMyRequests } from "../handlers";
 import { BalanceCard } from "./BalanceCard";
-import type { ApprovalStep, LeaveBalance, LeaveRequest, LeaveStatus } from "../contracts";
-
-const STATUS_LABEL: Record<LeaveStatus, string> = {
-  draft: "Draft",
-  pending_approval: "Awaiting approval",
-  approved: "Approved",
-  rejected: "Declined",
-  cancelled: "Cancelled",
-};
+import type { ApprovalStep, LeaveBalance, LeaveRequest } from "../contracts";
+import { StatusBadge } from "@/components/shared/status-badge";
+import { LEAVE_STATUS_LABEL, LEAVE_STATUS_TONE } from "../status";
 
 const FILTERS = [
   { key: "all", label: "All" },
@@ -198,9 +192,9 @@ export default function MyLeave() {
                         {r.workingDays === 1 ? "day" : "days"}
                       </span>
                     </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {STATUS_LABEL[r.status]}
-                    </span>
+                    <StatusBadge tone={LEAVE_STATUS_TONE[r.status]} className="shrink-0">
+                      {LEAVE_STATUS_LABEL[r.status]}
+                    </StatusBadge>
                   </button>
 
                   {open && (
