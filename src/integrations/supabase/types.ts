@@ -1619,6 +1619,18 @@ export type Database = {
           slug: string
         }[]
       }
+      platform_mail_health: {
+        Args: never
+        Returns: {
+          failed_24h: number
+          healthy: boolean
+          last_failure_at: string
+          last_failure_reason: string
+          last_sent_at: string
+          oldest_pending_minutes: number
+          pending_now: number
+        }[]
+      }
       platform_secret: { Args: { _name: string }; Returns: string }
       platform_set_module: {
         Args: { _granted: boolean; _module_key: string; _org_id: string }

@@ -155,3 +155,44 @@ export async function provisionOrganization(input: unknown): Promise<{ organizat
   if (!data) throw new AppError("INTERNAL_ERROR", "The workspace could not be created.", 500);
   return { organizationId: data as string };
 }
+
+/** Whether mail is actually being delivered, and why not. Platform admins only. */
+export interface MailHealth {
+  healthy: boolean;
+  failed24h: number;
+  pendingNow: number;
+  oldestPendingMinutes: number;
+  lastSentAt: string | null;
+  lastFailureAt: string | null;
+  /** Addresses are stripped in the database before this leaves it (D42). */
+  lastFailureReason: string | null;
+}
+
+/**
+ * Reads the mail alarm.
+ *
+ * Exists because three invitations failed on production for twelve hours and
+ * nothing said so — every check was green while nothing could be delivered.
+ *
+ * Failures here are swallowed deliberately and reported as "unknown" by the
+ * caller rather than thrown. A health check that takes down the console when it
+ * cannot answer has made the outage worse, and this is the one screen somebody
+ * opens *because* something seems wrong.
+ */
+export async function getMailHealth(): Promise<MailHealth | null> {
+  const { data, error } = await supabase.rpc("platform_mail_health");
+  if (error) return null;
+
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) return null;
+
+  return {
+    healthy: Boolean(r.healthy),
+    failed24h: Number(r.failed_24h ?? 0),
+    pendingNow: Number(r.pending_now ?? 0),
+    oldestPendingMinutes: Number(r.oldest_pending_minutes ?? 0),
+    lastSentAt: r.last_sent_at ?? null,
+    lastFailureAt: r.last_failure_at ?? null,
+    lastFailureReason: r.last_failure_reason ?? null,
+  };
+}
