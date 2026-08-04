@@ -42,6 +42,9 @@ bun run harness     # mandatory for database, handler or platform-service change
 `scripts/harness.sh` **truncates**. It refuses a non-local target holding real rows,
 and that guard is not to be worked around. Never point it at production.
 
+`scripts/backup-prod.sh --restore-test` is destructive too, but only ever to the **local**
+stack — it resets local and replays a backup into it. It never connects to production.
+
 ## Standing constraints
 
 - **Nothing is paid for until the MVP ships.** Say the cost before proposing anything.
@@ -54,6 +57,11 @@ and that guard is not to be worked around. Never point it at production.
   `docs/operations/REVIEWING_LOVABLE_CHANGES.md` and `scripts/lovable-gate.mjs`.
 - **A migration is a file in git**, so a secret never goes in one. Vault secrets are
   per-environment and manual (D43).
+- **Production has no automatic backups** — the Free plan provides none at all. The only
+  ones that exist come from `scripts/backup-prod.sh`, they live outside the repo in
+  `~/neuvto-backups/`, and they hold customer personal data. Taking and proving one is a
+  step in provisioning, before the first real row exists. See
+  `docs/operations/BACKUPS.md`.
 - **Neuvto's own console is `/neuvto-hq`**, not `/admin`, and the literal lives only in
   `src/platform/console-path.ts` as `CONSOLE_PATH` — CI fails a hardcoded one. That is
   obscurity, not security: the path ships to the browser. The control is

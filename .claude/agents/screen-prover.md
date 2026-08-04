@@ -66,7 +66,7 @@ These are the shapes that have actually bitten, ranked by how quietly they fail.
 **A control that misreports stored state.** The worst class, because there is
 nothing to notice. A `<select>` whose value is not among its options. A checkbox
 bound to a stale copy. An input whose displayed value survived a refused write.
-Always assert the *rendered* selection, not just the `value` property —
+Always assert the _rendered_ selection, not just the `value` property —
 `select.selectedOptions[0].textContent` is what a person actually reads.
 
 **A derived list that something else is reading.** The "Reports to" bug in one

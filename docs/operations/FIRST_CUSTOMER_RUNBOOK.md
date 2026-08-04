@@ -119,6 +119,28 @@ year but shows a full balance will be allowed to book leave they have not got.
 
 ---
 
+## Before the first real row exists — backups
+
+Do this **before** the customer's people are invited, not after. The order is the whole
+point: today production holds one auth user and losing it costs an afternoon; the moment
+their staff enter leave, the same loss is unrecoverable, because a leave balance exists
+nowhere else in the world.
+
+Supabase's Free plan has **no automatic backups at all** — not short retention, none. Until
+Neuvto is on Pro, the only backups that exist are the ones this produces.
+
+- [ ] Take one: `bash scripts/backup-prod.sh`
+- [ ] Prove it: `bash scripts/backup-prod.sh --restore-test` — replays it into the local
+      stack and counts what comes back. A backup nobody has restored is a hope.
+- [ ] Capture the logo files too — they are in S3, not in the database dump, and a restore
+      without them renders every customer logo broken. See `BACKUPS.md`.
+- [ ] Decide whether the daily `launchd` job goes on, and if it does, say out loud that it
+      only runs while the laptop is awake.
+
+Full detail, restore order and the honest limits: **`docs/operations/BACKUPS.md`**.
+
+---
+
 ## Day 3 — verify before anyone relies on it
 
 Do this with the customer watching, using their real data:
@@ -154,17 +176,19 @@ awaiting approval, and any harness alert. The nightly integrity check is the saf
 
 ## Gap summary
 
-| Gap                                       | Blocks                        | Type        |
-| ----------------------------------------- | ----------------------------- | ----------- |
-| Security questionnaire answers            | Signature                     | Writing     |
-| DPA, privacy policy, terms                | Signature                     | Legal       |
-| Pricing model                             | Signature                     | Business    |
-| ~~Super-admin provisioning console~~      | **Closed** — `/neuvto-hq`, step 8 | —       |
-| Vault secrets set by hand per environment | Every new environment         | Engineering |
-| Announcement template                     | Go-live polish                | Writing     |
-| Help centre and support process           | Second customer               | Writing     |
+| Gap                                       | Blocks                                                    | Type                |
+| ----------------------------------------- | --------------------------------------------------------- | ------------------- |
+| Security questionnaire answers            | Signature                                                 | Writing             |
+| DPA, privacy policy, terms                | Signature                                                 | Legal               |
+| Pricing model                             | Signature                                                 | Business            |
+| ~~Super-admin provisioning console~~      | **Closed** — `/neuvto-hq`, step 8                         | —                   |
+| Vault secrets set by hand per environment | Every new environment                                     | Engineering         |
+| ~~No backups of production~~              | **Closed** — `scripts/backup-prod.sh`, run before go-live | —                   |
+| Backups depend on one laptop being awake  | Second customer                                           | Business (Pro plan) |
+| Announcement template                     | Go-live polish                                            | Writing             |
+| Help centre and support process           | Second customer                                           | Writing             |
 
-**Four of five open gaps are not engineering.** That is the useful finding: what stands
+**Six of seven open gaps are not engineering.** That is the useful finding: what stands
 between the MVP and revenue is mostly legal and commercial work that no amount of building
 will produce.
 

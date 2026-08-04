@@ -141,13 +141,13 @@ component that only works in light mode is incomplete. Test both before calling 
 **Which surface gets which theme** is decided by `resolveTheme` in
 `src/platform/design/theme.ts`, not by the operating system alone:
 
-| Surface                       | Theme                     | Why                                                                         |
-| ----------------------------- | ------------------------- | --------------------------------------------------------------------------- |
-| `/app/*` — the employee app   | **dark**, overridable     | Leave gets checked late at night, on a phone. A toggle in the header wins.   |
-| `/neuvto-hq` — the console    | **light, always**         | A platform admin must never mistake the console for a tenant workspace (D42). |
-| everything else               | follows the OS            | A stranger's system preference is the only signal available.                 |
+| Surface                     | Theme                 | Why                                                                           |
+| --------------------------- | --------------------- | ----------------------------------------------------------------------------- |
+| `/app/*` — the employee app | **dark**, overridable | Leave gets checked late at night, on a phone. A toggle in the header wins.    |
+| `/neuvto-hq` — the console  | **light, always**     | A platform admin must never mistake the console for a tenant workspace (D42). |
+| everything else             | follows the OS        | A stranger's system preference is the only signal available.                  |
 
-Nocturne, adopted 4 Aug 2026, is dark-*first* rather than dark-mode-second. Four decisions
+Nocturne, adopted 4 Aug 2026, is dark-_first_ rather than dark-mode-second. Four decisions
 follow from that premise:
 
 - **`--radius` is 8px**, down from 12. Dense status lists read better with less rounding.

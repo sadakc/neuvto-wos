@@ -159,7 +159,7 @@ All three were invisible to every check in this file, because until `screen-prov
 existed every test in the project was a pure function and the entire class lived
 above them.
 
-The rule is therefore about *evidence*, not ceremony:
+The rule is therefore about _evidence_, not ceremony:
 
 - Render tests live in `*.test.tsx` with `// @vitest-environment happy-dom`.
 - Every one must be **watched failing** before it is trusted — reintroduce the bug,
