@@ -108,9 +108,15 @@ function Hero() {
             companies run their workforce.
           </p>
           <div className="mt-8 flex flex-wrap gap-3">
+            {/* `primary`, not `destructive`. Red is reserved for rejected,
+                error and over-balance (NEUVTO_DESIGN_SYSTEM.md), and every
+                other use of it in the codebase obeys that — this button and
+                the demo form's submit were the only two treating it as a
+                brand fill. On the page's main call to action it reads as a
+                warning about the thing it is inviting you to do. */}
             <a
               href="#demo"
-              className="inline-flex items-center rounded-md bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground shadow-sm hover:bg-destructive/90"
+              className="inline-flex items-center rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
             >
               Request early access
             </a>
@@ -370,7 +376,7 @@ function DemoForm() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 inline-flex items-center justify-center rounded-md bg-destructive px-5 py-3 text-sm font-semibold text-destructive-foreground hover:bg-destructive/90 disabled:opacity-60"
+              className="mt-2 inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {loading ? "Sending…" : "Request demo"}
             </button>
