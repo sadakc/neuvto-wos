@@ -135,3 +135,132 @@ describe("landing header — what must survive the deletion", () => {
     expect(wanted.filter((id) => document.getElementById(id) !== null)).toEqual(wanted);
   });
 });
+
+// ── red is a status, not a brand colour
+//
+// NEUVTO_DESIGN_SYSTEM.md gives `destructive` (#EF4444) exactly two jobs:
+// "Rejected, error, over-balance" as a status, and the `destructive` *button
+// variant* for "Reject, delete, cancel leave". Two buttons on this page were
+// using it as a brand fill for an invitation — the hero "Request early access"
+// and the demo form's submit. A red button on the one action the page exists to
+// invite reads as a warning about the thing it is offering you.
+//
+// The distinction the guard below draws is the one the design system already
+// draws, and it is a class-shape distinction, not a judgement call:
+//
+//   FILL ON AN ACTION   bg-destructive, text-destructive-foreground   forbidden here
+//   SIGNAL ON TEXT      text-destructive, border-destructive          allowed
+//
+// So `<span className="text-destructive"> *</span>` on a required field — which
+// is the design system's own error/required signal, and correct — stays legal,
+// while a red-filled call to action does not. The guard is scoped to elements
+// with an interactive role, which is why the asterisk cannot be caught by it
+// even if somebody one day gives it a background.
+
+/** Every class on an element, including the ones behind variant prefixes. */
+function classesOf(el: Element): string[] {
+  return (el.getAttribute("class") ?? "").split(/\s+/).filter(Boolean);
+}
+
+/**
+ * Matches `destructive` used as a *fill*, under any variant prefix and any
+ * opacity: `bg-destructive`, `hover:bg-destructive/90`, `dark:md:bg-destructive`,
+ * `text-destructive-foreground`.
+ *
+ * Deliberately does NOT match `text-destructive`, `border-destructive` or
+ * `bg-destructive-muted` — those are the status/error signals the system asks
+ * for, and a guard that banned them would eventually force somebody to strip
+ * the red asterisk off a required field to get a build green.
+ */
+const DESTRUCTIVE_FILL = /^(?:[\w-]+:)*(?:bg-destructive|text-destructive-foreground)(?:\/\d+)?$/;
+
+/** Everything on the page a visitor can click. */
+function actionsOnPage(): HTMLElement[] {
+  return [...screen.queryAllByRole("link"), ...screen.queryAllByRole("button")];
+}
+
+function describeAction(el: Element): string {
+  return `<${el.tagName.toLowerCase()}> "${(el.textContent ?? "").trim()}" — class="${el.getAttribute("class") ?? ""}"`;
+}
+
+describe("landing page — no invitation is painted as a warning", () => {
+  it("fills the hero call to action with primary, not destructive", () => {
+    render(<Index />);
+    const cta = screen.getByRole("link", { name: "Request early access" });
+
+    expect(cta).toHaveAttribute("href", "#demo");
+    // Asserted before the positive check so that a regression fails by *naming
+    // the red classes it found*, rather than by reporting a missing bg-primary
+    // and leaving the reader to work out what replaced it.
+    expect(classesOf(cta).filter((c) => DESTRUCTIVE_FILL.test(c))).toEqual([]);
+    expect(classesOf(cta)).toContain("bg-primary");
+    expect(classesOf(cta)).toContain("text-primary-foreground");
+  });
+
+  it("fills the demo form's submit button with primary, not destructive", () => {
+    render(<Index />);
+    // The only <button> on the page; the header's "Request Demo" is a link.
+    const submit = screen.getByRole("button", { name: "Request demo" });
+
+    expect(submit).toHaveAttribute("type", "submit");
+    expect(classesOf(submit).filter((c) => DESTRUCTIVE_FILL.test(c))).toEqual([]);
+    expect(classesOf(submit)).toContain("bg-primary");
+    expect(classesOf(submit)).toContain("text-primary-foreground");
+  });
+
+  it("has no red-filled control anywhere on the page, whatever it is called", () => {
+    // THE GUARD, and the reason it is shaped this way. A list of known CTA
+    // phrases would pin the two buttons we already know about and miss the third
+    // one — "Book a walkthrough", "Talk to us", "Start free" — which is exactly
+    // the button somebody adds six months from now by copying the styling off
+    // whichever neighbour they had open.
+    //
+    // This page is marketing. It has no reject, no delete, no cancel: there is
+    // no action on it that is *entitled* to a red fill, so the rule is simply
+    // that none of them has one. That holds for a control that does not exist
+    // yet and has a name nobody has thought of.
+    render(<Index />);
+    const actions = actionsOnPage();
+
+    // A guard over an empty list passes forever and proves nothing. If the page
+    // stops rendering, or the roles change, this fails first and says so.
+    expect(actions.length).toBeGreaterThanOrEqual(8);
+    expect(actions).toContain(screen.getByRole("button", { name: "Request demo" }));
+
+    const redFilled = actions
+      .filter((el) => classesOf(el).some((c) => DESTRUCTIVE_FILL.test(c)))
+      .map(describeAction);
+
+    expect(redFilled).toEqual([]);
+  });
+});
+
+describe("landing page — what red is still allowed to mean", () => {
+  it("keeps the red asterisk on required fields, and only on required fields", () => {
+    // The guard above must not be the reason somebody deletes this. `text-…`
+    // is the system's error/required signal ("Error: border-destructive plus a
+    // message in text-sm text-destructive"), and it is on a <span>, which has
+    // no interactive role and is therefore outside the guard's reach entirely.
+    render(<Index />);
+
+    const markers = [...document.querySelectorAll("label span")].filter(
+      (el) => el.textContent?.trim() === "*",
+    );
+    // "Your name" and "Work email" are required; Company and # Employees are not.
+    expect(markers).toHaveLength(2);
+    for (const marker of markers) {
+      expect(classesOf(marker)).toContain("text-destructive");
+    }
+
+    // The marker is meaningless if every field carries one — the optional
+    // fields must stay unmarked, or red stops signalling anything.
+    const labelled = [...document.querySelectorAll("label")].map((l) =>
+      (l.textContent ?? "").trim(),
+    );
+    expect(labelled).toContain("Your name *");
+    expect(labelled).toContain("Company");
+
+    // And it is not an action, so the guard cannot ever be what removes it.
+    expect(actionsOnPage()).not.toContain(markers[0] as HTMLElement);
+  });
+});
