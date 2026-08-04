@@ -827,6 +827,95 @@ begin
     end if;
     raise notice 'ok: a platform admin sees workspaces but no tenant data (D42)';
 
+    -- ─────────────────────────────────── the mail alarm actually alarms
+    --
+    -- Written after three invitations failed on production for twelve hours in
+    -- silence. Every check we had was green: the cron ran every minute, the
+    -- dispatcher returned 200, and Resend refused every message. The existing
+    -- scheduled-work suite covers an environment with delivery UNCONFIGURED —
+    -- a different fault, and not the one that happened.
+    perform pg_temp.as_postgres();
+    insert into public.notifications
+      (organization_id, recipient_id, event_key, channel, subject, body,
+       status, attempts, failed_reason, recipient_email)
+    values
+      (acme, ravi, 'member.invited', 'email', 'harness', '<p>harness</p>',
+       'failed', 1,
+       -- Carries an address on purpose: the redaction is the D42 half of this.
+       'HTTP 422: invalid recipient priya@customer.test', 'priya@customer.test');
+
+    -- Non-vacuity, the lesson of the block above: prove there IS a failure to
+    -- find, or "the alarm reports a failure" passes against an empty table.
+    select count(*) into n from public.notifications where status = 'failed';
+    if n = 0 then
+      raise exception 'RLS FAIL: no failed notification exists, so the mail alarm would prove nothing';
+    end if;
+
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f0');
+    select case when h.healthy then 1 else 0 end into n
+      from public.platform_mail_health() h;
+    perform pg_temp.check('the mail alarm reports unhealthy when mail has failed', n, 0);
+
+    select h.failed_24h into n from public.platform_mail_health() h;
+    if n < 1 then
+      raise exception 'RLS FAIL: mail alarm counted % failures, expected at least 1', n;
+    end if;
+
+    -- The reason survives, the address does not.
+    select case
+             when h.last_failure_reason like '%[address removed]%'
+              and h.last_failure_reason not like '%priya@customer.test%'
+             then 1 else 0 end
+      into n from public.platform_mail_health() h;
+    perform pg_temp.check('the failure reason keeps the diagnosis and drops the address (D42)', n, 1);
+
+    -- An ordinary administrator cannot read the platform's own health.
+    perform pg_temp.as_user(alice);
+    begin
+      perform * from public.platform_mail_health();
+      raise exception 'RLS FAIL: a tenant admin read platform mail health';
+    exception
+      when raise_exception then
+        if sqlerrm <> 'FORBIDDEN' then
+          raise exception 'RLS FAIL: mail health refused a tenant admin with "%" rather than FORBIDDEN', sqlerrm;
+        end if;
+        raise notice 'ok: mail health is refused to a tenant admin';
+    end;
+
+    -- ─────────────────────────────── and stops alarming once mail recovers
+    --
+    -- Added after the first version of this block passed under BOTH the old
+    -- health logic and the new one. It asserted only "a failure makes it
+    -- unhealthy", which is true either way, so sabotaging the fix changed
+    -- nothing and the assertion proved less than it appeared to.
+    --
+    -- The distinction is recovery: a failure counts against health only until
+    -- mail flows again. Without this, an alarm that goes red over a resolved
+    -- incident ships unnoticed — which is exactly what production did.
+    perform pg_temp.as_postgres();
+    insert into public.notifications
+      (organization_id, recipient_id, event_key, channel, subject, body,
+       status, attempts, sent_at, recipient_email)
+    values
+      (acme, ravi, 'member.invited', 'email', 'harness', '<p>harness</p>',
+       'sent', 1, now() + interval '1 minute', 'ravi@acme.test');
+
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f0');
+    select case when h.healthy then 1 else 0 end into n
+      from public.platform_mail_health() h;
+    perform pg_temp.check('a failure stops counting once mail flows again', n, 1);
+
+    -- ...and the failure is still REPORTED, because those messages never
+    -- arrived. Recovering is not the same as never having failed.
+    select h.failed_24h into n from public.platform_mail_health() h;
+    if n < 1 then
+      raise exception 'RLS FAIL: recovery hid the failure count entirely — expected it still reported, got %', n;
+    end if;
+    raise notice 'ok: recovery clears the alarm without hiding the failures';
+
+    perform pg_temp.as_postgres();
+    delete from public.notifications where subject = 'harness';
+
     -- ─────────────────────────────────────── the invitation, accepted
     perform pg_temp.as_postgres();
     select token into v_text from invitations i join organizations o on o.id = i.organization_id

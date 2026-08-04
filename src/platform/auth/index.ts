@@ -18,10 +18,12 @@ export { acceptInvitation } from "./invitations";
 export {
   isPlatformAdmin,
   listOrganizations,
+  getMailHealth,
   listOrganizationModules,
   setOrganizationModule,
   provisionOrganization,
   type CustomerWorkspace,
+  type MailHealth,
   type CustomerModule,
 } from "./platform";
 export {

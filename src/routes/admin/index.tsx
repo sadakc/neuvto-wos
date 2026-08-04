@@ -10,8 +10,11 @@ import {
   suggestSlug,
   type CustomerModule,
   type CustomerWorkspace,
+  getMailHealth,
+  type MailHealth,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
+import { MailHealthBanner } from "@/platform/auth/MailHealthBanner";
 
 export const Route = createFileRoute("/admin/")({
   ssr: false,
@@ -38,6 +41,7 @@ export const Route = createFileRoute("/admin/")({
  * the address before they hold the role.
  */
 function AdminConsole() {
+  const [mailHealth, setMailHealth] = useState<MailHealth | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [orgs, setOrgs] = useState<CustomerWorkspace[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -88,11 +92,16 @@ function AdminConsole() {
       setAllowed(ok);
       if (!ok) return;
 
-      try {
-        await load();
-      } catch {
-        if (!cancelled) setLoadError("We couldn't load the customer list.");
+      // Read in parallel and settled separately. The health check must never be
+      // able to stop the customer list loading — this is the screen somebody
+      // opens because something already seems wrong, and a broken check that
+      // blanks the page has made the outage worse rather than visible.
+      const [listResult, healthResult] = await Promise.allSettled([load(), getMailHealth()]);
+      if (cancelled) return;
+      if (listResult.status === "rejected") {
+        setLoadError("We couldn't load the customer list.");
       }
+      setMailHealth(healthResult.status === "fulfilled" ? healthResult.value : null);
     })();
 
     return () => {
@@ -194,6 +203,11 @@ function AdminConsole() {
         Every Neuvto workspace. Creating one invites the administrator you name; they set the
         company up from there.
       </p>
+
+      {/* Before the customer list, because it changes what the list means: a
+          workspace provisioned while mail is down has an administrator who was
+          never actually invited. */}
+      <MailHealthBanner health={mailHealth} />
 
       {/* ─────────────────────────────────────────────── provision */}
       <section className="mt-8 rounded-lg border border-border p-4">
