@@ -18,6 +18,40 @@ export async function getUserId(): Promise<string | null> {
 }
 
 /**
+ * The address this browser is signed in as, straight from the session.
+ *
+ * Not the same question as `getCurrentUser()?.email`, and that is the point:
+ * this answers in the case where `getCurrentUser` **throws**. Neuvto staff have
+ * no profile by design (D42), so it raises NO_ORGANIZATION for them — and the
+ * screen that has to say "you are signed in as …" is precisely the one shown to
+ * a person with no profile. Reading the session directly is the only way to name
+ * them.
+ */
+export async function getSessionEmail(): Promise<string | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw toAppError(error, "getSessionEmail");
+  return data.session?.user.email ?? null;
+}
+
+/**
+ * When this session began, as the server recorded it.
+ *
+ * `last_sign_in_at` is set by GoTrue at verification and is NOT touched by
+ * refresh-token rotation, which makes it the only honest absolute-session clock
+ * available to the browser. The tempting alternative — stamping a start time
+ * into localStorage — resets the moment somebody clears site data, which is the
+ * one thing an absolute timeout must not allow.
+ */
+export async function getSessionStartedAt(): Promise<number | null> {
+  const { data, error } = await supabase.auth.getSession();
+  if (error) throw toAppError(error, "getSessionStartedAt");
+  const iso = data.session?.user.last_sign_in_at;
+  if (!iso) return null;
+  const t = Date.parse(iso);
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
  * Loads the current user with their organisation and roles.
  *
  * Returns null when signed out. Throws NO_ORGANIZATION when authenticated but

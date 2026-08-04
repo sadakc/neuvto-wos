@@ -7,7 +7,15 @@
  */
 
 export { requestOtp, verifyOtp, signOut } from "./otp";
-export { getUserId, getCurrentUser, hasRole, isAdmin, canApprove } from "./session";
+export {
+  getUserId,
+  getCurrentUser,
+  getSessionEmail,
+  getSessionStartedAt,
+  hasRole,
+  isAdmin,
+  canApprove,
+} from "./session";
 
 /**
  * D39 — the one way into a workspace. `createOrganization` is deliberately

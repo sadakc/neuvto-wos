@@ -71,6 +71,12 @@ function AppShell() {
         if (cancelled) return;
         // Authenticated but no profile — they never finished signup.
         if (isAppError(e) && e.code === "NO_ORGANIZATION") {
+          // Deliberately NO `next`. Adding one here rebuilds the loop this
+          // replaced: `/auth` treats a `next` as intent and follows it, so
+          // `next=/app/...` would send a workspaceless platform admin straight
+          // back to this shell, which throws NO_ORGANIZATION again. Without it,
+          // `/auth` answers with the "you're already signed in" screen and the
+          // person has somewhere to go.
           window.location.href = "/auth";
           return;
         }
