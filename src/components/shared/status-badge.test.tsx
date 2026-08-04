@@ -1,103 +1,48 @@
 // @vitest-environment happy-dom
 
 /**
- * What a status badge promises.
+ * The platform's status badge, tested without any module's vocabulary.
  *
- * Before 4 Aug 2026 every leave status rendered as the same grey text, so
- * "approved", "declined" and "still waiting" were visually identical and the
- * only way to tell them apart was to read every row. The badge fixes that with
- * colour — which introduces a new way to be wrong.
+ * This file originally imported `@/modules/leave/status` to check the leave
+ * mapping, and CI refused it — correctly. `components/shared` is platform code,
+ * and a platform file that names a module means deleting that module breaks the
+ * build. `scripts/verify-module-removal.sh` proved exactly that. The leave
+ * mapping is tested in `src/modules/leave/status.test.ts`, where it belongs.
  *
- * These pin the two rules that make colour safe to rely on: the label is always
- * there, and the tone for a given status is the same on every screen.
+ * What is left here is the promise the component itself makes: a tone renders
+ * as a tinted fill by default, a solid fill uses its paired foreground, and
+ * whatever you put inside is still readable as text.
  */
 
 import { describe, expect, it } from "vitest";
 import { render, screen } from "@testing-library/react";
-import { StatusBadge } from "./status-badge";
-import { LEAVE_CALENDAR_TONE, LEAVE_STATUS_LABEL, LEAVE_STATUS_TONE } from "@/modules/leave/status";
-import { LEAVE_STATUSES } from "@/modules/leave/contracts";
+import { StatusBadge, type StatusTone } from "./status-badge";
+
+const TONES: StatusTone[] = ["success", "warning", "destructive", "info", "neutral"];
 
 describe("colour is never the only signal", () => {
-  it.each(LEAVE_STATUSES)("%s renders its label as text", (status) => {
+  it.each(TONES)("%s still renders its label as text", (tone) => {
     // Around one in twelve men has a colour vision deficiency, and red/green is
-    // the common axis — which is exactly the declined/approved axis here. A
-    // badge that says nothing is unreadable to them, and to anyone printing in
-    // greyscale.
-    render(
-      <StatusBadge tone={LEAVE_STATUS_TONE[status]}>{LEAVE_STATUS_LABEL[status]}</StatusBadge>,
-    );
-    expect(screen.getByText(LEAVE_STATUS_LABEL[status])).toBeInTheDocument();
-  });
-
-  it("every status has a distinct, human label", () => {
-    const labels = LEAVE_STATUSES.map((s) => LEAVE_STATUS_LABEL[s]);
-    expect(new Set(labels).size, `duplicate labels: ${labels.join(", ")}`).toBe(labels.length);
-    // Not the raw database value. `pending_approval` is a column, not a
-    // sentence somebody should have to read.
-    for (const label of labels) expect(label).not.toMatch(/_/);
-  });
-
-  it("says Declined rather than Rejected", () => {
-    // The column will keep saying `rejected`. A person reading that their leave
-    // was *rejected* hears something harsher than the manager who picked "not
-    // that week" meant.
-    expect(LEAVE_STATUS_LABEL.rejected).toBe("Declined");
-  });
-});
-
-describe("the tone mapping is fixed", () => {
-  // Improvising per screen — amber here, grey there — teaches people to ignore
-  // the colour, which costs more than never having added it.
-  it("maps each status to the tone the design system specifies", () => {
-    expect(LEAVE_STATUS_TONE).toEqual({
-      draft: "neutral",
-      pending_approval: "warning",
-      approved: "success",
-      rejected: "destructive",
-      cancelled: "neutral",
-    });
-  });
-
-  it("covers every status the database can produce", () => {
-    // A status added to the enum without a tone renders `undefined` classes —
-    // an unstyled badge, which looks like a styling glitch rather than a gap.
-    for (const status of LEAVE_STATUSES) {
-      expect(LEAVE_STATUS_TONE[status], `${status} has no tone`).toBeTruthy();
-      expect(LEAVE_STATUS_LABEL[status], `${status} has no label`).toBeTruthy();
-    }
-  });
-
-  it("keeps the calendar's deliberate disagreement with the list", () => {
-    // An approved request is a GREEN badge in a list and a BLUE cell in the
-    // calendar. Green on a calendar grid reads as "this day is free", which is
-    // the opposite of what an approved absence means; blue reads as "booked".
-    // Documented in `06` §Leave Calendar — this is not a bug to tidy up.
-    expect(LEAVE_STATUS_TONE.approved).toBe("success");
-    expect(LEAVE_CALENDAR_TONE.approved).toBe("info");
-    // ...and it disagrees about that ONE status and nothing else.
-    for (const status of LEAVE_STATUSES) {
-      if (status === "approved") continue;
-      expect(LEAVE_CALENDAR_TONE[status], `calendar diverges on ${status}`).toBe(
-        LEAVE_STATUS_TONE[status],
-      );
-    }
+    // the common axis — which in this product is the declined/approved axis. A
+    // badge carrying no text is unreadable to them, and to anyone printing in
+    // greyscale. The colour is emphasis on the label, not a substitute for it.
+    render(<StatusBadge tone={tone}>Some status</StatusBadge>);
+    expect(screen.getByText("Some status")).toBeInTheDocument();
   });
 });
 
 describe("emphasis", () => {
   it("defaults to the tinted fill, not the solid one", () => {
-    // Thirty leave requests rendered in solid amber and green is a fruit salad
-    // nobody can scan. Solid is for the one status that is the point of the
-    // page.
+    // Thirty rows in solid amber and green is a fruit salad nobody can scan.
+    // Solid is for the one status that is the point of the page.
     const { container } = render(<StatusBadge tone="warning">Awaiting approval</StatusBadge>);
     const badge = container.querySelector("[data-tone]");
     expect(badge?.className).toContain("bg-warning-muted");
-    expect(badge?.className).not.toContain("bg-warning ");
+    expect(badge?.className).not.toContain("text-warning-foreground");
   });
 
   it("uses the paired foreground on a solid fill", () => {
-    // A solid fill with body-coloured text is the contrast bug this pairing
+    // Body-coloured text on a solid fill is the contrast bug this pairing
     // exists to prevent; tokens.test.ts proves each pair meets AA.
     const { container } = render(
       <StatusBadge tone="warning" emphasis="solid">
@@ -107,5 +52,18 @@ describe("emphasis", () => {
     const badge = container.querySelector("[data-tone]");
     expect(badge?.className).toContain("bg-warning");
     expect(badge?.className).toContain("text-warning-foreground");
+  });
+
+  it.each(TONES)("%s has a class for both emphases", (tone) => {
+    // A tone missing from either map renders `undefined` in the class string —
+    // an unstyled badge, which reads as a styling glitch rather than a gap.
+    for (const emphasis of ["subtle", "solid"] as const) {
+      const { container } = render(
+        <StatusBadge tone={tone} emphasis={emphasis}>
+          x
+        </StatusBadge>,
+      );
+      expect(container.querySelector("[data-tone]")?.className).not.toContain("undefined");
+    }
   });
 });
