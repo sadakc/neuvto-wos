@@ -19,11 +19,13 @@ export {
   isPlatformAdmin,
   listOrganizations,
   getMailHealth,
+  getClientErrors,
   listOrganizationModules,
   setOrganizationModule,
   provisionOrganization,
   type CustomerWorkspace,
   type MailHealth,
+  type ClientErrorGroup,
   type CustomerModule,
 } from "./platform";
 export {

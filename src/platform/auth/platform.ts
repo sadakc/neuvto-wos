@@ -196,3 +196,56 @@ export async function getMailHealth(): Promise<MailHealth | null> {
     lastFailureReason: r.last_failure_reason ?? null,
   };
 }
+
+// ─────────────────────────────────────────────────────── front-end errors
+
+export interface ClientErrorGroup {
+  fingerprint: string;
+  message: string;
+  route: string | null;
+  mechanism: string;
+  severity: string;
+  /** Total across every day in the window, not rows. */
+  occurrences: number;
+  /** How many separate days this fault has appeared on. */
+  daysSeen: number;
+  firstSeenAt: string;
+  lastSeenAt: string;
+  release: string | null;
+  stack: string | null;
+}
+
+/**
+ * Reads the front-end error store.
+ *
+ * Exists because until 4 Aug 2026 a crash in production went nowhere at all:
+ * `reportLovableError` forwards to hooks that live only inside the Lovable
+ * editor, so the root boundary rendered "This page didn't load" and told no one.
+ *
+ * Swallows its own failure and returns null, for the same reason `getMailHealth`
+ * does — this is the screen somebody opens *because* something seems wrong, and
+ * a monitor that takes the console down when it cannot answer has made the
+ * outage worse. The caller renders "unknown" rather than "all clear".
+ *
+ * Note there is no organisation in this shape, deliberately. Which customer hit
+ * a bug is tenant data (D42) and the fault is diagnosable without it.
+ */
+export async function getClientErrors(days = 7): Promise<ClientErrorGroup[] | null> {
+  const { data, error } = await supabase.rpc("platform_client_errors", { p_days: days });
+  if (error) return null;
+  if (!Array.isArray(data)) return [];
+
+  return data.map((r) => ({
+    fingerprint: String(r.fingerprint),
+    message: String(r.message ?? ""),
+    route: r.route ?? null,
+    mechanism: String(r.mechanism ?? "unknown"),
+    severity: String(r.severity ?? "error"),
+    occurrences: Number(r.occurrences ?? 0),
+    daysSeen: Number(r.days_seen ?? 0),
+    firstSeenAt: String(r.first_seen_at),
+    lastSeenAt: String(r.last_seen_at),
+    release: r.release ?? null,
+    stack: r.stack ?? null,
+  }));
+}

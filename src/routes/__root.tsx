@@ -11,7 +11,7 @@ import { useEffect, type ReactNode } from "react";
 import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
-import { reportLovableError } from "../lib/lovable-error-reporting";
+import { reportError, installGlobalErrorHandlers } from "@/platform/observability/report";
 import { CONSOLE_PATH } from "@/platform/console-path";
 import { resolveTheme, THEME_STORAGE_KEY } from "@/platform/design/theme";
 
@@ -41,7 +41,7 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   console.error(error);
   const router = useRouter();
   useEffect(() => {
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
+    void reportError(error, "boundary", { boundary: "tanstack_root_error_component" });
   }, [error]);
 
   return (
@@ -201,6 +201,13 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+
+  // A boundary only catches errors thrown during render. An error in an event
+  // handler, a setTimeout, or an unawaited promise reaches neither — and in this
+  // app those are most of what breaks, because most of it is async calls to
+  // Postgres. Installed once at the root, torn down on unmount so a test can
+  // control it.
+  useEffect(() => installGlobalErrorHandlers(), []);
 
   return (
     <QueryClientProvider client={queryClient}>
