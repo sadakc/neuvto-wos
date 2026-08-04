@@ -12,9 +12,12 @@ import {
   type CustomerWorkspace,
   getMailHealth,
   type MailHealth,
+  getClientErrors,
+  type ClientErrorGroup,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { MailHealthBanner } from "@/platform/auth/MailHealthBanner";
+import { ClientErrorsPanel } from "@/platform/auth/ClientErrorsPanel";
 import { NeuvtoLockup } from "@/components/shared/neuvto-mark";
 import { CONSOLE_PATH } from "@/platform/console-path";
 
@@ -50,6 +53,7 @@ export const Route = createFileRoute("/neuvto-hq/")({
  */
 function AdminConsole() {
   const [mailHealth, setMailHealth] = useState<MailHealth | null>(null);
+  const [clientErrors, setClientErrors] = useState<ClientErrorGroup[] | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
   const [orgs, setOrgs] = useState<CustomerWorkspace[]>([]);
   const [loadError, setLoadError] = useState("");
@@ -104,12 +108,17 @@ function AdminConsole() {
       // able to stop the customer list loading — this is the screen somebody
       // opens because something already seems wrong, and a broken check that
       // blanks the page has made the outage worse rather than visible.
-      const [listResult, healthResult] = await Promise.allSettled([load(), getMailHealth()]);
+      const [listResult, healthResult, errorsResult] = await Promise.allSettled([
+        load(),
+        getMailHealth(),
+        getClientErrors(),
+      ]);
       if (cancelled) return;
       if (listResult.status === "rejected") {
         setLoadError("We couldn't load the customer list.");
       }
       setMailHealth(healthResult.status === "fulfilled" ? healthResult.value : null);
+      setClientErrors(errorsResult.status === "fulfilled" ? errorsResult.value : null);
     })();
 
     return () => {
@@ -222,6 +231,11 @@ function AdminConsole() {
           workspace provisioned while mail is down has an administrator who was
           never actually invited. */}
       <MailHealthBanner health={mailHealth} />
+
+      {/* Errors sit with the mail alarm rather than at the bottom: both answer
+          "is anything wrong right now", and a monitor somebody has to scroll to
+          is a monitor somebody stops reading. */}
+      <ClientErrorsPanel groups={clientErrors} />
 
       {/* ─────────────────────────────────────────────── provision */}
       <section className="mt-8 rounded-lg border border-border p-4">

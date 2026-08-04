@@ -69,9 +69,22 @@ export function isAppError(e: unknown): e is AppError {
  * Deliberately does NOT pass an unknown error's message through: a raw Postgres
  * or network error can leak schema details, and it reads as gibberish to the
  * person looking at the screen. The real cause is logged instead.
+ *
+ * This is also where a failed write becomes visible. Every module funnels
+ * through here — 28 files as of 4 Aug 2026 — so one call covers the whole
+ * surface, and it covers the right half of it: an `AppError` returns above
+ * without reporting, because VALIDATION_FAILED or ALREADY_DECIDED is the system
+ * working. Only the unknown path is a genuine fault, and only that path is
+ * reported. Reporting expected outcomes is how an error store becomes noise
+ * nobody reads.
  */
 export function toAppError(e: unknown, context: string): AppError {
   if (isAppError(e)) return e;
   console.error(`[${context}]`, e);
+  // Imported lazily so this module stays importable from server code and tests
+  // without dragging in the Supabase client.
+  void import("./observability/report")
+    .then((m) => m.reportError(e, "write_failed", { context }))
+    .catch(() => {});
   return new AppError("INTERNAL_ERROR", "Something went wrong on our end. Please try again.", 500);
 }

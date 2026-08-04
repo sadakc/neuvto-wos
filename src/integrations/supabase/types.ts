@@ -333,6 +333,65 @@ export type Database = {
         }
         Relationships: []
       }
+      client_errors: {
+        Row: {
+          fingerprint: string
+          first_seen_at: string
+          id: string
+          last_seen_at: string
+          mechanism: string
+          message: string
+          occurred_on: string
+          occurrences: number
+          organization_id: string | null
+          release: string | null
+          route: string | null
+          severity: string
+          stack: string | null
+          user_agent: string | null
+        }
+        Insert: {
+          fingerprint: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          mechanism: string
+          message: string
+          occurred_on?: string
+          occurrences?: number
+          organization_id?: string | null
+          release?: string | null
+          route?: string | null
+          severity?: string
+          stack?: string | null
+          user_agent?: string | null
+        }
+        Update: {
+          fingerprint?: string
+          first_seen_at?: string
+          id?: string
+          last_seen_at?: string
+          mechanism?: string
+          message?: string
+          occurred_on?: string
+          occurrences?: number
+          organization_id?: string | null
+          release?: string | null
+          route?: string | null
+          severity?: string
+          stack?: string | null
+          user_agent?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "client_errors_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_requests: {
         Row: {
           company: string | null
@@ -1596,6 +1655,22 @@ export type Database = {
       }
       org_today: { Args: { _org_id: string }; Returns: string }
       organization_display_name: { Args: { _org_id: string }; Returns: string }
+      platform_client_errors: {
+        Args: { p_days?: number }
+        Returns: {
+          days_seen: number
+          fingerprint: string
+          first_seen_at: string
+          last_seen_at: string
+          mechanism: string
+          message: string
+          occurrences: number
+          release: string
+          route: string
+          severity: string
+          stack: string
+        }[]
+      }
       platform_list_org_modules: {
         Args: { _org_id: string }
         Returns: {
@@ -1648,6 +1723,19 @@ export type Database = {
       }
       reactivate_employee: {
         Args: { _employee_id: string }
+        Returns: undefined
+      }
+      record_client_error: {
+        Args: {
+          p_fingerprint: string
+          p_mechanism: string
+          p_message: string
+          p_release?: string
+          p_route?: string
+          p_severity?: string
+          p_stack?: string
+          p_user_agent?: string
+        }
         Returns: undefined
       }
       render_template: {
