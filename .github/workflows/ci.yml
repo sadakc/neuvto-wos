@@ -108,6 +108,23 @@ jobs:
             exit 1
           fi
 
+      - name: The console path lives in one place
+        run: |
+          # `/admin` moved to `/neuvto-hq` on 4 Aug 2026 to get Neuvto's own
+          # console off every scanner wordlist. That is obscurity and not
+          # security — the path ships to the browser either way, and the real
+          # control is is_platform_admin() in the database.
+          #
+          # But obscurity that half-applies is worse than none: one forgotten
+          # `href="/admin"` re-advertises it, and the symptom is silent. So the
+          # literal is allowed in exactly one file, which also means moving it
+          # again stays a one-line change.
+          if grep -rEn "['\"\`]/admin\b" src --include='*.ts' --include='*.tsx' \
+               | grep -v '^src/routes/neuvto-hq/index.tsx:'; then
+            echo "::error::A hardcoded console path. Import CONSOLE_PATH from src/routes/neuvto-hq/index.tsx instead."
+            exit 1
+          fi
+
       - name: Modules must not import each other
         run: |
           fail=0

@@ -53,6 +53,10 @@ and that guard is not to be worked around. Never point it at production.
   `docs/operations/REVIEWING_LOVABLE_CHANGES.md` and `scripts/lovable-gate.mjs`.
 - **A migration is a file in git**, so a secret never goes in one. Vault secrets are
   per-environment and manual (D43).
+- **Neuvto's own console is `/neuvto-hq`**, not `/admin`, and the literal lives only in
+  `src/routes/neuvto-hq/index.tsx` as `CONSOLE_PATH` — CI fails a hardcoded one. That is
+  obscurity, not security: the path ships to the browser. The control is
+  `is_platform_admin()` plus a not-found page that discloses nothing.
 
 ## Two things that have bitten more than once
 

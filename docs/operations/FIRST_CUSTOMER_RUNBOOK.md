@@ -52,7 +52,7 @@ the first provisioning attempt failed. See the Vault section of
 PSQL=psql DATABASE_URL="<the target>" bash neuvto-harness/tests/verify_scheduled_work.sh
 ```
 
-**1. Provision the workspace** at `/admin`: company name, address, and the administrator's
+**1. Provision the workspace** at `/neuvto-hq`: company name, address, and the administrator's
 email and phone. They are invited, not created — they accept like anybody else, which means
 they have proved they control the address before they hold the role (D39).
 
@@ -62,7 +62,7 @@ hiding a menu item. Leave is the only one available today; Attendance and Payrol
 as `coming_soon`.
 
 **3. They accept the invitation** and land on the **setup wizard**, not a dashboard. If the
-email is slow, `/admin` shows a copyable link until it is accepted. TOTP enrolment (D21) is
+email is slow, `/neuvto-hq` shows a copyable link until it is accepted. TOTP enrolment (D21) is
 not built yet.
 
 The wizard walks them through the next four steps and every one of them is also reachable
@@ -159,7 +159,7 @@ awaiting approval, and any harness alert. The nightly integrity check is the saf
 | Security questionnaire answers            | Signature                     | Writing     |
 | DPA, privacy policy, terms                | Signature                     | Legal       |
 | Pricing model                             | Signature                     | Business    |
-| ~~Super-admin provisioning console~~      | **Closed** — `/admin`, step 8 | —           |
+| ~~Super-admin provisioning console~~      | **Closed** — `/neuvto-hq`, step 8 | —       |
 | Vault secrets set by hand per environment | Every new environment         | Engineering |
 | Announcement template                     | Go-live polish                | Writing     |
 | Help centre and support process           | Second customer               | Writing     |
