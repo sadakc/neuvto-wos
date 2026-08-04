@@ -35,6 +35,7 @@ screen in them.
 bun run lint
 bun run typecheck
 bun run test
+bun run tokens      # after ANY colour change — regenerates src/styles.css
 bun run harness     # mandatory for database, handler or platform-service changes
 ```
 
@@ -54,9 +55,21 @@ and that guard is not to be worked around. Never point it at production.
 - **A migration is a file in git**, so a secret never goes in one. Vault secrets are
   per-environment and manual (D43).
 - **Neuvto's own console is `/neuvto-hq`**, not `/admin`, and the literal lives only in
-  `src/routes/neuvto-hq/index.tsx` as `CONSOLE_PATH` — CI fails a hardcoded one. That is
+  `src/platform/console-path.ts` as `CONSOLE_PATH` — CI fails a hardcoded one. That is
   obscurity, not security: the path ships to the browser. The control is
   `is_platform_admin()` plus a not-found page that discloses nothing.
+- **`src/styles.css` is generated. Do not edit it.** Colours are authored in
+  `src/platform/design/tokens.ts`; run `bun run tokens` and commit the result. Editing
+  the stylesheet appears to work and is silently reverted by the next regeneration.
+  The TypeScript file is also what a React Native build will import — that is the
+  reason it, and not the CSS, is the source of truth.
+- **A new colour must pass `tokens.test.ts` before it exists.** It computes WCAG
+  contrast for every pairing and fails the build under AA. This is how we learned that
+  `--primary` had never been `#0EA5E9` — the authored OKLCH was outside sRGB, so every
+  browser clipped it to a colour nobody chose.
+- **The employee app is dark by default, the console is always light** (`design/theme.ts`).
+  The console's theme is not a preference: a platform admin must never mistake it for a
+  tenant workspace (D42).
 
 ## Two things that have bitten more than once
 
