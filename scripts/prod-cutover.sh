@@ -4,6 +4,7 @@
 #
 #   bash scripts/prod-cutover.sh              push migrations, deploy functions
 #   bash scripts/prod-cutover.sh --check      connect and report, change nothing
+#   bash scripts/prod-cutover.sh --repair     clear ledger rows with no local file, then push
 #   bash scripts/prod-cutover.sh --harness    also run the harness (EMPTY targets only)
 #
 # WHY THIS SCRIPT EXISTS
@@ -46,11 +47,13 @@ cd "$(dirname "$0")/.." || exit 1
 
 MODE="deploy"
 POOLER=false
+REPAIR=false
 for arg in "$@"; do
   case "$arg" in
     --check)   MODE="check" ;;
     --harness) MODE="harness" ;;
     --pooler)  POOLER=true ;;
+    --repair)  REPAIR=true ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -182,9 +185,92 @@ APPLIED="$("$PSQL" "$DB_URL" -tAc \
 echo "  public tables: $TABLES · migrations recorded: $APPLIED"
 echo
 
+# ────────────────────────────────────────────────────── the ledger, both ways
+#
+# `supabase db push` compares local files against the remote ledger and refuses
+# when they disagree in BOTH directions. That is the state this project reached
+# on 4 Aug 2026 and it is worth understanding rather than working around.
+#
+# Six migrations had been applied straight to production — by the dashboard, or
+# by an MCP tool, both of which stamp their own timestamp — and then committed
+# to the repo later under different, later versions. The SQL had run; the ledger
+# recorded it under a version git has never heard of. So:
+#
+#   remote has 6 versions with no local file  ─┐ push cannot tell which side is
+#   local has 6 files not in the remote ledger ┘ authoritative, so it stops
+#
+# The CLI's own remedy is `supabase migration repair`, which is the right idea
+# and the wrong ergonomics here: run bare it has no password and fails with
+# "Connect to your database by setting the env var correctly:
+# SUPABASE_DB_PASSWORD". This script already holds a connection that works, so
+# the repair belongs here.
+#
+# NOTE THE ASYMMETRY, because it is the safety property. Only versions with NO
+# LOCAL FILE are ever removed, and nothing is applied or dropped in the schema —
+# this edits the ledger alone. A version that HAS a local file is never touched,
+# so this can never make `push` skip a migration that has not run.
+LOCAL_VERSIONS="$(ls supabase/migrations/*.sql 2>/dev/null | sed 's|.*/||; s|_.*||' | sort -u)"
+PHANTOM="$("$PSQL" "$DB_URL" -tAc \
+  "select version from supabase_migrations.schema_migrations order by version" 2>/dev/null \
+  | tr -d ' ' | grep -v '^$' | grep -Fxv -f <(printf '%s\n' "$LOCAL_VERSIONS") || true)"
+
+if [[ -n "$PHANTOM" ]]; then
+  COUNT="$(printf '%s\n' "$PHANTOM" | wc -l | tr -d ' ')"
+  echo "  ⚠  LEDGER DIVERGENCE — $COUNT version(s) recorded on the remote with no local file:"
+  while IFS= read -r v; do
+    NAME="$("$PSQL" "$DB_URL" -tAc \
+      "select name from supabase_migrations.schema_migrations where version = '$v'" 2>/dev/null | tr -d ' ')"
+    printf "       %s  %s\n" "$v" "${NAME:-(no name recorded)}"
+  done <<<"$PHANTOM"
+  echo
+  echo "     Their SQL has run. Only the version numbers are wrong — they were"
+  echo "     applied outside this repo and committed later under other names."
+  echo "     \`supabase db push\` will refuse until the ledger agrees with git."
+  echo
+fi
+
 if [[ "$MODE" == "check" ]]; then
+  [[ -n "$PHANTOM" ]] && echo "     Clear them with: bash scripts/prod-cutover.sh --repair" && echo
   echo "  --check: nothing was changed."
   exit 0
+fi
+
+if [[ "$REPAIR" == true ]]; then
+  if [[ -z "$PHANTOM" ]]; then
+    echo "── repair: the ledger already agrees with git. Nothing to do."
+    echo
+  else
+    echo "── repair"
+    echo "     This DELETES the $COUNT row(s) above from supabase_migrations.schema_migrations."
+    echo "     It runs no DDL: your tables, functions and data are untouched."
+    echo "     Afterwards the local files re-apply and re-record under git's versions."
+    echo
+    printf '     Type "repair" to continue: '
+    read -r reply
+    if [[ "$reply" != "repair" ]]; then
+      echo "     Nothing was changed."
+      exit 1
+    fi
+    while IFS= read -r v; do
+      "$PSQL" "$DB_URL" -q -c \
+        "delete from supabase_migrations.schema_migrations where version = '$v'" >/dev/null
+      echo "     removed $v"
+    done <<<"$PHANTOM"
+    echo
+  fi
+elif [[ -n "$PHANTOM" ]]; then
+  echo "  REFUSING TO PUSH while the ledger disagrees with git."
+  echo "  \`supabase db push\` would fail anyway; this says why first."
+  echo
+  echo "      bash scripts/prod-cutover.sh --repair"
+  echo
+  echo "  Read the list above before running it. Every one of those should be a"
+  echo "  migration whose content you can find in supabase/migrations under a"
+  echo "  different version. If any name is unfamiliar, stop — that is schema on"
+  echo "  production that exists nowhere in git, and deleting its ledger row"
+  echo "  would hide it rather than fix it."
+  echo
+  exit 1
 fi
 
 # ------------------------------------------------------------------- migrations
