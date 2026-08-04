@@ -18,12 +18,12 @@ rather than transcribed.
 
 The trade, stated plainly so nobody re-opens it without new information:
 
-|                          | React Native / Expo                                   | SwiftUI + Compose                                    |
-| ------------------------ | ----------------------------------------------------- | ---------------------------------------------------- |
-| Design tokens            | **imported** from `design/tokens.ts`                  | regenerated per platform, drift is a matter of time  |
-| Supabase client, contracts, Zod schemas | reused directly                          | rewritten twice                                       |
-| Feel                     | very good, not indistinguishable                      | native                                                |
-| Cost of a second module  | one implementation                                    | three                                                 |
+|                                         | React Native / Expo                  | SwiftUI + Compose                                   |
+| --------------------------------------- | ------------------------------------ | --------------------------------------------------- |
+| Design tokens                           | **imported** from `design/tokens.ts` | regenerated per platform, drift is a matter of time |
+| Supabase client, contracts, Zod schemas | reused directly                      | rewritten twice                                     |
+| Feel                                    | very good, not indistinguishable     | native                                              |
+| Cost of a second module                 | one implementation                   | three                                               |
 
 The deciding factor was not feel — it was that a Leave module built three times gets fixed
 once and stays broken twice. Revisit only if a specific screen proves impossible, and
@@ -35,16 +35,16 @@ revisit for that screen, not for the architecture.
 
 These are properties of the current code, not aspirations.
 
-| Thing                    | Where it lives                                       | How native consumes it                                  |
-| ------------------------ | ---------------------------------------------------- | ------------------------------------------------------- |
-| Colour palette, 2 themes | `SEMANTIC` in `design/tokens.ts`                     | `oklchToHex(SEMANTIC.dark.primary)` → `#68c6fe`         |
-| Spacing scale            | `SPACE` — 4px base                                   | numbers are already density-independent pixels          |
-| Radius scale             | `RADIUS`, from `RADIUS_BASE`                         | pt / dp, 1:1                                            |
-| Type scale               | `TYPE.roles` — size, line height, weight, family     | multiply `size` by the OS font scale (see §3)           |
-| Touch target floor       | `MIN_TOUCH_TARGET = 48`                              | the same number Apple and Google both publish           |
-| Tab-bar cap              | `MAX_VISIBLE_TABS = 5`                               | `UITabBar`'s own limit (see §4)                         |
-| Error strings            | the database, via `AppError`                         | unchanged — messages come from Postgres, not the client |
-| Empty / loading / error states | each screen component                          | the states exist and are named; only the rendering differs |
+| Thing                          | Where it lives                                   | How native consumes it                                     |
+| ------------------------------ | ------------------------------------------------ | ---------------------------------------------------------- |
+| Colour palette, 2 themes       | `SEMANTIC` in `design/tokens.ts`                 | `oklchToHex(SEMANTIC.dark.primary)` → `#68c6fe`            |
+| Spacing scale                  | `SPACE` — 4px base                               | numbers are already density-independent pixels             |
+| Radius scale                   | `RADIUS`, from `RADIUS_BASE`                     | pt / dp, 1:1                                               |
+| Type scale                     | `TYPE.roles` — size, line height, weight, family | multiply `size` by the OS font scale (see §3)              |
+| Touch target floor             | `MIN_TOUCH_TARGET = 48`                          | the same number Apple and Google both publish              |
+| Tab-bar cap                    | `MAX_VISIBLE_TABS = 5`                           | `UITabBar`'s own limit (see §4)                            |
+| Error strings                  | the database, via `AppError`                     | unchanged — messages come from Postgres, not the client    |
+| Empty / loading / error states | each screen component                            | the states exist and are named; only the rendering differs |
 
 `oklchToHex` is exact for every token — the palette is asserted in-gamut, so no colour
 gets clipped on the way to sRGB and the two platforms cannot disagree.
