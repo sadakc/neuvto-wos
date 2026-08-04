@@ -53,7 +53,9 @@ security definer
 set search_path to 'public'
 as $function$
 declare
-  v_reason text;
+  v_reason  text;
+  v_sent    timestamptz;
+  v_failed  timestamptz;
 begin
   -- Platform infrastructure, so platform admins only. Raises rather than
   -- returning an empty row, for the same reason the reports do: a health check
@@ -62,6 +64,9 @@ begin
   if not public.is_platform_admin() then
     raise exception 'FORBIDDEN' using errcode = 'P0001';
   end if;
+
+  select max(sent_at) into v_sent from public.notifications where status = 'sent';
+  select max(updated_at) into v_failed from public.notifications where status = 'failed';
 
   select left(n.failed_reason, 300) into v_reason
     from public.notifications n
@@ -91,16 +96,24 @@ begin
      where status = 'pending' and deleted_at is null
   )
   select
-    -- Healthy means: nothing has failed today, and nothing is sitting in the
-    -- queue longer than the cron's own period plus room for a retry backoff.
-    -- Ten minutes rather than one: the first retry is two minutes out and the
-    -- second four, so a single provider blip must not read as an outage.
-    (f.c = 0 and p.oldest_min < 10),
+    -- Healthy means mail is flowing NOW — not that nothing has ever gone wrong.
+    --
+    -- The first version asked only "did anything fail in 24 hours", and the
+    -- first thing it did on production was show red over a resolved incident:
+    -- two failures from the previous day, both since superseded by a successful
+    -- send. An alarm that cries wolf after recovery is the one somebody learns
+    -- to ignore, which costs more than having no alarm at all.
+    --
+    -- So a failure counts against health only until mail flows again. The count
+    -- is still REPORTED, because two messages that never arrived remain worth
+    -- knowing about — the caller decides whether that is red or a footnote.
+    (p.oldest_min < 10
+     and (v_failed is null or (v_sent is not null and v_sent > v_failed))),
     f.c,
     p.c,
     p.oldest_min,
-    (select max(sent_at) from public.notifications where status = 'sent'),
-    (select max(updated_at) from public.notifications where status = 'failed'),
+    v_sent,
+    v_failed,
     nullif(v_reason, '')
   from f, p;
 end $function$;

@@ -56,6 +56,18 @@ export function MailHealthBanner({ health }: { health: MailHealth | null }) {
     return (
       <p data-testid="mail-health-ok" className="mt-6 text-sm text-muted-foreground">
         Mail is being delivered — last sent {ago(health.lastSentAt)}.
+        {health.failed24h > 0 && (
+          // Flowing now, but something failed earlier today. A footnote rather
+          // than an alarm: the messages are worth chasing, the system is not
+          // broken, and colouring this red is how somebody learns to ignore the
+          // red. Found on production showing an alert over a resolved incident.
+          <span data-testid="mail-health-recovered">
+            {" "}
+            <strong className="tabular-nums">{health.failed24h}</strong>{" "}
+            {health.failed24h === 1 ? "message" : "messages"} failed earlier today and did not
+            arrive.
+          </span>
+        )}
       </p>
     );
   }

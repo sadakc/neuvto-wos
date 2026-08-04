@@ -75,6 +75,17 @@ describe("MailHealthBanner", () => {
     expect(screen.queryByTestId("mail-health-alert")).toBeNull();
   });
 
+  it("does not cry wolf over a failure mail has since recovered from", () => {
+    // The exact state production was in the moment this shipped: two failures
+    // the previous day, superseded by a successful send. The first version
+    // showed a red alert, which is how an alarm teaches you to ignore it.
+    render(<MailHealthBanner health={{ ...HEALTHY, failed24h: 2 }} />);
+    expect(screen.queryByTestId("mail-health-alert")).toBeNull();
+    expect(screen.getByTestId("mail-health-ok")).toHaveTextContent("Mail is being delivered");
+    // Still says so, though — two messages did not arrive.
+    expect(screen.getByTestId("mail-health-recovered")).toHaveTextContent("2");
+  });
+
   it("reports a stuck queue even with nothing failed", () => {
     // The other shape of the outage: nothing errors, mail simply stops moving.
     // Counting only failures would call this healthy.

@@ -882,6 +882,37 @@ begin
         raise notice 'ok: mail health is refused to a tenant admin';
     end;
 
+    -- ─────────────────────────────── and stops alarming once mail recovers
+    --
+    -- Added after the first version of this block passed under BOTH the old
+    -- health logic and the new one. It asserted only "a failure makes it
+    -- unhealthy", which is true either way, so sabotaging the fix changed
+    -- nothing and the assertion proved less than it appeared to.
+    --
+    -- The distinction is recovery: a failure counts against health only until
+    -- mail flows again. Without this, an alarm that goes red over a resolved
+    -- incident ships unnoticed — which is exactly what production did.
+    perform pg_temp.as_postgres();
+    insert into public.notifications
+      (organization_id, recipient_id, event_key, channel, subject, body,
+       status, attempts, sent_at, recipient_email)
+    values
+      (acme, ravi, 'member.invited', 'email', 'harness', '<p>harness</p>',
+       'sent', 1, now() + interval '1 minute', 'ravi@acme.test');
+
+    perform pg_temp.as_user('00000000-0000-0000-0000-0000000000f0');
+    select case when h.healthy then 1 else 0 end into n
+      from public.platform_mail_health() h;
+    perform pg_temp.check('a failure stops counting once mail flows again', n, 1);
+
+    -- ...and the failure is still REPORTED, because those messages never
+    -- arrived. Recovering is not the same as never having failed.
+    select h.failed_24h into n from public.platform_mail_health() h;
+    if n < 1 then
+      raise exception 'RLS FAIL: recovery hid the failure count entirely — expected it still reported, got %', n;
+    end if;
+    raise notice 'ok: recovery clears the alarm without hiding the failures';
+
     perform pg_temp.as_postgres();
     delete from public.notifications where subject = 'harness';
 
