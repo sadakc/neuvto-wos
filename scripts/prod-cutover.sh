@@ -4,6 +4,7 @@
 #
 #   bash scripts/prod-cutover.sh              push migrations, deploy functions
 #   bash scripts/prod-cutover.sh --check      connect and report, change nothing
+#   bash scripts/prod-cutover.sh --repair     clear ledger rows with no local file, then push
 #   bash scripts/prod-cutover.sh --harness    also run the harness (EMPTY targets only)
 #
 # WHY THIS SCRIPT EXISTS
@@ -46,11 +47,13 @@ cd "$(dirname "$0")/.." || exit 1
 
 MODE="deploy"
 POOLER=false
+REPAIR=false
 for arg in "$@"; do
   case "$arg" in
     --check)   MODE="check" ;;
     --harness) MODE="harness" ;;
     --pooler)  POOLER=true ;;
+    --repair)  REPAIR=true ;;
     *) echo "unknown option: $arg" >&2; exit 2 ;;
   esac
 done
@@ -182,9 +185,168 @@ APPLIED="$("$PSQL" "$DB_URL" -tAc \
 echo "  public tables: $TABLES · migrations recorded: $APPLIED"
 echo
 
+# ────────────────────────────────────────────────────── the ledger, both ways
+#
+# `supabase db push` compares local files against the remote ledger and refuses
+# when they disagree in BOTH directions. That is the state this project reached
+# on 4 Aug 2026 and it is worth understanding rather than working around.
+#
+# Six migrations had been applied straight to production — by the dashboard, or
+# by an MCP tool, both of which stamp their own timestamp — and then committed
+# to the repo later under different, later versions. The SQL had run; the ledger
+# recorded it under a version git has never heard of. So:
+#
+#   remote has 6 versions with no local file  ─┐ push cannot tell which side is
+#   local has 6 files not in the remote ledger ┘ authoritative, so it stops
+#
+# The CLI's own remedy is `supabase migration repair`, which is the right idea
+# and the wrong ergonomics here: run bare it has no password and fails with
+# "Connect to your database by setting the env var correctly:
+# SUPABASE_DB_PASSWORD". This script already holds a connection that works, so
+# the repair belongs here.
+#
+# NOTE THE ASYMMETRY, because it is the safety property. Only versions with NO
+# LOCAL FILE are ever removed, and nothing is applied or dropped in the schema —
+# this edits the ledger alone. A version that HAS a local file is never touched,
+# so this can never make `push` skip a migration that has not run.
+LOCAL_VERSIONS="$(ls supabase/migrations/*.sql 2>/dev/null | sed 's|.*/||; s|_.*||' | sort -u)"
+PHANTOM="$("$PSQL" "$DB_URL" -tAc \
+  "select version from supabase_migrations.schema_migrations order by version" 2>/dev/null \
+  | tr -d ' ' | grep -v '^$' | grep -Fxv -f <(printf '%s\n' "$LOCAL_VERSIONS") || true)"
+
+if [[ -n "$PHANTOM" ]]; then
+  COUNT="$(printf '%s\n' "$PHANTOM" | wc -l | tr -d ' ')"
+  echo "  ⚠  LEDGER DIVERGENCE — $COUNT version(s) recorded on the remote with no local file:"
+  while IFS= read -r v; do
+    NAME="$("$PSQL" "$DB_URL" -tAc \
+      "select name from supabase_migrations.schema_migrations where version = '$v'" 2>/dev/null | tr -d ' ')"
+    printf "       %s  %s\n" "$v" "${NAME:-(no name recorded)}"
+  done <<<"$PHANTOM"
+  echo
+  echo "     Their SQL has run. Only the version numbers are wrong — they were"
+  echo "     applied outside this repo and committed later under other names."
+  echo "     \`supabase db push\` will refuse until the ledger agrees with git."
+  echo
+fi
+
 if [[ "$MODE" == "check" ]]; then
+  [[ -n "$PHANTOM" ]] && echo "     Clear them with: bash scripts/prod-cutover.sh --repair" && echo
   echo "  --check: nothing was changed."
   exit 0
+fi
+
+if [[ "$REPAIR" == true ]]; then
+  if [[ -z "$PHANTOM" ]]; then
+    echo "── repair: the ledger already agrees with git. Nothing to do."
+    echo
+  else
+    echo "── repair"
+    echo "     This DELETES the $COUNT row(s) above from supabase_migrations.schema_migrations."
+    echo "     It runs no DDL: your tables, functions and data are untouched."
+    echo "     Afterwards the local files re-apply and re-record under git's versions."
+    echo
+    printf '     Type "repair" to continue: '
+    read -r reply
+    if [[ "$reply" != "repair" ]]; then
+      echo "     Nothing was changed."
+      exit 1
+    fi
+    while IFS= read -r v; do
+      "$PSQL" "$DB_URL" -q -c \
+        "delete from supabase_migrations.schema_migrations where version = '$v'" >/dev/null
+      echo "     removed $v"
+    done <<<"$PHANTOM"
+    echo
+  fi
+elif [[ -n "$PHANTOM" ]]; then
+  echo "  REFUSING TO PUSH while the ledger disagrees with git."
+  echo "  \`supabase db push\` would fail anyway; this says why first."
+  echo
+  echo "      bash scripts/prod-cutover.sh --repair"
+  echo
+  echo "  Read the list above before running it. Every one of those should be a"
+  echo "  migration whose content you can find in supabase/migrations under a"
+  echo "  different version. If any name is unfamiliar, stop — that is schema on"
+  echo "  production that exists nowhere in git, and deleting its ledger row"
+  echo "  would hide it rather than fix it."
+  echo
+  exit 1
+fi
+
+# ─────────────────────────────────────────── functions a replay cannot replace
+#
+# The second thing that stopped the 4 Aug cutover, after the ledger.
+#
+# `create or replace function` is idempotent re-run against the SAME state. It is
+# NOT idempotent when the current state is a LATER version with a different
+# signature — Postgres refuses to change a function's return type, and says so
+# in a way the CLI reports only as "Failed to execute statement".
+#
+# That is exactly what a repaired replay produces. Production held
+# `leave_taken_report` with 13 columns, from the decision-note migration.
+# Replaying the migrations in order starts with the 12-column version that
+# preceded it, which is a downgrade, and the push died on statement 4.
+#
+# The end state was never in doubt: replaying both migrations lands on the same
+# 13 columns production already had. Only the intermediate step is impossible.
+# Dropping first makes the sequence replayable — the very next statements
+# recreate it, and the migrations that follow bring it to its final shape.
+#
+# Checked before it was trusted: every one of these functions had zero dependent
+# objects, so nothing cascades, and production held no customer data at the time.
+# If either stops being true, read this again before running it.
+if [[ "$REPAIR" == true ]]; then
+  PENDING_FNS="$(
+    for f in supabase/migrations/*.sql; do
+      v="$(basename "$f" | cut -d_ -f1)"
+      "$PSQL" "$DB_URL" -tAc \
+        "select 1 from supabase_migrations.schema_migrations where version='$v'" 2>/dev/null \
+        | grep -q 1 && continue
+      grep -oE 'create or replace function public\.[a-z_]+' "$f" | sed 's/.*public\.//'
+    done | sort -u
+  )"
+
+  DROPPABLE=""
+  while IFS= read -r fn; do
+    [[ -z "$fn" ]] && continue
+    SIGS="$("$PSQL" "$DB_URL" -tAc "
+      select 'public.' || p.proname || '(' || pg_get_function_identity_arguments(p.oid) || ')'
+        from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname = 'public' and p.proname = '$fn'" 2>/dev/null | sed '/^$/d')"
+    [[ -n "$SIGS" ]] && DROPPABLE="${DROPPABLE}${SIGS}"$'\n'
+  done <<<"$PENDING_FNS"
+  DROPPABLE="$(printf '%s' "$DROPPABLE" | sed '/^$/d')"
+
+  if [[ -n "$DROPPABLE" ]]; then
+    echo "── functions the replay will recreate"
+    echo "     These already exist, and the migrations about to run redefine them."
+    echo "     Any whose signature the replay would SHRINK will refuse to replace,"
+    echo "     so they are dropped and immediately recreated by the push:"
+    echo
+    printf '       %s\n' $(printf '%s\n' "$DROPPABLE")
+    echo
+    DEPS="$("$PSQL" "$DB_URL" -tAc "
+      select count(*) from pg_depend d
+        join pg_proc p on p.oid = d.refobjid
+        join pg_namespace n on n.oid = p.pronamespace
+       where n.nspname='public' and d.deptype='n'
+         and p.proname = any(string_to_array('$(printf '%s' "$PENDING_FNS" | tr '\n' ',' | sed 's/,$//')', ','))" 2>/dev/null || echo 0)"
+    echo "     dependent objects: ${DEPS:-0}  (anything above 0 would cascade — stop and look)"
+    echo
+    if [[ "${DEPS:-0}" != "0" ]]; then
+      echo "  REFUSING: something depends on these. Dropping would take it with them." >&2
+      exit 1
+    fi
+    printf '     Type "drop" to continue: '
+    read -r reply
+    [[ "$reply" == "drop" ]] || { echo "     Nothing was changed."; exit 1; }
+    while IFS= read -r sig; do
+      [[ -z "$sig" ]] && continue
+      "$PSQL" "$DB_URL" -q -c "drop function if exists $sig" >/dev/null
+      echo "     dropped $sig"
+    done <<<"$DROPPABLE"
+    echo
+  fi
 fi
 
 # ------------------------------------------------------------------- migrations
