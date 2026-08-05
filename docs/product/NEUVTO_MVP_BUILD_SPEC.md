@@ -246,7 +246,11 @@ Soft-delete filtering lives in the policy, never in application queries: one for
 - **Email OTP** (Supabase `signInWithOtp`) as the primary flow: email → 6-digit code → session. No password to set, forget, or reset — which also removes the missing password-reset gap.
 - **Google OAuth** retained for admins, but moved behind our own `src/platform/auth/` wrapper. The current direct `lovable` import in `src/routes/auth.tsx` is the known portability violation and is fixed as part of this step.
 - Password sign-in removed. Test accounts migrate by requesting an OTP on the same email.
-- OTP expiry and session duration come from settings, never hardcoded.
+- OTP expiry and session duration come from settings, never hardcoded. This line decided the
+  shape of D20's implementation (5 Aug 2026): the idle timeout reads `session_policy()` rather
+  than a constant, which is also the only way to answer for a platform admin — they have no
+  `organization_settings` row at all (D42). Idle is per ROLE as well as per organisation; see
+  §3 of `standards/NEUVTO_SECURITY_POLICY.md`.
 - Phone OTP deferred: needs an SMS provider and Indian DLT template registration. The auth wrapper is written so adding it is one method.
 
 ### Deactivation — D14

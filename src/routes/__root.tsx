@@ -12,6 +12,7 @@ import { Toaster } from "@/components/ui/sonner";
 
 import appCss from "../styles.css?url";
 import { reportError, installGlobalErrorHandlers } from "@/platform/observability/report";
+import { installIdleWatcher } from "@/platform/auth/idle";
 import { CONSOLE_PATH } from "@/platform/console-path";
 import { resolveTheme, THEME_STORAGE_KEY } from "@/platform/design/theme";
 
@@ -208,6 +209,13 @@ function RootComponent() {
   // Postgres. Installed once at the root, torn down on unmount so a test can
   // control it.
   useEffect(() => installGlobalErrorHandlers(), []);
+
+  // Signs somebody out after inactivity — 30 minutes for admins and platform
+  // staff, longer for employees, read from session_policy() rather than
+  // hardcoded (D20). Root rather than per-route because the route guards in this
+  // app are already duplicated a dozen times over, and it must also cover
+  // /neuvto-hq, which is not under /app.
+  useEffect(() => installIdleWatcher(), []);
 
   return (
     <QueryClientProvider client={queryClient}>
