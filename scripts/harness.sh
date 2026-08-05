@@ -164,6 +164,18 @@ PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_concurrency.
 printf '\n──  %s\n' "verifying scheduled work"
 PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_scheduled_work.sh"
 
+# ── the suite must leave the database as consistent as it found it
+#
+# verify_invariants.sql already ran, above, before the steps that mutate the
+# most. Running it AGAIN at the end is not redundant: on 5 Aug 2026
+# verify_concurrency.sh was leaving an orphaned reservation and two dangling
+# approval_requests behind, and the suite could not see it because the only
+# check that would have caught it had already finished.
+#
+# A test suite that leaves the database violating its own invariants is a test
+# suite whose next run starts from a lie.
+run "verifying the suite cleaned up" "$HARNESS_DIR/tests/verify_invariants.sql"
+
 cat <<'MSG'
 
 ──  HARNESS PASSED

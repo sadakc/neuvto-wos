@@ -101,7 +101,39 @@ AVAILABLE=$("$PSQL" "$DB_URL" -tAc \
   "select available_days from leave_balances
     where employee_id = '$PRIYA' and leave_type_id = '$CASUAL';" | tr -d '[:space:]')
 
-"$PSQL" "$DB_URL" -q -c "delete from leave_requests where employee_id = '$PRIYA';" >/dev/null
+# Put the tenant back exactly as it was found.
+#
+# The old cleanup deleted the leave_requests and stopped there, which left two
+# things behind that nothing noticed for weeks:
+#
+#   · leave_balances.reserved_days still holding the winner's days, with no
+#     request to back them — the reservation could never be released because the
+#     row that owned it was gone;
+#   · the approval_requests those submissions created, still pending, their
+#     entity_id pointing at leave_requests that no longer exist.
+#
+# The second put a permanently unloadable row in a manager's approvals queue.
+# Found on 5 Aug 2026 by signing in as Mark and looking at the screen — never by
+# a test, because verify_invariants.sql runs BEFORE this file and so checked a
+# database this had not broken yet.
+#
+# Deleting through the tables rather than calling leave_cancel is deliberate:
+# these requests are in a deliberately raced state and cancel would refuse some
+# of them. The point is to leave no trace, not to exercise the cancel path.
+#
+# Order matters — leave_requests.approval_request_id references approval_requests.
+"$PSQL" "$DB_URL" -q -c "
+  delete from approval_steps
+   where approval_request_id in (
+     select approval_request_id from leave_requests
+      where employee_id = '$PRIYA' and approval_request_id is not null);
+  delete from leave_requests where employee_id = '$PRIYA';
+  delete from approval_requests
+   where entity_type = 'leave_request'
+     and not exists (select 1 from leave_requests lr where lr.id = approval_requests.entity_id);
+  update leave_balances
+     set reserved_days = 0, pending_days = 0
+   where employee_id = '$PRIYA' and leave_type_id = '$CASUAL';" >/dev/null
 
 if [[ "$ACCEPTED" == "1" ]]; then
   echo "    ok: exactly one of two racing submissions won (available_days = $AVAILABLE)"

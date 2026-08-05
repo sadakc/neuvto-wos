@@ -244,14 +244,29 @@ export function installIdleWatcher(): () => void {
       return;
     }
     if (event === "SIGNED_IN") {
-      // Belt and braces. `arm()` below seeds a fresh timestamp before the first
-      // tick, so a stale key from a previous session is overwritten either way —
-      // removing this line failed no test, which is stated here rather than
-      // implied otherwise. It stays because it is the line somebody will look
-      // for when asking "what happens to the old session's keys", and the
-      // answer should be in the obvious place.
-      clearKeys();
+      // SEED a fresh timestamp; do NOT clear the key and hope arm() rewrites it.
+      //
+      // This line used to be `clearKeys()`, and it silently disabled the entire
+      // timeout. On any page load with an existing session the order is:
+      //
+      //   1. getSession() resolves  → arm() → armed = true, key written
+      //   2. supabase fires SIGNED_IN → clearKeys() removes the key
+      //   3. arm() is called again  → `if (armed) return` → never re-seeds
+      //
+      // leaving a watcher that ticks forever against a null baseline, which
+      // decide() correctly reads as "not idle yet". The timer ran; nobody was
+      // ever signed out. Found on 5 Aug 2026 by signing in and looking at
+      // localStorage, not by a test — idle.test.ts drove this event by hand in
+      // an order that could not reproduce it, and asserted "not signed out",
+      // which is true both when it works and when it is broken.
+      try {
+        localStorage.removeItem(ENDED_KEY);
+      } catch {
+        /* ignore */
+      }
       ending = false;
+      lastWrite = 0;
+      touch();
     }
     if (session && !onAuthPage()) arm();
     else if (!session) disarm();
