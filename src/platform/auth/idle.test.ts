@@ -157,7 +157,27 @@ describe("arming and disarming", () => {
     expect(navigate).not.toHaveBeenCalled();
   });
 
-  it("clears a stale timestamp on sign-in, so a fresh session is not expired at once", async () => {
+  it("keeps a baseline after SIGNED_IN, so the timeout still fires", async () => {
+    // THE REGRESSION. On a page load with an existing session, supabase fires
+    // SIGNED_IN *after* getSession() has already armed the watcher. The old code
+    // called clearKeys() there, deleting the baseline arm() had just written —
+    // and the re-arm returned early because `armed` was already true. The timer
+    // ran forever against a null baseline, which decide() reads as "not idle",
+    // so nobody was ever signed out. The feature was off.
+    //
+    // Asserting "not signed out" — which the test below this one does — passes
+    // in BOTH the working and broken cases. This asserts the opposite: that a
+    // sign-out DOES eventually happen, which is only true if the baseline
+    // survives.
+    await install();
+    h.authCallback?.("SIGNED_IN", h.session);
+    await advance(1_000);
+    expect(localStorage.getItem(ACTIVITY)).not.toBeNull();
+    await advance(31 * MIN);
+    expect(out).toHaveBeenCalledTimes(1);
+  });
+
+  it("does not expire a fresh session immediately", async () => {
     // The likeliest way this ships broken: a leftover key from an hour ago,
     // read on the first tick after signing in.
     //
