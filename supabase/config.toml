@@ -36,6 +36,17 @@ smtp_port = 54325
 site_url = "http://localhost:8080"
 additional_redirect_urls = ["http://localhost:8080"]
 
+# Session timeouts are NOT set here.
+#
+# `session_idle_minutes` and `session_absolute_hours` live on
+# `organization_settings` and are read by the browser through `session_policy()`
+# — per organisation and per role, which no static config file could express.
+#
+# `jwt_expiry` is deliberately absent too. It belongs on the hosted project, set
+# through the dashboard, for the reason spelled out below: pushing this file
+# sends the WHOLE [auth] block, including the localhost site_url. Adding a value
+# here creates a reason to push a file that must not be pushed.
+
 [auth.email]
 enable_signup = true
 # D8 — no passwords anywhere. Nothing to phish, forget, reuse, or leak.

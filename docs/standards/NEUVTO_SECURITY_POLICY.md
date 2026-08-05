@@ -21,6 +21,8 @@ wrapper is shaped so adding it is one method.
 
 ## 2 · Multi-factor (D21)
 
+> **Status: decided, NOT BUILT.** There is no MFA code anywhere in `src/` or `supabase/`. Everything below is the decision, in the present tense, describing a system that does not yet enrol anybody. `FIRST_CUSTOMER_RUNBOOK.md` is the only other place that admits this.
+
 **TOTP required for `org_admin` and `hr_admin`.** Optional for `manager` and `employee`.
 
 The asymmetry is deliberate: an admin can export every employee record in the organisation
@@ -40,26 +42,81 @@ Configurable per organisation, because a security firm and a software company ha
 different tolerances:
 
 ```
-organization_settings.session_idle_minutes     default 60
+organization_settings.session_idle_minutes     default 30   (was 60 until 5 Aug 2026)
 organization_settings.session_absolute_hours   default 24
 ```
 
 Idle timeout ends a session after inactivity; absolute timeout ends it regardless of
 activity. Both are enforced server-side — a client-side timer is a suggestion, not a control.
 
+**The policy is not one number.** An `org_admin` can export every employee record and change
+who approves what; an employee can see their own leave balance. Giving both the same session is
+not consistency, it is declining to think about it twice — the same argument §2 makes about
+MFA, applied to session length. `session_policy()` answers per caller:
+
+| caller                               | idle                        | absolute    |
+| ------------------------------------ | --------------------------- | ----------- |
+| platform admin (no organisation row) | 30 min                      | 8 h         |
+| `org_admin`, `hr_admin`, `manager`   | `session_idle_minutes` (30) | org setting |
+| `employee`                           | `max(setting, 8 h)`         | org setting |
+
+The employee floor is deliberate and is not a compromise. The app is mobile-first, installed as
+a PWA, and sign-in is email OTP with no password, no biometric and no "remember this device" —
+so a 30-minute idle limit means a guard who backgrounds the app over lunch must leave it, open
+their email, find a code and type six digits, several times a day. On the app D1 describes as
+"the HRMS your employees actually open", that is an adoption cost with no security gain: the
+absolute cap still bounds them, and what they can reach is their own balance.
+
+### Where this stands
+
+> **Status: browser timer BUILT (5 Aug 2026). Server-side enforcement NOT BUILT.**
+
+`src/platform/auth/idle.ts` polls every 15 seconds, shares activity across tabs through
+`localStorage`, warns 60 seconds before expiry, and signs out with a reason on the sign-in
+screen. The numbers come from `session_policy()`, never a constant.
+
+**What that genuinely does.** It ends the session in that browser after inactivity. For this
+product the threat is physical and ordinary — a shared shop-floor terminal, a supervisor's
+tablet on a desk, a laptop open in a canteen — and against a walk-up attacker it works.
+
+**What it does not do, at all.** It does not shorten any token's life. The refresh token sits
+in `localStorage` with `autoRefreshToken: true`, so anybody who exfiltrates it — XSS, a disk
+image, a stolen unlocked laptop — mints access tokens for as long as it lasts, timer or no
+timer. It is defeated by closing the tab, disabling JavaScript, or replaying the stored token
+with `curl`. It is a rule we ask the attacker to apply to themselves.
+
+So the sentence above is right and stays. This is defence in depth with the server-side half
+unbuilt, and describing it to a customer as "we enforce session timeouts" would be untrue.
+
+**What would make it a control:** a short `jwt_expiry` (set on the hosted project, deliberately
+not in `config.toml` — see the warning in that file), refresh-token rotation with reuse
+detection, and server-side revocation. The first is done; the third is below.
+
 ### Revocation
 
-Sessions are revoked immediately when:
+> **Status: decided, NOT BUILT — and less alarming than it sounds.** This section used to say
+> sessions "are revoked immediately". Nothing has ever revoked a session. What is true is
+> below, and the distinction matters because the original wording overstated a hole that had
+> already been closed a different way.
+
+The intent is that a session ends when:
 
 - A user is deactivated
 - A user's role changes (they re-authenticate with the new role)
 - An admin explicitly revokes them
 - `erase_employee` runs
 
-**Deactivation without revocation is the gap that matters.** D14 guards deactivating a
-manager — reassigning their reports and open approvals — but if their existing session
-keeps working, they simply keep the tab open and retain access to team leave data after
-leaving the company. Revocation is what makes D14 real.
+**What actually happens today: the token stays valid, and the data does not follow it.**
+`20260805100000_access_follows_active.sql` makes a deactivated person's `current_org_id()`
+null, so every tenant policy refuses them. Their JWT is deliberately left alone — deleting from
+`auth.sessions` and `auth.refresh_tokens` would couple our migrations to GoTrue's internal
+schema, a table we do not own and Supabase may change on any upgrade (D52). Refusing the data
+is the boundary that matters; the token buys nothing.
+
+So the remaining gap is narrower than "they keep access": a deactivated person holds a session
+that can reach no tenant data. Real revocation would close the last of it, and the idle timeout
+does **not** substitute for it — an idle timeout ends inactive sessions, and somebody actively
+using a tab is not idle.
 
 ---
 

@@ -142,6 +142,7 @@ run "seeding test data"        "$HARNESS_DIR/seed/seed_test_data.sql"
 run "verifying tenant isolation" "$HARNESS_DIR/tests/verify_rls.sql"
 run "verifying data integrity"   "$HARNESS_DIR/tests/verify_invariants.sql"
 run "verifying the error store"  "$HARNESS_DIR/tests/verify_error_reporting.sql"
+run "verifying session policy"   "$HARNESS_DIR/tests/verify_session_policy.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

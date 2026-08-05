@@ -65,3 +65,7 @@ export {
   type AppRole,
   type CurrentUser,
 } from "./contracts";
+
+export { installIdleWatcher } from "./idle";
+export { getSessionPolicy, type SessionPolicy } from "./session-policy";
+export { decide as decideIdle, type IdleVerdict } from "./idle-policy";

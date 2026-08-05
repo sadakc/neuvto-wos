@@ -1762,6 +1762,13 @@ export type Database = {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
       }
+      session_policy: {
+        Args: never
+        Returns: {
+          absolute_hours: number
+          idle_minutes: number
+        }[]
+      }
       working_days_excluded: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: {
