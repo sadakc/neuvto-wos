@@ -83,11 +83,19 @@ for these steps.
 2. Once inside, create a site. Netlify pushes you towards "import from Git" —
    **do not choose that.** Their build environment is the same trap we are
    escaping. Look for **Add new site → Deploy manually**, and if it asks for a
-   folder to drag in, drop any empty folder just to create the site. It will be
-   replaced on the first real deploy.
+   folder to drag in, drop a **genuinely empty** folder. Whatever you drop
+   becomes the site's contents until the first real deploy replaces it, so do
+   not reach for a random folder off the desktop.
 3. Open the new site → **Site configuration** → **General** → **Site details**.
 4. Copy the **Site ID** into your note. It looks like
    `1a2b3c4d-5e6f-7890-abcd-ef1234567890`.
+5. While you are on that screen, find **Project visibility**. On the current
+   free plan a project can be **Public**, **Password**, or **Private**.
+
+**Leave it private while testing if you prefer — but it must be Public before
+step 7.** Two things do not work otherwise: `verify-deploy.sh` fetches the site
+with no credentials and will report a failure, and once DNS moves, a private
+project means the live site is dark to everyone except you.
 
 ---
 
@@ -155,6 +163,10 @@ send that email. If it does not, stop and say so; do not proceed to step 7.
 ## Step 7 — Point neuvto.com at it, last
 
 Only after step 6 passes.
+
+**First, set Project visibility to Public** (Site configuration → General). A
+private project serves the site to you alone, so leaving it private here takes
+`neuvto.com` dark for every visitor the moment DNS resolves to it.
 
 Netlify will show the exact records under **Domain management → Add a custom
 domain**. Use the values it gives you rather than any written here — they
