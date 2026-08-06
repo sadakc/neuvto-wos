@@ -43,10 +43,15 @@ EXPECT_REF="${EXPECT_REF:-udrzhfgwqgolvyimbwto}"
 # Named so the failure message can say which environment it actually hit.
 PREPROD_REF="vkyvzhgigncranprhidn"
 EXPECT_STRING=""
+# Local build directories to scan INSTEAD of fetching a site. The point of this
+# mode is that CI can refuse to publish a wrong build rather than discovering it
+# afterwards — by which time the wrong thing is already what the world sees.
+SCAN_DIRS=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --url)           SITE="$2"; shift 2 ;;
+    --dir)           SCAN_DIRS="$SCAN_DIRS $2"; shift 2 ;;
     --expect-ref)    EXPECT_REF="$2"; shift 2 ;;
     --expect-string) EXPECT_STRING="$2"; shift 2 ;;
     -h|--help)       sed -n '2,20p' "$0"; exit 0 ;;
@@ -56,6 +61,53 @@ done
 
 TMP="$(mktemp -d)"; trap 'rm -rf "$TMP"' EXIT
 mkdir -p "$TMP/chunks"
+
+# ─────────────────────────────────────────── local mode: check before publishing
+if [ -n "$SCAN_DIRS" ]; then
+  echo "── build output:$SCAN_DIRS"
+  : > "$TMP/files"
+  for d in $SCAN_DIRS; do
+    if [ ! -d "$d" ]; then
+      echo "  FAILED: $d does not exist — nothing was built, or it built elsewhere." >&2
+      exit 1
+    fi
+    find "$d" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.html' \) >> "$TMP/files"
+  done
+  COUNT="$(grep -c . "$TMP/files" 2>/dev/null || echo 0)"
+  echo "   .. ${COUNT} file(s) to inspect"
+  if [ "$COUNT" -eq 0 ]; then
+    echo "  FAILED: no JavaScript or HTML in$SCAN_DIRS. Nothing was verified." >&2
+    exit 1
+  fi
+  # Same question, same answers, one code path — the whole reason this is a mode
+  # rather than a second script.
+  REFS="$(xargs grep -aho 'https://[a-z0-9]\{20\}\.supabase\.co' < "$TMP/files" 2>/dev/null \
+          | sed 's|https://||; s|\.supabase\.co||' | sort -u)"
+  echo
+  if [ -z "$REFS" ]; then
+    echo "  FAILED: no Supabase project reference in the build output." >&2
+    echo "  Not a pass — it means nothing was verified." >&2
+    exit 1
+  fi
+  BAD=0
+  for ref in $REFS; do
+    if [ "$ref" = "$EXPECT_REF" ]; then
+      echo "  ok  ${ref}  (expected)"
+    elif [ "$ref" = "$PREPROD_REF" ]; then
+      echo "  BAD ${ref}  ** PRE-PROD **" >&2; BAD=1
+    else
+      echo "  BAD ${ref}  ** UNKNOWN PROJECT **" >&2; BAD=1
+    fi
+  done
+  [ "$BAD" -ne 0 ] && {
+    echo >&2
+    echo "  FAILED. This build must not be published." >&2
+    exit 1
+  }
+  echo
+  echo "── PASSED — the build talks only to ${EXPECT_REF}"
+  exit 0
+fi
 
 # Routes worth asking. `/auth` is the one that matters most — it is where a
 # wrong backend does its damage — but it is `ssr: false` and its HTML has
