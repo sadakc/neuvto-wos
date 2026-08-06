@@ -2,13 +2,12 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
-const invoke = vi.fn().mockResolvedValue({ data: null, error: null });
+const fetchMock = vi.fn().mockResolvedValue({ ok: true, status: 204 });
 const getSession = vi.fn();
 
 vi.mock("@/integrations/supabase/client", () => ({
   supabase: {
     rpc: (...a: unknown[]) => rpc(...a),
-    functions: { invoke: (...a: unknown[]) => invoke(...a) },
     auth: { getSession: () => getSession() },
   },
 }));
@@ -17,9 +16,11 @@ vi.mock("@/lib/lovable-error-reporting", () => ({ reportLovableError: vi.fn() })
 import { reportError, installGlobalErrorHandlers, resetReportingStateForTests } from "./report";
 
 const argsOf = (call: number) => rpc.mock.calls[call][1] as Record<string, unknown>;
-/** The body handed to the edge function, for the anonymous path. */
+/** The body POSTed to the edge function, for the anonymous path. */
 const bodyOf = (call: number) =>
-  (invoke.mock.calls[call][1] as { body: Record<string, unknown> }).body;
+  JSON.parse((fetchMock.mock.calls[call][1] as { body: string }).body) as Record<string, unknown>;
+/** The URL it went to. */
+const urlOf = (call: number) => String(fetchMock.mock.calls[call][0]);
 
 /** Signed in unless a test says otherwise — the common case, and it keeps every
  *  assertion below about the RPC honest rather than accidentally passing. */
@@ -28,10 +29,11 @@ const signedOut = () => getSession.mockResolvedValue({ data: { session: null } }
 
 beforeEach(() => {
   rpc.mockClear();
-  invoke.mockClear();
+  fetchMock.mockClear();
   getSession.mockReset();
   rpc.mockResolvedValue({ data: null, error: null });
-  invoke.mockResolvedValue({ data: null, error: null });
+  fetchMock.mockResolvedValue({ ok: true, status: 204 });
+  vi.stubGlobal("fetch", fetchMock);
   signedIn();
   resetReportingStateForTests();
 });
@@ -167,14 +169,14 @@ describe("which channel a report takes", () => {
     await reportError(new Error("signed in and broken"), "boundary");
     expect(rpc).toHaveBeenCalledTimes(1);
     expect(rpc.mock.calls[0][0]).toBe("record_client_error");
-    expect(invoke).not.toHaveBeenCalled();
+    expect(fetchMock).not.toHaveBeenCalled();
   });
 
   it("uses the edge function when there is no session — the 6 Aug blind spot", async () => {
     signedOut();
     await reportError(new Error("crashed on the sign-in screen"), "boundary");
-    expect(invoke).toHaveBeenCalledTimes(1);
-    expect(invoke.mock.calls[0][0]).toBe("client-error");
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(urlOf(0)).toContain("/functions/v1/client-error");
     // The RPC is granted to `authenticated` only. Calling it here would not
     // merely be redundant, it would be refused — which is how this stayed
     // invisible for thirteen hours.
@@ -205,13 +207,61 @@ describe("which channel a report takes", () => {
     // loses the report altogether. Lose the attribution, never the report.
     getSession.mockRejectedValue(new Error("storage unavailable"));
     await reportError(new Error("session unreadable"), "boundary");
-    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     expect(rpc).not.toHaveBeenCalled();
   });
 
   it("does not loop when the edge function itself fails", async () => {
     signedOut();
-    invoke.mockRejectedValue(new Error("edge function down"));
+    fetchMock.mockRejectedValue(new Error("edge function down"));
     await expect(reportError(new Error("boom"), "boundary")).resolves.toBeUndefined();
+  });
+});
+
+/**
+ * The preflight.
+ *
+ * On 6 Aug 2026 the anonymous channel shipped, deployed cleanly, answered 204
+ * to a curl probe, and was refused by every real browser:
+ *
+ *     Request header field apikey is not allowed by
+ *     Access-Control-Allow-Headers in preflight response
+ *
+ * `supabase.functions.invoke` attaches apikey, authorization and x-client-info.
+ * Any one of them makes a cross-origin POST preflighted, and the function's
+ * header list named only content-type. curl issues no preflight, so nothing in
+ * the test suite or the manual probe could see it. Found by triggering an
+ * unhandled rejection on the live site and reading the console.
+ *
+ * These assert the shape that keeps the request SIMPLE. They cannot test CORS —
+ * only a browser can — but they can stop the headers creeping back.
+ */
+describe("the anonymous request stays simple enough to survive preflight", () => {
+  it("sends only Content-Type, so no credential header forces a preflight", async () => {
+    signedOut();
+    await reportError(new Error("preflight shape"), "boundary");
+    const init = fetchMock.mock.calls[0][1] as { headers: Record<string, string> };
+    expect(Object.keys(init.headers)).toEqual(["Content-Type"]);
+    // The three that broke it. Named individually so a failure says which.
+    const lower = Object.keys(init.headers).map((h) => h.toLowerCase());
+    expect(lower).not.toContain("apikey");
+    expect(lower).not.toContain("authorization");
+    expect(lower).not.toContain("x-client-info");
+  });
+
+  it("uses keepalive, so a crash on the way out still reports", async () => {
+    // A page that is crashing is often a page about to navigate. Without this
+    // the browser cancels the request in flight, and the error worth having
+    // most is the one that happened on the way out.
+    signedOut();
+    await reportError(new Error("unload safety"), "boundary");
+    const init = fetchMock.mock.calls[0][1] as { keepalive?: boolean };
+    expect(init.keepalive).toBe(true);
+  });
+
+  it("posts to the function URL derived from the configured Supabase URL", async () => {
+    signedOut();
+    await reportError(new Error("url shape"), "boundary");
+    expect(urlOf(0)).toMatch(/\/functions\/v1\/client-error$/);
   });
 });
