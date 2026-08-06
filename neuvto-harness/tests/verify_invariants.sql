@@ -90,6 +90,47 @@ begin
     raise notice 'ok: analytics event names well-formed';
   end if;
 
+  ---------------------------------------------------------------- notification templates
+  -- Two assertions, and they fail on different things on purpose.
+  --
+  -- The FIRST catches the state that reached production on 6 Aug 2026: the
+  -- table empty, all four system defaults gone, every notification event in the
+  -- product dead. It cost a real customer's first invitation. Nothing anywhere
+  -- said so, because a workspace with no members yet sends nothing, so the first
+  -- send attempt after the defaults vanished was also the first one a customer
+  -- was waiting on.
+  --
+  -- The list lives in the migration, not here — one definition, so the harness
+  -- and prod-cutover.sh cannot ask subtly different questions.
+  if to_regprocedure('public.missing_system_notification_templates()') is not null then
+    select array_to_string(public.missing_system_notification_templates(), ', ')
+      into offenders;
+    if offenders <> '' then
+      raise exception
+        'INVARIANT FAIL: no active system template for: %. Every notification for these events fails with NO_TEMPLATE, silently — run select public.ensure_system_notification_templates()', offenders;
+    end if;
+    raise notice 'ok: every system notification event has a template';
+  end if;
+
+  -- The SECOND needs no list, and that is the point of having it as well.
+  -- `notify()` takes its event key as a runtime argument, so there is no honest
+  -- way to derive "which templates must exist" from the schema — meaning the
+  -- list above can go stale the day somebody emits a new event. This assertion
+  -- cannot: emit anything with no template and it lands as a row saying so.
+  if to_regclass('public.notifications') is not null then
+    select count(*) into n
+    from notifications
+    where failed_reason = 'NO_TEMPLATE';
+    if n > 0 then
+      select coalesce(string_agg(distinct event_key, ', '), '') into offenders
+      from notifications
+      where failed_reason = 'NO_TEMPLATE';
+      raise exception
+        'INVARIANT FAIL: % notification(s) failed with NO_TEMPLATE, for: %. The event was emitted with no template to render it, so nobody was told anything', n, offenders;
+    end if;
+    raise notice 'ok: no notification failed for want of a template';
+  end if;
+
   -- ══════════════════════════════════════════════════ PHASE 1 — working calendar
 
   if to_regprocedure('public.calculate_working_days(uuid,date,date)') is null then

@@ -354,6 +354,47 @@ echo "── pushing migrations"
 supabase db push --linked
 echo
 
+# --------------------------------------------------------- notification templates
+#
+# Asked HERE, against production, and not left to the harness.
+#
+# On 6 Aug 2026 `notification_templates` was empty in production. Every
+# notification the product sends — approval.submitted, approval.decided,
+# approval.completed, member.invited — failed with NO_TEMPLATE and zero
+# delivery attempts. It was found by a customer's first invitation not
+# arriving, roughly a week after it broke.
+#
+# The harness could never have caught it. The harness runs against a local
+# database it seeds itself, where the templates are restored by the seed on
+# every run. Only production was missing them, and only production is asked.
+#
+# The question is the migration's own function, so this cannot drift from
+# what verify_invariants.sql asserts.
+echo "── verifying notification templates"
+if MISSING="$("$PSQL" "$DB_URL" -tAc \
+      "select array_to_string(public.missing_system_notification_templates(), ', ')" 2>/dev/null)"; then
+  MISSING="${MISSING//[[:space:]]/}"
+  if [[ -n "$MISSING" ]]; then
+    echo
+    echo "  FAILED: no active system template for: $MISSING" >&2
+    echo "  Every notification for these events will fail with NO_TEMPLATE and" >&2
+    echo "  send nothing, without raising anything anywhere. Repair with:" >&2
+    echo >&2
+    echo "      select public.ensure_system_notification_templates();" >&2
+    echo >&2
+    exit 1
+  fi
+  echo "  all four system templates present"
+else
+  # Pre-20260814100000 database, or the push did not land. Say which rather
+  # than reporting a pass for a question that was never answered.
+  echo "  CANNOT CHECK: missing_system_notification_templates() is not installed." >&2
+  echo "  That function ships in 20260814100000 — if the push above succeeded," >&2
+  echo "  this is a real failure and not an old database." >&2
+  exit 1
+fi
+echo
+
 # ---------------------------------------------------------------- edge function
 echo "── deploying notification-dispatch"
 supabase functions deploy notification-dispatch --project-ref "$REF"

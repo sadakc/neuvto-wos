@@ -126,21 +126,30 @@ dig +short MX neuvto.com
 
 ## Two email systems, doing different jobs
 
-|                             | Sign-in codes (OTP)                   | Notifications                                              |
-| --------------------------- | ------------------------------------- | ---------------------------------------------------------- |
-| Sent by                     | **Supabase's built-in email service** | **Resend** (step 5)                                        |
-| Configured in               | Supabase dashboard → Auth → Templates | `notification_templates`, API key in Edge Function secrets |
-| Needs `neuvto.com` verified | no                                    | yes                                                        |
-| Working today               | yes, on `neuvto.lovable.app`          | not yet built                                              |
+|                             | Sign-in codes (OTP)                            | Notifications                                        |
+| --------------------------- | ---------------------------------------------- | ---------------------------------------------------- |
+| Sent by                     | **Resend, over SMTP**, driven by Supabase Auth | **Resend, over the HTTP API**, from an edge function |
+| Credential                  | `smtp_pass` in the Supabase auth config        | `RESEND_API_KEY`, an edge function secret            |
+| Configured in               | Supabase dashboard → Auth → Emails             | `notification_templates`, plus that secret           |
+| Needs `neuvto.com` verified | yes                                            | yes                                                  |
+| Working today               | yes, on `neuvto.com`                           | yes                                                  |
 
-Sign-in already works for any email address, today, without Resend. Resend is
-only for the notifications the platform itself sends.
+Both go through Resend, and that is exactly why they are easy to confuse — but
+they are **two separate credentials**, and one can be valid while the other is
+not. On 6 Aug 2026 both were broken at once, for unrelated reasons, and fixing
+the first did nothing for the second. Rotating a Resend key means updating both;
+see "When an email does not arrive — start here" at the end of this document.
 
-**Supabase's built-in sender is rate-limited to a handful of messages per hour
-and is explicitly not intended for production.** It is fine for the demo and for
-the first customer's pilot; before real volume, auth email moves to custom SMTP
-on `neuvto.com` too. Check the current limit in the Supabase dashboard rather
-than trusting a number written here.
+The table above said something quite different until 6 Aug 2026 — that sign-in
+used "Supabase's built-in email service" and that notifications were "not yet
+built". Both stopped being true when custom SMTP went on (3 Aug) and when the
+notification engine shipped. A stale row here is not harmless: it sends whoever
+is debugging an outage to the wrong system.
+
+**The built-in sender is no longer in the path.** It was rate-limited to two
+emails an hour and could not set the sign-in template at all on a free project,
+which is what forced custom SMTP. `rate_limit_email_sent` is now 100/hour —
+check the dashboard rather than trusting a number written here.
 
 ---
 
@@ -496,3 +505,139 @@ than taken from the script's own output:
 What this does **not** prove: that the SMTP password is right. Nothing readable
 from the config can — a wrong key produces a configuration that looks exactly
 like this one and an inbox that stays empty. Only a real send settles it.
+
+---
+
+## When an email does not arrive — start here
+
+Both failures below happened on **6 Aug 2026**, within an hour of each other,
+and they looked identical from a user's seat: an email that never came. They
+had nothing to do with each other, and neither one's fix touches the other.
+
+**Establish which system is involved before doing anything else.** The two are
+described in "Two email systems, doing different jobs" above, and they share
+no code, no credential and no failure mode:
+
+| Symptom                                                 | System               | Go to |
+| ------------------------------------------------------- | -------------------- | ----- |
+| "Email me a code" fails, or the code never arrives      | Supabase Auth → SMTP | **A** |
+| An invitation, approval or decision email never arrives | Notification engine  | **B** |
+
+---
+
+### A · Sign-in codes — read the auth log first, not the inbox
+
+The screen says only _"Something went wrong on our end"_, because `toAppError`
+deliberately refuses to pass a raw provider error through to a user. The real
+message is one call away:
+
+```bash
+supabase logs auth --project-ref udrzhfgwqgolvyimbwto
+```
+
+Or reproduce it directly, which is faster and needs no dashboard. The URL and
+publishable key are public — they ship in the client bundle:
+
+```bash
+curl -sS -w "\nHTTP %{http_code}\n" -X POST "https://udrzhfgwqgolvyimbwto.supabase.co/auth/v1/otp" -H "apikey: <publishable key>" -H "Content-Type: application/json" -d '{"email":"you@example.com","create_user":true}'
+```
+
+`{}` and HTTP 200 means it sent. Anything else names the fault.
+
+| What the log says                          | What it means                                 |
+| ------------------------------------------ | --------------------------------------------- |
+| `535 "Authentication credentials invalid"` | The SMTP password is not a valid Resend key   |
+| `Error sending magic link email` + 500     | Same thing, seen from the client side         |
+| HTTP 429                                   | Rate limit — `RATE_LIMITED`, not a broken key |
+
+**The 535 is the one that happened.** The Resend API key held as Supabase's
+`smtp_pass` stopped being valid; why was never established. Sign-in was dead
+for **every address, at every entry point, for roughly 13 hours** before anyone
+noticed.
+
+Fixing it is three steps, and **step 3 is the one that gets forgotten**:
+
+1. Resend → API Keys → create a key with sending access on `neuvto.com`. Copy
+   it on the creation screen; Resend shows it once.
+2. Supabase → Authentication → Emails → SMTP Settings → Password.
+3. Supabase → Edge Functions → Secrets → `RESEND_API_KEY`, the **same key**.
+   This is a separate credential for a separate system. Doing 1 and 2 alone
+   restores sign-in and leaves every notification broken.
+
+#### Do not diagnose this from `smtp_pass`
+
+The Management API returns it as a 64-character digest, not the stored value.
+It will never begin with `re_`, and that says nothing about whether the key is
+right. **The only evidence is a send.**
+
+---
+
+### B · Notifications — the database already knows why
+
+Ask the notification row, not the mail provider. It records the reason at the
+moment it fails:
+
+```sql
+select event_key, status, attempts, failed_reason, last_error, created_at
+from public.notifications order by created_at desc limit 20;
+```
+
+`attempts: 0` is the single most useful thing on that row. **Zero attempts
+means it never reached Resend at all**, so no amount of key rotation will help.
+
+| `failed_reason`          | Meaning                                 | Fix                                            |
+| ------------------------ | --------------------------------------- | ---------------------------------------------- |
+| `NO_TEMPLATE`            | No active template for that event       | See below                                      |
+| anything, `attempts` > 0 | It reached Resend and Resend refused it | Read `last_error`; check the key (A·3)         |
+| status `pending`, old    | The dispatcher is not running           | Check the `neuvto-dispatch-notifications` cron |
+
+#### `NO_TEMPLATE`
+
+`notification_templates` was **empty in production** on 6 Aug 2026. All four
+system defaults were gone, so _every_ notification the product sends was dead —
+`approval.submitted`, `approval.decided`, `approval.completed`, `member.invited`.
+Found by a real customer's first invitation not arriving. What emptied it was
+never established.
+
+`notify_address` treats a missing template as a **recorded failure, never a
+raise** (D28) — the invitation must not roll back because an email could not be
+rendered. That is correct, and it is also why this is silent: the invitation
+looks fine, the row says failed, and nothing shouts.
+
+Repair is idempotent and safe to run anywhere:
+
+```sql
+select public.ensure_system_notification_templates();
+```
+
+Then **re-send through the UI** — revoke the invitation and issue it again. Do
+not retry the failed row: it stored `(no template)` as its subject and body, so
+retrying it emails exactly that.
+
+To check without fixing:
+
+```sql
+select public.missing_system_notification_templates();
+```
+
+An empty array is healthy. `prod-cutover.sh` runs this after every push and
+refuses to finish if anything is missing; `verify_invariants.sql` asserts the
+same thing from the harness. Neither existed when this broke.
+
+---
+
+### What made both of these invisible
+
+Worth stating plainly, because it is the same lesson twice.
+
+**Sign-in errors reach no monitor.** `record_client_error` is granted to
+`authenticated` only, and somebody requesting a sign-in code is anonymous — so
+the 535 produced no `client_errors` row for 13 hours. This is documented as a
+known limitation in `20260812100000_errors_in_production_are_visible.sql`.
+Closing it needs an edge function, not a wider grant.
+
+**Notification failures reach a monitor nobody was looking at.**
+`platform_mail_health()` would have reported `NO_TEMPLATE` as its last failure
+reason and returned `healthy: false` — but only once something tried to send,
+and only to somebody who opened the console. On a workspace with no members
+yet, nothing tried until a customer was waiting.
