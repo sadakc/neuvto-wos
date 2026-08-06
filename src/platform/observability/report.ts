@@ -141,8 +141,27 @@ export async function reportError(
       // No session: the RPC would refuse, and refusing is how the 6 Aug outage
       // stayed invisible. Unprefixed keys — the edge function maps them onto
       // the RPC's parameters, and it is the only thing that knows both shapes.
-      await supabase.functions.invoke("client-error", {
-        body: {
+      //
+      // A bare `fetch`, deliberately, and NOT supabase.functions.invoke.
+      //
+      // `invoke` attaches apikey, authorization and x-client-info. Every one of
+      // them turns a simple cross-origin POST into a preflighted one, and on
+      // 6 Aug 2026 that is exactly what broke this: the endpoint answered curl
+      // perfectly and refused every real browser at the preflight, because the
+      // header list did not mention `apikey`. The server now allows them, but
+      // not sending credentials to a deliberately unauthenticated endpoint is
+      // the better shape regardless — there is nothing there to authenticate
+      // to, and it cannot break again when the SDK adds a header.
+      //
+      // `keepalive` matters more than it looks: a page that is crashing is
+      // often a page that is about to navigate, and without it the browser
+      // cancels the request in flight. The error worth reporting most is the
+      // one that happens on the way out.
+      await fetch(`${import.meta.env.VITE_SUPABASE_URL}/functions/v1/client-error`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        keepalive: true,
+        body: JSON.stringify({
           fingerprint: fp,
           message,
           mechanism,
@@ -151,7 +170,7 @@ export async function reportError(
           severity: "error",
           release,
           user_agent: userAgent,
-        },
+        }),
       });
     }
   } catch {

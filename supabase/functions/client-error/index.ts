@@ -127,7 +127,20 @@ function corsHeaders(origin: string | null): Record<string, string> {
   const allowed = origin && ALLOWED_ORIGINS.includes(origin);
   return {
     "Access-Control-Allow-Origin": allowed ? origin! : "null",
-    "Access-Control-Allow-Headers": "content-type",
+    // `content-type` alone was wrong, and wrong in the way that survives every
+    // test: curl issues no preflight, so the endpoint answered 204 to a probe
+    // and 100% of real browsers were refused before the POST was ever sent.
+    // Found on 6 Aug 2026 by triggering an unhandled rejection on the live site
+    // and reading the console — never by an assertion.
+    //
+    //     Request header field apikey is not allowed by
+    //     Access-Control-Allow-Headers in preflight response
+    //
+    // The client sends only content-type now (see report.ts). These are listed
+    // anyway because a caller using supabase-js's functions.invoke sends all
+    // four, and an endpoint that works from curl and from one SDK but not the
+    // other is a trap for whoever wires up the next caller.
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "POST, OPTIONS",
     "Access-Control-Max-Age": "86400",
     Vary: "Origin",
