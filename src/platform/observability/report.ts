@@ -16,14 +16,25 @@ import { fingerprint, messageOf, sanitizeRoute, scrubText, MAX_MESSAGE, MAX_STAC
  * Lovable hook is still called, because inside the editor it is genuinely useful
  * and costs nothing when absent.
  *
- * ── the limit worth knowing before relying on this
+ * ── two channels, chosen by whether there is a session
  *
- * `record_client_error` is granted to `authenticated` only. Errors on the
- * landing page, on `/auth`, and during invitation acceptance are NOT captured —
- * those callers have no session, and granting `anon` a database function is the
- * exact shape of the open relay found on production on 2 Aug 2026. The migration
- * header explains the trade in full. It is a real blind spot, and closing it
- * needs an edge function rather than a wider grant.
+ * `record_client_error` is granted to `authenticated` only, and that has not
+ * changed: granting `anon` a database function is the exact shape of the open
+ * relay found on production on 2 Aug 2026.
+ *
+ * It left a blind spot, and on 6 Aug 2026 the blind spot cost thirteen hours.
+ * Resend started rejecting Supabase's SMTP login, sign-in was dead for every
+ * address, and this store stayed empty throughout — because everybody hitting
+ * it was anonymous, which is what "cannot sign in" means. A person found it.
+ *
+ * So a caller with no session goes to the `client-error` edge function instead,
+ * which holds the service key and calls `record_public_client_error`. `anon`
+ * still executes nothing. The two paths differ in ways worth knowing:
+ *
+ *   · the signed-in one attributes the error to an organisation, derived from
+ *     the session and never from the client;
+ *   · the public one cannot, and spends a SEPARATE daily ceiling — so flooding
+ *     the public channel cannot suppress a customer's real errors.
  */
 
 type Mechanism = "boundary" | "onerror" | "unhandledrejection" | "write_failed";
@@ -59,6 +70,27 @@ export function resetReportingStateForTests() {
   reporting = false;
 }
 
+/**
+ * Which channel to use.
+ *
+ * Reads the stored session rather than making a network call, so this costs
+ * nothing on a page that is already broken.
+ *
+ * A failure here resolves to FALSE — the public channel — on purpose. The two
+ * ways to be wrong are not symmetric: routing a signed-in caller to the public
+ * endpoint loses the organisation attribution and spends the public budget,
+ * while routing an anonymous one to the RPC loses the report entirely. Losing
+ * the report is the failure this whole channel exists to stop.
+ */
+async function hasSession(): Promise<boolean> {
+  try {
+    const { data } = await supabase.auth.getSession();
+    return Boolean(data?.session);
+  } catch {
+    return false;
+  }
+}
+
 export async function reportError(
   error: unknown,
   mechanism: Mechanism,
@@ -85,21 +117,43 @@ export async function reportError(
     seen.add(fp);
 
     reporting = true;
-    // Deliberately not awaited by callers and deliberately swallowed here. An
+
+    // Wired when the deploy pipeline supplies a commit sha. Without it, "is
+    // this still happening after the fix" cannot be answered — worth doing,
+    // and honestly absent today rather than faked.
+    const release = import.meta.env?.VITE_COMMIT_SHA ?? undefined;
+    const userAgent = navigator?.userAgent?.slice(0, 300);
+
+    // Deliberately not awaited by callers and deliberately swallowed below. An
     // error handler that can itself fail visibly is not an error handler.
-    await supabase.rpc("record_client_error", {
-      p_fingerprint: fp,
-      p_message: message,
-      p_mechanism: mechanism,
-      p_stack: stack ?? undefined,
-      p_route: route,
-      p_severity: "error",
-      // Wired when the deploy pipeline supplies a commit sha. Without it, "is
-      // this still happening after the fix" cannot be answered — worth doing,
-      // and honestly absent today rather than faked.
-      p_release: import.meta.env?.VITE_COMMIT_SHA ?? undefined,
-      p_user_agent: navigator?.userAgent?.slice(0, 300),
-    });
+    if (await hasSession()) {
+      await supabase.rpc("record_client_error", {
+        p_fingerprint: fp,
+        p_message: message,
+        p_mechanism: mechanism,
+        p_stack: stack ?? undefined,
+        p_route: route,
+        p_severity: "error",
+        p_release: release,
+        p_user_agent: userAgent,
+      });
+    } else {
+      // No session: the RPC would refuse, and refusing is how the 6 Aug outage
+      // stayed invisible. Unprefixed keys — the edge function maps them onto
+      // the RPC's parameters, and it is the only thing that knows both shapes.
+      await supabase.functions.invoke("client-error", {
+        body: {
+          fingerprint: fp,
+          message,
+          mechanism,
+          stack: stack ?? undefined,
+          route,
+          severity: "error",
+          release,
+          user_agent: userAgent,
+        },
+      });
+    }
   } catch {
     // Swallowed on purpose. There is nowhere left to report a reporting failure,
     // and rethrowing here turns one broken page into an infinite loop.
