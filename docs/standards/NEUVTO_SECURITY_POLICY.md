@@ -113,6 +113,16 @@ at all, because it is the thing somebody checks instead of checking the setting.
 exfiltrated from a browser is useless after at most 30 minutes instead of 60. It now matches
 the idle window `session_policy()` gives an admin, so the two numbers no longer disagree.
 
+**And what it cost, found the same day.** Halving the token life doubles how often the browser
+refreshes, which puts refreshes on roughly the same thirty-minute cadence as the admin idle
+window — so a refresh in flight when the idle timeout signs somebody out is now routine where
+at 3600 it almost never happened. supabase-js raises `AuthRefreshDiscardedError` for exactly
+that, correctly, and it is the sign-out working rather than a fault. It surfaced as a crash in
+`client_errors` within hours of the change. Nothing was broken for anybody; the error store was
+recording a normal outcome as an incident. `toAppError` now maps it to `UNAUTHENTICATED`
+without reporting. The lesson worth keeping is that the two numbers being equal is not purely
+a tidiness win — it makes the two events coincide.
+
 **What it does not buy.** Supabase refresh tokens **never expire** — they are single-use and
 they rotate, but they do not age out. The refresh token in `localStorage` remains the real
 exposure and is untouched by any of this. Rotation with reuse detection is the mitigation

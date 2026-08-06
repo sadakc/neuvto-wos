@@ -43,8 +43,31 @@ export async function getSessionEmail(): Promise<string | null> {
  * one thing an absolute timeout must not allow.
  */
 export async function getSessionStartedAt(): Promise<number | null> {
-  const { data, error } = await supabase.auth.getSession();
-  if (error) throw toAppError(error, "getSessionStartedAt");
+  // Null on ANY failure, never a throw, and deliberately never a report.
+  //
+  // This function's contract — stated in `IdleInput.sessionStartedAt` and
+  // honoured by `decide()` — is "null when it cannot be read, which disables
+  // the absolute check rather than guessing". It previously threw
+  // `toAppError`, which contradicted that contract in a way nobody could see:
+  // its only caller is `idle.ts`, which writes `.catch(() => null)` and so
+  // tolerated the throw exactly as designed — but `toAppError` REPORTS before
+  // it throws, so the tolerated outcome still landed in `client_errors` as an
+  // application fault.
+  //
+  // That is what happened on 6 Aug 2026 at 08:05. The idle timeout fired for
+  // the first time in production, `end()` called `signOut()`, and a token
+  // refresh already in flight was discarded — supabase-js raises
+  // `AuthRefreshDiscardedError` for precisely this, and it is a normal
+  // consequence of signing out, not a fault. Nobody saw anything. The error
+  // store recorded a crash.
+  //
+  // An error store that logs the system working is how the store stops being
+  // read, which costs more than the entry is worth.
+  const { data, error } = await supabase.auth.getSession().catch(() => ({
+    data: { session: null },
+    error: new Error("session unreadable"),
+  }));
+  if (error) return null;
   const iso = data.session?.user.last_sign_in_at;
   if (!iso) return null;
   const t = Date.parse(iso);
