@@ -395,9 +395,20 @@ else
 fi
 echo
 
-# ---------------------------------------------------------------- edge function
+# ---------------------------------------------------------------- edge functions
 echo "── deploying notification-dispatch"
 supabase functions deploy notification-dispatch --project-ref "$REF"
+
+# The public error channel. `verify_jwt = false` comes from config.toml, which
+# `functions deploy` reads — do NOT pass --no-verify-jwt here instead, or the
+# setting lives in two places and the file stops being the truth.
+#
+# It must be public: every caller it exists for is somebody who cannot sign in.
+# Deployed with the default verify_jwt it returns 401 to all of them and records
+# nothing, which is indistinguishable from the blind spot it closes. See the
+# header of supabase/functions/client-error/index.ts.
+echo "── deploying client-error"
+supabase functions deploy client-error --project-ref "$REF"
 
 # THE ARGUMENT ORDER IS THE WHOLE WARNING.
 #

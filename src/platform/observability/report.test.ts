@@ -2,18 +2,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const rpc = vi.fn().mockResolvedValue({ data: null, error: null });
+const invoke = vi.fn().mockResolvedValue({ data: null, error: null });
+const getSession = vi.fn();
+
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (...a: unknown[]) => rpc(...a) },
+  supabase: {
+    rpc: (...a: unknown[]) => rpc(...a),
+    functions: { invoke: (...a: unknown[]) => invoke(...a) },
+    auth: { getSession: () => getSession() },
+  },
 }));
 vi.mock("@/lib/lovable-error-reporting", () => ({ reportLovableError: vi.fn() }));
 
 import { reportError, installGlobalErrorHandlers, resetReportingStateForTests } from "./report";
 
 const argsOf = (call: number) => rpc.mock.calls[call][1] as Record<string, unknown>;
+/** The body handed to the edge function, for the anonymous path. */
+const bodyOf = (call: number) =>
+  (invoke.mock.calls[call][1] as { body: Record<string, unknown> }).body;
+
+/** Signed in unless a test says otherwise — the common case, and it keeps every
+ *  assertion below about the RPC honest rather than accidentally passing. */
+const signedIn = () => getSession.mockResolvedValue({ data: { session: { user: { id: "u1" } } } });
+const signedOut = () => getSession.mockResolvedValue({ data: { session: null } });
 
 beforeEach(() => {
   rpc.mockClear();
+  invoke.mockClear();
+  getSession.mockReset();
   rpc.mockResolvedValue({ data: null, error: null });
+  invoke.mockResolvedValue({ data: null, error: null });
+  signedIn();
   resetReportingStateForTests();
 });
 
@@ -127,5 +146,72 @@ describe("installGlobalErrorHandlers — what a boundary never sees", () => {
     window.dispatchEvent(Object.assign(new Event("error"), { error: new Error("after teardown") }));
     await new Promise((r) => setTimeout(r, 20));
     expect(rpc).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * The channel split.
+ *
+ * These exist because of a specific thirteen-hour outage on 6 Aug 2026: Resend
+ * rejected Supabase's SMTP login, sign-in was dead for every address, and
+ * `client_errors` recorded nothing at all — every caller was anonymous, which
+ * is precisely what "cannot sign in" means.
+ *
+ * Note what each test asserts. "Did not throw" would pass whether the report
+ * went somewhere or nowhere, and that flavour of assertion is exactly how the
+ * idle timeout shipped dead a day earlier. Each one names the channel.
+ */
+describe("which channel a report takes", () => {
+  it("uses the RPC when there is a session, so the error gets an organisation", async () => {
+    signedIn();
+    await reportError(new Error("signed in and broken"), "boundary");
+    expect(rpc).toHaveBeenCalledTimes(1);
+    expect(rpc.mock.calls[0][0]).toBe("record_client_error");
+    expect(invoke).not.toHaveBeenCalled();
+  });
+
+  it("uses the edge function when there is no session — the 6 Aug blind spot", async () => {
+    signedOut();
+    await reportError(new Error("crashed on the sign-in screen"), "boundary");
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(invoke.mock.calls[0][0]).toBe("client-error");
+    // The RPC is granted to `authenticated` only. Calling it here would not
+    // merely be redundant, it would be refused — which is how this stayed
+    // invisible for thirteen hours.
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("sends the edge function unprefixed keys, not the RPC's p_ ones", async () => {
+    signedOut();
+    await reportError(new Error("shape matters"), "unhandledrejection");
+    const b = bodyOf(0);
+    expect(b.message).toBe("shape matters");
+    expect(b.mechanism).toBe("unhandledrejection");
+    expect(b.fingerprint).toBeTruthy();
+    expect(b).not.toHaveProperty("p_message");
+  });
+
+  it("still scrubs on the anonymous path — PII must not reach the network either way", async () => {
+    signedOut();
+    await reportError(new Error("no account for priya@customer.test on +919663333364"), "boundary");
+    const b = bodyOf(0) as { message: string };
+    expect(b.message).not.toContain("@customer.test");
+    expect(b.message).not.toContain("9663333364");
+  });
+
+  it("falls back to the public channel when the session cannot be read", async () => {
+    // Asymmetric on purpose. Routing a signed-in caller to the public endpoint
+    // costs the organisation attribution; routing an anonymous one to the RPC
+    // loses the report altogether. Lose the attribution, never the report.
+    getSession.mockRejectedValue(new Error("storage unavailable"));
+    await reportError(new Error("session unreadable"), "boundary");
+    expect(invoke).toHaveBeenCalledTimes(1);
+    expect(rpc).not.toHaveBeenCalled();
+  });
+
+  it("does not loop when the edge function itself fails", async () => {
+    signedOut();
+    invoke.mockRejectedValue(new Error("edge function down"));
+    await expect(reportError(new Error("boom"), "boundary")).resolves.toBeUndefined();
   });
 });

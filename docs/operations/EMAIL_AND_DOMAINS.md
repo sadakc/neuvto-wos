@@ -630,11 +630,27 @@ same thing from the harness. Neither existed when this broke.
 
 Worth stating plainly, because it is the same lesson twice.
 
-**Sign-in errors reach no monitor.** `record_client_error` is granted to
-`authenticated` only, and somebody requesting a sign-in code is anonymous — so
-the 535 produced no `client_errors` row for 13 hours. This is documented as a
-known limitation in `20260812100000_errors_in_production_are_visible.sql`.
-Closing it needs an edge function, not a wider grant.
+**Sign-in errors reached no monitor — fixed 6 Aug 2026.** `record_client_error`
+is granted to `authenticated` only, and somebody requesting a sign-in code is
+anonymous, so the 535 produced no `client_errors` row for 13 hours. It was a
+known limitation, written down in
+`20260812100000_errors_in_production_are_visible.sql` when the store was built.
+
+Closed by `20260815100000` and the `client-error` edge function, which accepts
+unauthenticated POSTs and calls `record_public_client_error` with the service
+key. `anon` still executes nothing — the posture from the 2 Aug open relay is
+unchanged.
+
+Two things about it are worth knowing when reading the console:
+
+- Anonymous reports carry **no `organization_id`** and are marked
+  `source = 'public'`. There is no session to derive an organisation from, and
+  letting a caller name one would let it pin errors on somebody else's customer.
+- They spend a **separate daily ceiling** — 100 distinct fingerprints, against
+  the signed-in channel's 500. That split is not tidiness. The ceiling is silent
+  by design, so a shared counter would let anyone post junk until the budget was
+  gone and then watch real customer errors disappear, with nothing announcing
+  it. `verify_error_reporting.sql` asserts the two cannot starve each other.
 
 **Notification failures reach a monitor nobody was looking at.**
 `platform_mail_health()` would have reported `NO_TEMPLATE` as its last failure

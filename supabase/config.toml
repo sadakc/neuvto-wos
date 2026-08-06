@@ -89,3 +89,34 @@ content_path = "./supabase/templates/magic_link.html"
 # .md; make this file environment-aware before anyone runs that command.
 #
 # Tracked as a launch blocker in NEUVTO_MVP_BUILD_SPEC.md.
+
+# ── Edge functions ──────────────────────────────────────────────────────────
+#
+# Read by `supabase functions deploy`, NOT by `supabase config push`. Adding
+# this section does not make the file above any safer to push — the [auth]
+# warning stands, unchanged.
+
+[functions.notification-dispatch]
+# Invoked by pg_cron with the service key. The default (verify_jwt = true) is
+# correct and is stated rather than left implicit, so that the contrast with
+# the entry below is deliberate rather than something somebody has to notice.
+verify_jwt = true
+
+[functions.client-error]
+# PUBLIC ON PURPOSE. This is the one endpoint in the system that accepts an
+# unauthenticated request, and the whole point of it is callers who have no
+# session: a crash on the landing page, on /auth, or midway through accepting
+# an invitation.
+#
+# Leaving this true would make the function deploy cleanly, return 401 to every
+# real caller, and record nothing — which is indistinguishable from the blind
+# spot it was built to close, and is how this would silently not work.
+#
+# It does NOT weaken `anon executes nothing` (20260808100000). The function
+# holds the service key and calls record_public_client_error, which is granted
+# to service_role alone. `anon` still cannot execute one database function.
+#
+# Read the header of supabase/functions/client-error/index.ts before changing
+# this — the bounds that make a public endpoint acceptable are described there,
+# and the one that matters is a separate 100-per-day ceiling in Postgres.
+verify_jwt = false
