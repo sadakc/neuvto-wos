@@ -117,18 +117,44 @@ begin
   -- way to derive "which templates must exist" from the schema — meaning the
   -- list above can go stale the day somebody emits a new event. This assertion
   -- cannot: emit anything with no template and it lands as a row saying so.
+  --
+  -- ── why `deleted_at is null`, and why that is not a loophole
+  --
+  -- A NO_TEMPLATE row is a permanent record of a past failure. Without this
+  -- clause the first one ever recorded fails this check forever, so the only
+  -- way to get the harness green again is to hard-delete the evidence — which
+  -- is the opposite of what should happen to an incident record, and is what
+  -- the soft-delete discipline (D16–D19) exists to avoid everywhere else.
+  --
+  -- So soft-delete is the acknowledgement: the row stays, and it stops being
+  -- reported as open. Production carries exactly one, from the invitation that
+  -- never arrived on 6 Aug 2026.
+  --
+  -- It is not a way to make a real problem go away, and that is worth being
+  -- precise about rather than trusting. Soft-deleting these rows CANNOT hide a
+  -- missing template, because the check directly above asks
+  -- `missing_system_notification_templates()` — it reads the template table, not
+  -- the notification table, and nothing done to a notification row affects it.
+  -- Somebody who soft-deletes their way out of this assertion while a template
+  -- is genuinely absent still fails, one check earlier, with a clearer message.
+  --
+  -- What soft-delete CAN hide is the other case: an event emitted with a key
+  -- nobody wrote a template for. That one is a live fault until somebody adds
+  -- the template, and it will simply come back on the next emit.
   if to_regclass('public.notifications') is not null then
     select count(*) into n
     from notifications
-    where failed_reason = 'NO_TEMPLATE';
+    where failed_reason = 'NO_TEMPLATE'
+      and deleted_at is null;
     if n > 0 then
       select coalesce(string_agg(distinct event_key, ', '), '') into offenders
       from notifications
-      where failed_reason = 'NO_TEMPLATE';
+      where failed_reason = 'NO_TEMPLATE'
+        and deleted_at is null;
       raise exception
-        'INVARIANT FAIL: % notification(s) failed with NO_TEMPLATE, for: %. The event was emitted with no template to render it, so nobody was told anything', n, offenders;
+        'INVARIANT FAIL: % unacknowledged notification(s) failed with NO_TEMPLATE, for: %. The event was emitted with no template to render it, so nobody was told anything. Fix the template first; soft-delete the row only once it is a closed incident', n, offenders;
     end if;
-    raise notice 'ok: no notification failed for want of a template';
+    raise notice 'ok: no unacknowledged notification failed for want of a template';
   end if;
 
   -- ══════════════════════════════════════════════════ PHASE 1 — working calendar
