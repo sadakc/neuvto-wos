@@ -11,6 +11,11 @@ node_modules
 dist
 dist-ssr
 .output
+# The netlify preset writes here. Absent until 6 Aug 2026, when a build run to
+# prove the preset worked was committed by `git add -A` — 100+ artefacts into a
+# docs PR, because the other three build directories were listed and this one
+# was not.
+.netlify
 .vinxi
 .tanstack/**
 .nitro
