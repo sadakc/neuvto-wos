@@ -47,7 +47,13 @@ organization_settings.session_absolute_hours   default 24
 ```
 
 Idle timeout ends a session after inactivity; absolute timeout ends it regardless of
-activity. Both are enforced server-side — a client-side timer is a suggestion, not a control.
+activity. Both **must be enforced server-side to count as controls** — a client-side timer is
+a suggestion, not a control.
+
+That is the requirement, written in the imperative because it is not met. This line read
+"Both are enforced server-side" until 6 Aug 2026, which was simply false: the only thing
+ending a session is a timer in the browser. Read "Where this stands" below before repeating
+any of this to a customer.
 
 **The policy is not one number.** An `org_admin` can export every employee record and change
 who approves what; an employee can see their own leave balance. Giving both the same session is
@@ -90,7 +96,43 @@ unbuilt, and describing it to a customer as "we enforce session timeouts" would 
 
 **What would make it a control:** a short `jwt_expiry` (set on the hosted project, deliberately
 not in `config.toml` — see the warning in that file), refresh-token rotation with reuse
-detection, and server-side revocation. The first is done; the third is below.
+detection, and server-side revocation.
+
+| Piece                            | Status on `neuvto-wos-prod`                                         |
+| -------------------------------- | ------------------------------------------------------------------- |
+| `jwt_exp`                        | **1800s** (30 min), set 6 Aug 2026 — was 3600, the Supabase default |
+| `refresh_token_rotation_enabled` | **on**, `security_refresh_token_reuse_interval` 10s                 |
+| Server-side revocation           | **not built** — see below                                           |
+
+This table replaces the line that used to sit here, which said "the first is done". It was not
+done: `jwt_exp` was still 3600, the value the project ships with, and nobody had changed it.
+A status line that claims a security control is in place when it is not is worse than no line
+at all, because it is the thing somebody checks instead of checking the setting.
+
+**What the 1800 actually buys**, stated narrowly so it is not oversold: an access token
+exfiltrated from a browser is useless after at most 30 minutes instead of 60. It now matches
+the idle window `session_policy()` gives an admin, so the two numbers no longer disagree.
+
+**What it does not buy.** Supabase refresh tokens **never expire** — they are single-use and
+they rotate, but they do not age out. The refresh token in `localStorage` remains the real
+exposure and is untouched by any of this. Rotation with reuse detection is the mitigation
+that matters there, and it is on: replaying a consumed refresh token is detectable rather
+than free.
+
+#### Why the server-side timeout is not simply switched on
+
+Supabase has exactly the control this section says is missing —
+`sessions_inactivity_timeout` and `sessions_timebox`, both currently `0`. They would enforce
+server-side what `idle.ts` can only suggest.
+
+**They are Pro Plan and up.** The Supabase docs are explicit ("This feature is only available
+on Pro Plans and up"), and the Neuvto organisation is on the free plan. Nothing is paid for
+before the MVP ships, so this stays unbuilt by decision rather than oversight.
+
+Worth knowing before it looks like an easy win later: even on Pro, sessions are **not
+proactively terminated** when the timeout is reached. The docs say they are "cleaned up
+progressively 24 hours after reaching that status". It is a policy the server eventually
+enforces, not a switch that kills a session at the thirty-minute mark.
 
 ### Revocation
 
