@@ -46,6 +46,8 @@ export function WorkingCalendar({
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  /** Numeric boxes mid-edit. Empty here means "being cleared", never zero. */
+  const [typing, setTyping] = useState<Partial<Record<keyof OrgSettings, string>>>({});
 
   useEffect(() => {
     let cancelled = false;
@@ -75,6 +77,56 @@ export function WorkingCalendar({
   function update<K extends keyof OrgSettings>(key: K, value: OrgSettings[K]) {
     setSettings((s) => (s ? { ...s, [key]: value } : s));
     setSaved(false);
+    // A refusal belongs to the attempt that caused it. It was cleared only at
+    // the top of onSave, so "That didn't save" sat under whatever you changed
+    // next, describing values it had never seen.
+    setError("");
+  }
+
+  /**
+   * A CLEARED NUMBER BOX IS NOT ZERO.
+   *
+   * Every numeric field here was `update(key, Number(e.target.value))`, and
+   * `Number("") === 0`. Selecting the 5 in "Minimum notice" and pressing delete
+   * therefore set the workspace default to "no notice at all" — and
+   * `org_settings_notice` permits 0, so Save accepted it without complaint. The
+   * only signal was the box reading 0 where it had read nothing.
+   *
+   * That is the same defect this PR exists to fix one layer down: a leave type
+   * pre-filled with 0 overriding the workspace default. A stray zero in a notice
+   * field is exactly what we are here to stop being invisible.
+   *
+   * `fyStartDay` had it worse and hid it better: `org_settings_fy_day` requires
+   * 1 to 31, so an emptied box produced a save that FAILED, with a message about
+   * a day of the month nobody had typed.
+   *
+   * So the typed text is held separately while a field is being edited, and only
+   * a value that parses reaches `settings`. Blur drops the draft, and the box
+   * snaps back to the number that is actually stored — never to a zero nobody
+   * chose.
+   */
+  function updateNumber<K extends keyof OrgSettings>(key: K, text: string) {
+    setTyping((t) => ({ ...t, [key]: text }));
+    setSaved(false);
+    setError("");
+    if (text.trim() === "") return;
+    const n = Number(text);
+    if (!Number.isFinite(n)) return;
+    setSettings((s) => (s ? { ...s, [key]: n } : s));
+  }
+
+  /** Editing is over: show what is stored, whatever was half-typed. */
+  function commitNumber<K extends keyof OrgSettings>(key: K) {
+    setTyping((t) => {
+      const next = { ...t };
+      delete next[key];
+      return next;
+    });
+  }
+
+  /** What a numeric box should display: the draft if one is open, else the truth. */
+  function numberValue<K extends keyof OrgSettings>(key: K, stored: number): string {
+    return typing[key] ?? String(stored);
   }
 
   function toggleWeekendDay(day: number) {
@@ -227,8 +279,9 @@ export function WorkingCalendar({
                 type="number"
                 min={1}
                 max={31}
-                value={s.fyStartDay}
-                onChange={(e) => update("fyStartDay", Number(e.target.value))}
+                value={numberValue("fyStartDay", s.fyStartDay)}
+                onChange={(e) => updateNumber("fyStartDay", e.target.value)}
+                onBlur={() => commitNumber("fyStartDay")}
                 className="h-12 w-20 rounded-md border border-border bg-background px-3 text-sm"
               />
             </div>
@@ -275,12 +328,22 @@ export function WorkingCalendar({
               type="number"
               min={0}
               max={365}
-              value={s.defaultMinNoticeDays}
-              onChange={(e) => update("defaultMinNoticeDays", Number(e.target.value))}
+              value={numberValue("defaultMinNoticeDays", s.defaultMinNoticeDays)}
+              onChange={(e) => updateNumber("defaultMinNoticeDays", e.target.value)}
+              onBlur={() => commitNumber("defaultMinNoticeDays")}
               className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
             />
+            {/* "A leave type can require more" was wrong in a way that mattered.
+                The database resolves
+                  coalesce(type.min_notice_days, org.default_min_notice_days, 0)
+                so a type's own number WINS whether it is higher or lower — a
+                type set to 0 against a workspace default of 5 needs no notice at
+                all. Sada asked whether the two settings were duplicates; a
+                description that only mentioned "more" is part of why they looked
+                like it. */}
             <p className="mt-1 text-xs text-muted-foreground">
-              Days. A leave type can require more
+              Days. Used by any leave type that doesn&apos;t set its own — a type with its own
+              number uses that instead, higher or lower
             </p>
           </div>
 

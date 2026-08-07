@@ -70,6 +70,10 @@ const INVITE_ERRORS: Partial<Record<ErrorCode, { message: string; field?: string
     field: "phone",
   },
   INVALID_EMAIL: { message: "Enter a valid email address.", field: "email" },
+  NAME_REQUIRED: {
+    message: "Enter their name — it is how they appear on every screen.",
+    field: "fullName",
+  },
   FORBIDDEN: { message: "Only an administrator can invite people.", field: undefined },
 };
 

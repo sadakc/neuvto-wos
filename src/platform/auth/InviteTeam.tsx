@@ -36,6 +36,14 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
   const [error, setError] = useState("");
   const [sent, setSent] = useState<string[]>([]);
 
+  /**
+   * A refusal belongs to the address that caused it. `setError("")` ran only at
+   * the top of onSubmit, so "Somebody with that email address is already in this
+   * workspace" stayed on screen while the admin corrected the address — an error
+   * describing a value no longer in the box.
+   */
+  const edited = () => setError("");
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -72,7 +80,10 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
             type="email"
             required
             value={email}
-            onChange={(e) => setEmail(e.target.value)}
+            onChange={(e) => {
+              setEmail(e.target.value);
+              edited();
+            }}
             placeholder="colleague@company.com"
             className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
           />
@@ -86,7 +97,10 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
             id="inv-phone"
             type="tel"
             value={phone}
-            onChange={(e) => setPhone(e.target.value)}
+            onChange={(e) => {
+              setPhone(e.target.value);
+              edited();
+            }}
             placeholder="+91 98765 43210"
             className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
           />
@@ -99,13 +113,23 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
+          {/* Required from 7 Aug 2026. The name is what every other screen
+              identifies somebody BY — People, the approval timeline, the
+              reporting-line and successor dropdowns all fall back to the email
+              address without it, so a workspace invited without names reads as
+              a list of logins rather than a list of colleagues. */}
           <label htmlFor="inv-name" className="block text-sm font-medium">
-            Name <span className="text-muted-foreground">(optional)</span>
+            Name
           </label>
           <input
             id="inv-name"
+            required
             value={fullName}
-            onChange={(e) => setFullName(e.target.value)}
+            onChange={(e) => {
+              setFullName(e.target.value);
+              edited();
+            }}
+            placeholder="Priya Patel"
             className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
           />
         </div>
@@ -117,7 +141,10 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
           <select
             id="inv-role"
             value={role}
-            onChange={(e) => setRole(e.target.value as AppRole)}
+            onChange={(e) => {
+              setRole(e.target.value as AppRole);
+              edited();
+            }}
             className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
           >
             {APP_ROLES.map((r) => (
@@ -137,7 +164,7 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
 
       <button
         type="submit"
-        disabled={busy || !email}
+        disabled={busy || !email || !fullName.trim()}
         data-testid="send-invite"
         className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
       >

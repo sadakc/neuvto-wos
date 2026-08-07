@@ -15,6 +15,7 @@
 
 import { useEffect, useState } from "react";
 import { getCurrentUser, type CurrentUser } from "@/platform/auth";
+import { getOrgSettings } from "@/platform/calendar";
 import { isAppError } from "@/platform/errors";
 import { listLeaveTypes, saveLeaveType, setLeaveTypeStatus } from "../handlers";
 import { LeaveTypeInput, type LeaveType } from "../contracts";
@@ -30,11 +31,29 @@ type Draft = {
   approvalRequired: boolean;
 };
 
+/**
+ * `minNoticeDays` starts BLANK, not "0" — and that one character was the whole
+ * reason the workspace-level notice setting appeared to do nothing.
+ *
+ * The database resolves
+ *
+ *     coalesce(v_type.min_notice_days, v_settings.default_min_notice_days, 0)
+ *
+ * so a leave type leaving notice blank inherits the organisation's default.
+ * Pre-filling the field with "0" meant every type ever created through this form
+ * carried an explicit zero, which OVERRODE the default. The helper text said
+ * "Blank uses the workspace default" while the form guaranteed it was never
+ * blank.
+ *
+ * Sada asked whether the two settings were duplicates. They are not — one is the
+ * fallback for the other — but they behaved like it, because in practice the
+ * fallback could never be reached.
+ */
 const EMPTY: Draft = {
   name: "",
   description: "",
   maxDaysPerYear: "12",
-  minNoticeDays: "0",
+  minNoticeDays: "",
   approvalRequired: true,
   maxPerRequest: "",
 };
@@ -56,6 +75,12 @@ export default function LeaveTypes() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [types, setTypes] = useState<LeaveType[]>([]);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
+  /**
+   * The workspace's fallback notice, so a type that inherits it can say the
+   * number rather than saying nothing. Null while unknown, and the row then
+   * says "the workspace default" without inventing a figure.
+   */
+  const [defaultNotice, setDefaultNotice] = useState<number | null>(null);
 
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
@@ -75,6 +100,14 @@ export default function LeaveTypes() {
         setState("ready");
       })
       .catch(() => !cancelled && setState("error"));
+
+    // Separate, and deliberately not in the Promise.all above: the settings read
+    // is decoration. Failing it must not blank a screen whose actual job —
+    // configuring leave types — works perfectly without it.
+    getOrgSettings()
+      .then((s) => !cancelled && setDefaultNotice(s?.defaultMinNoticeDays ?? null))
+      .catch(() => {});
+
     return () => {
       cancelled = true;
     };
@@ -163,9 +196,22 @@ export default function LeaveTypes() {
                     </span>
                   )}
                 </p>
+                {/* Notice was `t.minNoticeDays ? … : ""`, which is silent for
+                    BOTH null and 0 — so a type inheriting the workspace default
+                    and a type overriding it with zero read identically, and
+                    neither said which. That is the display half of the same
+                    confusion the blank default fixes. */}
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {t.maxDaysPerYear} {t.maxDaysPerYear === 1 ? "day" : "days"} a year
-                  {t.minNoticeDays ? ` · ${t.minNoticeDays} days' notice` : ""}
+                  {t.minNoticeDays === null
+                    ? defaultNotice === null
+                      ? " · notice: the workspace default"
+                      : defaultNotice > 0
+                        ? ` · ${defaultNotice} ${defaultNotice === 1 ? "day" : "days"}' notice (workspace default)`
+                        : " · no notice needed (workspace default)"
+                    : t.minNoticeDays > 0
+                      ? ` · ${t.minNoticeDays} ${t.minNoticeDays === 1 ? "day" : "days"}' notice`
+                      : " · no notice needed"}
                   {t.maxPerRequest ? ` · up to ${t.maxPerRequest} at a time` : ""}
                   {!t.approvalRequired && " · no approval needed"}
                 </p>
@@ -253,12 +299,15 @@ export default function LeaveTypes() {
                 inputMode="decimal"
                 min={0}
                 max={365}
+                // Whole days or halves. Entitlement is pro-rated onto the same
+                // grid, so a type set to 12.4 could never be honoured exactly.
+                step={0.5}
                 value={draft.maxDaysPerYear}
                 onChange={(e) => setDraft({ ...draft, maxDaysPerYear: e.target.value })}
                 className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
               />
               <p className="mt-1 text-xs text-muted-foreground">
-                Pro-rated for anyone who joins part-way through the year
+                Whole days or halves. Pro-rated for anyone who joins part-way through the year
               </p>
             </div>
 
@@ -274,10 +323,17 @@ export default function LeaveTypes() {
                 max={365}
                 value={draft.minNoticeDays}
                 onChange={(e) => setDraft({ ...draft, minNoticeDays: e.target.value })}
+                placeholder={defaultNotice === null ? "" : String(defaultNotice)}
                 className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
               />
+              {/* The placeholder shows the inherited number, so leaving this
+                  blank is visibly a choice rather than an omission. */}
               <p className="mt-1 text-xs text-muted-foreground">
-                Days. Blank uses the workspace default
+                {defaultNotice === null
+                  ? "Days. Blank uses the workspace default"
+                  : defaultNotice > 0
+                    ? `Days. Blank uses the workspace default of ${defaultNotice}`
+                    : "Days. Blank uses the workspace default, which is none"}
               </p>
             </div>
 
@@ -289,8 +345,9 @@ export default function LeaveTypes() {
                 id="lt-max"
                 type="number"
                 inputMode="decimal"
-                min={1}
+                min={0.5}
                 max={365}
+                step={0.5}
                 value={draft.maxPerRequest}
                 onChange={(e) => setDraft({ ...draft, maxPerRequest: e.target.value })}
                 className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"

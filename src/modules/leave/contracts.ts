@@ -48,18 +48,31 @@ export const LeaveTypeInput = z.object({
   id: z.string().uuid().optional(),
   name: z.string().trim().min(1, "Give this leave type a name").max(60, "That name is too long"),
   description: z.string().trim().max(300, "Keep the description under 300 characters").optional(),
-  /** leave_type_days_sane: >= 0. Zero is legitimate — an unpaid type with no allowance. */
+  /**
+   * leave_type_days_sane: >= 0. Zero is legitimate — an unpaid type with no
+   * allowance. leave_type_days_are_halves: whole days or halves.
+   */
   maxDaysPerYear: z
     .number({ invalid_type_error: "Enter a number of days" })
     .min(0, "Days per year cannot be negative")
-    .max(365, "That is more days than there are in a year"),
-  /** leave_type_notice_sane: null or >= 0. */
+    .max(365, "That is more days than there are in a year")
+    .multipleOf(0.5, "Use whole days or halves — 12 or 12.5, not 12.4"),
+  /**
+   * leave_type_notice_sane: null or >= 0.
+   *
+   * NULL IS THE INTERESTING VALUE. It means "inherit the workspace default",
+   * which is what `coalesce(min_notice_days, default_min_notice_days, 0)`
+   * resolves in leave_submit. Zero is a different answer — it overrides the
+   * default with "none". The form pre-filled this with 0 until 7 Aug 2026, so
+   * the workspace setting could never actually be reached.
+   */
   minNoticeDays: z.number().int().min(0, "Notice cannot be negative").max(365).nullable(),
   /** leave_type_per_request_sane: null or > 0. Null means no limit — not zero. */
   maxPerRequest: z
     .number()
     .positive("A maximum per request must be more than zero")
     .max(365)
+    .multipleOf(0.5, "Use whole days or halves")
     .nullable(),
   /**
    * D38. False means approved the moment it is submitted. The reason this
@@ -253,6 +266,11 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   // it. This message is what makes that distinction visible.
   FORBIDDEN: "Reports cover everybody in the workspace, so they're limited to administrators.",
   LEAVE_TYPE_NAME_TAKEN: "There's already a leave type with that name.",
+  // Leave is counted in whole days and halves, so an opening balance has to be
+  // one too. The screen's step="0.5" is a browser attribute; this is the rule.
+  NOT_A_HALF_DAY: "Use whole days or halves — 2 or 2.5, not 2.7.",
+  OPENING_BALANCE_OVERDRAWN:
+    "That's more days than this person was ever entitled to. Check the figure, or set their entitlement first.",
   LEAVE_TYPE_IN_USE:
     "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",
 };

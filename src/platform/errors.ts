@@ -43,6 +43,9 @@ export const ERROR_CODES = [
   "PHONE_ALREADY_INVITED",
   "INVALID_EMAIL",
   "ORGANIZATION_NAME_REQUIRED",
+  // An invitation with no name produces a workspace whose People list, approval
+  // timeline and every dropdown fall back to showing email addresses.
+  "NAME_REQUIRED",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];
