@@ -120,3 +120,13 @@ verify_jwt = true
 # this — the bounds that make a public endpoint acceptable are described there,
 # and the one that matters is a separate 100-per-day ceiling in Postgres.
 verify_jwt = false
+
+[functions.demo-request]
+# PUBLIC ON PURPOSE, for the same reason as client-error: every caller is a
+# stranger on the landing page with no session and no prospect of one.
+#
+# It replaced a server function that used the service role key — the only such
+# caller in the codebase — so this setting is what allows that key to stop
+# existing outside Supabase. Left at the default it returns 401 to every
+# visitor and the demo form silently collects nothing.
+verify_jwt = false

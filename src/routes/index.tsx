@@ -1,8 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useServerFn } from "@tanstack/react-start";
 import { useState } from "react";
 import { toast } from "sonner";
-import { submitDemoRequest } from "@/lib/demo.functions";
+import { submitDemoRequest } from "@/lib/demo-request";
 import mobileMockup from "@/assets/mobile-mockup.png";
 import { NeuvtoLockup, NeuvtoMark } from "@/components/shared/neuvto-mark";
 import adminMockup from "@/assets/admin-mockup.png";
@@ -292,7 +291,6 @@ function Roadmap() {
 }
 
 function DemoForm() {
-  const submit = useServerFn(submitDemoRequest);
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -306,7 +304,7 @@ function DemoForm() {
     e.preventDefault();
     setLoading(true);
     try {
-      await submit({ data: form });
+      await submitDemoRequest(form);
       toast.success("Thanks! We'll be in touch shortly.");
       setForm({ name: "", email: "", company: "", employees: "", message: "" });
     } catch (err) {
