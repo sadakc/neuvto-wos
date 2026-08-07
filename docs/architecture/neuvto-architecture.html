@@ -293,6 +293,15 @@
      So it is declared, and declared identically in both places. */
   .plate-body pre.mermaid[data-processed] {
     text-align: center;
+  }
+  /* Scoped to `.mermaid-local`, which the loader below sets only after IT has
+     configured mermaid. That matters where this file is published as a Claude
+     Artifact: a strict CSP blocks the CDN import, so the artifact renders these
+     blocks with its OWN mermaid — which may use HTML labels, measured in a CSS
+     context this rule would then poison. Pinning a font is only correct when we
+     also chose htmlLabels: false. Where our script did not run, we impose
+     nothing and the host's own measurements hold. */
+  .mermaid-local .plate-body pre.mermaid[data-processed] {
     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   }
 
@@ -1312,6 +1321,8 @@ erDiagram
       sequence: { useMaxWidth: true, htmlLabels: false },
       er: { useMaxWidth: true },
     });
+    // Set BEFORE run(), so the font rule is in place as boxes are drawn.
+    document.documentElement.classList.add("mermaid-local");
     await mermaid.run({
       querySelector: "pre.mermaid",
       suppressErrors: true,
