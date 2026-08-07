@@ -19,6 +19,7 @@ import {
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { InviteTeam } from "@/platform/auth/InviteTeam";
+import { listDepartments, setDepartment, type Department } from "@/platform/organization";
 
 export const Route = createFileRoute("/app/members")({
   ssr: false,
@@ -57,6 +58,8 @@ export function MembersPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
+  /** D58. Empty is ordinary — a workspace that has configured none. */
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
 
@@ -64,6 +67,12 @@ export function MembersPage() {
     const [m, i] = await Promise.all([listMembers(), listInvitations(baseUrl)]);
     setMembers(m);
     setInvitations(i);
+    // Separately and forgivingly: this screen's job is the people, and a failed
+    // department read must not blank it. The selects fall back to "No
+    // department", which is what an unconfigured workspace shows anyway.
+    await listDepartments()
+      .then(setDepartments)
+      .catch(() => {});
   }
 
   useEffect(() => {
@@ -109,6 +118,20 @@ export function MembersPage() {
       setError(isAppError(err) ? err.message : "That reporting line couldn't be set.");
       // Reload regardless: the select is showing a value the database refused,
       // and leaving it there tells the person their change stuck.
+      await load();
+    }
+  }
+
+  async function onSetDepartment(employeeId: string, departmentId: string | null) {
+    setError("");
+    setNotice("");
+    try {
+      await setDepartment(employeeId, departmentId);
+      await load();
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That department couldn't be set.");
+      // Reload for the same reason onSetManager does: the select is showing a
+      // value the database refused.
       await load();
     }
   }
@@ -472,6 +495,33 @@ export function MembersPage() {
                     </button>
                   )}
                 </div>
+
+                {/* D58. Only once departments exist — an empty dropdown reads as
+                    a broken control, and Settings is where they are created. */}
+                {departments.length > 0 && (
+                  <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
+                    <label
+                      htmlFor={`dept-${m.id}`}
+                      className="text-xs text-muted-foreground sm:w-28"
+                    >
+                      Department
+                    </label>
+                    <select
+                      id={`dept-${m.id}`}
+                      data-testid="department"
+                      value={m.departmentId ?? ""}
+                      onChange={(e) => onSetDepartment(m.id, e.target.value || null)}
+                      className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                    >
+                      <option value="">No department</option>
+                      {departments.map((d) => (
+                        <option key={d.id} value={d.id}>
+                          {d.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
 
                 {/* The confirmation, inline rather than a modal: it has to name what
                   moves, and a person deciding that wants the list in front of

@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ── the seam
@@ -31,7 +31,34 @@ import userEvent from "@testing-library/user-event";
 const inviteMember = vi.fn<(input: unknown) => Promise<string>>(async () => "invitation-id");
 vi.mock("./members", () => ({ inviteMember: (input: unknown) => inviteMember(input) }));
 
+/**
+ * D58 — the department read.
+ *
+ * Left unmocked this reaches the real Supabase client, and every test in this
+ * file fired two HTTP requests at whatever was listening on localhost. They came
+ * back 401 and the form's `.catch(() => {})` swallowed it, so the suite passed
+ * while talking to a database.
+ */
+const listDepartments = vi.fn<() => Promise<{ id: string; name: string }[]>>();
+vi.mock("@/platform/organization", () => ({ listDepartments: () => listDepartments() }));
+
 import { InviteTeam } from "./InviteTeam";
+
+/** Real UUIDs: `InviteInput.departmentId` is `z.string().uuid()`. */
+const OPERATIONS = { id: "b2c4e6a8-0d1f-4a3b-8c5d-2e7f9a1b3c55", name: "Operations" };
+const SALES = { id: "f70a3c19-4b2d-4e6f-9a80-5c3d1e7b2f44", name: "Sales" };
+
+/**
+ * Root-level, so it runs before each describe's own `vi.clearAllMocks()` —
+ * outer hooks first, and `mockClear` forgets the calls but keeps the
+ * implementation.
+ */
+beforeEach(() => {
+  listDepartments.mockReset();
+  // The starting state of every new workspace, and the one the existing tests
+  // in this file were written against: none configured, no Department field.
+  listDepartments.mockResolvedValue([]);
+});
 
 // Deliberately loose. Only the first test is about the label's exact words; if
 // it ever reads "Full name" the button tests below should still be measuring
@@ -180,6 +207,124 @@ describe("InviteTeam — the Role dropdown", () => {
 
     expect(inviteMember).toHaveBeenCalledWith(
       expect.objectContaining({ role: "supervisor", fullName: "Sunita Kapoor" }),
+    );
+  });
+});
+
+/**
+ * D58 — the Department field.
+ *
+ * Departments have existed in the database since the first migration and
+ * nothing in the product ever wrote a row, so the Department column on both
+ * leave reports was blank for everybody. Placing somebody at the moment they
+ * are invited is one of the two ways it gets filled in — the other is the
+ * People screen, once they have accepted.
+ *
+ * The field is conditional, which is the part that needs both sides tested. A
+ * dropdown whose only entry is "No department" is a control that asks a
+ * question it cannot answer, and a field that appears at a moment nobody can
+ * predict reads as broken.
+ */
+describe("InviteTeam — the Department field", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const deptSelect = () => screen.getByLabelText(/^Department/) as HTMLSelectElement;
+
+  /** Renders and waits for the department read to have landed either way. */
+  async function renderInvite() {
+    render(<InviteTeam />);
+    await waitFor(() => expect(listDepartments).toHaveBeenCalledTimes(1));
+    // The read resolves in a microtask after the call; this settles the state
+    // update so an absence assertion is about the render and not about timing.
+    await waitFor(() => expect(sendButton()).toBeDisabled());
+  }
+
+  it("does not offer an empty dropdown when the workspace has no departments", async () => {
+    listDepartments.mockResolvedValue([]);
+    const user = userEvent.setup();
+    await renderInvite();
+
+    expect(screen.queryByLabelText(/^Department/)).toBeNull();
+    expect(screen.queryByText("No department")).toBeNull();
+
+    // And the form is still fully usable — the missing field costs nothing.
+    await user.type(emailField(), "priya.patel@acme.test");
+    await user.type(nameField(), "Priya Patel");
+    await user.click(sendButton());
+
+    expect(inviteMember).toHaveBeenCalledTimes(1);
+  });
+
+  it("appears once departments exist, defaulting to No department", async () => {
+    // The same wait as the test above, so the absence there is genuinely about
+    // the condition and not about the assertion running too early.
+    listDepartments.mockResolvedValue([OPERATIONS, SALES]);
+    await renderInvite();
+
+    const select = deptSelect();
+    expect(select.value).toBe("");
+    // What is legible in the closed box, not just the value behind it.
+    expect(select.selectedOptions[0].textContent).toBe("No department");
+    expect(
+      within(select)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["No department", "Operations", "Sales"]);
+  });
+
+  it("sends the chosen department with the invitation", async () => {
+    listDepartments.mockResolvedValue([OPERATIONS, SALES]);
+    const user = userEvent.setup();
+    await renderInvite();
+
+    // Sales is the last option, so a select falling back to its first would be
+    // visible here rather than agreeing with the assertion by accident.
+    await user.selectOptions(deptSelect(), SALES.id);
+    expect(deptSelect().selectedOptions[0].textContent).toBe("Sales");
+
+    await user.type(emailField(), "priya.patel@acme.test");
+    await user.type(nameField(), "Priya Patel");
+    await user.click(sendButton());
+
+    expect(inviteMember).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "priya.patel@acme.test", departmentId: SALES.id }),
+    );
+  });
+
+  it("sends null for No department, not an empty string", async () => {
+    // `InviteInput.departmentId` is `z.string().uuid().nullable()`, and "" is
+    // neither. The invitation would be refused by its own schema for a choice
+    // that is the default and entirely legitimate.
+    listDepartments.mockResolvedValue([OPERATIONS, SALES]);
+    const user = userEvent.setup();
+    await renderInvite();
+
+    await user.type(emailField(), "priya.patel@acme.test");
+    await user.type(nameField(), "Priya Patel");
+    await user.click(sendButton());
+
+    expect(inviteMember).toHaveBeenCalledWith(expect.objectContaining({ departmentId: null }));
+    // The specific wrong value, named, so the failure says which one it was.
+    expect(inviteMember).not.toHaveBeenCalledWith(expect.objectContaining({ departmentId: "" }));
+  });
+
+  it("still lets somebody be invited when the department read fails", async () => {
+    // The read is deliberately non-blocking. Inviting people is what this form
+    // is FOR, and a workspace with no departments is the normal starting state
+    // — so a failed read must look like that rather than like a broken form.
+    listDepartments.mockRejectedValue(new Error("network"));
+    const user = userEvent.setup();
+    await renderInvite();
+
+    expect(screen.queryByLabelText(/^Department/)).toBeNull();
+    expect(screen.queryByTestId("invite-error")).toBeNull();
+
+    await user.type(emailField(), "priya.patel@acme.test");
+    await user.type(nameField(), "Priya Patel");
+    await user.click(sendButton());
+
+    expect(inviteMember).toHaveBeenCalledWith(
+      expect.objectContaining({ email: "priya.patel@acme.test", departmentId: null }),
     );
   });
 });

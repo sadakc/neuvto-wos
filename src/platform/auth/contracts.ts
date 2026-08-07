@@ -183,6 +183,13 @@ export const InviteInput = z.object({
     .trim()
     .min(1, "Enter their name — it is how they appear on every screen")
     .max(200, "That name is too long"),
+  /**
+   * D58. Optional, and empty is the honest default — a workspace that has not
+   * configured any departments cannot place anybody, and requiring one would
+   * make the first invitation impossible. Carried on the invitation and applied
+   * to the profile at acceptance (D53), like the start date and reporting line.
+   */
+  departmentId: z.string().uuid().nullable().optional().default(null),
 });
 export type InviteInput = z.infer<typeof InviteInput>;
 

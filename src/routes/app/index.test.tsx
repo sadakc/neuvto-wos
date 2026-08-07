@@ -24,7 +24,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import type { AppRole, CurrentUser } from "@/platform/auth";
 
 // ── the seam
@@ -82,8 +82,25 @@ const userWith = (roles: AppRole[]): CurrentUser => ({
   roles,
 });
 
-/** The line under the greeting. Located by position, so no test id is invented. */
+/**
+ * The line under the greeting. Located by position, so no test id is invented.
+ *
+ * WAITS FOR THE LOADING LINE TO GO, not for the heading. The <h1> renders
+ * "Welcome" in BOTH states — `user?.fullName ? \`Welcome, …\` : "Welcome"` — so
+ * `findByRole("heading")` resolves on the very first paint, and
+ * `nextElementSibling` is then read synchronously against a DOM that has not
+ * loaded yet. It returned "Loading your access…" and the assertion compared it
+ * to "Supervisor".
+ *
+ * It passed anyway, on `act`'s incidental flush, until adding 22 tests in a
+ * neighbouring file shifted worker scheduling enough to lose the race once in
+ * six runs. Reproduced deterministically by delaying `getCurrentUser` by 25ms.
+ *
+ * A test that waits for the wrong thing is worse than one that fails: it is
+ * green for a reason unrelated to what it claims.
+ */
 async function roleLine(): Promise<HTMLElement> {
+  await waitFor(() => expect(screen.queryByText("Loading your access…")).toBeNull());
   const heading = await screen.findByRole("heading", { level: 1 });
   return heading.nextElementSibling as HTMLElement;
 }
