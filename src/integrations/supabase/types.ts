@@ -1318,6 +1318,96 @@ export type Database = {
           },
         ]
       }
+      report_definitions: {
+        Row: {
+          created_at: string
+          description: string | null
+          module_key: string
+          report_key: string
+          title: string
+        }
+        Insert: {
+          created_at?: string
+          description?: string | null
+          module_key: string
+          report_key: string
+          title: string
+        }
+        Update: {
+          created_at?: string
+          description?: string | null
+          module_key?: string
+          report_key?: string
+          title?: string
+        }
+        Relationships: []
+      }
+      report_schedules: {
+        Row: {
+          cadence: Database["public"]["Enums"]["report_cadence"]
+          created_at: string
+          created_by: string | null
+          day_of_month: number | null
+          day_of_week: number | null
+          deleted_at: string | null
+          id: string
+          is_active: boolean
+          last_run_on: string | null
+          organization_id: string
+          recipients: string[]
+          report_key: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cadence: Database["public"]["Enums"]["report_cadence"]
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          day_of_week?: number | null
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_run_on?: string | null
+          organization_id: string
+          recipients?: string[]
+          report_key: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cadence?: Database["public"]["Enums"]["report_cadence"]
+          created_at?: string
+          created_by?: string | null
+          day_of_month?: number | null
+          day_of_week?: number | null
+          deleted_at?: string | null
+          id?: string
+          is_active?: boolean
+          last_run_on?: string | null
+          organization_id?: string
+          recipients?: string[]
+          report_key?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "report_schedules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "report_schedules_report_key_fkey"
+            columns: ["report_key"]
+            isOneToOne: false
+            referencedRelation: "report_definitions"
+            referencedColumns: ["report_key"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1580,6 +1670,24 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_pending_report_for: {
+        Args: { _org: string }
+        Returns: {
+          current_level: number
+          days_waiting: number
+          department_name: string
+          employee_name: string
+          from_date: string
+          leave_request_id: string
+          leave_type_name: string
+          required_levels: number
+          submitted_at: string
+          to_date: string
+          waiting_on: string
+          working_days: number
+        }[]
+      }
+      leave_report_schedule_run: { Args: never; Returns: number }
       leave_set_opening_balance: {
         Args: {
           _carryforward: number
@@ -1598,8 +1706,38 @@ export type Database = {
         }
         Returns: string
       }
+      leave_summary_days: { Args: { _days: number }; Returns: string }
+      leave_summary_lines: {
+        Args: { _from: string; _kind: string; _org: string; _to: string }
+        Returns: {
+          line_count: number
+          lines: string
+        }[]
+      }
+      leave_summary_when: {
+        Args: { _from: string; _to: string }
+        Returns: string
+      }
       leave_taken_report: {
         Args: { _from: string; _to: string }
+        Returns: {
+          decided_at: string
+          decided_by: string
+          decision_note: string
+          department_name: string
+          employee_name: string
+          from_date: string
+          leave_request_id: string
+          leave_type_name: string
+          reason: string
+          status: string
+          submitted_at: string
+          to_date: string
+          working_days: number
+        }[]
+      }
+      leave_taken_report_for: {
+        Args: { _from: string; _org: string; _to: string }
         Returns: {
           decided_at: string
           decided_by: string
@@ -1774,6 +1912,42 @@ export type Database = {
         Args: { _payload: Json; _template: string }
         Returns: string
       }
+      report_schedule_fires_on: {
+        Args: {
+          _cadence: Database["public"]["Enums"]["report_cadence"]
+          _day_of_month: number
+          _day_of_week: number
+          _on: string
+        }
+        Returns: boolean
+      }
+      report_schedule_mark_run: {
+        Args: { _id: string; _on: string }
+        Returns: undefined
+      }
+      report_schedule_remove: { Args: { _id: string }; Returns: undefined }
+      report_schedule_save: {
+        Args: {
+          _cadence: Database["public"]["Enums"]["report_cadence"]
+          _day_of_month?: number
+          _day_of_week?: number
+          _id?: string
+          _is_active?: boolean
+          _recipients: string[]
+          _report_key: string
+        }
+        Returns: string
+      }
+      report_schedules_due: {
+        Args: { _report_key: string }
+        Returns: {
+          cadence: Database["public"]["Enums"]["report_cadence"]
+          id: string
+          local_today: string
+          organization_id: string
+          recipients: string[]
+        }[]
+      }
       resolve_approver: {
         Args: {
           _org_id: string
@@ -1833,6 +2007,7 @@ export type Database = {
         | "cancelled"
       notification_channel: "email" | "in_app"
       notification_status: "pending" | "sent" | "failed"
+      report_cadence: "weekly" | "monthly"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1983,6 +2158,7 @@ export const Constants = {
       ],
       notification_channel: ["email", "in_app"],
       notification_status: ["pending", "sent", "failed"],
+      report_cadence: ["weekly", "monthly"],
     },
   },
 } as const

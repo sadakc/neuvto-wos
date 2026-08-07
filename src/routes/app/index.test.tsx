@@ -24,7 +24,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import type { AppRole, CurrentUser } from "@/platform/auth";
 
 // ── the seam
@@ -82,8 +82,24 @@ const userWith = (roles: AppRole[]): CurrentUser => ({
   roles,
 });
 
-/** The line under the greeting. Located by position, so no test id is invented. */
+/**
+ * The line under the greeting. Located by position, so no test id is invented.
+ *
+ * WAITS FOR THE LOADING LINE TO GO, NOT FOR THE HEADING.
+ *
+ * The `<h1>` says "Welcome" in BOTH states, so `findByRole("heading")` resolves
+ * on the very first render and `nextElementSibling` is then read while the line
+ * underneath still says "Loading your access…". Every assertion here compares
+ * that line against a role name, so the whole file was one scheduling change
+ * away from failing — and it was passing only because a mocked promise settles
+ * in a microtask, which no real session fetch ever will.
+ *
+ * Proved by delaying the mocked `getCurrentUser` by 25 ms: **5 of these 7 tests
+ * failed**, deterministically, with `expected 'Loading your access…' to be
+ * 'Supervisor'`. Zero fail with the wait below.
+ */
 async function roleLine(): Promise<HTMLElement> {
+  await waitFor(() => expect(screen.queryByText("Loading your access…")).toBeNull());
   const heading = await screen.findByRole("heading", { level: 1 });
   return heading.nextElementSibling as HTMLElement;
 }
