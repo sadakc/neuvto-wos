@@ -1,31 +1,31 @@
 flowchart TB
     subgraph AUTH["WHERE THE WORK IS DONE — two authoring tools, one repository"]
         direction LR
-        LOV["<b>Lovable</b><br/>visual editing &amp; preview<br/>points at PRE-PRODUCTION"]
-        CC["<b>Claude Code</b><br/>engineering, migrations,<br/>tests, review"]
+        LOV["Lovable<br/>visual editing &amp; preview<br/>points at PRE-PRODUCTION"]
+        CC["Claude Code<br/>engineering, migrations,<br/>tests, review"]
     end
 
     subgraph SRC["SOURCE OF TRUTH"]
-        GH["<b>GitHub</b> · main branch<br/>every change arrives by pull request"]
+        GH["GitHub · main branch<br/>every change arrives by pull request"]
     end
 
     subgraph GATE["AUTOMATED CHECKS — nothing reaches a customer without passing"]
         direction LR
-        CI["<b>CI</b><br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
-        BUILD["<b>Build</b><br/>GitHub Actions<br/>our variables, our machine"]
-        VER1["<b>Gate 1</b><br/>which database does<br/>this build talk to?"]
-        VER2["<b>Gate 2</b><br/>which database does<br/>the LIVE SITE talk to?"]
+        CI["CI<br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
+        BUILD["Build<br/>GitHub Actions<br/>our variables, our machine"]
+        VER1["Gate 1<br/>which database does<br/>this build talk to?"]
+        VER2["Gate 2<br/>which database does<br/>the LIVE SITE talk to?"]
     end
 
     subgraph RUN["WHAT A CUSTOMER TOUCHES"]
         direction LR
-        NET["<b>Netlify</b><br/>hosts neuvto.com"]
-        SUP[("<b>Supabase</b><br/>Postgres · Auth<br/>ap-south-1")]
-        RES["<b>Resend</b><br/>sign-in codes<br/>&amp; notifications"]
+        NET["Netlify<br/>hosts neuvto.com"]
+        SUP[("Supabase<br/>Postgres · Auth<br/>ap-south-1")]
+        RES["Resend<br/>sign-in codes<br/>&amp; notifications"]
     end
 
     subgraph DEV["BEFORE ANY OF IT — a full copy on one laptop"]
-        DOCK["<b>Docker</b><br/>runs Postgres, Auth and a mail<br/>catcher locally. No cloud, no cost,<br/>no customer data."]
+        DOCK["Docker<br/>runs Postgres, Auth and a mail<br/>catcher locally. No cloud, no cost,<br/>no customer data."]
     end
 
     LOV -->|"pull request"| GH

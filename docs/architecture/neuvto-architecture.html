@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neuvto WOS — Platform Architecture</title>
 
 <style>
@@ -239,6 +241,31 @@
     min-width: 0;
     text-align: center;
   }
+  /* Until 7 Aug 2026 this rule did not exist, and every diagram was invisible.
+     `.plate-body` paints --plate-bg (#0B1720); the <pre> inside inherited --ink
+     (#0F1922) from the page. Near-black on near-black, in both themes, for nine
+     plates. --plate-ink existed the whole time and was never applied to the one
+     element that needed it.
+
+     This colours the SOURCE, which is what shows before mermaid renders — or
+     for good if it never does. See the loader at the end of the document: the
+     fallback is legible text rather than a blank panel. */
+  .plate-body pre.mermaid {
+    color: var(--plate-ink);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    text-align: left;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 0;
+  }
+  /* Once rendered, mermaid supplies its own colours from the init block in each
+     plate. Nothing here should fight them. */
+  .plate-body pre.mermaid[data-processed] {
+    text-align: center;
+    font-size: inherit;
+  }
 
   .plate-foot {
     display: flex;
@@ -345,9 +372,9 @@
       These nine plates show how, and what carries it into production.
     </p>
     <div class="specs">
-      <span>Version <b>1.1</b></span>
+      <span>Version 1.1</span>
       <span>7 August 2026</span>
-      <span>Status <b>Live in production</b></span>
+      <span>Status Live in production</span>
     </div>
   </header>
 
@@ -594,31 +621,31 @@ flowchart LR
 flowchart TB
     subgraph AUTH["WHERE THE WORK IS DONE — two authoring tools, one repository"]
         direction LR
-        LOV["<b>Lovable</b><br/>visual editing &amp; preview<br/>points at PRE-PRODUCTION"]
-        CC["<b>Claude Code</b><br/>engineering, migrations,<br/>tests, review"]
+        LOV["Lovable<br/>visual editing &amp; preview<br/>points at PRE-PRODUCTION"]
+        CC["Claude Code<br/>engineering, migrations,<br/>tests, review"]
     end
 
     subgraph SRC["SOURCE OF TRUTH"]
-        GH["<b>GitHub</b> · main branch<br/>every change arrives by pull request"]
+        GH["GitHub · main branch<br/>every change arrives by pull request"]
     end
 
     subgraph GATE["AUTOMATED CHECKS — nothing reaches a customer without passing"]
         direction LR
-        CI["<b>CI</b><br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
-        BUILD["<b>Build</b><br/>GitHub Actions<br/>our variables, our machine"]
-        VER1["<b>Gate 1</b><br/>which database does<br/>this build talk to?"]
-        VER2["<b>Gate 2</b><br/>which database does<br/>the LIVE SITE talk to?"]
+        CI["CI<br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
+        BUILD["Build<br/>GitHub Actions<br/>our variables, our machine"]
+        VER1["Gate 1<br/>which database does<br/>this build talk to?"]
+        VER2["Gate 2<br/>which database does<br/>the LIVE SITE talk to?"]
     end
 
     subgraph RUN["WHAT A CUSTOMER TOUCHES"]
         direction LR
-        NET["<b>Netlify</b><br/>hosts neuvto.com"]
-        SUP[("<b>Supabase</b><br/>Postgres · Auth<br/>ap-south-1")]
-        RES["<b>Resend</b><br/>sign-in codes<br/>&amp; notifications"]
+        NET["Netlify<br/>hosts neuvto.com"]
+        SUP[("Supabase<br/>Postgres · Auth<br/>ap-south-1")]
+        RES["Resend<br/>sign-in codes<br/>&amp; notifications"]
     end
 
     subgraph DEV["BEFORE ANY OF IT — a full copy on one laptop"]
-        DOCK["<b>Docker</b><br/>runs Postgres, Auth and a mail<br/>catcher locally. No cloud, no cost,<br/>no customer data."]
+        DOCK["Docker<br/>runs Postgres, Auth and a mail<br/>catcher locally. No cloud, no cost,<br/>no customer data."]
     end
 
     LOV -->|"pull request"| GH
@@ -1084,3 +1111,51 @@ erDiagram
   </div>
 
 </div>
+
+<!-- ============================== DIAGRAMS ==============================
+  Nine plates carried mermaid source and nothing ever rendered it — there was
+  no script tag in this document at all. Combined with `.plate-body` painting a
+  near-black ground under text that inherited near-black ink, the result was
+  nine invisible panels. Reported 7 Aug 2026 as "the background colour hides it,
+  nothing is visible to the naked eye", which is exactly what it was.
+
+  Two failures are handled deliberately:
+
+    · No network. The CDN is unreachable on a plane or behind a proxy, and the
+      catch below leaves the SOURCE on screen — now legible, because
+      `.plate-body pre.mermaid` gives it --plate-ink. A readable definition is
+      a poor diagram and a perfectly good fallback; a blank panel is neither.
+
+    · A diagram that will not parse. `mermaid.run` is told to keep going rather
+      than abandon the page, so one bad plate cannot take the other eight with
+      it.
+
+  securityLevel is 'strict', which disables HTML inside node labels. That is
+  why no label here uses <b> — bold text is not worth relaxing sanitisation on
+  a document people open from a shared drive.
+-->
+<script type="module">
+  try {
+    const { default: mermaid } = await import(
+      "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"
+    );
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      // Each plate carries its own %%{init}%% block with the plate palette.
+      // Nothing global should override them.
+      theme: "base",
+      flowchart: { useMaxWidth: true },
+      sequence: { useMaxWidth: true },
+      er: { useMaxWidth: true },
+    });
+    await mermaid.run({
+      querySelector: "pre.mermaid",
+      suppressErrors: true,
+    });
+  } catch {
+    // Deliberately silent. The page is already readable without this; an alert
+    // or a console wall would be noise on a document that is working as well as
+    // it can.
+  }
+</script>
