@@ -1,0 +1,109 @@
+# Publish neuvto.com — built here, where we control which database it points at.
+#
+# WHY THIS EXISTS
+#
+# Lovable builds the published site and injects its own backend variables, which
+# override the repository's. Twice — 3 Aug and 6 Aug 2026 — that put the live
+# site on the PRE-PRODUCTION database. The second time, sign-in returned HTTP 200
+# and sent no email, because it was authenticating against a project with no SMTP
+# configured. Nothing failed loudly. See docs/operations/PRODUCTION_HOSTING.md.
+#
+# The variables below come from repository secrets, so the build cannot be
+# repointed by anything outside this file.
+#
+# THE ORDER OF THE LAST THREE STEPS IS THE WHOLE DESIGN
+#
+#   build → verify the ARTEFACT → publish → verify the LIVE SITE
+#
+# Verifying only after publishing means discovering the mistake once the world
+# can already see it. The artefact check is what makes a wrong build unpublishable
+# rather than merely regrettable.
+
+name: Deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# A second push while the first is deploying would race to publish. Newest wins;
+# cancelling mid-deploy is safe because Netlify promotes atomically.
+concurrency:
+  group: deploy-production
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      # main is protected and every PR runs these, but a deploy workflow that
+      # trusts that is one force-push away from publishing a broken build.
+      - name: Lint, types, tests
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test
+
+      - name: Build
+        env:
+          # Baked into the bundle at build time. Public by design — they are
+          # readable in the shipped JavaScript by anyone who looks.
+          VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # The server half reads these unprefixed names. Deliberately NOT
+          # VITE_-prefixed: anything so named is copied into the browser bundle.
+          SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
+          NITRO_PRESET: netlify
+        run: bun run build
+
+      # ─────────────────────────────────────────────── the gate
+      #
+      # Fails the job before anything is published if the artefact names any
+      # project other than production — or if it names none at all, which means
+      # the check could not find what it was looking for and has verified
+      # nothing. Proven by building against pre-prod on purpose and watching
+      # this step fail.
+      - name: Verify the build before publishing it
+        run: bash scripts/verify-deploy.sh --dir dist --dir .netlify
+
+      - name: Publish to Netlify
+        id: publish
+        env:
+          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
+          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+        run: |
+          # Prebuilt: Netlify publishes what we built, and never builds it
+          # itself. Letting Netlify build would reintroduce exactly the problem
+          # this workflow exists to remove — a build environment we do not own.
+          bunx netlify-cli@17 deploy \
+            --prod \
+            --dir=dist \
+            --functions=.netlify/functions-internal \
+            --message="${GITHUB_SHA::7} — $(git log -1 --pretty=%s)"
+
+      # The artefact check above proves what we built. This proves what is being
+      # SERVED, which is a different claim: a stale cache, a half-finished
+      # rollout, or a deploy to the wrong site all pass the first check and fail
+      # this one.
+      - name: Verify the live site
+        run: |
+          echo "Waiting for the rollout to settle before checking."
+          sleep 30
+          bash scripts/verify-deploy.sh --url "${DEPLOY_URL:-https://neuvto.com}"
+        env:
+          # Until DNS moves, point this at the Netlify address by setting a
+          # DEPLOY_URL repository variable. Once neuvto.com is switched, delete
+          # the variable and this checks the real thing.
+          DEPLOY_URL: ${{ vars.DEPLOY_URL }}
