@@ -1,5 +1,7 @@
 # NEUVTO WOS — Build Spec
 
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+
 ## The platform is the product
 
 **Derived from:** `02_PRODUCT_PRINCIPLES.md`, `03_PLATFORM_ARCHITECTURE.md`, `04_MODULE_ROADMAP.md`, `06_LEAVE_MANAGEMENT.md`, `07_ROLES_PERMISSIONS.md` (all v1.0)

@@ -1,6 +1,6 @@
 # NEUVTO WOS — Coding Standards
 
-**Version:** 1.0 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent
+**Version:** 1.1 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 8 Aug 2026
 
 Two goals: consistency across every module, and **portability out of Lovable at any time**. §9 is the portability contract — treat it as non-negotiable.
 
@@ -245,6 +245,40 @@ Never force-push or rebase pushed commits — it corrupts Lovable's history (`AG
 
 ---
 
+## 10a. Documents carry a version, and it moves when they do
+
+**Standing instruction from Sada, 8 Aug 2026.** When a fix or an enhancement merges,
+the documents describing that behaviour are updated **with it** — not at the end of a
+batch — and their version is bumped.
+
+Every file under `docs/` carries this on line 3:
+
+```
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+```
+
+- **Bump the minor version** when the behaviour a document describes changes.
+- **Bump the major version** when its advice is reversed rather than extended — the
+  Netlify hosting runbook becoming a Cloudflare one is a 2.0, not a 1.1.
+- **`Updated:` is the date of the change**, not the date somebody re-read it.
+
+**Why a version and not just a git log.** A document with no version cannot be told
+apart from the one somebody read last week, so a stale paragraph and a current one look
+identical on the page. This is not hypothetical here: `DEPLOYMENT.md` claimed "the
+published site talks to whichever database `.env` names" through **two outages**, sat
+merged and inert, and was read by the person acting on it both times. Nothing about the
+file said it had gone out of date.
+
+**It costs nothing to do.** `deploy.yml` ignores `docs/**` and `**/*.md`, so a
+documentation commit triggers no deploy and spends no hosting credit. There is no
+budget argument for leaving it until later.
+
+Only 6 of 20 documents carried a version before this rule; the rest start at 1.0 as of
+8 Aug 2026, which is the first version anybody has named rather than a claim about
+their history.
+
+---
+
 ## 11. Review checklist
 
 - [ ] Correct directory; import rules (§1) hold
@@ -257,3 +291,6 @@ Never force-push or rebase pushed commits — it corrupts Lovable's history (`AG
 - [ ] No Lovable import outside the quarantine
 - [ ] Deviations from spec carry a decision-ID comment
 - [ ] Harness passes
+- [ ] Every document the change affects is updated, and its `**Version:**` bumped (§10a)
+- [ ] A change to a screen went through `screen-prover`; a change to a guard, policy,
+      migration or validation rule went through `refusal-prover`

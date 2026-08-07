@@ -1,5 +1,7 @@
 # Documentation
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
 

@@ -1,5 +1,7 @@
 # First Customer — Onboarding Runbook
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 **Purpose:** not marketing. This is a **product test.** Walking through what a real customer
 must actually do to go live is how the missing bulk import and opening balances were found,
 and walking it again will surface more.
