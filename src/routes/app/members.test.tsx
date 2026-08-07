@@ -45,6 +45,18 @@ const PRIYA = "priya-id";
 const SUNITA = "sunita-id";
 const ALICE = "alice-id";
 
+/**
+ * D58 — two departments, and the one that is NOT the first option.
+ *
+ * `listDepartments` orders by name, so the options render "No department",
+ * "Operations", "Sales". Mark is in Sales deliberately: a <select> whose value
+ * is absent from its options renders the FIRST one, and putting everybody in
+ * Operations would let that failure pass unnoticed. Real UUIDs because that is
+ * what the column holds.
+ */
+const OPERATIONS = { id: "b2c4e6a8-0d1f-4a3b-8c5d-2e7f9a1b3c55", name: "Operations" };
+const SALES = { id: "f70a3c19-4b2d-4e6f-9a80-5c3d1e7b2f44", name: "Sales" };
+
 const MEMBERS = [
   {
     id: ALICE,
@@ -58,6 +70,9 @@ const MEMBERS = [
     joinedDate: "2019-01-01",
     isActive: true,
     managerId: null,
+    // In no department, which is ordinary and must read as "No department"
+    // rather than as the first one in the list.
+    departmentId: null,
     roles: ["org_admin"],
   },
   {
@@ -68,6 +83,8 @@ const MEMBERS = [
     joinedDate: "2020-01-01",
     isActive: true,
     managerId: null,
+    // The LAST option, not the first — see the note on SALES.
+    departmentId: SALES.id,
     roles: ["manager"],
   },
   {
@@ -81,6 +98,7 @@ const MEMBERS = [
     joinedDate: "2019-04-01",
     isActive: true,
     managerId: null,
+    departmentId: null,
     roles: ["supervisor"],
   },
   {
@@ -93,6 +111,7 @@ const MEMBERS = [
     // The whole point: Ravi reports to Mark, and a search for "ravi" removes
     // Mark from the list.
     managerId: MARK,
+    departmentId: OPERATIONS.id,
     roles: ["employee"],
   },
   {
@@ -105,6 +124,7 @@ const MEMBERS = [
     // Reports to the Supervisor, not to the Manager. This is the arrangement
     // D57 exists to permit, so it is the one the fixture should contain.
     managerId: SUNITA,
+    departmentId: null,
     roles: ["employee"],
   },
 ];
@@ -134,6 +154,24 @@ vi.mock("@/platform/auth", async () => ({
   revokeInvitation: vi.fn(),
   setJoinedDate: vi.fn(),
   setReportingLine: vi.fn(),
+}));
+
+/**
+ * D58 — the department seam.
+ *
+ * Left unmocked, `@/platform/organization` reaches the real Supabase client and
+ * every test in this file fired two HTTP requests at whatever was listening on
+ * localhost. They came back 401 and the `.catch(() => {})` in `load()` swallowed
+ * it, so the suite passed while talking to a database — which is both slow and
+ * a test that depends on a machine nobody configured.
+ */
+const listDepartments = vi.fn<() => Promise<{ id: string; name: string }[]>>();
+const setDepartment = vi.fn<(employeeId: string, departmentId: string | null) => Promise<void>>();
+
+vi.mock("@/platform/organization", () => ({
+  listDepartments: () => listDepartments(),
+  setDepartment: (employeeId: string, departmentId: string | null) =>
+    setDepartment(employeeId, departmentId),
 }));
 
 import { MembersPage } from "./members";
@@ -167,6 +205,19 @@ function rowFor(name: string): HTMLElement {
   }
   return rows[0];
 }
+
+/**
+ * Root-level, so it runs before each describe's own `vi.clearAllMocks()` —
+ * outer hooks first, and `mockClear` forgets the calls but keeps the
+ * implementation. Every test starts from a workspace that has two departments
+ * and a `setDepartment` that succeeds; the tests that need otherwise say so.
+ */
+beforeEach(() => {
+  listDepartments.mockReset();
+  listDepartments.mockResolvedValue([OPERATIONS, SALES]);
+  setDepartment.mockReset();
+  setDepartment.mockResolvedValue(undefined);
+});
 
 describe("People — search", () => {
   beforeEach(() => vi.clearAllMocks());
@@ -431,5 +482,110 @@ describe("People — handing a leaver's team to somebody who cannot approve", ()
     expect(screen.getByTestId("members-error")).not.toHaveTextContent(
       "That person couldn't be deactivated.",
     );
+  });
+});
+
+/**
+ * D58 — the Department dropdown on each row.
+ *
+ * The table has existed since the first migration and nothing in the product
+ * ever wrote a row, so the Department column on both leave reports was blank
+ * for everybody. This is one of the two places it gets filled in.
+ *
+ * The shape being guarded is the one this file was created for. A `<select>`
+ * whose value is absent from its options renders the FIRST option, so a control
+ * that quietly says "No department" for somebody who is in Sales is
+ * indistinguishable from the truth — and the report it feeds is wrong in a way
+ * nobody can see from either end.
+ *
+ * The handler half — the Postgres refusals, the cross-tenant check `setDepartment`
+ * goes through — is in `platform/organization/departments.test.ts`.
+ */
+describe("People — the Department dropdown", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const deptSelect = (name: string) =>
+    within(rowFor(name)).getByTestId("department") as HTMLSelectElement;
+
+  it("renders no department control at all in a workspace that has none", async () => {
+    // The default state of every new workspace. An empty dropdown offering only
+    // "No department" is a control that looks broken and answers nothing —
+    // Settings is where departments are created, and the field appears here on
+    // its own once they exist.
+    listDepartments.mockResolvedValue([]);
+    await renderPeople();
+
+    expect(screen.getAllByTestId("member-row")).toHaveLength(5);
+    expect(screen.queryAllByTestId("department")).toHaveLength(0);
+    expect(screen.queryByText("No department")).toBeNull();
+  });
+
+  it("shows each person's stored department, and 'No department' for somebody in none", async () => {
+    await renderPeople();
+
+    // Sales is the LAST option. A select falling back to its first option would
+    // render "No department" here and look entirely normal.
+    const mark = deptSelect("Mark Manager");
+    expect(mark.value).toBe(SALES.id);
+    expect(mark.selectedOptions[0].textContent).toBe("Sales");
+
+    const ravi = deptSelect("Ravi Employee");
+    expect(ravi.value).toBe(OPERATIONS.id);
+    expect(ravi.selectedOptions[0].textContent).toBe("Operations");
+
+    // Null is ordinary, and has to read as a stated "No department" rather than
+    // as a blank box.
+    const priya = deptSelect("Priya Employee");
+    expect(priya.value).toBe("");
+    expect(priya.selectedOptions[0].textContent).toBe("No department");
+
+    // Every department is on offer in every row, whoever the row belongs to.
+    expect(
+      within(priya)
+        .getAllByRole("option")
+        .map((o) => o.textContent),
+    ).toEqual(["No department", "Operations", "Sales"]);
+  });
+
+  it("names the person and the department chosen when it is changed", async () => {
+    const user = userEvent.setup();
+    await renderPeople();
+
+    await user.selectOptions(deptSelect("Priya Employee"), SALES.id);
+
+    await waitFor(() => expect(setDepartment).toHaveBeenCalledTimes(1));
+    expect(setDepartment).toHaveBeenCalledWith(PRIYA, SALES.id);
+  });
+
+  it("takes somebody out of a department with null, not with an empty string", async () => {
+    // `admin_set_department` clears the column on null. An empty string is not
+    // a uuid and is not null — it is a value the RPC has no case for, and the
+    // difference is invisible on screen.
+    const user = userEvent.setup();
+    await renderPeople();
+
+    await user.selectOptions(deptSelect("Ravi Employee"), "");
+
+    await waitFor(() => expect(setDepartment).toHaveBeenCalledTimes(1));
+    expect(setDepartment).toHaveBeenCalledWith(RAVI, null);
+    // The specific wrong value, named, so the failure says which one it was.
+    expect(setDepartment).not.toHaveBeenCalledWith(RAVI, "");
+  });
+
+  it("still lists the people when the department read fails", async () => {
+    // The department read is deliberately behind a `.catch(() => {})` in
+    // `load()`, because this screen's job is the people. A failed read must cost
+    // the department dropdowns and nothing else — not the rows, not the search,
+    // not an error banner about something the administrator did not ask for.
+    listDepartments.mockRejectedValue(new AppError("INTERNAL_ERROR", "boom", 500));
+    await renderPeople();
+
+    expect(screen.getAllByTestId("member-row")).toHaveLength(5);
+    expect(within(rowFor("Ravi Employee")).getByTestId("reporting-line")).toBeInTheDocument();
+    expect(screen.getByTestId("people-search")).toBeInTheDocument();
+    expect(screen.queryByTestId("members-error")).toBeNull();
+    // And no half-built control: the dropdown is absent rather than present and
+    // empty, which is the same rule as the no-departments case above.
+    expect(screen.queryAllByTestId("department")).toHaveLength(0);
   });
 });

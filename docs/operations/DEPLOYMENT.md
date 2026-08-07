@@ -436,6 +436,41 @@ integration landing unreviewed on `main` is worse than losing one-click sync.
 
 ---
 
+## ⚠️ Publishing is metered — a deploy costs 15 credits
+
+Netlify's free plan is **300 credits a month** and charges **15 credits per
+production deploy**. That is **twenty publishes a month, total**, and when they
+run out the project **pauses**: visitors get `Site not available`, no further
+deploy is accepted, and credits cannot be bought on the free plan. `neuvto.com`
+resolves to Netlify, so exhausting them is a customer-visible outage rather than
+an inconvenience.
+
+On this pipeline's first day — 7 Aug 2026 — it published **eight** times and four
+of those shipped a **byte-identical site**: two documentation pull requests, one
+change to `verify-deploy.sh`, and one manual re-run of a commit already live.
+Sixty credits, a fifth of the month, for no change at all.
+
+So `deploy.yml` now carries a `paths-ignore` list. What it does and does not do:
+
+- **It skips a push only when _every_ changed file matches.** A pull request
+  touching both `src/` and `docs/` still publishes — which is correct, and is why
+  #63 through #66 would all still have gone out.
+- **`supabase/` is on the list** because migrations are applied by hand and never
+  reach the browser bundle. **`scripts/` is on it** because changing the verifier
+  does not change what it verifies.
+- **`workflow_dispatch` is kept** precisely so either of those can still be
+  published deliberately when you want the live site rebuilt anyway.
+
+**This is a stopgap, not the answer.** At this project's real pace — 42
+site-changing commits in the fortnight to 7 Aug, roughly 90 deploys a month, some
+1,350 credits — no Netlify tier below Pro at $20/user/month carries it, and Pro
+still meters every deploy. Hosting moves to **Cloudflare Workers**, where deploys
+are unmetered at every tier, static asset requests are free, there is no egress
+charge, and the paid tier is $5/month. Until that move lands, treat the twenty
+publishes a month as a real budget.
+
+---
+
 ## Release checklist
 
 Run before merging any step:
@@ -447,6 +482,10 @@ bun run lint && bun run typecheck && bun run test && bun run harness
 Then, after the merge:
 
 - [ ] CI green on `main`
+- [ ] **A docs-only or migration-only merge produces no Deploy run, by design.**
+      Waiting for one is waiting for something that will not come — see
+      "Publishing is metered" above. Use `workflow_dispatch` if you actually want
+      the site rebuilt
 - [ ] Migration applied to Lovable Cloud and verified by `SELECT`
 - [ ] Row present in `supabase_migrations.schema_migrations`
 - [ ] **`bash scripts/verify-deploy.sh` passes** — asks the live site which

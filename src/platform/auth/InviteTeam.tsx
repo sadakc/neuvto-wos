@@ -14,16 +14,24 @@
  * enumerate a competitor's staff by typing addresses and watching which bounce.
  */
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import { APP_ROLES, ROLE_LABELS, type AppRole } from "./contracts";
 import { inviteMember } from "./members";
+import { listDepartments, type Department } from "@/platform/organization";
 
 export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
   const [role, setRole] = useState<AppRole>("employee");
+  const [departmentId, setDepartmentId] = useState("");
+  /**
+   * D58. Loaded separately and never blocking: a workspace with no departments
+   * is the normal starting state, and a failed read here must not stop somebody
+   * being invited. The field simply does not appear when there are none.
+   */
+  const [departments, setDepartments] = useState<Department[]>([]);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -37,16 +45,27 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
    */
   const edited = () => setError("");
 
+  useEffect(() => {
+    let cancelled = false;
+    listDepartments()
+      .then((d) => !cancelled && setDepartments(d))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setBusy(true);
     try {
-      await inviteMember({ email, phone, role, fullName });
+      await inviteMember({ email, phone, role, fullName, departmentId: departmentId || null });
       setSent((s) => [email, ...s]);
       setEmail("");
       setPhone("");
       setFullName("");
+      setDepartmentId("");
       onInvited?.();
     } catch (err) {
       setError(
@@ -148,6 +167,35 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
           </select>
         </div>
       </div>
+
+      {/* Only when there are any. An empty dropdown is a control that looks
+          broken; Settings is where departments are created, and this field
+          appears on its own once they exist. */}
+      {departments.length > 0 && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <div>
+            <label htmlFor="inv-dept" className="block text-sm font-medium">
+              Department <span className="text-muted-foreground">(optional)</span>
+            </label>
+            <select
+              id="inv-dept"
+              value={departmentId}
+              onChange={(e) => {
+                setDepartmentId(e.target.value);
+                edited();
+              }}
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+            >
+              <option value="">No department</option>
+              {departments.map((d) => (
+                <option key={d.id} value={d.id}>
+                  {d.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        </div>
+      )}
 
       {error && (
         <p role="alert" data-testid="invite-error" className="text-sm text-destructive">

@@ -15,7 +15,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { APP_ROLES, type AppRole } from "./contracts";
+import { APP_ROLES, PhoneInput, type AppRole } from "./contracts";
 
 export interface ImportRow {
   /** 1-based, and counting the header — the number the person sees in their spreadsheet. */
@@ -26,6 +26,21 @@ export interface ImportRow {
   managerEmail: string;
   department: string;
   role: AppRole;
+  /**
+   * ADVERTISED SINCE THIS FILE WAS WRITTEN, AND DISCARDED UNTIL 7 Aug 2026.
+   *
+   * `phone` has been in OPTIONAL_COLUMNS from the start, so the screen listed it
+   * as a column the file may carry — and it was never parsed, and `runImport`
+   * passed `_phone: undefined` unconditionally. Every phone number in every
+   * spreadsheet anybody has imported was read, ignored, and thrown away in
+   * silence.
+   *
+   * Nothing failed. The invitation was created, the person joined, and their
+   * number simply was not there — which is exactly the shape of defect this
+   * project keeps meeting: the path existed, the column was named, and the two
+   * were never connected.
+   */
+  phone: string;
 }
 
 export type RowOutcome = "will-import" | "warning" | "error" | "imported" | "failed";
@@ -109,10 +124,31 @@ export function parseImportFile(text: string): ParsedFile {
         joinedDate: at(cells, "joined_date"),
         managerEmail: at(cells, "manager_email").toLowerCase(),
         department: at(cells, "department"),
+        phone: at(cells, "phone"),
         role: (APP_ROLES as readonly string[]).includes(raw) ? (raw as AppRole) : "employee",
       };
     }),
   };
+}
+
+/**
+ * A spreadsheet phone number, in the one shape the database indexes.
+ *
+ * NOT passed through raw. `invitation_create` normalises with
+ * `regexp_replace(_phone, '[^0-9+]', '', 'g')`, which strips punctuation and
+ * leaves the country code — so `9876543210`, `+919876543210` and `09876543210`
+ * become three different keys for one human, and the uniqueness index D41 relies
+ * on stops catching the case it exists for. PhoneInput is where that was fixed
+ * for the single-invite form; an import has to arrive through the same rule or
+ * the fix only covers one door.
+ *
+ * Returns "" for anything invalid rather than throwing: a bad number is a
+ * warning on the row, not a reason to refuse somebody a workspace.
+ */
+function canonicalPhone(raw: string): string {
+  if (!raw.trim()) return "";
+  const parsed = PhoneInput.safeParse(raw);
+  return parsed.success ? parsed.data : "";
 }
 
 /** What the workspace already contains, so the dry run can say so before sending anything. */
@@ -174,6 +210,9 @@ export async function dryRun(rows: ImportRow[], knownDepartments: string[]): Pro
     if (row.department && !departments.has(row.department.toLowerCase())) {
       notes.push(`No department called "${row.department}"`);
     }
+    if (row.phone && !canonicalPhone(row.phone)) {
+      notes.push(`"${row.phone}" is not a 10-digit Indian mobile`);
+    }
 
     return notes.length > 0
       ? { row, outcome: "warning", message: notes.join("; ") + " — they will join without it." }
@@ -207,7 +246,7 @@ export async function runImport(
   for (const row of rows) {
     const { error } = await supabase.rpc("invitation_create", {
       _email: row.email,
-      _phone: undefined,
+      _phone: canonicalPhone(row.phone) || undefined,
       _role: row.role,
       _full_name: row.fullName || undefined,
       _joined_date: row.joinedDate,

@@ -5,6 +5,7 @@ import { isAppError } from "@/platform/errors";
 import { addHoliday, listHolidays, removeHoliday, type Holiday } from "@/platform/calendar";
 import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platform/modules";
 import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
+import { Departments } from "@/platform/organization/Departments";
 import { WorkingCalendar } from "@/platform/calendar/WorkingCalendar";
 
 export const Route = createFileRoute("/app/settings")({
@@ -167,6 +168,19 @@ function SettingsPage() {
         <div className="mt-4">
           {user && <WorkingCalendar organizationId={user.organizationId} />}
         </div>
+      </section>
+
+      {/* ─────────────────────────────────────────────── departments
+          Above Holidays because it is the one people go looking for: the
+          Department column exists on every report and, until now, nothing in
+          the product could put anybody in one. */}
+      <section className="mt-12">
+        <h2 className="font-display text-lg font-semibold tracking-tight">Departments</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          How your workforce is grouped on reports. Somebody&apos;s department is set on their row
+          under People, or from the department column of a spreadsheet import.
+        </p>
+        <div className="mt-4">{user && <Departments organizationId={user.organizationId} />}</div>
       </section>
 
       {/* ─────────────────────────────────────────────── holidays */}

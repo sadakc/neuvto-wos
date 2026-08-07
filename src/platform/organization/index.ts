@@ -14,6 +14,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { AppError, toAppError } from "@/platform/errors";
+import { z } from "zod";
 
 export interface Organization {
   id: string;
@@ -242,4 +243,152 @@ export async function getLogoUrl(
   const { data, error } = await supabase.storage.from("org-logos").createSignedUrl(path, 60 * 60);
   if (error || !data?.signedUrl) return null;
   return updatedAt ? `${data.signedUrl}#${Date.parse(updatedAt)}` : data.signedUrl;
+}
+
+// ───────────────────────────────────────────────────────────── departments
+//
+// The write side that never existed. The table has been there since the first
+// migration — RLS, an admin write policy, grants, a parent column, a foreign key
+// from `profiles` — and nothing in the product ever wrote a row. So the
+// Department column on both leave reports was blank for everybody, and the
+// spreadsheet import validated names against a permanently empty list and warned
+// on every row that named one.
+//
+// These live here rather than in a `departments.ts` for a dull but real reason:
+// the component is `Departments.tsx`, and on a case-insensitive filesystem —
+// which macOS is by default — `departments.ts` and `Departments.tsx` are the
+// same path. TypeScript says so out loud. `CompanyIdentity.tsx` sitting beside
+// its handlers in this file is the convention already, and this follows it.
+
+export interface Department {
+  id: string;
+  name: string;
+  parentDepartmentId: string | null;
+  /** How many active people are in it. Drives the warning before removal. */
+  memberCount: number;
+}
+
+/** Mirrors `departments_name_not_blank` and the length the column will take. */
+export const DepartmentInput = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Give this department a name").max(100, "That name is too long"),
+});
+export type DepartmentInput = z.infer<typeof DepartmentInput>;
+
+/**
+ * Every department, with a head count.
+ *
+ * Two reads rather than an embed with an aggregate. PostgREST can count a
+ * relationship, but only for rows the caller may READ — and `profiles` is
+ * visible to a manager for their own reports only, so the same query would
+ * return different counts to different people and the number would quietly
+ * become "people you can see in this department". An administrator is the only
+ * caller here, but a count whose meaning depends on who asks is a trap left for
+ * whoever widens the screen later.
+ */
+export async function listDepartments(): Promise<Department[]> {
+  const [departments, people] = await Promise.all([
+    supabase.from("departments").select("id, name, parent_department_id").order("name"),
+    supabase.from("profiles").select("department_id").eq("is_active", true),
+  ]);
+
+  if (departments.error) {
+    throw new AppError("INTERNAL_ERROR", "We couldn't load your departments.", 500);
+  }
+
+  const counts = new Map<string, number>();
+  for (const p of people.data ?? []) {
+    if (p.department_id) counts.set(p.department_id, (counts.get(p.department_id) ?? 0) + 1);
+  }
+
+  return (departments.data ?? []).map((d) => ({
+    id: d.id,
+    name: d.name,
+    parentDepartmentId: d.parent_department_id,
+    memberCount: counts.get(d.id) ?? 0,
+  }));
+}
+
+/**
+ * Creates one, or renames it. The organisation comes from the caller's own
+ * profile and never from the form — a client-supplied organization_id is a
+ * cross-tenant write waiting for the one policy that forgets to check it.
+ */
+export async function saveDepartment(
+  input: DepartmentInput,
+  organizationId: string,
+): Promise<void> {
+  const parsed = DepartmentInput.parse(input);
+
+  const { error } = parsed.id
+    ? await supabase.from("departments").update({ name: parsed.name }).eq("id", parsed.id)
+    : await supabase
+        .from("departments")
+        .insert({ organization_id: organizationId, name: parsed.name });
+
+  if (!error) return;
+
+  // uq_department_name is partial and case-insensitive, so "Sales" collides with
+  // "sales" and a removed department's name is free again. Worth saying plainly
+  // rather than showing an index name.
+  if (error.code === "23505" || error.message.includes("uq_department_name")) {
+    throw new AppError("VALIDATION_FAILED", "There's already a department with that name.", 400);
+  }
+  throw toAppError(error, "saveDepartment");
+}
+
+/**
+ * Removes one, and takes everybody out of it.
+ *
+ * An RPC because it is two writes that must not come apart: soft-deleting the
+ * department alone leaves `profiles.department_id` pointing at a row nobody can
+ * read, which reads as "no department" on every screen while the column still
+ * holds a live reference.
+ */
+export async function removeDepartment(id: string): Promise<{ peopleUnassigned: number }> {
+  const { data, error } = await supabase.rpc("department_remove", { _id: id });
+
+  if (error) {
+    if (error.message.includes("DEPARTMENT_HAS_CHILDREN")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "This department has departments inside it. Remove or move those first.",
+        400,
+      );
+    }
+    throw toAppError(error, "removeDepartment");
+  }
+
+  const moved = (data as { people_unassigned?: number } | null)?.people_unassigned ?? 0;
+  return { peopleUnassigned: moved };
+}
+
+/**
+ * Puts somebody in a department, or takes them out. `null` clears it.
+ *
+ * D50 — an administrator editing somebody else goes through a SECURITY DEFINER
+ * function. The one it enforces that a foreign key cannot: the department has to
+ * belong to the caller's own organisation. A FK constrains existence, not
+ * ownership, and every report joining departments would otherwise be able to
+ * disclose a name across a tenant boundary.
+ */
+export async function setDepartment(
+  employeeId: string,
+  departmentId: string | null,
+): Promise<void> {
+  // The generated types declare every RPC argument non-nullable — Postgres does
+  // not distinguish "has no default" from "may not be null" — and this one
+  // genuinely accepts null. The same cast setReportingLine carries, for the same
+  // reason.
+  const { error } = await supabase.rpc("admin_set_department", {
+    _employee_id: employeeId,
+    _department_id: departmentId,
+  } as unknown as { _employee_id: string; _department_id: string });
+
+  if (!error) return;
+
+  if (error.message.includes("DEPARTMENT_NOT_FOUND")) {
+    throw new AppError("NOT_FOUND", "That department no longer exists.", 404);
+  }
+  throw toAppError(error, "setDepartment");
 }

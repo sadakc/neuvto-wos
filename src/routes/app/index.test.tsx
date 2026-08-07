@@ -85,18 +85,19 @@ const userWith = (roles: AppRole[]): CurrentUser => ({
 /**
  * The line under the greeting. Located by position, so no test id is invented.
  *
- * WAITS FOR THE LOADING LINE TO GO, NOT FOR THE HEADING.
+ * WAITS FOR THE LOADING LINE TO GO, not for the heading. The <h1> renders
+ * "Welcome" in BOTH states — `user?.fullName ? \`Welcome, …\` : "Welcome"` — so
+ * `findByRole("heading")` resolves on the very first paint, and
+ * `nextElementSibling` is then read synchronously against a DOM that has not
+ * loaded yet. It returned "Loading your access…" and the assertion compared it
+ * to "Supervisor".
  *
- * The `<h1>` says "Welcome" in BOTH states, so `findByRole("heading")` resolves
- * on the very first render and `nextElementSibling` is then read while the line
- * underneath still says "Loading your access…". Every assertion here compares
- * that line against a role name, so the whole file was one scheduling change
- * away from failing — and it was passing only because a mocked promise settles
- * in a microtask, which no real session fetch ever will.
+ * It passed anyway, on `act`'s incidental flush, until adding 22 tests in a
+ * neighbouring file shifted worker scheduling enough to lose the race once in
+ * six runs. Reproduced deterministically by delaying `getCurrentUser` by 25ms.
  *
- * Proved by delaying the mocked `getCurrentUser` by 25 ms: **5 of these 7 tests
- * failed**, deterministically, with `expected 'Loading your access…' to be
- * 'Supervisor'`. Zero fail with the wait below.
+ * A test that waits for the wrong thing is worse than one that fails: it is
+ * green for a reason unrelated to what it claims.
  */
 async function roleLine(): Promise<HTMLElement> {
   await waitFor(() => expect(screen.queryByText("Loading your access…")).toBeNull());
