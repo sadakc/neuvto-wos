@@ -1,5 +1,7 @@
 # Reviewing Lovable's changes
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 Lovable writes to this repository. Its changes are reviewed before they land,
 and the review is enforced rather than remembered.
 

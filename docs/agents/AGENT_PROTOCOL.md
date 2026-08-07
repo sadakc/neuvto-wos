@@ -1,5 +1,7 @@
 # Neuvto WOS — Agent Protocol
 
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+
 Binding on every agent in `.claude/agents/`. Read this before acting.
 
 Neuvto WOS is a multi-tenant SaaS holding **other companies' employee data**. The person
@@ -174,6 +176,38 @@ Two things this does not mean. It is not a request for a coverage number: six te
 that each pin a real promise beat sixty asserting the DOM exists. And it does not
 apply to a pure-function change with no screen in it — `screen-prover` writes render
 tests, and inventing one to satisfy a rule is the failure this is meant to prevent.
+
+### Guards go through `refusal-prover`. Always.
+
+**Standing instruction from Sada, 8 Aug 2026**, on being told that `screen-prover`
+covers negative cases only as far as the component boundary. Any change to a
+migration, RPC, policy, grant or validation rule is routed through `refusal-prover`
+before it is reported as done. Not on request — by default.
+
+The two agents split by layer, and neither substitutes for the other:
+
+|        | `screen-prover`                                 | `refusal-prover`                                   |
+| ------ | ----------------------------------------------- | -------------------------------------------------- |
+| Proves | a screen behaves                                | the system refuses                                 |
+| Layer  | components, routes, on-screen copy              | migrations, RPCs, policies, grants, arithmetic     |
+| Writes | `*.test.tsx` render tests                       | `*.sql` proofs, harness invariants, boundary tests |
+| Both   | break it first, watch it fail, quote the output |                                                    |
+
+Same rule about evidence, one addition that is specific to this layer:
+
+- **Non-vacuity.** An assertion of the form "no rows violate X" is true of an empty
+  database. Plant a violation, confirm the check fires, roll it back. The anon-executable
+  check in `verify_invariants.sql` already does this and explains why — without it, it
+  would have stayed green throughout the window in which production was an open relay.
+- **Take a function body from `pg_get_functiondef`, never from a migration file.** Several
+  functions have more than one definition and only the last one is live. Reproducing an
+  older one is how `deactivate_employee` lost its `LAST_ADMIN` guard.
+- **Never against an environment holding customer data.** The seed truncates.
+
+`neuvto-harness/tests/verify_invariants.sql` is the worked example, and the
+`report_schedule_fires_on` assertions in it are the clearest one: arithmetic that is
+only wrong on a date you cannot test today, so it was moved into a function that can
+be asked about February.
 
 ---
 

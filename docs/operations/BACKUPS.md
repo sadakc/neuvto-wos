@@ -1,5 +1,7 @@
 # Backups
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 **Supabase's Free plan has no automatic backups.** Not short retention — none at
 all. Daily backups with 7-day retention begin on Pro (~$25/month). Until Neuvto
 is on a paid plan, the only backups that exist are the ones `scripts/backup-prod.sh`

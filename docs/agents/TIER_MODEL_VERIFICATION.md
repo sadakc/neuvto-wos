@@ -1,5 +1,7 @@
 # Tier model — verification record
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 The whole agent system rests on one claim: **`db-guardian` diagnoses and never
 edits.** If that claim is false, an agent can silently weaken tenant isolation
 while reporting that it fixed a bug — the worst outcome this repository has.

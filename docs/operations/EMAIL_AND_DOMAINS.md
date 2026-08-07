@@ -1,5 +1,7 @@
 # Email and domains
 
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+
 Two different things get called "email domain" and confusing them wastes days.
 They are unrelated, and only one of them constrains anybody.
 

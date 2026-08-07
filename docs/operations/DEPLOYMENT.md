@@ -1,5 +1,7 @@
 # Deployment — how code and schema actually reach each environment
 
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+
 **The single most important fact:** merging to `main` deploys **code** and not
 **schema**. Nothing about a green CI run or a successful Lovable sync tells you
 the hosted database has your migration. Applying it is a separate, manual,

@@ -1,5 +1,7 @@
 # Publishing neuvto.com ourselves
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 Written for somebody who is not a developer. Every step says where to click and
 what to copy. If a step does not match what you see, stop and ask — a screen
 that looks different usually means the tool changed its wording, not that you

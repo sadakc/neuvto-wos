@@ -1,5 +1,7 @@
 # Local development
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 ## The one thing that will catch you
 
 **`.env` points at PRODUCTION, not your machine.**

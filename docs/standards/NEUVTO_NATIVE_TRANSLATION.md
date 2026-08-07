@@ -1,5 +1,7 @@
 # NEUVTO WOS — Translating the design system to native
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 **Status:** Active · **Decided:** 4 Aug 2026
 **Read with:** `NEUVTO_DESIGN_SYSTEM.md`, which this does not repeat.
 

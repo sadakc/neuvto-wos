@@ -1,5 +1,7 @@
 # Autosave — work reaches git without anybody asking
 
+**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+
 Nothing worth keeping should depend on somebody remembering to ask for it to be
 saved. At the end of every Claude Code turn, whatever changed is committed and
 pushed to a branch automatically.
