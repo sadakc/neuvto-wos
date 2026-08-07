@@ -19,11 +19,37 @@
 # can already see it. The artefact check is what makes a wrong build unpublishable
 # rather than merely regrettable.
 
+# A DEPLOY COSTS MONEY, SO A COMMIT THAT CANNOT CHANGE THE SITE MUST NOT CAUSE ONE
+#
+# Netlify's free plan is 300 credits a month and charges 15 per production
+# deploy. Twenty deploys, total. On this workflow's first day — 7 Aug 2026 — it
+# published eight times and FOUR of those shipped a byte-identical site: two
+# documentation pull requests, one change to verify-deploy.sh, and one manual
+# re-run of the same commit. Sixty credits, a fifth of the month, for nothing.
+#
+# `paths-ignore` skips a push only when EVERY changed file matches, so a pull
+# request touching both src/ and docs/ still deploys — which is right, and is
+# why #63 through #66 would all still have published. It is the docs-only
+# commit, and only that, which now goes quiet.
+#
+# supabase/ is on the list because migrations are applied by hand and never
+# reach the bundle; scripts/ is on it because changing the verifier does not
+# change what it verifies. Either can still be exercised deliberately through
+# workflow_dispatch, which is why that trigger stays.
+
 name: Deploy
 
 on:
   push:
     branches: [main]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "supabase/**"
+      - "neuvto-harness/**"
+      - "scripts/**"
+      - ".github/**"
+      - ".claude/**"
   workflow_dispatch:
 
 # A second push while the first is deploying would race to publish. Newest wins;
