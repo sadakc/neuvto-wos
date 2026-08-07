@@ -46,6 +46,10 @@ export const ERROR_CODES = [
   // An invitation with no name produces a workspace whose People list, approval
   // timeline and every dropdown fall back to showing email addresses.
   "NAME_REQUIRED",
+  // D57. Covers both doors: naming an Employee as somebody's manager, and
+  // handing a leaver's reports to one. One code because it is one rule and the
+  // way out of both is the same — change their role.
+  "MANAGER_CANNOT_APPROVE",
 ] as const;
 
 export type ErrorCode = (typeof ERROR_CODES)[number];

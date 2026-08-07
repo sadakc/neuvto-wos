@@ -4,6 +4,7 @@ import {
   getCurrentUser,
   isAdmin,
   APP_ROLES,
+  ROLE_LABELS,
   type AppRole,
   type CurrentUser,
 } from "@/platform/auth";
@@ -27,13 +28,6 @@ const RULE_LABELS: Record<ApproverRule, string> = {
   reporting_manager: "Their manager",
   manager_of_manager: "Their manager's manager",
   role: "Anyone with a role",
-};
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  org_admin: "Administrator",
-  hr_admin: "HR administrator",
-  manager: "Manager",
-  employee: "Employee",
 };
 
 /**
@@ -236,6 +230,12 @@ function ApprovalRulesPage() {
                     onChange={(e) => edit(l.id, { approverRole: e.target.value as AppRole })}
                     className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
                   >
+                    {/* Employee is excluded, and until D57 this filter was the
+                        ONLY thing excluding it — `chain_role_present` required
+                        an approver_role alongside a 'role' rule and had no
+                        opinion on which. `chain_role_can_approve` now refuses it
+                        in the database, so this list is presentation again
+                        rather than the rule. */}
                     {APP_ROLES.filter((r) => r !== "employee").map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}

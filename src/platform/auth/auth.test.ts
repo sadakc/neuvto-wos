@@ -5,6 +5,8 @@ import {
   SignupInput,
   PhoneInput,
   InviteInput,
+  APP_ROLES,
+  ROLE_LABELS,
   suggestSlug,
 } from "./contracts";
 import { hasRole, isAdmin, canApprove } from "./session";
@@ -161,6 +163,33 @@ describe("role helpers", () => {
     expect(canApprove(user(["manager"]))).toBe(true);
     expect(canApprove(user(["org_admin"]))).toBe(true);
     expect(canApprove(user(["employee"]))).toBe(false);
+  });
+
+  it("lets supervisors and coordinators approve too", () => {
+    // D57. Added 7 Aug 2026, and mirroring is_approver_role() in the database —
+    // which is the copy that actually decides anything. This one only decides
+    // what a screen offers.
+    expect(canApprove(user(["supervisor"]))).toBe(true);
+    expect(canApprove(user(["coordinator"]))).toBe(true);
+  });
+
+  it("does not make supervisors or coordinators administrators", () => {
+    // The distinction the whole role split rests on. A Supervisor signs off
+    // leave for their own reports; Settings, People and the workspace-wide
+    // reports are is_admin() and stay closed to them.
+    expect(isAdmin(user(["supervisor"]))).toBe(false);
+    expect(isAdmin(user(["coordinator"]))).toBe(false);
+  });
+
+  it("keeps every role in APP_ROLES labelled", () => {
+    // There were FOUR copies of this map. Three were Record<AppRole, string> and
+    // failed typecheck the moment two roles were added; the fourth, on the
+    // dashboard, was Record<string, string> and would have rendered nothing at
+    // all for a Supervisor while compiling perfectly. This asserts the one that
+    // replaced them stays complete.
+    for (const role of APP_ROLES) {
+      expect(ROLE_LABELS[role]).toBeTruthy();
+    }
   });
 
   it("is safe when signed out", () => {

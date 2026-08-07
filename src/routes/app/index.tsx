@@ -1,6 +1,12 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
-import { getCurrentUser, isAdmin, canApprove, type CurrentUser } from "@/platform/auth";
+import {
+  getCurrentUser,
+  isAdmin,
+  canApprove,
+  ROLE_LABELS,
+  type CurrentUser,
+} from "@/platform/auth";
 import { getDashboardCards, type ModuleDashboardCard } from "@/platform/modules";
 
 export const Route = createFileRoute("/app/")({
@@ -8,13 +14,6 @@ export const Route = createFileRoute("/app/")({
   head: () => ({ meta: [{ title: "Dashboard — Neuvto WOS" }] }),
   component: Dashboard,
 });
-
-const ROLE_LABELS: Record<string, string> = {
-  org_admin: "Administrator",
-  hr_admin: "HR administrator",
-  manager: "Manager",
-  employee: "Employee",
-};
 
 function Dashboard() {
   const [user, setUser] = useState<CurrentUser | null>(null);

@@ -9,9 +9,9 @@ import {
   listMembers,
   reactivateMember,
   revokeInvitation,
+  ROLE_LABELS,
   setJoinedDate,
   setReportingLine,
-  type AppRole,
   type CurrentUser,
   type DeactivationImpact,
   type Invitation,
@@ -25,13 +25,6 @@ export const Route = createFileRoute("/app/members")({
   head: () => ({ meta: [{ title: "People — Neuvto WOS" }] }),
   component: MembersPage,
 });
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  org_admin: "Administrator",
-  hr_admin: "HR administrator",
-  manager: "Manager",
-  employee: "Employee",
-};
 
 /**
  * The people in this workspace, and the ones who have been asked to join.

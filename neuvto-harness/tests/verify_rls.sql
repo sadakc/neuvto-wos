@@ -1356,14 +1356,36 @@ begin
       raise notice 'ok: deactivation is not something a plain UPDATE can do';
 
       ---------------------------------------------------- 3 · cycles
+      --
+      -- This used to close the loop through Ravi — `dan → ravi`, giving
+      -- ravi → mark → dan → ravi. D57 made that cycle impossible rather than
+      -- merely refused: Ravi is an Employee, and an Employee can no longer be
+      -- anybody's manager, so the reporting-line guard now fires first and the
+      -- cycle guard is never reached.
+      --
+      -- Repointed through Mark, who is a manager. That is also the only kind of
+      -- cycle that can still occur — every link in a reporting chain is now
+      -- somebody who can approve — so this tests the case that exists rather
+      -- than the one that used to.
       perform pg_temp.as_user(alice);
       begin
-        perform public.admin_set_reporting_line(dan, ravi);   -- ravi → mark → dan → ravi
+        perform public.admin_set_reporting_line(dan, mark);   -- mark → dan → mark
         raise exception 'RLS FAIL: a reporting cycle was accepted';
       exception when others then
         if sqlerrm not like '%REPORTING_CYCLE%' then raise; end if;
       end;
       raise notice 'ok: a reporting line that closes a loop is refused';
+
+      ---------------------------------------------------- 3b · D57, at the same door
+      -- The refusal that displaced the fixture above, asserted in its own right
+      -- so that removing it cannot quietly pass as "the cycle test still works".
+      begin
+        perform public.admin_set_reporting_line(dan, ravi);
+        raise exception 'RLS FAIL: an Employee was accepted as somebody''s manager';
+      exception when others then
+        if sqlerrm not like '%MANAGER_CANNOT_APPROVE%' then raise; end if;
+      end;
+      raise notice 'ok: an employee cannot be given somebody to manage';
 
       ---------------------------------------------------- 4 · AC9, and the collapse
       perform pg_temp.as_postgres();

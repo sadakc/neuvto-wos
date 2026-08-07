@@ -210,6 +210,16 @@ export async function setReportingLine(
   if (raw.includes("MANAGER_NOT_FOUND")) {
     throw new AppError("NOT_FOUND", "That manager is no longer in this workspace.", 404);
   }
+  // D57. Names the decision rather than just the refusal — Sada's own framing:
+  // "If there is any report under them, then let the admin decide that they are
+  // the managers." The way out is a role change, and the message says where.
+  if (raw.includes("MANAGER_CANNOT_APPROVE")) {
+    throw new AppError(
+      "MANAGER_CANNOT_APPROVE",
+      "An Employee can't have people reporting to them, because leave is approved by whoever somebody reports to. Give them the Manager, Supervisor or Coordinator role first.",
+      400,
+    );
+  }
   throw toAppError(error, "setReportingLine");
 }
 
@@ -307,6 +317,17 @@ export async function deactivateMember(
       throw new AppError(
         "VALIDATION_FAILED",
         "You can't deactivate yourself. Ask another administrator.",
+        400,
+      );
+    }
+    // D57, and the reason it is checked here as well as on the reporting line:
+    // this function moves reports and pending approval steps DIRECTLY, so it is
+    // a second way to give somebody a team. Only raised when there is actually
+    // something to hand over.
+    if (raw.includes("SUCCESSOR_CANNOT_APPROVE")) {
+      throw new AppError(
+        "MANAGER_CANNOT_APPROVE",
+        "This person's reports and approvals have to go to somebody who can approve leave. Choose a manager, supervisor, coordinator or administrator.",
         400,
       );
     }

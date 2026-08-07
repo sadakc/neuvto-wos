@@ -846,6 +846,39 @@ begin
     raise notice 'ok: no self-approvals';
   end if;
 
+  ---------------------------------------------------------------- D57 — an employee approves nothing
+  -- Level 1 of every default chain is `reporting_manager`, which reads
+  -- profiles.manager_id and asks nothing about the role attached to it. So an
+  -- Employee with a direct report has been approving leave since the approval
+  -- engine was written, and neither canApprove() nor the role picker on Approval
+  -- rules could see it — they govern the `role` rule, which is level 2.
+  --
+  -- Guarded now at every write (admin_set_reporting_line, deactivate_employee),
+  -- and asserted here because a guard is only as good as the next function that
+  -- forgets to call it. This is the invariant those guards exist to maintain,
+  -- stated independently of them.
+  select count(*) into n
+  from profiles m
+  where m.deleted_at is null
+    and m.is_active
+    and not public.can_approve(m.id)
+    and exists (select 1 from profiles r where r.manager_id = m.id and r.deleted_at is null);
+  if n > 0 then
+    raise exception 'INVARIANT FAIL: % active person(s) hold direct reports without a role that can approve — leave routed to them can never be decided', n;
+  end if;
+
+  -- The other half: an approval level that names a role which cannot approve.
+  -- chain_role_can_approve enforces it for new rows; this catches anything that
+  -- predates the constraint or arrives around it.
+  select count(*) into n
+  from approval_chains c
+  where c.approver_role is not null
+    and not public.is_approver_role(c.approver_role);
+  if n > 0 then
+    raise exception 'INVARIANT FAIL: % approval level(s) name a role that cannot approve', n;
+  end if;
+  raise notice 'ok: nobody approves who is not allowed to, by reporting line or by chain';
+
   -- ══════════════════════════════ PHASE 2 — every function pins its search_path
   --
   -- Supabase linter 0011 already catches this, on a dashboard nobody opens on

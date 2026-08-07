@@ -20,7 +20,7 @@
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 
 // ── the seam
@@ -115,5 +115,71 @@ describe("InviteTeam — the name is required", () => {
     expect(await screen.findByText("priya.patel@acme.test")).toBeInTheDocument();
     expect(nameField()).toHaveValue("");
     expect(sendButton()).toBeDisabled();
+  });
+});
+
+/**
+ * D57 — Supervisor and Coordinator.
+ *
+ * This form is where a role is CHOSEN, so it is the first place a role that
+ * exists in the database but not in the label map becomes visible. It used to
+ * keep its own `Record<AppRole, string>`; that copy is gone and the map now
+ * comes from `contracts`, real here rather than stubbed — a fake map in this
+ * file would make these tests agree with themselves and with nothing else.
+ *
+ * The failure being pinned is not "the option is missing". A `<option>` whose
+ * label is `undefined` still renders, still has the right value, and is still
+ * selectable — it is simply BLANK. An administrator sees a gap in the list and
+ * has no way to know what it is for.
+ */
+describe("InviteTeam — the Role dropdown", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  const roleSelect = () => screen.getByLabelText("Role") as HTMLSelectElement;
+
+  it("offers all six roles, each with the word a person reads", () => {
+    render(<InviteTeam />);
+
+    const options = within(roleSelect()).getAllByRole("option") as HTMLOptionElement[];
+    // Value and label together. Either half alone passes against the bug: the
+    // values come from APP_ROLES and were never wrong, and a label list alone
+    // would not catch a label attached to the wrong role.
+    expect(options.map((o) => [o.value, o.textContent])).toEqual([
+      ["org_admin", "Administrator"],
+      ["hr_admin", "HR administrator"],
+      ["manager", "Manager"],
+      ["supervisor", "Supervisor"],
+      ["coordinator", "Coordinator"],
+      ["employee", "Employee"],
+    ]);
+  });
+
+  it("starts on Employee, and says so rather than showing a blank box", () => {
+    // The default is the least privilege, which is right — but a `<select>`
+    // reports its default the same way it reports a stored value, so the thing
+    // to check is what is legible in the closed box, not the value behind it.
+    render(<InviteTeam />);
+
+    expect(roleSelect().value).toBe("employee");
+    expect(roleSelect().selectedOptions[0].textContent).toBe("Employee");
+  });
+
+  it("sends the role's database value, not the label on screen", async () => {
+    // The half that leaves the screen. `<option>Supervisor</option>` without a
+    // `value` is valid HTML and reads identically; it would send the string
+    // "Supervisor" to a column whose enum only knows "supervisor".
+    const user = userEvent.setup();
+    render(<InviteTeam />);
+
+    await user.selectOptions(roleSelect(), "supervisor");
+    expect(roleSelect().selectedOptions[0].textContent).toBe("Supervisor");
+
+    await user.type(emailField(), "sunita.kapoor@acme.test");
+    await user.type(nameField(), "Sunita Kapoor");
+    await user.click(sendButton());
+
+    expect(inviteMember).toHaveBeenCalledWith(
+      expect.objectContaining({ role: "supervisor", fullName: "Sunita Kapoor" }),
+    );
   });
 });
