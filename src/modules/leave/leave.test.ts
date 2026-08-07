@@ -22,7 +22,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { leaveErrorMessage } from "./contracts";
 
-const calls = vi.hoisted(() => ({ eq: [] as [string, unknown][], uid: "ravi" as string | null }));
+const calls = vi.hoisted(() => ({
+  eq: [] as [string, unknown][],
+  uid: "ravi" as string | null,
+  /** What PostgREST hands back for the next rpc() — exactly as supabase-js shapes it. */
+  rpcError: null as { message: string } | null,
+}));
 
 vi.mock("@/integrations/supabase/client", () => {
   const builder = {
@@ -36,6 +41,7 @@ vi.mock("@/integrations/supabase/client", () => {
   return {
     supabase: {
       from: () => builder,
+      rpc: () => Promise.resolve({ data: null, error: calls.rpcError }),
       auth: {
         getUser: () => Promise.resolve({ data: { user: calls.uid ? { id: calls.uid } : null } }),
       },
@@ -43,11 +49,12 @@ vi.mock("@/integrations/supabase/client", () => {
   };
 });
 
-const { getMyRequests } = await import("./handlers");
+const { getMyRequests, submitLeave } = await import("./handlers");
 
 beforeEach(() => {
   calls.eq = [];
   calls.uid = "ravi";
+  calls.rpcError = null;
 });
 
 describe("getMyRequests", () => {
@@ -90,5 +97,72 @@ describe("leaveErrorMessage — INSUFFICIENT_NOTICE", () => {
     expect(leaveErrorMessage("INSUFFICIENT_NOTICE")).toBe(
       "This leave type needs more notice than that.",
     );
+  });
+});
+
+/**
+ * The same refusals, through the path an employee actually takes.
+ *
+ * The block above tests `leaveErrorMessage` by handing it the full string —
+ * which is the one string `toLeaveError` never gave it. `toLeaveError` stripped
+ * everything up to the first colon, so the two codes that carry a number were
+ * the two codes whose names were thrown away, and both landed on "That didn't
+ * work. Please try again."
+ *
+ * Sada met it on 7 Aug 2026: Casual Leave set to one day's notice, applied for
+ * the same day, and was told nothing about notice at all. INSUFFICIENT_BALANCE
+ * had been broken the same way since it was written and nobody had reached it.
+ *
+ * So these tests start at `submitLeave` and assert on the sentence, because the
+ * defect lived in the two lines between the mapper and the screen and a test of
+ * either end alone cannot see it.
+ */
+describe("submitLeave — what the employee is actually shown", () => {
+  const request = {
+    leaveTypeId: "3f1a2b4c-5d6e-4f70-8a91-b2c3d4e5f607",
+    fromDate: "2026-08-07",
+    toDate: "2026-08-07",
+  };
+
+  const refusal = async (message: string) => {
+    calls.rpcError = { message };
+    return await submitLeave(request).then(
+      () => null,
+      (e: unknown) => e as { message: string; code: string; details?: { code?: string } },
+    );
+  };
+
+  it("names the notice rule, and says how many days it wanted", async () => {
+    const e = await refusal("INSUFFICIENT_NOTICE: 1 days required");
+    expect(e?.message).toBe("This leave type needs at least 1 day of notice before you apply.");
+  });
+
+  it("says what was asked for and what was left", async () => {
+    // Never once reached a screen. Same line, same cause, and the more common
+    // of the two — an employee runs out of days far more often than they
+    // mistime a request.
+    const e = await refusal("INSUFFICIENT_BALANCE: requested 3, available 1");
+    expect(e?.message).toBe("You asked for 3 days but have 1 available.");
+  });
+
+  it("still reads a code that carries no number", async () => {
+    // These were never broken: with no colon there was nothing for the regex to
+    // strip. Kept so a future change to the parsing cannot quietly trade one
+    // half of the taxonomy for the other.
+    const e = await refusal("PAST_DATE");
+    expect(e?.message).toBe("You can't apply for leave in the past.");
+  });
+
+  it("keeps the raw code for a support conversation", async () => {
+    const e = await refusal("INSUFFICIENT_NOTICE: 5 days required");
+    expect(e?.details?.code).toBe("INSUFFICIENT_NOTICE: 5 days required");
+  });
+
+  it("shows a Postgres message to nobody", async () => {
+    // The other half of the contract. A constraint name is schema disclosure
+    // and reads as gibberish; anything unrecognised has to become the generic
+    // sentence rather than being passed through.
+    const e = await refusal('duplicate key value violates unique constraint "uq_leave_type_name"');
+    expect(e?.message).toBe("That didn't work. Please try again.");
   });
 });
