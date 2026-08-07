@@ -65,47 +65,61 @@ mkdir -p "$TMP/chunks"
 # ─────────────────────────────────────────── local mode: check before publishing
 if [ -n "$SCAN_DIRS" ]; then
   echo "── build output:$SCAN_DIRS"
-  : > "$TMP/files"
+  # EACH directory is checked SEPARATELY, and each must contain the reference.
+  #
+  # The first real run of this pipeline (7 Aug 2026) passed while shipping a
+  # site that could not reach any database at all. The two halves read
+  # DIFFERENT variables — the browser bundle uses VITE_SUPABASE_URL, the server
+  # bundle uses SUPABASE_URL — and the original version pooled both directories
+  # into one list. The server half held a valid value, the browser half held
+  # junk, the union looked clean, and the deployed page threw
+  # "Invalid supabaseUrl" on load.
+  #
+  # Pooling them asks "does this project appear anywhere", which is not the
+  # question. The question is whether EVERY shipped half talks to it.
+  BAD=0
   for d in $SCAN_DIRS; do
     if [ ! -d "$d" ]; then
       echo "  FAILED: $d does not exist — nothing was built, or it built elsewhere." >&2
       exit 1
     fi
-    find "$d" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.html' \) >> "$TMP/files"
-  done
-  COUNT="$(grep -c . "$TMP/files" 2>/dev/null || echo 0)"
-  echo "   .. ${COUNT} file(s) to inspect"
-  if [ "$COUNT" -eq 0 ]; then
-    echo "  FAILED: no JavaScript or HTML in$SCAN_DIRS. Nothing was verified." >&2
-    exit 1
-  fi
-  # Same question, same answers, one code path — the whole reason this is a mode
-  # rather than a second script.
-  REFS="$(xargs grep -aho 'https://[a-z0-9]\{20\}\.supabase\.co' < "$TMP/files" 2>/dev/null \
-          | sed 's|https://||; s|\.supabase\.co||' | sort -u)"
-  echo
-  if [ -z "$REFS" ]; then
-    echo "  FAILED: no Supabase project reference in the build output." >&2
-    echo "  Not a pass — it means nothing was verified." >&2
-    exit 1
-  fi
-  BAD=0
-  for ref in $REFS; do
-    if [ "$ref" = "$EXPECT_REF" ]; then
-      echo "  ok  ${ref}  (expected)"
-    elif [ "$ref" = "$PREPROD_REF" ]; then
-      echo "  BAD ${ref}  ** PRE-PROD **" >&2; BAD=1
-    else
-      echo "  BAD ${ref}  ** UNKNOWN PROJECT **" >&2; BAD=1
+    find "$d" -type f \( -name '*.js' -o -name '*.mjs' -o -name '*.html' \) > "$TMP/files"
+    COUNT="$(grep -c . "$TMP/files" 2>/dev/null || echo 0)"
+    if [ "$COUNT" -eq 0 ]; then
+      echo "  FAILED: no JavaScript or HTML in ${d}. Nothing was verified." >&2
+      exit 1
     fi
+
+    REFS="$(xargs grep -aho 'https://[a-z0-9]\{20\}\.supabase\.co' < "$TMP/files" 2>/dev/null \
+            | sed 's|https://||; s|\.supabase\.co||' | sort -u)"
+
+    if [ -z "$REFS" ]; then
+      echo "  BAD ${d} — ${COUNT} file(s), NO project reference" >&2
+      echo "      This half of the build reaches no database. If it is the" >&2
+      echo "      browser bundle, every page throws on load; if it is the" >&2
+      echo "      server bundle, every server route fails." >&2
+      echo "      Usual cause: the variable it reads is unset or malformed." >&2
+      echo "      Browser reads VITE_SUPABASE_URL; server reads SUPABASE_URL." >&2
+      BAD=1
+      continue
+    fi
+    for ref in $REFS; do
+      if [ "$ref" = "$EXPECT_REF" ]; then
+        echo "  ok  ${d} — ${ref} (expected), ${COUNT} file(s)"
+      elif [ "$ref" = "$PREPROD_REF" ]; then
+        echo "  BAD ${d} — ${ref} ** PRE-PROD **" >&2; BAD=1
+      else
+        echo "  BAD ${d} — ${ref} ** UNKNOWN PROJECT **" >&2; BAD=1
+      fi
+    done
   done
-  [ "$BAD" -ne 0 ] && {
-    echo >&2
+
+  echo
+  if [ "$BAD" -ne 0 ]; then
     echo "  FAILED. This build must not be published." >&2
     exit 1
-  }
-  echo
-  echo "── PASSED — the build talks only to ${EXPECT_REF}"
+  fi
+  echo "── PASSED — every half of the build talks only to ${EXPECT_REF}"
   exit 0
 fi
 
