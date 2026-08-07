@@ -31,9 +31,31 @@ import {
  * Postgres raises a bare code; this turns it into something an employee can
  * read. The code survives in `details` so a support conversation can still
  * reach the real cause.
+ *
+ * THE COLON IS PART OF THE CODE. This used to strip everything matching
+ *
+ *     ^.*?:\s*        — anything up to the first colon, non-greedy
+ *
+ * which was harmless for every refusal that is a bare word — `PAST_DATE` has no
+ * colon, so there was nothing to match — and destroyed the only two that are
+ * not. `INSUFFICIENT_NOTICE: 1 days required` arrived here and left as
+ * `1 days required`, which `leaveErrorMessage` cannot recognise, so both of the
+ * refusals that carry a NUMBER became "That didn't work. Please try again."
+ *
+ * The number is the entire point of those two messages. An employee told they
+ * need "more notice" and not how much can only guess a date and resubmit; one
+ * told they have insufficient days is not told how many they have.
+ *
+ * It survived because the test suite fed `leaveErrorMessage` the full string
+ * directly — the one string this function never passed it. The mapping was
+ * proved; the two lines between the mapping and the screen were not. The tests
+ * now start at `submitLeave`.
+ *
+ * `ERROR:` is still stripped: PostgREST hands back the raise message alone, but
+ * a driver or a proxy that prefixes it should not cost us the code again.
  */
 function toLeaveError(message: string): AppError {
-  const code = message.replace(/^.*?:\s*/, "").trim() || message;
+  const code = message.replace(/^ERROR:\s*/i, "").trim() || message;
   return new AppError("VALIDATION_FAILED", leaveErrorMessage(code), 400, { code });
 }
 
