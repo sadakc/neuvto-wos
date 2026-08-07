@@ -1367,6 +1367,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_set_department: {
+        Args: { _department_id: string; _employee_id: string }
+        Returns: undefined
+      }
       admin_set_joined_date: {
         Args: { _employee_id: string; _joined_date: string }
         Returns: undefined
@@ -1433,6 +1437,7 @@ export type Database = {
         Returns: Json
       }
       deactivation_impact: { Args: { _employee_id: string }; Returns: Json }
+      department_remove: { Args: { _id: string }; Returns: Json }
       dispatch_notifications: { Args: never; Returns: undefined }
       emit_platform_event: {
         Args: { _event_key: string; _payload: Json }

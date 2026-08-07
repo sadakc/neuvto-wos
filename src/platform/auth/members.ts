@@ -27,6 +27,8 @@ export interface Member {
   isActive: boolean;
   /** Null means they report to nobody — an owner, or somebody not yet placed. */
   managerId: string | null;
+  /** D58. Null is ordinary: a workspace with no departments configured has nobody in one. */
+  departmentId: string | null;
   roles: AppRole[];
 }
 
@@ -42,6 +44,8 @@ export interface Invitation {
   phone: string | null;
   fullName: string | null;
   role: AppRole;
+  /** Carried until they accept, then applied to the profile (D53). */
+  departmentId: string | null;
   createdAt: string;
   expiresAt: string;
   acceptedAt: string | null;
@@ -85,6 +89,7 @@ export async function inviteMember(input: unknown): Promise<string> {
     _phone: parsed.phone || undefined,
     _role: parsed.role,
     _full_name: parsed.fullName || undefined,
+    _department_id: parsed.departmentId || undefined,
   });
 
   if (error) {
@@ -115,7 +120,7 @@ export async function listInvitations(baseUrl: string): Promise<Invitation[]> {
   const { data, error } = await supabase
     .from("invitations")
     .select(
-      "id, email, phone, full_name, role, token, created_at, expires_at, accepted_at, revoked_at",
+      "id, email, phone, full_name, role, department_id, token, created_at, expires_at, accepted_at, revoked_at",
     )
     .order("created_at", { ascending: false });
 
@@ -127,6 +132,7 @@ export async function listInvitations(baseUrl: string): Promise<Invitation[]> {
     phone: r.phone,
     fullName: r.full_name,
     role: r.role as AppRole,
+    departmentId: r.department_id,
     createdAt: r.created_at,
     expiresAt: r.expires_at,
     acceptedAt: r.accepted_at,
@@ -145,7 +151,7 @@ export async function listMembers(): Promise<Member[]> {
   const [people, roles] = await Promise.all([
     supabase
       .from("profiles")
-      .select("id, full_name, email, phone, joined_date, is_active, manager_id")
+      .select("id, full_name, email, phone, joined_date, is_active, manager_id, department_id")
       .order("full_name"),
     supabase.from("user_roles").select("user_id, role"),
   ]);
@@ -169,6 +175,7 @@ export async function listMembers(): Promise<Member[]> {
     joinedDate: r.joined_date,
     isActive: r.is_active,
     managerId: r.manager_id,
+    departmentId: r.department_id,
     roles: byUser.get(r.id) ?? [],
   }));
 }
