@@ -261,10 +261,102 @@
     margin: 0;
   }
   /* Once rendered, mermaid supplies its own colours from the init block in each
-     plate. Nothing here should fight them. */
+     plate. */
   .plate-body pre.mermaid[data-processed] {
     text-align: center;
     font-size: inherit;
+  }
+
+  /* ── The text inside a diagram, forced legible ────────────────────────────
+     Reported 7 Aug 2026: "the peach colour background is covering the white
+     colour ... this is wherever you see the diagrams."
+
+     Mermaid DERIVES colours it is not given. The plates set primaryColor and
+     primaryTextColor and say nothing about cluster titles, so mermaid computed
+     its own — #F2E4DB, a peach, on 44 subgraph labels across the document.
+     Nothing in this palette is peach.
+
+     Worse, all of that depended on the per-diagram %%{init}%% directive being
+     honoured, and viewers disagree about whether to honour it — which is why a
+     diagram could look correct here and unreadable on somebody else's screen.
+
+     So this does not negotiate. Every plate has the same fixed dark ground in
+     both themes, therefore every piece of text on one is light, whatever theme
+     a renderer decides to apply. `!important` because mermaid writes inline
+     styles and inline beats a class. */
+  .plate-body svg .nodeLabel,
+  .plate-body svg .edgeLabel,
+  .plate-body svg .label,
+  .plate-body svg text,
+  .plate-body svg span,
+  .plate-body svg p,
+  .plate-body svg div {
+    color: var(--plate-ink) !important;
+    fill: var(--plate-ink) !important;
+    background: transparent !important;
+  }
+  /* Subgraph titles sit a step back from the nodes they contain — the same
+     hierarchy the prose uses, rather than shouting at the same volume. */
+  .plate-body svg .cluster-label .nodeLabel,
+  .plate-body svg .cluster-label text,
+  .plate-body svg .cluster-label span,
+  .plate-body svg .cluster-label p {
+    color: var(--plate-accent) !important;
+    fill: var(--plate-accent) !important;
+  }
+  /* An edge label sits ON a line; without its own ground the line runs through
+     the words. */
+  .plate-body svg .edgeLabel rect,
+  .plate-body svg .edgeLabel foreignObject div {
+    background-color: var(--plate-bar) !important;
+    fill: var(--plate-bar) !important;
+  }
+
+  /* ── The SHAPES, forced dark, and this half is not optional ───────────────
+     Forcing the text light without forcing the fill dark is worse than doing
+     nothing, and that is exactly the trap this nearly fell into.
+     Two people looked at the same file and saw opposite things:
+
+       measured here   dark node fill, peach cluster titles
+       seen by Sada    cream node fill, near-white text — "the peach coloured
+                       background is covering the white colour"
+
+     Both were true. His renderer took `primaryTextColor` from the diagram's
+     %%{init}%% block and ignored the fills, so light text landed on mermaid's
+     own light default shapes. A rule that only lightened the text would have
+     made his view MORE unreadable, not less.
+
+     So both halves are stated. Whatever a renderer decides, a plate is dark and
+     the text on it is light — the palette is not a request. */
+  .plate-body svg .node rect,
+  .plate-body svg .node polygon,
+  .plate-body svg .node circle,
+  .plate-body svg .node path,
+  .plate-body svg rect.basic,
+  .plate-body svg .label-container {
+    fill: var(--plate-bg) !important;
+    stroke: var(--plate-edge) !important;
+  }
+  .plate-body svg .cluster rect,
+  .plate-body svg g.cluster > rect {
+    fill: var(--plate-bar) !important;
+    stroke: var(--plate-edge) !important;
+  }
+  /* Sequence and ER diagrams name their parts differently, and Plates 07 and 09
+     are both. Missing them would leave two plates unreadable while seven looked
+     fixed — which is how a partial fix passes review. */
+  .plate-body svg .actor,
+  .plate-body svg .labelBox,
+  .plate-body svg .entityBox,
+  .plate-body svg .attributeBoxOdd,
+  .plate-body svg .attributeBoxEven {
+    fill: var(--plate-bg) !important;
+    stroke: var(--plate-edge) !important;
+  }
+  .plate-body svg .actor-line,
+  .plate-body svg line,
+  .plate-body svg .relationshipLine {
+    stroke: var(--plate-muted) !important;
   }
 
   .plate-foot {
@@ -1142,9 +1234,32 @@ erDiagram
     mermaid.initialize({
       startOnLoad: false,
       securityLevel: "strict",
-      // Each plate carries its own %%{init}%% block with the plate palette.
-      // Nothing global should override them.
       theme: "base",
+      // The plate palette, stated here as well as in each diagram's own
+      // %%{init}%% block. Not redundancy — the per-diagram directive is not
+      // honoured by every renderer, and when it is skipped mermaid derives its
+      // own colours. That is where the peach came from. The .mmd files keep
+      // their directives so they still look right opened on their own.
+      themeVariables: {
+        background: "transparent",
+        primaryColor: "#13252F",
+        primaryTextColor: "#DCE9F0",
+        primaryBorderColor: "#31556A",
+        secondaryColor: "#0F1F29",
+        tertiaryColor: "#0D1B24",
+        lineColor: "#5B8AA5",
+        clusterBkg: "#0D1C25",
+        clusterBorder: "#284655",
+        edgeLabelBackground: "#101F2A",
+        // The ones mermaid was left to invent, which is how 44 labels became
+        // peach. Named explicitly so nothing is derived.
+        textColor: "#DCE9F0",
+        nodeTextColor: "#DCE9F0",
+        titleColor: "#38BDF8",
+        labelTextColor: "#DCE9F0",
+        fontFamily: "ui-monospace, SFMono-Regular, Menlo, monospace",
+        fontSize: "12px",
+      },
       flowchart: { useMaxWidth: true },
       sequence: { useMaxWidth: true },
       er: { useMaxWidth: true },
