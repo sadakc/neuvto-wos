@@ -33,6 +33,12 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "";
 
+// Shared with notification-dispatch, and deliberately the same defaults: one
+// sending identity, one place to change it. RESEND_API_KEY is already a secret
+// on this project; DEMO_REQUEST_RECIPIENT is the only new one.
+const RESEND_BASE = Deno.env.get("RESEND_API_BASE") ?? "https://api.resend.com";
+const FROM = Deno.env.get("NOTIFICATION_FROM") ?? "Neuvto <notifications@neuvto.com>";
+
 const ALLOWED_ORIGINS = (
   Deno.env.get("DEMO_REQUEST_ORIGINS") ??
   "https://neuvto.com,https://www.neuvto.com,https://neuvto-wos.netlify.app,http://localhost:5173,http://localhost:3000"
@@ -167,5 +173,150 @@ Deno.serve(async (req: Request) => {
     return json(origin, 500, { error: "Could not submit request. Please try again." });
   }
 
+  // AFTER the row is safe, and never allowed to change the answer.
+  //
+  // The request is recorded whatever happens next: a lead that is in the table
+  // but not in an inbox is recoverable, and one the visitor was told had failed
+  // is not. So this is awaited (a Deno isolate can be torn down the moment the
+  // response is returned, taking a floating promise with it) and its outcome is
+  // logged rather than returned.
+  await notify({
+    name,
+    email,
+    company: str(body.company, 200),
+    employees: str(body.employees, 50),
+    message: str(body.message, 5000),
+  });
+
   return json(origin, 200, { ok: true });
 });
+
+/**
+ * Tell somebody a demo request arrived.
+ *
+ * ── why this does not use the notification queue
+ *
+ * `notifications.organization_id` is NOT NULL and a demo request belongs to no
+ * organisation, so it cannot be queued without either a fake organisation row
+ * or making that column nullable — the latter being a change to RLS on a core
+ * table, for one email. Recorded as a deliberate trade in D62: this path has no
+ * retry and no audit trail, which is why the failure is loud in the log rather
+ * than silent, and why it is the FIRST thing to move if a second platform-level
+ * notification ever appears.
+ *
+ * ── why the address is an environment secret
+ *
+ * Sada's address must not be in the browser bundle, in git, or in the page —
+ * a public form that renders the recipient is a form that harvests it. It lives
+ * in Supabase's secret store, is read here, and never leaves this process.
+ *
+ * ── unconfigured is loud, not silent
+ *
+ * The same rule `dispatch_notifications` follows, for the same reason: the
+ * defect that migration exists to fix was a delivery path that failed by doing
+ * nothing at all. A missing secret says so, every time, naming what to set.
+ */
+async function notify(r: {
+  name: string;
+  email: string;
+  company: string;
+  employees: string;
+  message: string;
+}): Promise<void> {
+  const to = Deno.env.get("DEMO_REQUEST_RECIPIENT") ?? "";
+  const key = Deno.env.get("RESEND_API_KEY") ?? "";
+
+  if (!to || !key) {
+    console.error(
+      `[demo-request] a demo request from ${r.email} was RECORDED BUT NOT EMAILED — ` +
+        `${!to ? "DEMO_REQUEST_RECIPIENT" : ""}${!to && !key ? " and " : ""}${!key ? "RESEND_API_KEY" : ""} ` +
+        `is not set on this project. The row is safe in demo_requests; nobody has been told about it.`,
+    );
+    return;
+  }
+
+  // Everything below is a stranger's input rendered into HTML. Escaped for the
+  // same reason render_template() escapes (D27) — and it matters more here,
+  // because the reader is Neuvto rather than a customer, and the one inbox that
+  // sees every one of these is the worst place to land an injected link.
+  const esc = (s: string) =>
+    s
+      .replace(/&/g, "&amp;")
+      .replace(/</g, "&lt;")
+      .replace(/>/g, "&gt;")
+      .replace(/"/g, "&quot;")
+      .replace(/'/g, "&#39;");
+
+  // A single-line mail header. Every C0/C1 control goes — not just CR and LF,
+  // because a lone CR, a vertical tab and NEL (U+0085) are each treated as a
+  // line break somewhere in a mail path — then runs of whitespace collapse and
+  // the result is bounded. A 400-character subject is unreadable long before
+  // any provider rejects it.
+  const header = (value: string) =>
+    value
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\u0000-\u001f\u007f-\u009f]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim()
+      .slice(0, 200);
+
+  const row = (label: string, value: string) =>
+    value ? `<p style="margin:0 0 6px"><strong>${label}:</strong> ${esc(value)}</p>` : "";
+
+  const html =
+    `<p style="margin:0 0 14px">A demo request came in from the website.</p>` +
+    row("Name", r.name) +
+    row("Email", r.email) +
+    row("Company", r.company) +
+    row("Employees", r.employees) +
+    (r.message
+      ? `<p style="margin:14px 0 6px"><strong>What they are interested in</strong></p>` +
+        `<pre style="font-family:ui-monospace,Menlo,Consolas,monospace;font-size:13px;` +
+        `line-height:1.6;white-space:pre-wrap;margin:0">${esc(r.message)}</pre>`
+      : "") +
+    `<p style="margin:18px 0 0;color:#666;font-size:12px">` +
+    `Every request is also in the <code>demo_requests</code> table, whether or not this email arrived.</p>`;
+
+  let response: Response;
+  try {
+    response = await fetch(`${RESEND_BASE}/emails`, {
+      method: "POST",
+      headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        from: FROM,
+        to: [to],
+        // Reply goes to the prospect rather than to notifications@, which
+        // nothing reads. The whole point of this email is to answer it.
+        reply_to: r.email,
+        // `header()`, not the raw value, and NOT esc() — this is the one field
+        // that is not HTML.
+        //
+        // `esc()` covers every value in the body. The subject is a mail header,
+        // and a header is terminated by CRLF: a name of
+        // "Real Person\r\nBcc: attacker@evil.test" survives `.trim()` (which
+        // only strips the ends) and reaches this line intact from the public
+        // form. Whether Resend sanitises it is not known and is not ours to
+        // rely on — a header we build is a header we clean.
+        //
+        // Found by db-guardian, which proved the CRLF reaches the database
+        // layer as `…0d0a4263633a20…`. Reachable in production, unlike the
+        // btrim finding beside it.
+        subject: header(`Demo request — ${r.name}${r.company ? ` (${r.company})` : ""}`),
+        html,
+      }),
+    });
+  } catch (e) {
+    console.error(
+      `[demo-request] RECORDED BUT NOT EMAILED — could not reach Resend for ${r.email}:`,
+      e instanceof Error ? e.message : String(e),
+    );
+    return;
+  }
+
+  if (!response.ok) {
+    console.error(
+      `[demo-request] RECORDED BUT NOT EMAILED — Resend refused ${r.email} with ` +
+        `${response.status}: ${(await response.text()).slice(0, 300)}`,
+    );
+  }
+}

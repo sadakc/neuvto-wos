@@ -1,6 +1,6 @@
 # Email and domains
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 8 Aug 2026
 
 Two different things get called "email domain" and confusing them wastes days.
 They are unrelated, and only one of them constrains anybody.
@@ -631,6 +631,44 @@ select public.missing_system_notification_templates();
 An empty array is healthy. `prod-cutover.sh` runs this after every push and
 refuses to finish if anything is missing; `verify_invariants.sql` asserts the
 same thing from the harness. Neither existed when this broke.
+
+---
+
+### C · A demo request that reached nobody
+
+Different from everything else on this page: a demo request does **not** go
+through `notifications`. `notifications.organization_id` is NOT NULL and a
+demo request belongs to no organisation, so the `demo-request` edge function
+sends it directly through Resend (D62). That path has **no retry and no audit
+trail** — which is exactly why the failures below are loud.
+
+**Every request is recorded whether or not the email arrives.** Nothing is ever
+lost; the worst case is that nobody was told. To check:
+
+```sql
+select created_at, name, email, company from public.demo_requests
+ order by created_at desc limit 20;
+```
+
+Two secrets on the project, and the function names whichever is missing:
+
+| Secret                   | What it is                                                                      |
+| ------------------------ | ------------------------------------------------------------------------------- |
+| `RESEND_API_KEY`         | Already set — shared with `notification-dispatch`                               |
+| `DEMO_REQUEST_RECIPIENT` | **New.** Where demo requests go. Not in git, not in the bundle, not on the page |
+
+If nothing arrives, read the function's log first. It says which of the two is
+unset, or what Resend refused, and always says the row is safe:
+
+```
+[demo-request] a demo request from x@y.com was RECORDED BUT NOT EMAILED —
+DEMO_REQUEST_RECIPIENT is not set on this project. The row is safe in
+demo_requests; nobody has been told about it.
+```
+
+The email's `reply_to` is the prospect's address rather than
+`notifications@neuvto.com`, which nothing reads — replying to it should reach
+the person who asked.
 
 ---
 

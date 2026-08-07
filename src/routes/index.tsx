@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useId, useState } from "react";
 import { toast } from "sonner";
 import { submitDemoRequest } from "@/lib/demo-request";
 import mobileMockup from "@/assets/mobile-mockup.png";
@@ -22,6 +22,23 @@ export const Route = createFileRoute("/")({
           "Mobile-first workforce OS. Launching with Leave Management, expanding to attendance, payroll, and performance.",
       },
     ],
+    // ───────────────────────────────────────────────────────── canonical
+    //
+    // ON THIS ROUTE, NOT IN __root.tsx, AND THAT IS THE WHOLE POINT.
+    //
+    // `__root.tsx`'s `links` are static and shared by every route, so a
+    // canonical declared there would tell Google that /app, /auth and
+    // /neuvto-hq are all copies of the landing page. That is worse than having
+    // none: a wrong canonical is an instruction to drop the real URL, and this
+    // one would point every page in the product at the marketing site.
+    //
+    // This is the only public, indexable page in the product — everything else
+    // is behind a session — so it is the only page that needs one.
+    //
+    // Absolute and with the trailing slash, matching what sitemap.xml already
+    // publishes as <loc>. A canonical that disagrees with the sitemap is two
+    // answers to one question.
+    links: [{ rel: "canonical", href: "https://neuvto.com/" }],
   }),
   component: Index,
 });
@@ -291,6 +308,7 @@ function Roadmap() {
 }
 
 function DemoForm() {
+  const messageId = useId();
   const [loading, setLoading] = useState(false);
   const [form, setForm] = useState({
     name: "",
@@ -361,10 +379,13 @@ function DemoForm() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">
+              {/* The fifth field, and the one Field() does not cover. Same
+                  defect, same fix — the label was here and joined to nothing. */}
+              <label htmlFor={messageId} className="mb-1 block text-sm font-medium text-foreground">
                 What are you interested in?
               </label>
               <textarea
+                id={messageId}
                 value={form.message}
                 onChange={(e) => setForm({ ...form, message: e.target.value })}
                 rows={4}
@@ -385,6 +406,29 @@ function DemoForm() {
   );
 }
 
+/**
+ * A labelled field on the demo form.
+ *
+ * THE `<label>` WAS ALREADY HERE AND WAS CONNECTED TO NOTHING.
+ *
+ * It had no `htmlFor`, the input had no `id`, and the input was not nested
+ * inside it — so it was a styled paragraph that happened to be a `<label>`
+ * element. That is worse than obviously-missing markup, because the source
+ * reads as correct: only the accessibility tree disagrees. Rendered and asked
+ * what a screen reader would find, all five fields on this form answered the
+ * same way:
+ *
+ *     input[type=text]   id=NONE  → *** NO ACCESSIBLE NAME ***
+ *     input[type=email]  id=NONE  → *** NO ACCESSIBLE NAME ***
+ *     …
+ *
+ * Five fields, five times "edit text, blank". This is the first form a
+ * prospective customer meets, and one of them will be using a screen reader.
+ *
+ * `useId()` rather than a hand-passed name: this component renders four times
+ * on one page, and duplicate ids would associate every label with the first
+ * input — which looks fixed and is not.
+ */
 function Field({
   label,
   value,
@@ -400,14 +444,24 @@ function Field({
   required?: boolean;
   placeholder?: string;
 }) {
+  const id = useId();
   return (
     <div>
-      <label className="mb-1 block text-sm font-medium text-foreground">
+      <label htmlFor={id} className="mb-1 block text-sm font-medium text-foreground">
         {label}
-        {required && <span className="text-destructive"> *</span>}
+        {required && (
+          <span className="text-destructive" aria-hidden="true">
+            {" "}
+            *
+          </span>
+        )}
       </label>
       <input
+        id={id}
         type={type}
+        // The asterisk is decorative and hidden from assistive tech above;
+        // `required` is what actually announces the field as required, and it
+        // was already here doing that job.
         required={required}
         placeholder={placeholder}
         value={value}
