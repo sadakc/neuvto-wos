@@ -16,16 +16,18 @@ deployed onto it multi-tenant. Leave Management is the first module, not the
 point. If a document here reads as though the leave product is the product, it
 predates 31 Jul 2026 and is wrong.
 
-| If you want to know                                  | Read                                                                          |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
-| What is being built, in what order, and what is done | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)          |
-| Why something was built differently from the PRD     | the **D1–D46** decision table in the same file                                |
-| Whether the platform itself is finished              | the **platform acceptance criteria** (PA1–PA10) in the same file              |
-| How to run the thing on your own machine             | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)            |
-| How code and schema reach the hosted site            | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                          |
-| Where the backups are, and whether they restore      | [operations/BACKUPS.md](operations/BACKUPS.md)                                |
-| Why email works in one environment and not another   | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md) |
-| How the system is shaped, for an investor or advisor | [architecture/](architecture/)                                                |
+| If you want to know                                  | Read                                                                                       |
+| ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| What is being built, in what order, and what is done | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
+| Why something was built differently from the PRD     | the **D1–D46** decision table in the same file                                             |
+| Whether the platform itself is finished              | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
+| How to run the thing on your own machine             | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
+| How code and schema reach the hosted site            | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
+| Who hosts `neuvto.com`, and how a deploy is proved   | [operations/PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)                       |
+| What each tool in the stack is for, in plain English | Plate 05 of [architecture/neuvto-architecture.html](architecture/neuvto-architecture.html) |
+| Where the backups are, and whether they restore      | [operations/BACKUPS.md](operations/BACKUPS.md)                                             |
+| Why email works in one environment and not another   | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)              |
+| How the system is shaped, for an investor or advisor | [architecture/](architecture/)                                                             |
 
 ---
 
@@ -67,15 +69,16 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 
 ### [operations/](operations/)
 
-| File                                                                    | Covers                                                                                      |
-| ----------------------------------------------------------------------- | ------------------------------------------------------------------------------------------- |
-| [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                     |
-| [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud     |
-| [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives |
-| [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                     |
-| [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out  |
-| [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm          |
-| [REVIEWING_LOVABLE_CHANGES.md](operations/REVIEWING_LOVABLE_CHANGES.md) | what Lovable may never do, what needs your approval, and why it is not CODEOWNERS           |
+| File                                                                    | Covers                                                                                         |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
+| [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                        |
+| [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud        |
+| [PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)               | why `neuvto.com` is built by GitHub Actions and served by Netlify, written for a non-developer |
+| [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives    |
+| [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                        |
+| [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out     |
+| [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm             |
+| [REVIEWING_LOVABLE_CHANGES.md](operations/REVIEWING_LOVABLE_CHANGES.md) | what Lovable may never do, what needs your approval, and why it is not CODEOWNERS              |
 
 ### [agents/](agents/)
 

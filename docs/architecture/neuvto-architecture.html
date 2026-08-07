@@ -1,3 +1,5 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Neuvto WOS — Platform Architecture</title>
 
 <style>
@@ -239,6 +241,152 @@
     min-width: 0;
     text-align: center;
   }
+  /* Until 7 Aug 2026 this rule did not exist, and every diagram was invisible.
+     `.plate-body` paints --plate-bg (#0B1720); the <pre> inside inherited --ink
+     (#0F1922) from the page. Near-black on near-black, in both themes, for nine
+     plates. --plate-ink existed the whole time and was never applied to the one
+     element that needed it.
+
+     This colours the SOURCE, which is what shows before mermaid renders — or
+     for good if it never does. See the loader at the end of the document: the
+     fallback is legible text rather than a blank panel. */
+  /* `:not([data-processed])` is load-bearing, not tidiness.
+     Mermaid renders the SVG INSIDE this <pre>, so any font declared here is
+     inherited by the diagram's labels — while mermaid has already measured and
+     sized every box using the font IT was given. Two different fonts: one to
+     size the box, another to fill it.
+
+     Measured on 7 Aug 2026 with this selector unscoped: a label needing 116px
+     inside a foreignObject 103px wide. "Leave Management" rendered as
+     "Leave Managemen", "Payroll" as "Payrol". Reported as text not fitting its
+     field, which is exactly what it was.
+
+     So this styles the SOURCE only — what shows if mermaid never runs. Once it
+     has, we impose no font and mermaid's own measurements hold. */
+  .plate-body pre.mermaid:not([data-processed]) {
+    color: var(--plate-ink);
+    font-family: var(--font-mono);
+    font-size: 0.78rem;
+    line-height: 1.55;
+    text-align: left;
+    white-space: pre;
+    overflow-x: auto;
+    margin: 0;
+  }
+  /* Once rendered, mermaid supplies its own colours from the init block in each
+     plate. */
+  /* ── This font string must equal DIAGRAM_FONT in the loader. Exactly. ──────
+     Mermaid measures every label to size its box, using the fontFamily it was
+     configured with. The browser then draws that label with whatever CSS says.
+     When those disagree, boxes are sized for one font and filled with another,
+     and the text is clipped — "Leave Management" became "Leave Managemen".
+
+     Both wrong answers were measured on 7 Aug 2026:
+
+       declaring var(--font-mono) here   a fuller stack than mermaid measured
+                                         with. 1 label needing 116px in 103px.
+       declaring nothing here            worse. The SVG lives inside a <pre>,
+                                         whose USER-AGENT default is generic
+                                         `monospace` — a wider face again.
+                                         229 of 316 labels clipped.
+
+     So it is declared, and declared identically in both places. */
+  .plate-body pre.mermaid[data-processed] {
+    text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  }
+
+  /* ── The text inside a diagram, forced legible ────────────────────────────
+     Reported 7 Aug 2026: "the peach colour background is covering the white
+     colour ... this is wherever you see the diagrams."
+
+     Mermaid DERIVES colours it is not given. The plates set primaryColor and
+     primaryTextColor and say nothing about cluster titles, so mermaid computed
+     its own — #F2E4DB, a peach, on 44 subgraph labels across the document.
+     Nothing in this palette is peach.
+
+     Worse, all of that depended on the per-diagram %%{init}%% directive being
+     honoured, and viewers disagree about whether to honour it — which is why a
+     diagram could look correct here and unreadable on somebody else's screen.
+
+     So this does not negotiate. Every plate has the same fixed dark ground in
+     both themes, therefore every piece of text on one is light, whatever theme
+     a renderer decides to apply. `!important` because mermaid writes inline
+     styles and inline beats a class. */
+  .plate-body svg .nodeLabel,
+  .plate-body svg .edgeLabel,
+  .plate-body svg .label,
+  .plate-body svg text,
+  .plate-body svg span,
+  .plate-body svg p,
+  .plate-body svg div {
+    color: var(--plate-ink) !important;
+    fill: var(--plate-ink) !important;
+    background: transparent !important;
+  }
+  /* Subgraph titles sit a step back from the nodes they contain — the same
+     hierarchy the prose uses, rather than shouting at the same volume. */
+  .plate-body svg .cluster-label .nodeLabel,
+  .plate-body svg .cluster-label text,
+  .plate-body svg .cluster-label span,
+  .plate-body svg .cluster-label p {
+    color: var(--plate-accent) !important;
+    fill: var(--plate-accent) !important;
+  }
+  /* An edge label sits ON a line; without its own ground the line runs through
+     the words. */
+  .plate-body svg .edgeLabel rect,
+  .plate-body svg .edgeLabel foreignObject div {
+    background-color: var(--plate-bar) !important;
+    fill: var(--plate-bar) !important;
+  }
+
+  /* ── The SHAPES, forced dark, and this half is not optional ───────────────
+     Forcing the text light without forcing the fill dark is worse than doing
+     nothing, and that is exactly the trap this nearly fell into.
+     Two people looked at the same file and saw opposite things:
+
+       measured here   dark node fill, peach cluster titles
+       seen by Sada    cream node fill, near-white text — "the peach coloured
+                       background is covering the white colour"
+
+     Both were true. His renderer took `primaryTextColor` from the diagram's
+     %%{init}%% block and ignored the fills, so light text landed on mermaid's
+     own light default shapes. A rule that only lightened the text would have
+     made his view MORE unreadable, not less.
+
+     So both halves are stated. Whatever a renderer decides, a plate is dark and
+     the text on it is light — the palette is not a request. */
+  .plate-body svg .node rect,
+  .plate-body svg .node polygon,
+  .plate-body svg .node circle,
+  .plate-body svg .node path,
+  .plate-body svg rect.basic,
+  .plate-body svg .label-container {
+    fill: var(--plate-bg) !important;
+    stroke: var(--plate-edge) !important;
+  }
+  .plate-body svg .cluster rect,
+  .plate-body svg g.cluster > rect {
+    fill: var(--plate-bar) !important;
+    stroke: var(--plate-edge) !important;
+  }
+  /* Sequence and ER diagrams name their parts differently, and Plates 07 and 09
+     are both. Missing them would leave two plates unreadable while seven looked
+     fixed — which is how a partial fix passes review. */
+  .plate-body svg .actor,
+  .plate-body svg .labelBox,
+  .plate-body svg .entityBox,
+  .plate-body svg .attributeBoxOdd,
+  .plate-body svg .attributeBoxEven {
+    fill: var(--plate-bg) !important;
+    stroke: var(--plate-edge) !important;
+  }
+  .plate-body svg .actor-line,
+  .plate-body svg line,
+  .plate-body svg .relationshipLine {
+    stroke: var(--plate-muted) !important;
+  }
 
   .plate-foot {
     display: flex;
@@ -253,6 +401,40 @@
   }
 
   /* ---------- colophon ---------- */
+
+  /* Added for Plate 05. The document had no table until the toolchain needed
+     one: a diagram shows what connects to what, and says nothing about why a
+     thing was chosen — which is the question a business reader actually has. */
+  .roles {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    margin: 0.25rem 0 0;
+  }
+  .roles th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    white-space: nowrap;
+  }
+  .roles td {
+    vertical-align: top;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--rule-soft);
+    padding: 0.6rem 0.75rem 0.6rem 0;
+    line-height: 1.5;
+  }
+  .roles td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .roles tr:last-child td { border-bottom: none; }
+  @media (max-width: 640px) {
+    .roles, .roles tbody, .roles tr, .roles td { display: block; width: 100%; }
+    .roles thead { display: none; }
+    .roles tr { border-bottom: 1px solid var(--rule); padding: 0.5rem 0; }
+    .roles td { border: none; padding: 0.15rem 0; }
+    .roles td:first-child { padding-top: 0.4rem; }
+  }
 
   .colophon {
     margin-top: 5rem;
@@ -308,20 +490,22 @@
     <p class="standfirst">
       Neuvto WOS is a multi-tenant Workforce Operating System. Leave Management is the first
       of eleven planned modules — and it is built so that the second one is cheap.
-      These eight plates show how.
+      These nine plates show how, and what carries it into production.
     </p>
     <div class="specs">
-      <span>Version <b>1.0</b></span>
-      <span>28 July 2026</span>
-      <span>Status <b>Phase 0 built</b></span>
+      <span>Version 1.1</span>
+      <span>7 August 2026</span>
+      <span>Status Live in production</span>
     </div>
   </header>
 
   <p class="notice">
-    <strong>What this document is.</strong> It describes the architecture as specified and
-    approved. The platform layer (Phase 0) is built and merged; the Leave module is
-    specified but not yet implemented. Every module name and target quarter comes from the
-    product roadmap; nothing here is estimated or embellished.
+    <strong>What this document is.</strong> It describes the architecture as built. The
+    platform layer and the Leave module are both implemented, deployed, and serving
+    <code>neuvto.com</code> from the pipeline in Plate&nbsp;05. Every module name and
+    target quarter comes from the product roadmap; nothing here is estimated or
+    embellished, and where something is decided but not yet built it says so in those
+    words.
   </p>
 
   <!-- ============================== PART ONE ============================== -->
@@ -331,7 +515,8 @@
     <h2>The argument</h2>
   </div>
   <p class="part-note">
-    Four plates, readable without a technical background.
+    Five plates, readable without a technical background. The last one names every tool
+    the product depends on and why each was chosen.
   </p>
 
   <figure class="plate">
@@ -348,7 +533,7 @@
       <div class="plate-body">
         <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
 flowchart TB
-    subgraph MOD["BUSINESS MODULES — independent, enabled per customer"]
+    subgraph MOD["BUSINESS MODULES<br/>independent, enabled per customer"]
         direction LR
         L["Leave Management<br/>MVP · Q3 2026"]
         A["Attendance<br/>Q4 2026"]
@@ -358,7 +543,7 @@ flowchart TB
         R["6 further modules<br/>through Q1 2029"]
     end
 
-    subgraph PLAT["PLATFORM LAYER — built once, consumed by every module"]
+    subgraph PLAT["PLATFORM LAYER<br/>built once, consumed by every module"]
         direction LR
         subgraph BUILT["Built in MVP"]
             direction LR
@@ -380,11 +565,12 @@ flowchart TB
         end
     end
 
-    subgraph INF["INFRASTRUCTURE"]
+    subgraph INF["INFRASTRUCTURE<br/>bought, not built"]
         direction LR
+        NT["Netlify<br/>hosts neuvto.com"]
         PG[("Supabase Postgres<br/>row-level security")]
         SA["Supabase Auth"]
-        RE["Resend"]
+        RE["Resend<br/>email delivery"]
     end
 
     MOD ==>|"consume"| PLAT
@@ -539,6 +725,143 @@ flowchart LR
     </div>
   </figure>
 
+  <figure class="plate">
+    <div class="plate-no">05</div>
+    <div class="plate-main">
+      <h3>What each tool is for</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        Six services carry this product, and not one of them was chosen for novelty.
+        Each does a job that would otherwise be done by hand, badly, by somebody who
+        should be doing something else. The pipeline below is also the answer to a
+        question that cost two outages: <em>which database is the live site actually
+        talking to?</em>
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart TB
+    subgraph AUTH["WHERE THE WORK IS DONE<br/>two authoring tools, one repository"]
+        direction LR
+        LOV["Lovable<br/>visual editing &amp; preview<br/>points at PRE-PRODUCTION"]
+        CC["Claude Code<br/>engineering, migrations,<br/>tests, review"]
+    end
+
+    subgraph SRC["SOURCE OF TRUTH"]
+        GH["GitHub · main branch<br/>every change arrives by pull request"]
+    end
+
+    subgraph GATE["AUTOMATED CHECKS<br/>nothing reaches a customer without passing"]
+        direction LR
+        CI["CI<br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
+        BUILD["Build<br/>GitHub Actions<br/>our variables, our machine"]
+        VER1["Gate 1<br/>which database does<br/>this build talk to?"]
+        VER2["Gate 2<br/>which database does<br/>the LIVE SITE talk to?"]
+    end
+
+    subgraph RUN["WHAT A CUSTOMER TOUCHES"]
+        direction LR
+        NET["Netlify<br/>hosts neuvto.com"]
+        SUP[("Supabase<br/>Postgres · Auth<br/>ap-south-1")]
+        RES["Resend<br/>sign-in codes<br/>&amp; notifications"]
+    end
+
+    subgraph DEV["BEFORE ANY OF IT<br/>a full copy on one laptop"]
+        DOCK["Docker<br/>runs Postgres, Auth and a mail<br/>catcher locally. No cloud, no cost,<br/>no customer data."]
+    end
+
+    LOV -->|"pull request"| GH
+    CC  -->|"pull request"| GH
+    GH  --> CI
+    CI  --> BUILD
+    BUILD --> VER1
+    VER1 -->|"passes"| NET
+    NET --> VER2
+    NET --> SUP
+    NET --> RES
+    DOCK -.->|"same schema,<br/>proved before push"| GH
+</pre>
+      </div>
+
+      <table class="roles">
+        <thead>
+          <tr><th>Tool</th><th>What it does</th><th>Why this one</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Docker</td>
+            <td>Runs a complete private copy of the product on one laptop — database,
+                sign-in, and a mail catcher that traps outgoing email instead of sending
+                it.</td>
+            <td>Every change is proved against a real database before it is pushed
+                anywhere. It costs nothing, needs no internet, and holds no customer
+                data — so a mistake made here reaches nobody.</td>
+          </tr>
+          <tr>
+            <td>Lovable</td>
+            <td>Visual editing and instant preview of screens. Its preview points at the
+                pre-production database, never the real one.</td>
+            <td>It makes changing how something <em>looks</em> fast, without waiting on
+                an engineer. Its changes arrive as pull requests and are reviewed like any
+                other — it writes to the repository, and once scaffolded a conflicting
+                email system that had to be removed.</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td>The engineering seat: database migrations, business rules, tests,
+                security review, and the release checks.</td>
+            <td>The work that has to be <em>correct</em> rather than merely visible —
+                tenant isolation, leave arithmetic, permissions. It is also what writes
+                the tests that try to break each rule before it is trusted.</td>
+          </tr>
+          <tr>
+            <td>GitHub</td>
+            <td>Holds the code, and runs the automated checks on every proposed change.</td>
+            <td>One place that is the truth. Nothing reaches customers without passing
+                lint, types, 403 tests, and a full migration and tenant-isolation run.</td>
+          </tr>
+          <tr>
+            <td>Netlify</td>
+            <td>Serves <code>neuvto.com</code> to the world.</td>
+            <td>Chosen on 7&nbsp;Aug&nbsp;2026 after the published site twice went live
+                wired to the <em>wrong database</em> — the previous host supplied its own
+                settings at build time and silently overrode ours. Building it ourselves
+                and handing Netlify the finished result makes that impossible rather than
+                unlikely.</td>
+          </tr>
+          <tr>
+            <td>Supabase</td>
+            <td>The database, sign-in, and the scheduled jobs. Every customer's data sits
+                in one database, separated by rules the database itself enforces.</td>
+            <td>Separation enforced by the database cannot be forgotten by a developer.
+                A query that fails to filter by customer returns nothing rather than
+                somebody else's employees.</td>
+          </tr>
+          <tr>
+            <td>Resend</td>
+            <td>Delivers sign-in codes and notification email from
+                <code>neuvto.com</code>.</td>
+            <td>Mail sent from a domain we own and have proved we own. Without that,
+                sign-in codes land in spam — which is indistinguishable, to a customer,
+                from the product being broken.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="claim" style="margin-top:1.1rem">
+        <em>The two gates, and why they exist</em>
+        On 3&nbsp;and 6&nbsp;August 2026 the live site was serving code wired to the
+        pre-production database. Sign-in appeared to work and sent nothing: the screen
+        said a code had been sent, and it had been asked of a database with no email
+        configured. Both times the deploy reported success. Gate&nbsp;1 now inspects the
+        built files before they are published; Gate&nbsp;2 inspects the running site
+        afterwards. Either one failing stops the release, and a check that cannot find an
+        answer counts as a failure rather than a pass.
+      </p>
+
+      <div class="plate-foot"><span>Source · scripts/verify-deploy.sh · .github/workflows/deploy.yml</span><span>Adopted 7 Aug 2026</span></div>
+    </div>
+  </figure>
+
   <!-- ============================== PART TWO ============================== -->
 
   <div class="part">
@@ -551,7 +874,7 @@ flowchart LR
   </p>
 
   <figure class="plate">
-    <div class="plate-no">05</div>
+    <div class="plate-no">06</div>
     <div class="plate-main">
       <h3>Component architecture</h3>
       <p class="claim">
@@ -572,7 +895,7 @@ flowchart TB
         INT["Third-party<br/>integrations"]
     end
 
-    subgraph SURFACES["TRANSPORT SURFACES — two ways in, one contract"]
+    subgraph SURFACES["TRANSPORT SURFACES<br/>two ways in, one contract"]
         direction LR
         SF["Server functions<br/>TanStack Start"]
         RST["/api/v1/*<br/>REST"]
@@ -586,7 +909,7 @@ flowchart TB
         DOM["domain logic<br/>balances · entitlement"]
     end
 
-    subgraph PLATFORM["src/platform — modules import this; it never imports them"]
+    subgraph PLATFORM["src/platform<br/>modules import this;<br/>it never imports them"]
         direction LR
         APR["approvals"]
         NOT["notifications"]
@@ -625,7 +948,7 @@ flowchart TB
   </figure>
 
   <figure class="plate">
-    <div class="plate-no">06</div>
+    <div class="plate-no">07</div>
     <div class="plate-main">
       <h3>Leave submission — the hard path</h3>
       <p class="claim">
@@ -697,7 +1020,7 @@ sequenceDiagram
   </figure>
 
   <figure class="plate">
-    <div class="plate-no">07</div>
+    <div class="plate-no">08</div>
     <div class="plate-main">
       <h3>Approval Engine — state machine</h3>
       <p class="claim">
@@ -753,7 +1076,7 @@ stateDiagram-v2
   </figure>
 
   <figure class="plate">
-    <div class="plate-no">08</div>
+    <div class="plate-no">09</div>
     <div class="plate-main">
       <h3>Data model</h3>
       <p class="claim">
@@ -884,16 +1207,19 @@ erDiagram
     <div>
       <h4>Status</h4>
       <p>
-        Architecture approved; construction not started. Module names and quarters are the
+        Platform and Leave module built and live. Module names and quarters are the
         roadmap's own. No cost, headcount or revenue figures appear here because none have
-        been established.
+        been established. Everything in the stack below runs on a free tier — nothing is
+        paid for until the MVP ships.
       </p>
     </div>
     <div>
       <h4>Stack</h4>
       <p>
         TanStack Start · TypeScript · Tailwind · shadcn/ui · Supabase Postgres with
-        row-level security · Resend. Production database in <code>ap-south-1</code>.
+        row-level security · Resend. Built by GitHub Actions, served by Netlify.
+        Production database in <code>ap-south-1</code>. Plate&nbsp;05 explains what each
+        piece is for.
       </p>
     </div>
     <div>
@@ -906,3 +1232,93 @@ erDiagram
   </div>
 
 </div>
+
+<!-- ============================== DIAGRAMS ==============================
+  Nine plates carried mermaid source and nothing ever rendered it — there was
+  no script tag in this document at all. Combined with `.plate-body` painting a
+  near-black ground under text that inherited near-black ink, the result was
+  nine invisible panels. Reported 7 Aug 2026 as "the background colour hides it,
+  nothing is visible to the naked eye", which is exactly what it was.
+
+  Two failures are handled deliberately:
+
+    · No network. The CDN is unreachable on a plane or behind a proxy, and the
+      catch below leaves the SOURCE on screen — now legible, because
+      `.plate-body pre.mermaid` gives it --plate-ink. A readable definition is
+      a poor diagram and a perfectly good fallback; a blank panel is neither.
+
+    · A diagram that will not parse. `mermaid.run` is told to keep going rather
+      than abandon the page, so one bad plate cannot take the other eight with
+      it.
+
+  securityLevel is 'strict', which disables HTML inside node labels. That is
+  why no label here uses <b> — bold text is not worth relaxing sanitisation on
+  a document people open from a shared drive.
+-->
+<script type="module">
+  // Must match `.plate-body pre.mermaid[data-processed]` in the stylesheet
+  // above — mermaid sizes each box with this font and the browser draws with
+  // that rule. If they differ, every label is clipped. See the note there.
+  const DIAGRAM_FONT = "ui-monospace, SFMono-Regular, Menlo, monospace";
+
+  try {
+    const { default: mermaid } = await import(
+      "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs"
+    );
+    mermaid.initialize({
+      startOnLoad: false,
+      securityLevel: "strict",
+      theme: "base",
+      // The plate palette, stated here as well as in each diagram's own
+      // %%{init}%% block. Not redundancy — the per-diagram directive is not
+      // honoured by every renderer, and when it is skipped mermaid derives its
+      // own colours. That is where the peach came from. The .mmd files keep
+      // their directives so they still look right opened on their own.
+      themeVariables: {
+        background: "transparent",
+        primaryColor: "#13252F",
+        primaryTextColor: "#DCE9F0",
+        primaryBorderColor: "#31556A",
+        secondaryColor: "#0F1F29",
+        tertiaryColor: "#0D1B24",
+        lineColor: "#5B8AA5",
+        clusterBkg: "#0D1C25",
+        clusterBorder: "#284655",
+        edgeLabelBackground: "#101F2A",
+        // The ones mermaid was left to invent, which is how 44 labels became
+        // peach. Named explicitly so nothing is derived.
+        textColor: "#DCE9F0",
+        nodeTextColor: "#DCE9F0",
+        titleColor: "#38BDF8",
+        labelTextColor: "#DCE9F0",
+        fontFamily: DIAGRAM_FONT,
+        fontSize: "12px",
+      },
+      // htmlLabels: false is the fix for text spilling out of its box.
+      //
+      // With HTML labels, mermaid sizes each box by measuring a temporary DOM
+      // node that lives OUTSIDE .plate-body — so none of the plate styling
+      // applies to it — and then draws the label inside a foreignObject where
+      // all of it does. Measured in one CSS context, rendered in another.
+      // On 7 Aug 2026 that clipped 229 of 316 labels, and matching the fonts
+      // by hand did not fix it, because the two contexts differ in more than
+      // font.
+      //
+      // As SVG <text>, mermaid measures with getBBox in the same coordinate
+      // space it draws in. There is no second context to disagree with.
+      // It also suits securityLevel 'strict', which exists to keep HTML out of
+      // labels in the first place.
+      flowchart: { useMaxWidth: true, htmlLabels: false },
+      sequence: { useMaxWidth: true, htmlLabels: false },
+      er: { useMaxWidth: true },
+    });
+    await mermaid.run({
+      querySelector: "pre.mermaid",
+      suppressErrors: true,
+    });
+  } catch {
+    // Deliberately silent. The page is already readable without this; an alert
+    // or a console wall would be noise on a document that is working as well as
+    // it can.
+  }
+</script>
