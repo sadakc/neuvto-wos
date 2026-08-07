@@ -1,6 +1,6 @@
 # First Customer — Onboarding Runbook
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
 
 **Purpose:** not marketing. This is a **product test.** Walking through what a real customer
 must actually do to go live is how the missing bulk import and opening balances were found,
@@ -57,6 +57,14 @@ PSQL=psql DATABASE_URL="<the target>" bash neuvto-harness/tests/verify_scheduled
 **1. Provision the workspace** at `/neuvto-hq`: company name, address, and the administrator's
 email and phone. They are invited, not created — they accept like anybody else, which means
 they have proved they control the address before they hold the role (D39).
+
+> **Signing out of the console.** The header shows which account you are signed in as and
+> carries a **Sign out** button. Both matter more here than in a customer workspace: this
+> screen lists every customer Neuvto has, and one address — `anshvilla@gmail.com` — holds
+> platform admin _and_ `org_admin` in Acme, so "which account am I in" is a real question.
+> Until 8 Aug 2026 the console had no way out at all; the page sits outside `/app` by design,
+> so it inherited none of the tenant shell's header, and ending a session meant clearing
+> cookies.
 
 **2. Grant their modules** on the same screen (D44). A module Neuvto has not granted cannot be
 switched on by the customer, and its functions refuse in the database rather than merely

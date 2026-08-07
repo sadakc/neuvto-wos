@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import {
   getUserId,
+  getSessionEmail,
+  signOut,
   isPlatformAdmin,
   listOrganizations,
   listOrganizationModules,
@@ -20,6 +22,7 @@ import { MailHealthBanner } from "@/platform/auth/MailHealthBanner";
 import { ClientErrorsPanel } from "@/platform/auth/ClientErrorsPanel";
 import { NeuvtoLockup } from "@/components/shared/neuvto-mark";
 import { CONSOLE_PATH } from "@/platform/console-path";
+import { hardNavigate } from "@/platform/navigate";
 
 /**
  * Re-exported so existing importers keep working. The value itself, and why it
@@ -55,6 +58,8 @@ function AdminConsole() {
   const [mailHealth, setMailHealth] = useState<MailHealth | null>(null);
   const [clientErrors, setClientErrors] = useState<ClientErrorGroup[] | null>(null);
   const [allowed, setAllowed] = useState<boolean | null>(null);
+  const [sessionEmail, setSessionEmail] = useState<string | null>(null);
+  const [signingOut, setSigningOut] = useState(false);
   const [orgs, setOrgs] = useState<CustomerWorkspace[]>([]);
   const [loadError, setLoadError] = useState("");
 
@@ -103,6 +108,16 @@ function AdminConsole() {
       if (cancelled) return;
       setAllowed(ok);
       if (!ok) return;
+
+      // Straight from the session, not from a profile — Neuvto staff have none
+      // by design (D42), so `getCurrentUser()` raises NO_ORGANIZATION for
+      // exactly the people this screen is for. `getSessionEmail` exists for
+      // this case and says so in its own comment.
+      //
+      // Not decoration: anshvilla@gmail.com holds platform admin AND org_admin
+      // in a customer workspace, so "which account am I in" is a real question
+      // here, and the answer belongs next to the button that ends the session.
+      setSessionEmail(await getSessionEmail().catch(() => null));
 
       // Read in parallel and settled separately. The health check must never be
       // able to stop the customer list loading — this is the screen somebody
@@ -218,8 +233,66 @@ function AdminConsole() {
       {/* The console is Neuvto's own tool, so it wears Neuvto's mark — and the
           light theme it always renders in (design/theme.ts) is the other half
           of the same signal. A platform admin should never have to wonder
-          whether they are looking at a customer's workspace or at ours. */}
-      <NeuvtoLockup className="mb-8" />
+          whether they are looking at a customer's workspace or at ours.
+
+          The way out sits beside it, as it does in the tenant shell. Until now
+          there was none: this page is deliberately outside /app, so it inherits
+          none of that header, and a platform admin's only way to end a session
+          was to clear cookies. On a screen that lists every customer, that is
+          not a small omission. */}
+      <div className="mb-8 flex items-start justify-between gap-4">
+        <NeuvtoLockup />
+        <div className="flex shrink-0 flex-col items-end gap-1">
+          {sessionEmail && (
+            <span
+              data-testid="console-session-email"
+              className="max-w-[16rem] truncate text-xs text-muted-foreground"
+              title={sessionEmail}
+            >
+              Signed in as {sessionEmail}
+            </span>
+          )}
+          <button
+            onClick={async () => {
+              setSigningOut(true);
+              try {
+                await signOut();
+              } catch {
+                // DELIBERATELY SWALLOWED, AND THE CATCH IS NOT OPTIONAL.
+                //
+                // The `finally` below leaves the page whatever happened, which
+                // is the behaviour we want. But `finally` alone does not handle
+                // the rejection — it re-throws it into a promise React has
+                // already discarded, and `installGlobalErrorHandlers` turns
+                // every `unhandledrejection` into a client-error row. That row
+                // renders in `ClientErrorsPanel`, which is on THIS page.
+                //
+                // So without this catch, a sign-out we chose to ignore files
+                // itself as a crash in the one monitor Neuvto staff actually
+                // read — and `report.ts` groups by fingerprint, so retrying
+                // during an outage climbs the panel. Found by screen-prover:
+                // the test run exits 1 on the unhandled rejection.
+              } finally {
+                // Whatever signOut did, this browser is finished with the
+                // console. A failed sign-out that leaves somebody sitting on a
+                // page listing every customer is the worse outcome, and
+                // `/auth` re-checks the session on arrival anyway.
+                //
+                // Through the seam rather than assigning directly: navigate.ts
+                // exists because eight raw assignments left the `/auth`
+                // redirect untestable. Line 102 above is still one of them and
+                // is left alone — it is not this change's to move.
+                hardNavigate("/auth");
+              }
+            }}
+            disabled={signingOut}
+            data-testid="console-sign-out"
+            className="inline-flex h-12 shrink-0 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground disabled:opacity-50"
+          >
+            {signingOut ? "Signing out…" : "Sign out"}
+          </button>
+        </div>
+      </div>
 
       <h1 className="font-display text-xl font-semibold tracking-tight">Customers</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
