@@ -17,28 +17,48 @@
  * offers this action exactly once, and the once is the button.
  */
 
-import { describe, expect, it, vi } from "vitest";
-import { render, screen, within } from "@testing-library/react";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+import { render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
+import { Toaster } from "@/components/ui/sonner";
 
 // ── the seam
 //
 // index.tsx is a route module: it calls createFileRoute at module load, and the
-// demo form binds a server function on mount. Both are replaced so the test is
-// about what the page puts on screen. Nothing below the header is mocked away —
-// the whole page renders, which is what lets the header's count be checked
-// against a page that also says "Request demo" on its form button.
+// demo form posts to the demo-request edge function. Both are replaced so the
+// test is about what the page puts on screen. Nothing else is mocked away — the
+// whole page renders, which is what lets the header's count be checked against a
+// page that also says "Request demo" on its form button, and what lets the form
+// be filled the way a visitor fills it.
+//
+// `submitDemoRequest` is the only thing on this page that reaches the network,
+// and src/test/setup.ts fails any file that reaches it. Named so a failure reads
+// as "expected submitDemoRequest to have been called once" rather than
+// "expected vi.fn()" — which of the five values arrived on which key is the
+// entire content of one assertion below.
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: unknown) => opts,
 }));
 
 vi.mock("@/lib/demo-request", () => ({
-  submitDemoRequest: vi.fn().mockResolvedValue(undefined),
+  submitDemoRequest: vi.fn().mockName("submitDemoRequest"),
 }));
 
+import { submitDemoRequest } from "@/lib/demo-request";
 import { Route } from "./index";
 
 const Index = (Route as unknown as { component: () => React.ReactElement }).component;
+
+beforeEach(() => {
+  // The name is re-applied after every reset: `mockReset()` drops it, and a
+  // failure that reads "expected vi.fn() to be called 1 times" says nothing
+  // about which call did not happen. Watched printing exactly that.
+  vi.mocked(submitDemoRequest)
+    .mockReset()
+    .mockName("submitDemoRequest")
+    .mockResolvedValue(undefined);
+});
 
 function renderLanding() {
   render(<Index />);
@@ -258,5 +278,265 @@ describe("landing page — what red is still allowed to mean", () => {
 
     // And it is not an action, so the guard cannot ever be what removes it.
     expect(actionsOnPage()).not.toContain(markers[0] as HTMLElement);
+  });
+});
+
+// ── the demo form: five fields that had no names at all
+//
+// There WERE five `<label>` elements. Not one of them was attached to anything:
+// no `htmlFor`, no `id` on the control, and the control not nested inside. So
+// every field rendered as a styled paragraph next to an anonymous box, and the
+// source read as correct — only the accessibility tree disagreed:
+//
+//     input[type=text]   id=NONE  → *** NO ACCESSIBLE NAME ***
+//     input[type=email]  id=NONE  → *** NO ACCESSIBLE NAME ***
+//     …
+//
+// This is the first form a prospective customer meets, and one of them is using
+// a screen reader — which announced five consecutive "edit text, blank".
+//
+// Everything below is queried BY LABEL and never by placeholder, test id or DOM
+// position. That is not a stylistic preference: a query that reaches an input
+// any other way passes just as happily against the broken version, which is
+// exactly how this shipped. `getByLabelText` and `getByRole(…, { name })` fail
+// when the association is missing, and they are the only queries that do.
+
+/** Enough of a control to identify it in a failure message. */
+function describeField(el: Element): string {
+  const type = el.getAttribute("type");
+  return `<${el.tagName.toLowerCase()}${type ? ` type=${type}` : ""}> id=${el.id || "NONE"}`;
+}
+
+/**
+ * The landing page, plus the toaster the app really mounts.
+ *
+ * `<Toaster />` is the same component `__root.tsx` renders, so "the visitor is
+ * told" can be asserted as text on screen rather than as a call to a mocked
+ * `toast`. Mocking sonner would leave these tests unable to tell a message that
+ * renders from one that is thrown into a void.
+ */
+function renderDemoForm() {
+  const user = userEvent.setup();
+  const { container } = render(
+    <>
+      <Index />
+      <Toaster />
+    </>,
+  );
+  const form = container.querySelector("form");
+  if (!form) throw new Error("no <form> on the landing page");
+  return { user, form };
+}
+
+/** What a real visitor puts in, one distinguishable value per field. */
+const TYPED = {
+  name: "Priya Raman",
+  email: "priya@vistara.test",
+  company: "Vistara Facilities",
+  employees: "50-200",
+  message: "Leave first, attendance next year.",
+};
+
+/**
+ * Fills every field, reaching each one only by its label.
+ *
+ * No two values share a prefix, so a crossed association shows up as the wrong
+ * string on the wrong key rather than as a passing test.
+ */
+async function fillByLabel(user: ReturnType<typeof userEvent.setup>) {
+  await user.type(screen.getByLabelText(/Your name/), TYPED.name);
+  await user.type(screen.getByLabelText(/Work email/), TYPED.email);
+  await user.type(screen.getByLabelText(/Company/), TYPED.company);
+  await user.type(screen.getByLabelText(/Employees/), TYPED.employees);
+  await user.type(screen.getByLabelText(/interested in/), TYPED.message);
+}
+
+describe("demo form — every field answers to its label", () => {
+  it("names all five, and the last one is the textarea", () => {
+    const { form } = renderDemoForm();
+
+    const fields = {
+      name: screen.getByLabelText(/Your name/),
+      email: screen.getByLabelText(/Work email/),
+      company: screen.getByLabelText(/Company/),
+      employees: screen.getByLabelText(/Employees/),
+      message: screen.getByLabelText(/interested in/),
+    };
+
+    // Which control each label reached, not merely that it reached one. A label
+    // joined to the wrong element is still a missing name for the right one.
+    expect(fields.name.tagName).toBe("INPUT");
+    expect(fields.name).toHaveAttribute("type", "text");
+    expect(fields.email.tagName).toBe("INPUT");
+    expect(fields.email).toHaveAttribute("type", "email");
+    expect(fields.company.tagName).toBe("INPUT");
+    expect(fields.employees.tagName).toBe("INPUT");
+    expect(fields.message.tagName).toBe("TEXTAREA");
+
+    // …and there is no sixth field sitting there nameless. Asserted as a list of
+    // leftovers so a regression prints the field it could not name rather than a
+    // count.
+    const named = Object.values(fields);
+    const unnamed = within(form)
+      .getAllByRole("textbox")
+      .filter((el) => !named.includes(el));
+    expect(unnamed.map(describeField)).toEqual([]);
+  });
+
+  it("gives each control an id of its own, and each label something to point at", () => {
+    // `Field` renders FOUR times on this page. A hand-passed or hard-coded id
+    // would make all four labels point at the first input — which reads as
+    // fixed, passes any test that only looks for a `for` attribute, and leaves
+    // three fields as anonymous as they were.
+    const { form } = renderDemoForm();
+
+    const controls = [...form.querySelectorAll("input, textarea")];
+    expect(controls).toHaveLength(5);
+
+    const ids = controls.map((c) => c.id);
+    expect(controls.filter((c) => !c.id).map(describeField)).toEqual([]);
+
+    const repeated = ids.filter((id, i) => ids.indexOf(id) !== i);
+    expect(repeated).toEqual([]);
+
+    const labels = [...form.querySelectorAll("label")];
+    expect(labels).toHaveLength(5);
+    const dangling = labels
+      .filter((l) => !ids.includes(l.htmlFor))
+      .map((l) => `"${(l.textContent ?? "").trim()}" → for=${l.htmlFor || "NONE"}`);
+    expect(dangling).toEqual([]);
+  });
+
+  it("puts what is typed into the field the label named, and into no other", async () => {
+    // The association proved rather than assumed. Under one shared id every one
+    // of these queries returns the same input, so the four empty assertions are
+    // what separates a real `htmlFor` from a coincidental one.
+    const { user } = renderDemoForm();
+
+    await user.type(screen.getByLabelText(/Work email/), TYPED.email);
+
+    expect(screen.getByLabelText(/Work email/)).toHaveValue(TYPED.email);
+    expect(screen.getByLabelText(/Your name/)).toHaveValue("");
+    expect(screen.getByLabelText(/Company/)).toHaveValue("");
+    expect(screen.getByLabelText(/Employees/)).toHaveValue("");
+    expect(screen.getByLabelText(/interested in/)).toHaveValue("");
+  });
+});
+
+describe("demo form — what marks a field as required", () => {
+  it("hides the asterisk from assistive tech and lets `required` do the announcing", () => {
+    const { form } = renderDemoForm();
+
+    const markers = [...form.querySelectorAll("label span")].filter(
+      (el) => el.textContent?.trim() === "*",
+    );
+    expect(markers).toHaveLength(2);
+    for (const marker of markers) {
+      expect(marker).toHaveAttribute("aria-hidden", "true");
+    }
+
+    // The consequence, which is the part worth pinning: the name a screen
+    // reader announces is "Your name", not "Your name star". Exact match — an
+    // un-hidden asterisk is inside the accessible name and this stops matching.
+    expect(screen.getByRole("textbox", { name: "Your name" })).toBe(
+      screen.getByLabelText(/Your name/),
+    );
+    expect(screen.getByRole("textbox", { name: "Work email" })).toBe(
+      screen.getByLabelText(/Work email/),
+    );
+
+    // And the actual signal is on the control, where it is announced and
+    // enforced rather than merely drawn.
+    expect(screen.getByLabelText(/Your name/)).toBeRequired();
+    expect(screen.getByLabelText(/Work email/)).toBeRequired();
+
+    // The optional three stay optional. A form where everything is required
+    // says nothing by marking anything.
+    expect(screen.getByLabelText(/Company/)).not.toBeRequired();
+    expect(screen.getByLabelText(/Employees/)).not.toBeRequired();
+    expect(screen.getByLabelText(/interested in/)).not.toBeRequired();
+  });
+});
+
+describe("demo form — sending it", () => {
+  it("sends exactly what was typed, on the keys it was typed into", async () => {
+    // Filled through the labels alone, so this is simultaneously the strongest
+    // statement about the association: five distinct strings, and a label wired
+    // to the wrong `onChange` arrives here as the wrong value on the wrong key.
+    const { user } = renderDemoForm();
+
+    await fillByLabel(user);
+    await user.click(screen.getByRole("button", { name: "Request demo" }));
+
+    await waitFor(() => expect(submitDemoRequest).toHaveBeenCalledTimes(1));
+    expect(submitDemoRequest).toHaveBeenCalledWith(TYPED);
+  });
+
+  it("thanks the visitor and empties the form once it is accepted", async () => {
+    const { user } = renderDemoForm();
+
+    await fillByLabel(user);
+    await user.click(screen.getByRole("button", { name: "Request demo" }));
+
+    expect(await screen.findByText("Thanks! We'll be in touch shortly.")).toBeInTheDocument();
+    // Emptied, so a second visitor at the same laptop does not send the first
+    // one's details again.
+    expect(screen.getByLabelText(/Your name/)).toHaveValue("");
+    expect(screen.getByLabelText(/Work email/)).toHaveValue("");
+    expect(screen.getByLabelText(/Company/)).toHaveValue("");
+    expect(screen.getByLabelText(/Employees/)).toHaveValue("");
+    expect(screen.getByLabelText(/interested in/)).toHaveValue("");
+  });
+
+  it("tells the visitor when it is refused, and keeps everything they typed", async () => {
+    // A refusal that also wipes the form is a visitor who leaves. The message is
+    // the endpoint's own sentence — the one thing here somebody can act on.
+    vi.mocked(submitDemoRequest).mockRejectedValueOnce(
+      new Error("Please check your email address."),
+    );
+
+    const { user } = renderDemoForm();
+
+    await fillByLabel(user);
+    await user.click(screen.getByRole("button", { name: "Request demo" }));
+
+    expect(await screen.findByText("Please check your email address.")).toBeInTheDocument();
+    expect(screen.queryByText("Thanks! We'll be in touch shortly.")).toBeNull();
+
+    expect(screen.getByLabelText(/Your name/)).toHaveValue(TYPED.name);
+    expect(screen.getByLabelText(/Work email/)).toHaveValue(TYPED.email);
+    expect(screen.getByLabelText(/Company/)).toHaveValue(TYPED.company);
+    expect(screen.getByLabelText(/Employees/)).toHaveValue(TYPED.employees);
+    expect(screen.getByLabelText(/interested in/)).toHaveValue(TYPED.message);
+
+    // And the button is usable again, so correcting the address is one edit
+    // rather than a reload.
+    await waitFor(() => expect(screen.getByRole("button", { name: "Request demo" })).toBeEnabled());
+  });
+
+  it("says it is sending, and refuses a second click while it is", async () => {
+    // Two clicks is two demo requests: two rows, two emails, and a sales call
+    // that opens by apologising. The label matters as much as the disabling — an
+    // unchanged button under a click that did something reads as a dead button,
+    // which is precisely how people click it again.
+    let release!: () => void;
+    vi.mocked(submitDemoRequest).mockReturnValue(
+      new Promise<void>((resolve) => {
+        release = resolve;
+      }),
+    );
+
+    const { user } = renderDemoForm();
+    await fillByLabel(user);
+    await user.click(screen.getByRole("button", { name: "Request demo" }));
+
+    const sending = screen.getByRole("button", { name: "Sending…" });
+    expect(sending).toBeDisabled();
+
+    await user.click(sending);
+    expect(submitDemoRequest).toHaveBeenCalledTimes(1);
+
+    release();
+    expect(await screen.findByText("Thanks! We'll be in touch shortly.")).toBeInTheDocument();
   });
 });
