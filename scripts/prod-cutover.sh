@@ -410,6 +410,11 @@ supabase functions deploy notification-dispatch --project-ref "$REF"
 echo "── deploying client-error"
 supabase functions deploy client-error --project-ref "$REF"
 
+# The public demo form. Also verify_jwt = false, from config.toml — see the
+# comment on client-error above, which applies unchanged.
+echo "── deploying demo-request"
+supabase functions deploy demo-request --project-ref "$REF"
+
 # THE ARGUMENT ORDER IS THE WHOLE WARNING.
 #
 # An earlier version of this message read:

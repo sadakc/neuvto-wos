@@ -32,12 +32,8 @@ vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: unknown) => opts,
 }));
 
-vi.mock("@tanstack/react-start", () => ({
-  useServerFn: () => vi.fn(),
-}));
-
-vi.mock("@/lib/demo.functions", () => ({
-  submitDemoRequest: vi.fn(),
+vi.mock("@/lib/demo-request", () => ({
+  submitDemoRequest: vi.fn().mockResolvedValue(undefined),
 }));
 
 import { Route } from "./index";

@@ -157,6 +157,27 @@ begin
     raise notice 'ok: no unacknowledged notification failed for want of a template';
   end if;
 
+  ---------------------------------------------------------------- the public lead form
+  -- `demo_requests` is written by anonymous strangers, which makes its grants
+  -- worth asserting rather than assuming. Until 7 Aug 2026 `anon` held the full
+  -- default set on it — INSERT, SELECT, UPDATE, DELETE — and was saved only by
+  -- RLS having no policy for three of the four. A grant nothing exercises is
+  -- still a grant somebody can write a policy against by accident.
+  --
+  -- The public path is now the demo-request edge function, which holds the
+  -- service key. The function itself is covered by the anon-executable check
+  -- further down; this is the table.
+  if to_regclass('public.demo_requests') is not null then
+    select coalesce(string_agg(priv, ', '), '') into offenders
+    from unnest(array['INSERT','SELECT','UPDATE','DELETE']) as priv
+    where has_table_privilege('anon', 'public.demo_requests', priv);
+    if offenders <> '' then
+      raise exception
+        'INVARIANT FAIL: anon holds % on demo_requests. The public form goes through the demo-request edge function; anon needs no grant here', offenders;
+    end if;
+    raise notice 'ok: anon holds no grant on the public lead table';
+  end if;
+
   -- ══════════════════════════════════════════════════ PHASE 1 — working calendar
 
   if to_regprocedure('public.calculate_working_days(uuid,date,date)') is null then
