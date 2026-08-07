@@ -1,5 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { EmailInput, VerifyOtpInput, SignupInput, PhoneInput, suggestSlug } from "./contracts";
+import {
+  EmailInput,
+  VerifyOtpInput,
+  SignupInput,
+  PhoneInput,
+  InviteInput,
+  suggestSlug,
+} from "./contracts";
 import { hasRole, isAdmin, canApprove } from "./session";
 import type { CurrentUser } from "./contracts";
 
@@ -166,5 +173,34 @@ describe("role helpers", () => {
     const u = user(["employee", "manager"]);
     expect(canApprove(u)).toBe(true);
     expect(isAdmin(u)).toBe(false);
+  });
+});
+
+describe("InviteInput — a colleague has a name", () => {
+  const valid = { email: "priya@acme.test", role: "employee" as const, fullName: "Priya Patel" };
+
+  it("refuses an invitation with no name", () => {
+    // Optional until 7 Aug 2026. The address proves who somebody is; the name is
+    // how their colleagues recognise them, and People, the reporting-line
+    // dropdown, the successor picker and every report all fall back to showing
+    // the email address without it.
+    expect(() => InviteInput.parse({ ...valid, fullName: "" })).toThrow();
+    expect(() => InviteInput.parse({ email: valid.email, role: valid.role })).toThrow();
+  });
+
+  it("refuses whitespace, which is not a name", () => {
+    // btrim runs before the length test in invitation_create too. "   " reads as
+    // a name to nothing but length().
+    expect(() => InviteInput.parse({ ...valid, fullName: "   " })).toThrow();
+  });
+
+  it("accepts one, and trims it", () => {
+    expect(InviteInput.parse({ ...valid, fullName: "  Priya Patel  " }).fullName).toBe(
+      "Priya Patel",
+    );
+  });
+
+  it("leaves phone optional — it is the name that changed, not the rest", () => {
+    expect(InviteInput.parse(valid).phone).toBe("");
   });
 });

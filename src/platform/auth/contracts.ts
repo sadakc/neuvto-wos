@@ -117,12 +117,34 @@ export const ProvisionInput = SignupInput.extend({
 });
 export type ProvisionInput = z.infer<typeof ProvisionInput>;
 
-/** Inviting somebody into the caller's own workspace. */
+/**
+ * Inviting somebody into the caller's own workspace.
+ *
+ * `fullName` is REQUIRED, from 7 Aug 2026 — Sada: "The name cannot be optional.
+ * Make it a regular one."
+ *
+ * It was optional because an invitation needs only an address to be deliverable.
+ * That is true and it is not the point: the name is what every other screen
+ * identifies a person BY. `members.tsx` falls back to `m.fullName || m.email`,
+ * so a workspace invited without names is a list of email addresses — in the
+ * approval timeline, the reporting-line dropdown, the successor picker on
+ * deactivation, and every report. The address is a login, not a person.
+ *
+ * `invitation_create` refuses a blank one too, so this is not the only guard.
+ * Provisioning is unaffected: `provision_organization` writes to `invitations`
+ * directly rather than through that function, deliberately, and a platform admin
+ * naming a customer's first administrator is a different decision from a
+ * customer naming their own colleague.
+ */
 export const InviteInput = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address").max(320),
   phone: PhoneInput.optional().default(""),
   role: z.enum(APP_ROLES),
-  fullName: z.string().trim().max(200).optional().default(""),
+  fullName: z
+    .string()
+    .trim()
+    .min(1, "Enter their name — it is how they appear on every screen")
+    .max(200, "That name is too long"),
 });
 export type InviteInput = z.infer<typeof InviteInput>;
 

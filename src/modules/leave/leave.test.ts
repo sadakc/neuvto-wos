@@ -20,7 +20,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { leaveErrorMessage } from "./contracts";
+import { leaveErrorMessage, LeaveTypeInput } from "./contracts";
 
 const calls = vi.hoisted(() => ({ eq: [] as [string, unknown][], uid: "ravi" as string | null }));
 
@@ -90,5 +90,55 @@ describe("leaveErrorMessage — INSUFFICIENT_NOTICE", () => {
     expect(leaveErrorMessage("INSUFFICIENT_NOTICE")).toBe(
       "This leave type needs more notice than that.",
     );
+  });
+});
+
+/**
+ * Whole days or halves — Sada, 7 Aug 2026, on being shown 0.3 and 0.7 in a
+ * balance: "that confuses the end user."
+ *
+ * These mirror leave_type_days_are_halves and leave_type_per_request_is_halves
+ * exactly. A form that accepts what the database refuses produces an
+ * unexplained failure, which is the specific bug this module has met more than
+ * once — so the constraint and the schema are asserted together or not at all.
+ */
+describe("LeaveTypeInput — days come in halves", () => {
+  const base = {
+    name: "Casual",
+    maxDaysPerYear: 12,
+    minNoticeDays: null,
+    maxPerRequest: null,
+    approvalRequired: true,
+  };
+
+  it("accepts whole days and halves", () => {
+    for (const days of [0, 0.5, 12, 12.5, 365]) {
+      expect(LeaveTypeInput.parse({ ...base, maxDaysPerYear: days }).maxDaysPerYear).toBe(days);
+    }
+  });
+
+  it("refuses the decimals that started this", () => {
+    for (const days of [0.3, 0.7, 2.4, 12.1]) {
+      expect(() => LeaveTypeInput.parse({ ...base, maxDaysPerYear: days })).toThrow();
+    }
+  });
+
+  it("applies the same grid to the per-request maximum", () => {
+    expect(LeaveTypeInput.parse({ ...base, maxPerRequest: 2.5 }).maxPerRequest).toBe(2.5);
+    expect(() => LeaveTypeInput.parse({ ...base, maxPerRequest: 2.7 })).toThrow();
+  });
+
+  it("still lets the per-request maximum be null, which means no limit", () => {
+    // Null is not zero here, and never was. The grid must not quietly turn
+    // "no limit" into a number.
+    expect(LeaveTypeInput.parse({ ...base, maxPerRequest: null }).maxPerRequest).toBeNull();
+  });
+
+  it("keeps null notice distinct from zero notice", () => {
+    // The distinction the workspace default depends on: null inherits it, zero
+    // overrides it with "none". The form pre-filled zero until 7 Aug 2026, so
+    // the default could never be reached.
+    expect(LeaveTypeInput.parse({ ...base, minNoticeDays: null }).minNoticeDays).toBeNull();
+    expect(LeaveTypeInput.parse({ ...base, minNoticeDays: 0 }).minNoticeDays).toBe(0);
   });
 });
