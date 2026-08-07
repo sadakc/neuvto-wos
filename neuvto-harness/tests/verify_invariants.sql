@@ -879,6 +879,126 @@ begin
   end if;
   raise notice 'ok: nobody approves who is not allowed to, by reporting line or by chain';
 
+  -- ══════════════════════════ scheduled reports cross tenants; nobody else may
+  --
+  -- Three functions read or act across EVERY organisation, because a cron job
+  -- has no organisation of its own. That is correct and it is also the whole
+  -- risk: `report_schedules_due` returns other customers' recipients,
+  -- `leave_report_schedule_run` reads their leave. Both refuse a caller who has
+  -- an auth.uid(), and both are revoked from `authenticated` — two independent
+  -- locks, because a grant is one careless migration away from coming back and
+  -- `grant execute on all functions in schema public` is a real thing people
+  -- write.
+  --
+  -- Named explicitly rather than pattern-matched: a blanket "no SECURITY DEFINER
+  -- function may be executable by authenticated" would be false for almost every
+  -- function in the product, and a rule with fifty exceptions protects nothing.
+  declare
+    v_sys text[] := array[
+      'report_schedules_due',
+      'report_schedule_mark_run',
+      'leave_report_schedule_run',
+      'leave_summary_lines',
+      'leave_taken_report_for',
+      'leave_pending_report_for'
+    ];
+    v_found int;
+  begin
+    select count(*) into v_found
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+     where ns.nspname = 'public' and p.proname = any (v_sys);
+
+    -- A rename must fail here rather than pass by absence. This assertion is
+    -- worth nothing if the thing it guards has quietly moved.
+    if v_found < array_length(v_sys, 1) then
+      raise exception
+        'INVARIANT FAIL: expected % system-context function(s), found % — one has been renamed or dropped, and this check is now guarding nothing',
+        array_length(v_sys, 1), v_found;
+    end if;
+
+    select coalesce(string_agg(p.proname, ', ' order by p.proname), '')
+      into offenders
+      from pg_proc p join pg_namespace ns on ns.oid = p.pronamespace
+     where ns.nspname = 'public'
+       and p.proname = any (v_sys)
+       and has_function_privilege('authenticated', p.oid, 'EXECUTE');
+    if offenders <> '' then
+      raise exception
+        'INVARIANT FAIL: these cross-organisation functions are executable by a signed-in user: %. They return every tenant''s data — cron is the only caller', offenders;
+    end if;
+    raise notice 'ok: the cross-organisation report functions are system-context only';
+  end;
+
+  -- The February trap, asked about February.
+  --
+  -- A due query can only ever be run on today, so the day it is wrong about is
+  -- the day nobody is testing. `= day_of_month` looks obviously correct and
+  -- means a schedule set to the 31st never fires in February, April, June,
+  -- September or November — silently, for ever, indistinguishable from a broken
+  -- email. The arithmetic is a function precisely so it can be asked about a
+  -- date that is not today, and these are that question.
+  if to_regprocedure('public.report_schedule_fires_on(public.report_cadence,smallint,smallint,date)') is not null then
+    if not public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 31::smallint, date '2026-02-28')
+       or not public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 31::smallint, date '2028-02-29')
+       or not public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 31::smallint, date '2026-08-31')
+       or not public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 30::smallint, date '2026-09-30') then
+      raise exception
+        'INVARIANT FAIL: "the last day of the month" does not fire on a short month''s last day — every February, April, June, September and November is skipped in silence';
+    end if;
+    if public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 31::smallint, date '2026-02-27')
+       or public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 31::smallint, date '2026-09-29')
+       or public.report_schedule_fires_on('monthly'::public.report_cadence, null::smallint, 15::smallint, date '2026-02-16') then
+      raise exception
+        'INVARIANT FAIL: a monthly schedule fired on a day that is not its own';
+    end if;
+    -- ISO weekdays, because the screen numbers Monday 1 and the database must
+    -- agree or every weekly report goes out a day early. 3 Aug 2026 is a Monday.
+    if not public.report_schedule_fires_on('weekly'::public.report_cadence, 1::smallint, null::smallint, date '2026-08-03')
+       or not public.report_schedule_fires_on('weekly'::public.report_cadence, 7::smallint, null::smallint, date '2026-08-09')
+       or public.report_schedule_fires_on('weekly'::public.report_cadence, 7::smallint, null::smallint, date '2026-08-03') then
+      raise exception
+        'INVARIANT FAIL: weekday numbering is not ISO — Monday must be 1 and Sunday 7';
+    end if;
+    raise notice 'ok: "the last day of the month" means February too, and Monday is 1';
+  end if;
+
+  -- A schedule nobody can ever receive.
+  --
+  -- report_definitions is global — it lists what the PRODUCT can send — while a
+  -- schedule belongs to one workspace, and the runner skips any organisation
+  -- whose module is off (D44). So a schedule surviving a module being switched
+  -- off is a row that says "every Monday" on screen and sends nothing, for
+  -- ever, with no error anywhere. Exactly the shape of the queue nobody drained.
+  if to_regclass('public.report_schedules') is not null then
+    select coalesce(string_agg(distinct s.report_key, ', '), '')
+      into offenders
+      from public.report_schedules s
+      join public.report_definitions d on d.report_key = s.report_key
+     where s.is_active
+       and s.deleted_at is null
+       and not public.module_enabled_for(s.organization_id, d.module_key);
+    if offenders <> '' then
+      raise exception
+        'INVARIANT FAIL: active schedule(s) for report(s) whose module is switched off: %. The screen promises an email that will never be sent', offenders;
+    end if;
+    raise notice 'ok: every active report schedule belongs to a module that is switched on';
+
+    -- The RPC validates addresses; a direct write does not. The CHECK constraint
+    -- can only count them, because Postgres forbids a subquery in one.
+    select coalesce(string_agg(r.addr, ', '), '') into offenders
+      from (
+        select unnest(s.recipients) as addr
+          from public.report_schedules s
+         where s.deleted_at is null
+      ) r
+     where r.addr !~ '^[^@[:space:]]+@[^@[:space:]]+\.[^@[:space:]]+$';
+    if offenders <> '' then
+      raise exception
+        'INVARIANT FAIL: report schedule recipient(s) that are not addresses: %. Every send to these fails, and a failed notification is the quietest fault in the product', offenders;
+    end if;
+    raise notice 'ok: every scheduled-report recipient is an email address';
+  end if;
+
   -- ══════════════════════════════ PHASE 2 — every function pins its search_path
   --
   -- Supabase linter 0011 already catches this, on a dashboard nobody opens on

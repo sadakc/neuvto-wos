@@ -632,6 +632,51 @@ same thing from the harness. Neither existed when this broke.
 
 ---
 
+### C · A scheduled report that did not arrive
+
+Scheduled reports go through the same queue as everything else, so section B
+above applies unchanged — look at `notifications` first. What is different is
+that a schedule can fail **before** it ever produces a row, which section B
+cannot see because there is nothing to see.
+
+Work down this list; each step rules out one silence.
+
+```sql
+-- 1. Is the job installed and running at all?
+select jobname, schedule, active from cron.job
+ where jobname = 'neuvto-leave-report-schedules';
+select status, return_message, start_time from cron.job_run_details
+ where jobid = (select jobid from cron.job where jobname = 'neuvto-leave-report-schedules')
+ order by start_time desc limit 5;
+
+-- 2. What does the workspace think it asked for, and when did it last go out?
+--    last_run_on is the ORGANISATION's date, not the server's.
+select organization_id, report_key, cadence, day_of_week, day_of_month,
+       recipients, is_active, last_run_on
+  from public.report_schedules where deleted_at is null;
+
+-- 3. Does the database agree today is the day? Ask about any date, not just today.
+select public.report_schedule_fires_on('monthly', null, 31, date '2026-02-28');  -- t
+```
+
+| What you find                              | What it means                                                                                                                                                          |
+| ------------------------------------------ | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| No `cron.job` row                          | The migration has not been applied to this environment. Code deploys and schema does not — see [DEPLOYMENT.md](DEPLOYMENT.md)                                          |
+| `last_run_on` is today, no notification    | It ran and the module was **switched off** for that workspace (D44). It is deliberately not marked as run, so switching Leave back on resumes at the next occurrence   |
+| `last_run_on` is a day off what you expect | Not a bug. The day is judged in the **organisation's own timezone**, so an Indian workspace's Monday starts 5½ hours before the server's                               |
+| A monthly schedule set to 31               | Fires on the **last day of whatever month it is** — 28 February, 30 April. `= day_of_month` would skip five months a year in silence, which is why the clamp is tested |
+| `failed_reason: NO_TEMPLATE`               | `leave_summary.weekly` / `leave_summary.monthly` are seeded by `20260820110000`. Same repair as above                                                                  |
+
+**The runner is system-context only.** `report_schedules_due`,
+`report_schedule_mark_run` and `leave_report_schedule_run` cross every
+organisation, because cron has no organisation of its own. All three refuse a
+caller with an `auth.uid()` **and** are revoked from `authenticated` — two locks,
+because a grant is one careless migration away from returning.
+`verify_invariants.sql` asserts both, and fails loudly if any of them is renamed
+rather than passing by absence.
+
+---
+
 ### What made both of these invisible
 
 Worth stating plainly, because it is the same lesson twice.

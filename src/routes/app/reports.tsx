@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { getModuleReports, type ModuleReport } from "@/platform/modules";
+import { ScheduledReports } from "@/platform/reports";
 
 export const Route = createFileRoute("/app/reports")({
   ssr: false,
@@ -135,6 +136,23 @@ function ReportsPage() {
           <Active />
         </Suspense>
       </div>
+
+      {/* ─────────────────────────────────────────── scheduled delivery
+          Below the reports rather than beside them: this is not a fourth
+          report, it is how any of the three above arrives without somebody
+          signing in to fetch it. Names no module — a schedule points at a
+          report_key some module registered, and this file still knows nothing
+          about leave (D30). */}
+      <section className="mt-12 border-t border-border pt-8">
+        <h2 className="font-display text-lg font-semibold tracking-tight">Scheduled reports</h2>
+        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+          Have a report emailed on a day you choose, to anybody you name — they do not need a Neuvto
+          account. Everything is timed by your workspace&apos;s own calendar and timezone.
+        </p>
+        <div className="mt-4">
+          <ScheduledReports />
+        </div>
+      </section>
     </div>
   );
 }

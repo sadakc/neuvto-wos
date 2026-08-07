@@ -17,6 +17,45 @@
 
 begin;
 
+-- ------------------------------------------- keep what migrations installed
+--
+-- ⚠️ A GLOBAL TEMPLATE IS SCHEMA, NOT TEST DATA.
+--
+-- `truncate public.organizations cascade` reaches every table with a foreign
+-- key to it, and `notification_templates` is one — so the reset below takes
+-- ALL templates with it, including the ones with `organization_id is null`
+-- that migrations install. Removing the table from the list below does not
+-- help; the cascade gets there anyway.
+--
+-- That was harmless while the platform owned every template, because
+-- `ensure_system_notification_templates()` put its four back. It silently
+-- stopped being harmless the moment a MODULE installed one of its own:
+-- `leave_summary.weekly` and `leave_summary.monthly` come from
+-- 20260820110000, not from that function, so every harness run left a database
+-- in which Leave's scheduled email could not be rendered.
+--
+-- AND THE HARNESS PASSED, which is the part worth dwelling on.
+-- `missing_system_notification_templates()` lists the PLATFORM's four keys and
+-- knows nothing about any module's, so the check written to catch exactly this
+-- could not see it. The NO_TEMPLATE invariant would have caught it eventually —
+-- but only once something tried to send, which is precisely how the 6 Aug 2026
+-- incident stayed invisible until a customer was waiting on it.
+--
+-- Found on 7 Aug 2026 when an end-to-end proof that had passed minutes earlier
+-- began reporting `the email has no template`. The only thing between the two
+-- runs was a harness run.
+--
+-- So the global rows are snapshotted and put back verbatim. Snapshotted rather
+-- than re-derived, because the seed must not know which modules exist (D30) —
+-- it preserves whatever the migrations installed without naming any of it.
+do $$
+begin
+  if to_regclass('public.notification_templates') is not null then
+    create temp table _global_templates on commit drop as
+      select * from public.notification_templates where organization_id is null;
+  end if;
+end $$;
+
 -- ---------------------------------------------------------------- reset
 -- Child-to-parent order; skips anything not yet created.
 do $$
@@ -200,16 +239,27 @@ begin
 end $$;
 
 -- ---------------------------------------------------------------- notifications
--- The reset above truncates notification_templates, which takes the system
--- defaults installed by the migration with it. They are restored by calling the
--- migration's own function rather than by restating the template text here:
--- a second copy would let the harness pass against wording that production does
--- not send, and neither copy would fail when they drifted apart.
+--
+-- Put back exactly what the migrations installed — every global template, not
+-- just the platform's four. See the note at the top of this file for what the
+-- alternative silently did to a module's email.
 do $$
+declare
+  n integer := 0;
 begin
+  if to_regclass('pg_temp._global_templates') is not null then
+    insert into public.notification_templates
+      select * from _global_templates;
+    get diagnostics n = row_count;
+    raise notice 'seeded: notification_templates (% global template(s) restored verbatim)', n;
+  end if;
+
+  -- Belt and braces, and a genuine repair rather than a restore: it inserts
+  -- only what is absent, so on a healthy database it is a no-op, and on one
+  -- whose defaults have gone missing — as production's had on 6 Aug 2026 — it
+  -- puts them back.
   if to_regprocedure('public.ensure_system_notification_templates()') is not null then
     perform public.ensure_system_notification_templates();
-    raise notice 'seeded: notification_templates (system defaults restored)';
   end if;
 end $$;
 
