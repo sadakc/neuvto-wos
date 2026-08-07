@@ -31,11 +31,12 @@ flowchart TB
         end
     end
 
-    subgraph INF["INFRASTRUCTURE"]
+    subgraph INF["INFRASTRUCTURE — bought, not built"]
         direction LR
+        NT["Netlify<br/>hosts neuvto.com"]
         PG[("Supabase Postgres<br/>row-level security")]
         SA["Supabase Auth"]
-        RE["Resend"]
+        RE["Resend<br/>email delivery"]
     end
 
     MOD ==>|"consume"| PLAT

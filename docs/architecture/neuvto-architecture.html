@@ -254,6 +254,40 @@
 
   /* ---------- colophon ---------- */
 
+  /* Added for Plate 05. The document had no table until the toolchain needed
+     one: a diagram shows what connects to what, and says nothing about why a
+     thing was chosen — which is the question a business reader actually has. */
+  .roles {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+    margin: 0.25rem 0 0;
+  }
+  .roles th {
+    text-align: left;
+    font-weight: 600;
+    color: var(--ink);
+    border-bottom: 1px solid var(--rule);
+    padding: 0.5rem 0.75rem 0.5rem 0;
+    white-space: nowrap;
+  }
+  .roles td {
+    vertical-align: top;
+    color: var(--ink-soft);
+    border-bottom: 1px solid var(--rule-soft);
+    padding: 0.6rem 0.75rem 0.6rem 0;
+    line-height: 1.5;
+  }
+  .roles td:first-child { color: var(--ink); font-weight: 600; white-space: nowrap; }
+  .roles tr:last-child td { border-bottom: none; }
+  @media (max-width: 640px) {
+    .roles, .roles tbody, .roles tr, .roles td { display: block; width: 100%; }
+    .roles thead { display: none; }
+    .roles tr { border-bottom: 1px solid var(--rule); padding: 0.5rem 0; }
+    .roles td { border: none; padding: 0.15rem 0; }
+    .roles td:first-child { padding-top: 0.4rem; }
+  }
+
   .colophon {
     margin-top: 5rem;
     padding-top: 1.5rem;
@@ -308,20 +342,22 @@
     <p class="standfirst">
       Neuvto WOS is a multi-tenant Workforce Operating System. Leave Management is the first
       of eleven planned modules — and it is built so that the second one is cheap.
-      These eight plates show how.
+      These nine plates show how, and what carries it into production.
     </p>
     <div class="specs">
-      <span>Version <b>1.0</b></span>
-      <span>28 July 2026</span>
-      <span>Status <b>Phase 0 built</b></span>
+      <span>Version <b>1.1</b></span>
+      <span>7 August 2026</span>
+      <span>Status <b>Live in production</b></span>
     </div>
   </header>
 
   <p class="notice">
-    <strong>What this document is.</strong> It describes the architecture as specified and
-    approved. The platform layer (Phase 0) is built and merged; the Leave module is
-    specified but not yet implemented. Every module name and target quarter comes from the
-    product roadmap; nothing here is estimated or embellished.
+    <strong>What this document is.</strong> It describes the architecture as built. The
+    platform layer and the Leave module are both implemented, deployed, and serving
+    <code>neuvto.com</code> from the pipeline in Plate&nbsp;05. Every module name and
+    target quarter comes from the product roadmap; nothing here is estimated or
+    embellished, and where something is decided but not yet built it says so in those
+    words.
   </p>
 
   <!-- ============================== PART ONE ============================== -->
@@ -331,7 +367,8 @@
     <h2>The argument</h2>
   </div>
   <p class="part-note">
-    Four plates, readable without a technical background.
+    Five plates, readable without a technical background. The last one names every tool
+    the product depends on and why each was chosen.
   </p>
 
   <figure class="plate">
@@ -380,11 +417,12 @@ flowchart TB
         end
     end
 
-    subgraph INF["INFRASTRUCTURE"]
+    subgraph INF["INFRASTRUCTURE — bought, not built"]
         direction LR
+        NT["Netlify<br/>hosts neuvto.com"]
         PG[("Supabase Postgres<br/>row-level security")]
         SA["Supabase Auth"]
-        RE["Resend"]
+        RE["Resend<br/>email delivery"]
     end
 
     MOD ==>|"consume"| PLAT
@@ -539,6 +577,143 @@ flowchart LR
     </div>
   </figure>
 
+  <figure class="plate">
+    <div class="plate-no">05</div>
+    <div class="plate-main">
+      <h3>What each tool is for</h3>
+      <p class="claim">
+        <em>What this proves</em>
+        Six services carry this product, and not one of them was chosen for novelty.
+        Each does a job that would otherwise be done by hand, badly, by somebody who
+        should be doing something else. The pipeline below is also the answer to a
+        question that cost two outages: <em>which database is the live site actually
+        talking to?</em>
+      </p>
+      <div class="plate-body">
+        <pre class="mermaid">%%{init:{'theme':'base','themeVariables':{'background':'transparent','primaryColor':'#13252F','primaryTextColor':'#DCE9F0','primaryBorderColor':'#31556A','lineColor':'#5B8AA5','secondaryColor':'#0F1F29','tertiaryColor':'#0D1B24','clusterBkg':'#0D1C25','clusterBorder':'#284655','fontFamily':'ui-monospace, SFMono-Regular, Menlo, monospace','fontSize':'12px','edgeLabelBackground':'#0B1720'}}}%%
+flowchart TB
+    subgraph AUTH["WHERE THE WORK IS DONE — two authoring tools, one repository"]
+        direction LR
+        LOV["<b>Lovable</b><br/>visual editing &amp; preview<br/>points at PRE-PRODUCTION"]
+        CC["<b>Claude Code</b><br/>engineering, migrations,<br/>tests, review"]
+    end
+
+    subgraph SRC["SOURCE OF TRUTH"]
+        GH["<b>GitHub</b> · main branch<br/>every change arrives by pull request"]
+    end
+
+    subgraph GATE["AUTOMATED CHECKS — nothing reaches a customer without passing"]
+        direction LR
+        CI["<b>CI</b><br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
+        BUILD["<b>Build</b><br/>GitHub Actions<br/>our variables, our machine"]
+        VER1["<b>Gate 1</b><br/>which database does<br/>this build talk to?"]
+        VER2["<b>Gate 2</b><br/>which database does<br/>the LIVE SITE talk to?"]
+    end
+
+    subgraph RUN["WHAT A CUSTOMER TOUCHES"]
+        direction LR
+        NET["<b>Netlify</b><br/>hosts neuvto.com"]
+        SUP[("<b>Supabase</b><br/>Postgres · Auth<br/>ap-south-1")]
+        RES["<b>Resend</b><br/>sign-in codes<br/>&amp; notifications"]
+    end
+
+    subgraph DEV["BEFORE ANY OF IT — a full copy on one laptop"]
+        DOCK["<b>Docker</b><br/>runs Postgres, Auth and a mail<br/>catcher locally. No cloud, no cost,<br/>no customer data."]
+    end
+
+    LOV -->|"pull request"| GH
+    CC  -->|"pull request"| GH
+    GH  --> CI
+    CI  --> BUILD
+    BUILD --> VER1
+    VER1 -->|"passes"| NET
+    NET --> VER2
+    NET --> SUP
+    NET --> RES
+    DOCK -.->|"same schema,<br/>proved before push"| GH
+</pre>
+      </div>
+
+      <table class="roles">
+        <thead>
+          <tr><th>Tool</th><th>What it does</th><th>Why this one</th></tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>Docker</td>
+            <td>Runs a complete private copy of the product on one laptop — database,
+                sign-in, and a mail catcher that traps outgoing email instead of sending
+                it.</td>
+            <td>Every change is proved against a real database before it is pushed
+                anywhere. It costs nothing, needs no internet, and holds no customer
+                data — so a mistake made here reaches nobody.</td>
+          </tr>
+          <tr>
+            <td>Lovable</td>
+            <td>Visual editing and instant preview of screens. Its preview points at the
+                pre-production database, never the real one.</td>
+            <td>It makes changing how something <em>looks</em> fast, without waiting on
+                an engineer. Its changes arrive as pull requests and are reviewed like any
+                other — it writes to the repository, and once scaffolded a conflicting
+                email system that had to be removed.</td>
+          </tr>
+          <tr>
+            <td>Claude Code</td>
+            <td>The engineering seat: database migrations, business rules, tests,
+                security review, and the release checks.</td>
+            <td>The work that has to be <em>correct</em> rather than merely visible —
+                tenant isolation, leave arithmetic, permissions. It is also what writes
+                the tests that try to break each rule before it is trusted.</td>
+          </tr>
+          <tr>
+            <td>GitHub</td>
+            <td>Holds the code, and runs the automated checks on every proposed change.</td>
+            <td>One place that is the truth. Nothing reaches customers without passing
+                lint, types, 403 tests, and a full migration and tenant-isolation run.</td>
+          </tr>
+          <tr>
+            <td>Netlify</td>
+            <td>Serves <code>neuvto.com</code> to the world.</td>
+            <td>Chosen on 7&nbsp;Aug&nbsp;2026 after the published site twice went live
+                wired to the <em>wrong database</em> — the previous host supplied its own
+                settings at build time and silently overrode ours. Building it ourselves
+                and handing Netlify the finished result makes that impossible rather than
+                unlikely.</td>
+          </tr>
+          <tr>
+            <td>Supabase</td>
+            <td>The database, sign-in, and the scheduled jobs. Every customer's data sits
+                in one database, separated by rules the database itself enforces.</td>
+            <td>Separation enforced by the database cannot be forgotten by a developer.
+                A query that fails to filter by customer returns nothing rather than
+                somebody else's employees.</td>
+          </tr>
+          <tr>
+            <td>Resend</td>
+            <td>Delivers sign-in codes and notification email from
+                <code>neuvto.com</code>.</td>
+            <td>Mail sent from a domain we own and have proved we own. Without that,
+                sign-in codes land in spam — which is indistinguishable, to a customer,
+                from the product being broken.</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <p class="claim" style="margin-top:1.1rem">
+        <em>The two gates, and why they exist</em>
+        On 3&nbsp;and 6&nbsp;August 2026 the live site was serving code wired to the
+        pre-production database. Sign-in appeared to work and sent nothing: the screen
+        said a code had been sent, and it had been asked of a database with no email
+        configured. Both times the deploy reported success. Gate&nbsp;1 now inspects the
+        built files before they are published; Gate&nbsp;2 inspects the running site
+        afterwards. Either one failing stops the release, and a check that cannot find an
+        answer counts as a failure rather than a pass.
+      </p>
+
+      <div class="plate-foot"><span>Source · scripts/verify-deploy.sh · .github/workflows/deploy.yml</span><span>Adopted 7 Aug 2026</span></div>
+    </div>
+  </figure>
+
   <!-- ============================== PART TWO ============================== -->
 
   <div class="part">
@@ -551,7 +726,7 @@ flowchart LR
   </p>
 
   <figure class="plate">
-    <div class="plate-no">05</div>
+    <div class="plate-no">06</div>
     <div class="plate-main">
       <h3>Component architecture</h3>
       <p class="claim">
@@ -625,7 +800,7 @@ flowchart TB
   </figure>
 
   <figure class="plate">
-    <div class="plate-no">06</div>
+    <div class="plate-no">07</div>
     <div class="plate-main">
       <h3>Leave submission — the hard path</h3>
       <p class="claim">
@@ -697,7 +872,7 @@ sequenceDiagram
   </figure>
 
   <figure class="plate">
-    <div class="plate-no">07</div>
+    <div class="plate-no">08</div>
     <div class="plate-main">
       <h3>Approval Engine — state machine</h3>
       <p class="claim">
@@ -753,7 +928,7 @@ stateDiagram-v2
   </figure>
 
   <figure class="plate">
-    <div class="plate-no">08</div>
+    <div class="plate-no">09</div>
     <div class="plate-main">
       <h3>Data model</h3>
       <p class="claim">
@@ -884,16 +1059,19 @@ erDiagram
     <div>
       <h4>Status</h4>
       <p>
-        Architecture approved; construction not started. Module names and quarters are the
+        Platform and Leave module built and live. Module names and quarters are the
         roadmap's own. No cost, headcount or revenue figures appear here because none have
-        been established.
+        been established. Everything in the stack below runs on a free tier — nothing is
+        paid for until the MVP ships.
       </p>
     </div>
     <div>
       <h4>Stack</h4>
       <p>
         TanStack Start · TypeScript · Tailwind · shadcn/ui · Supabase Postgres with
-        row-level security · Resend. Production database in <code>ap-south-1</code>.
+        row-level security · Resend. Built by GitHub Actions, served by Netlify.
+        Production database in <code>ap-south-1</code>. Plate&nbsp;05 explains what each
+        piece is for.
       </p>
     </div>
     <div>

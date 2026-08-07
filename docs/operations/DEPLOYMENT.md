@@ -10,17 +10,27 @@ build against a broken database.
 
 ## The three environments
 
-| Environment        | Project ref            | Reached by                                                                   | Contains                       |
-| ------------------ | ---------------------- | ---------------------------------------------------------------------------- | ------------------------------ |
-| **Local**          | —                      | `supabase start` · `.env.local` · `bun run harness`                          | Whatever your migrations build |
-| **Pre-production** | `vkyvzhgigncranprhidn` | Lovable's own database tool · Lovable previews                               | Lovable Cloud — Sada's testing |
-| **Production**     | `udrzhfgwqgolvyimbwto` | `bash scripts/prod-cutover.sh` · `psql` · the harness · `neuvto.lovable.app` | Real customer data             |
+| Environment        | Project ref            | Reached by                                                           | Contains                       |
+| ------------------ | ---------------------- | -------------------------------------------------------------------- | ------------------------------ |
+| **Local**          | —                      | `supabase start` · `.env.local` · `bun run harness`                  | Whatever your migrations build |
+| **Pre-production** | `vkyvzhgigncranprhidn` | Lovable's own database tool · Lovable previews                       | Lovable Cloud — Sada's testing |
+| **Production**     | `udrzhfgwqgolvyimbwto` | `bash scripts/prod-cutover.sh` · `psql` · the harness · `neuvto.com` | Real customer data             |
 
 **Hosting and database are separate choices**, and this is the fact the whole
-arrangement rests on. Lovable builds and publishes `neuvto.lovable.app`, but the
-app is plain `supabase-js` reading `VITE_SUPABASE_URL` — `src/integrations/lovable/index.ts`
-is auto-generated and imported by nothing. So the published site talks to
-whichever database `.env` names, and that is a project Sada owns.
+arrangement rests on. Since 7 Aug 2026 the site is built by GitHub Actions and
+served by **Netlify**; Lovable still builds its own preview, pointed at
+pre-production, which is where a preview belongs. The app is plain `supabase-js`
+reading `VITE_SUPABASE_URL` — `src/integrations/lovable/index.ts` is
+auto-generated and imported by nothing.
+
+> **This paragraph used to end "so the published site talks to whichever database
+> `.env` names".** That was false, and believing it cost two outages. Lovable
+> supplies its own backend variables at build time and they override the
+> repository's, so a correct `.env` sat merged and inert while `neuvto.com` served
+> a build wired to pre-production — on 3 Aug, and again on 6 Aug. See
+> [PRODUCTION_HOSTING.md](PRODUCTION_HOSTING.md) for the move to a pipeline we
+> own, and run `bash scripts/verify-deploy.sh` to ask the live site directly
+> rather than reasoning about it.
 
 > ## Why production is not Lovable Cloud
 >
@@ -55,10 +65,17 @@ whichever database `.env` names, and that is a project Sada owns.
 
 > ## ⚠️ `.env` decides which database the published app talks to
 >
-> It is committed, and it is the **only** thing that decides. `scripts/lovable-gate.mjs`
-> therefore blocks any Lovable pull request touching it — a regenerated `.env`
-> would silently repoint the live site, and every symptom of that is a data
-> problem rather than a config one.
+> It is committed, and for **local and CI builds** it is what decides.
+> `scripts/lovable-gate.mjs` blocks any Lovable pull request touching it — a
+> regenerated `.env` would silently repoint a local build, and every symptom of
+> that is a data problem rather than a config one.
+>
+> It is **not** what decided the published site while Lovable published it: that
+> build injected its own values over these. It is authoritative again now that
+> GitHub Actions does the building, but the deploy workflow passes the values in
+> from repository secrets explicitly rather than relying on this file — because
+> an environment variable set to an empty string silently overrides a correct
+> `.env` entry, which is its own outage on 7 Aug.
 >
 > **`SUPABASE_PROJECT_ID` must not be set in `.env`.** The unprefixed variable is
 > read by nothing in the app, but the Supabase CLI honours it and it **silently
@@ -125,9 +142,9 @@ The `version` is the filename's timestamp prefix; `name` is the filename without
 by Lovable's own agent populate it, ours do not, and the difference is harmless.
 It is the `version` that prevents re-application.
 
-**4 · Confirm the published site still loads.** `neuvto.lovable.app` — the
-landing page uses `demo_requests`, which no platform migration touches, so a
-broken landing page means something unexpected happened.
+**4 · Confirm the published site still loads.** `neuvto.com` — the landing page
+uses `demo_requests`, which no platform migration touches, so a broken landing
+page means something unexpected happened.
 
 ---
 
@@ -234,13 +251,18 @@ Neither is a migration, and both fail in a way that points at the application:
   only a magic link, so the 6-digit code screen can never be completed — the user
   waits for a code that was never sent. Dashboard → Authentication → Email
   Templates.
-- **Site URL and the redirect allow-list must include `https://neuvto.lovable.app`.**
-  Otherwise every link in every email lands somewhere useless.
+- **Site URL and the redirect allow-list must include `https://neuvto.com`.**
+  Otherwise every link in every email lands somewhere useless. The hosted
+  `site_url` is already `https://neuvto.com`; it is deliberately NOT set from
+  `supabase/config.toml`, whose `[auth]` block still names `localhost` — see the
+  warning at the end of that file.
 
 ### Last: repoint the app
 
-`.env` is what makes production real. Until this changes, migrations are in
-production and the published site is still talking to pre-production:
+`.env` is what makes production real **for a local or CI build**. Until this
+changes, migrations are in production and a build made here still talks to
+pre-production. What the _published_ site talks to is decided by the deploy
+workflow's repository secrets — see [PRODUCTION_HOSTING.md](PRODUCTION_HOSTING.md):
 
 ```
 VITE_SUPABASE_URL="https://udrzhfgwqgolvyimbwto.supabase.co"
@@ -253,8 +275,8 @@ VITE_SUPABASE_PROJECT_ID="udrzhfgwqgolvyimbwto"
 Do **not** add `SUPABASE_PROJECT_ID` — see the warning above about it hijacking
 local container naming.
 
-Before doing it, confirm nothing on `neuvto.lovable.app` matters: repointing
-means the accounts and data there stop being visible to the live site.
+Before doing it, confirm nothing on the pre-production project matters:
+repointing means the accounts and data there stop being visible to the live site.
 Provisioning is invitation-only and Sada names every administrator, so this
 should be his own testing — but check rather than assume.
 
@@ -427,7 +449,10 @@ Then, after the merge:
 - [ ] CI green on `main`
 - [ ] Migration applied to Lovable Cloud and verified by `SELECT`
 - [ ] Row present in `supabase_migrations.schema_migrations`
-- [ ] `neuvto.lovable.app` loads
+- [ ] **`bash scripts/verify-deploy.sh` passes** — asks the live site which
+      database it is actually talking to. Two outages were reported as successful
+      deploys before this existed; a green deploy is not evidence
+- [ ] `neuvto.com` loads
 - [ ] **Both Vault secrets set in that environment** — see above. A migration
       cannot do this, and without it every email queues silently
 - [ ] **`select * from cron.job`** returns the jobs the migrations declare, and

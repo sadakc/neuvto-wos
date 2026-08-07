@@ -335,20 +335,25 @@ points at.**
 
 PR #32 ("the published app talks to the database we own") changed `.env`, and its
 premise — "`.env` is the only thing that decides which database the app reaches"
-— does not hold for the **published** artifact. Lovable builds the site and
-supplies its own backend variables, so the bundle at `neuvto.com` still resolves
-to `vkyvzhgigncranprhidn`. **The repoint is merged but not live.** Until the site
-is rebuilt against our own project, anything configured on `neuvto-wos-prod`
-changes nothing a customer would experience.
+— did not hold for the **published** artifact: Lovable built the site and supplied
+its own backend variables, so the bundle at `neuvto.com` resolved to
+`vkyvzhgigncranprhidn` while the repoint sat merged and inert. It happened on
+3 Aug and again on 6 Aug 2026.
+
+**Resolved 7 Aug 2026.** The site is now built by GitHub Actions with variables
+we supply and served by Netlify; Lovable no longer publishes production. Verified
+by a real sign-in code sent from `neuvto.com` through the production project, and
+guarded on every deploy by `scripts/verify-deploy.sh`. See
+[PRODUCTION_HOSTING.md](PRODUCTION_HOSTING.md).
 
 **Fixed on `neuvto-wos-prod` today**, all three verified by reading the config
 back:
 
-| Setting             | Was                     | Now                                                                      |
-| ------------------- | ----------------------- | ------------------------------------------------------------------------ |
-| `mailer_otp_length` | **8**                   | 6                                                                        |
-| `site_url`          | `http://localhost:3000` | `https://neuvto.com`                                                     |
-| `uri_allow_list`    | _(empty)_               | `https://neuvto.com`, `https://neuvto.lovable.app`, and `/**` under each |
+| Setting             | Was                     | Now                                                                          |
+| ------------------- | ----------------------- | ---------------------------------------------------------------------------- |
+| `mailer_otp_length` | **8**                   | 6                                                                            |
+| `site_url`          | `http://localhost:3000` | `https://neuvto.com`                                                         |
+| `uri_allow_list`    | _(empty)_               | `https://neuvto.com`, `https://neuvto-wos.netlify.app`, and `/**` under each |
 
 The OTP length was the one nobody had written down. The form validates
 `/^\d{6}$/` and the input caps at six characters, so an eight-digit code could
@@ -482,9 +487,10 @@ Test with an address **that has never signed in before**, and then with one that
 has. They take different routes — Confirm signup and Magic Link — and for months
 only one of them was ever checked.
 
-Until the published site is rebuilt against `neuvto-wos-prod` this proves the
-project is correct, not that a customer's sign-in works — `neuvto.com` still
-serves a bundle wired to Lovable's backend. See "Where this stands" above.
+Since 7 Aug 2026 this proves both: `neuvto.com` is built by GitHub Actions
+against `neuvto-wos-prod` and a real sign-in code has been delivered end to end.
+Before that date the same test proved only that the project was configured
+correctly, because the published bundle was wired to a different database.
 
 ### Applied to `neuvto-wos-prod`, 3 Aug 2026
 
