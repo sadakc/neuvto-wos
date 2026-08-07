@@ -6,7 +6,7 @@ flowchart TB
         INT["Third-party<br/>integrations"]
     end
 
-    subgraph SURFACES["TRANSPORT SURFACES — two ways in, one contract"]
+    subgraph SURFACES["TRANSPORT SURFACES<br/>two ways in, one contract"]
         direction LR
         SF["Server functions<br/>TanStack Start"]
         RST["/api/v1/*<br/>REST"]
@@ -20,7 +20,7 @@ flowchart TB
         DOM["domain logic<br/>balances · entitlement"]
     end
 
-    subgraph PLATFORM["src/platform — modules import this; it never imports them"]
+    subgraph PLATFORM["src/platform<br/>modules import this;<br/>it never imports them"]
         direction LR
         APR["approvals"]
         NOT["notifications"]

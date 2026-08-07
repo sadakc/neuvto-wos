@@ -1,5 +1,5 @@
 flowchart TB
-    subgraph MOD["BUSINESS MODULES — independent, enabled per customer"]
+    subgraph MOD["BUSINESS MODULES<br/>independent, enabled per customer"]
         direction LR
         L["Leave Management<br/>MVP · Q3 2026"]
         A["Attendance<br/>Q4 2026"]
@@ -9,7 +9,7 @@ flowchart TB
         R["6 further modules<br/>through Q1 2029"]
     end
 
-    subgraph PLAT["PLATFORM LAYER — built once, consumed by every module"]
+    subgraph PLAT["PLATFORM LAYER<br/>built once, consumed by every module"]
         direction LR
         subgraph BUILT["Built in MVP"]
             direction LR
@@ -31,7 +31,7 @@ flowchart TB
         end
     end
 
-    subgraph INF["INFRASTRUCTURE — bought, not built"]
+    subgraph INF["INFRASTRUCTURE<br/>bought, not built"]
         direction LR
         NT["Netlify<br/>hosts neuvto.com"]
         PG[("Supabase Postgres<br/>row-level security")]
