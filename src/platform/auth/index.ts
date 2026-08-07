@@ -55,6 +55,7 @@ export {
 
 export {
   APP_ROLES,
+  ROLE_LABELS,
   EmailInput,
   VerifyOtpInput,
   SignupInput,

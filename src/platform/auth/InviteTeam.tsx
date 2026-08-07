@@ -16,15 +16,8 @@
 
 import { useState } from "react";
 import { isAppError } from "@/platform/errors";
-import { APP_ROLES, type AppRole } from "./contracts";
+import { APP_ROLES, ROLE_LABELS, type AppRole } from "./contracts";
 import { inviteMember } from "./members";
-
-const ROLE_LABELS: Record<AppRole, string> = {
-  org_admin: "Administrator",
-  hr_admin: "HR administrator",
-  manager: "Manager",
-  employee: "Employee",
-};
 
 export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
   const [email, setEmail] = useState("");

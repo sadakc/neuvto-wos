@@ -347,6 +347,7 @@ export type Database = {
           release: string | null
           route: string | null
           severity: string
+          source: string
           stack: string | null
           user_agent: string | null
         }
@@ -363,6 +364,7 @@ export type Database = {
           release?: string | null
           route?: string | null
           severity?: string
+          source?: string
           stack?: string | null
           user_agent?: string | null
         }
@@ -379,6 +381,7 @@ export type Database = {
           release?: string | null
           route?: string | null
           severity?: string
+          source?: string
           stack?: string | null
           user_agent?: string | null
         }
@@ -1419,6 +1422,7 @@ export type Database = {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: number
       }
+      can_approve: { Args: { _user_id: string }; Returns: boolean }
       chain_condition_matches: {
         Args: { _context: Json; _field: string; _op: string; _value: number }
         Returns: boolean
@@ -1498,6 +1502,10 @@ export type Database = {
       invitation_revoke: { Args: { _id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_approver_on: { Args: { _request_id: string }; Returns: boolean }
+      is_approver_role: {
+        Args: { _role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
@@ -1612,6 +1620,7 @@ export type Database = {
         Args: { _org_id: string; _ref: string }
         Returns: boolean
       }
+      missing_system_notification_templates: { Args: never; Returns: string[] }
       module_enabled_for: {
         Args: { _module_key: string; _org_id: string }
         Returns: boolean
@@ -1738,6 +1747,29 @@ export type Database = {
         }
         Returns: undefined
       }
+      record_demo_request: {
+        Args: {
+          p_company?: string
+          p_email: string
+          p_employees?: string
+          p_message?: string
+          p_name: string
+        }
+        Returns: undefined
+      }
+      record_public_client_error: {
+        Args: {
+          p_fingerprint: string
+          p_mechanism: string
+          p_message: string
+          p_release?: string
+          p_route?: string
+          p_severity?: string
+          p_stack?: string
+          p_user_agent?: string
+        }
+        Returns: undefined
+      }
       render_template: {
         Args: { _payload: Json; _template: string }
         Returns: string
@@ -1762,6 +1794,10 @@ export type Database = {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
       }
+      scrub_client_text: {
+        Args: { _limit: number; _text: string }
+        Returns: string
+      }
       session_policy: {
         Args: never
         Returns: {
@@ -1779,7 +1815,13 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "org_admin" | "hr_admin" | "manager" | "employee"
+      app_role:
+        | "org_admin"
+        | "hr_admin"
+        | "manager"
+        | "employee"
+        | "supervisor"
+        | "coordinator"
       approval_decision: "pending" | "approved" | "rejected"
       approval_status: "pending" | "approved" | "rejected" | "cancelled"
       approver_rule: "reporting_manager" | "manager_of_manager" | "role"
@@ -1921,7 +1963,14 @@ export const Constants = {
   },
   public: {
     Enums: {
-      app_role: ["org_admin", "hr_admin", "manager", "employee"],
+      app_role: [
+        "org_admin",
+        "hr_admin",
+        "manager",
+        "employee",
+        "supervisor",
+        "coordinator",
+      ],
       approval_decision: ["pending", "approved", "rejected"],
       approval_status: ["pending", "approved", "rejected", "cancelled"],
       approver_rule: ["reporting_manager", "manager_of_manager", "role"],

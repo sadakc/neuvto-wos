@@ -7,8 +7,46 @@
 
 import { z } from "zod";
 
-export const APP_ROLES = ["org_admin", "hr_admin", "manager", "employee"] as const;
+/**
+ * Mirrors the `app_role` enum. Order is display order — administrators first,
+ * then the roles that approve, then the one that does not.
+ *
+ * Supervisor and Coordinator arrived 7 Aug 2026 at Sada's request. They APPROVE
+ * and they do not ADMINISTER: `canApprove` includes them, `isAdmin` does not.
+ * Officer was asked for and then withdrawn once the cost was clear — a Postgres
+ * enum value can be added but never removed, so it waits until it is wanted.
+ */
+export const APP_ROLES = [
+  "org_admin",
+  "hr_admin",
+  "manager",
+  "supervisor",
+  "coordinator",
+  "employee",
+] as const;
 export type AppRole = (typeof APP_ROLES)[number];
+
+/**
+ * What each role is CALLED on screen. One definition, because there were four.
+ *
+ * InviteTeam's own header complains that a fourth copy of the invite form would
+ * be "a fourth place for the wording to drift" — and four copies of this map had
+ * quietly appeared underneath it. Adding two roles is what surfaced them: three
+ * were `Record<AppRole, string>` and failed typecheck immediately, and the
+ * fourth, on the dashboard, was `Record<string, string>` and would have rendered
+ * NOTHING for a Supervisor while compiling perfectly.
+ *
+ * `Record<AppRole, string>` here means the next role added cannot be forgotten
+ * anywhere — the compiler names every screen that has to say something about it.
+ */
+export const ROLE_LABELS: Record<AppRole, string> = {
+  org_admin: "Administrator",
+  hr_admin: "HR administrator",
+  manager: "Manager",
+  supervisor: "Supervisor",
+  coordinator: "Coordinator",
+  employee: "Employee",
+};
 
 export const EmailInput = z.object({
   email: z.string().trim().toLowerCase().email("Enter a valid email address").max(320),

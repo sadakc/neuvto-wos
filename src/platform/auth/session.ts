@@ -127,7 +127,27 @@ export function isAdmin(user: CurrentUser | null): boolean {
   return hasRole(user, "org_admin") || hasRole(user, "hr_admin");
 }
 
-/** Anyone who can approve: an explicit manager, or an admin. */
+/**
+ * Anyone who can approve.
+ *
+ * Mirrors `is_approver_role()` in the database (D57), which is the copy that
+ * actually decides anything — this one only decides what a screen offers.
+ *
+ * Note what is absent: `employee`. And note that this is deliberately NOT
+ * `isAdmin` plus extras — a Supervisor approves leave for their own reports and
+ * administers nothing, so Settings, People and the workspace-wide reports stay
+ * closed to them.
+ *
+ * This function was never the enforcement. Approvals resolve through
+ * `resolve_approver`, whose first rule reads `profiles.manager_id` — a column
+ * with no opinion about the role attached to it. That is why D57 guards where a
+ * manager is SET rather than where one is read.
+ */
 export function canApprove(user: CurrentUser | null): boolean {
-  return hasRole(user, "manager") || isAdmin(user);
+  return (
+    hasRole(user, "manager") ||
+    hasRole(user, "supervisor") ||
+    hasRole(user, "coordinator") ||
+    isAdmin(user)
+  );
 }
