@@ -1,6 +1,6 @@
 # NEUVTO WOS — Security Policy
 
-**Version:** 1.0 · **Status:** Active
+**Version:** 1.1 · **Status:** Active · **Updated:** 9 Aug 2026
 
 Covers **D20–D22**, plus the encryption and compliance positions. Security decisions that
 are cheap now and awkward later — session policy shapes the auth build, and an attachment
@@ -184,6 +184,44 @@ Roles never live on `profiles`. A role column on a user-editable table is privil
 escalation waiting to happen.
 
 Cross-tenant access returns **403, never 404** (API standards §5).
+
+### GRANT and RLS answer different questions (D65)
+
+RLS answers **which rows**. GRANT answers **whether you may touch the table at all**.
+Both are required, and it is easy to ship one believing you shipped two.
+
+| Role            | Holds on `public` tables                       |
+| --------------- | ---------------------------------------------- |
+| `anon`          | **nothing**                                    |
+| `authenticated` | `SELECT` / `INSERT` / `UPDATE` / `DELETE` only |
+| `service_role`  | everything — it bypasses RLS by design         |
+
+`anon` is what the **publishable key** resolves to, and that key ships inside the
+JavaScript bundle. Until 9 Aug 2026 it held four privileges on 24 of 27 tables locally,
+and `SELECT`/`INSERT`/`UPDATE`/`DELETE` on 24 tables in production — never by decision,
+always from Supabase's stock default privileges. RLS refused all of it, which is why
+nothing leaked and why it went unnoticed: a single policy written `using (true)`, or one
+table with RLS left off, was the whole distance between a stranger and every customer's
+employee records.
+
+`authenticated` keeps its DML because PostgREST needs it — revoking `SELECT` takes the
+application offline, it does not harden it. What it loses is `TRUNCATE`, `REFERENCES`,
+`TRIGGER` and `MAINTAIN`. **`TRUNCATE` ignores RLS entirely**: on 8 Aug 2026 db-guardian
+emptied `demo_requests` — every prospect who had ever used the form — while signed in as
+an ordinary employee of a customer organisation.
+
+**Three rules follow, and `verify_invariants.sql` enforces all three:**
+
+- `anon` holds no privilege on any table in `public`.
+- No browser role holds `TRUNCATE`, `REFERENCES`, `TRIGGER` or `MAINTAIN`.
+- A table with RLS enabled and **no policy** — this schema's way of saying "reachable only
+  through a `SECURITY DEFINER` function" — grants nothing to either browser role. Inert is
+  not the same as absent, and `platform_admins` was granted `SELECT` on production while
+  its own migration said no grant existed.
+
+Enforced as invariants rather than trusted to `ALTER DEFAULT PRIVILEGES`, because one
+default is unreachable: `supabase_admin` holds its own default ACL on `public` granting
+everything to both roles, and `postgres` is not a member of it and cannot change it.
 
 ---
 
