@@ -152,6 +152,40 @@ export const ProvisionInput = SignupInput.extend({
   adminEmail: z.string().trim().toLowerCase().email("Enter the administrator's email address"),
   adminPhone: PhoneInput.optional().default(""),
   adminName: z.string().trim().max(200).optional().default(""),
+  /**
+   * Whether this workspace is one of Neuvto's own rehearsals rather than a
+   * customer's.
+   *
+   * Defaults to FALSE, and the direction of that default is the whole point: an
+   * unmarked test workspace is an inconvenience, a customer wrongly marked as
+   * test is on the allow-list a future purge deletes from
+   * (docs/operations/TEST_DATA_PURGE.md). If this value is ever missing,
+   * malformed, or ambiguous, the safe reading is "this is a real customer".
+   *
+   * Nothing in the product may branch on it — a test workspace that behaves
+   * differently from a real one has stopped testing the real one. It exists
+   * only so a deletion months from now can tell them apart.
+   *
+   * ⚠️ `z.boolean()`, and NEVER `z.coerce.boolean()`.
+   *
+   * This is the only thing standing between the database and a truthy string.
+   * `provision_organization` accepts anything Postgres reads as a boolean, so
+   * `"on"` — the exact value an HTML checkbox submits — and `1` — what any
+   * `Number(checked)` produces — both MARK the workspace when they reach it.
+   * Verified over real HTTP, along with the reassuring half: `"false"`, `"0"`,
+   * `0`, `null` and omission all leave it unmarked, so the default cannot be
+   * flipped by absence.
+   *
+   * `z.boolean()` refuses every one of those strings with `invalid_type`. The
+   * coercing form does not, and it fails in the worst available direction:
+   *
+   *     z.coerce.boolean().parse("false")  // => true
+   *
+   * — a non-empty string is truthy, so the literal word "false" marks the
+   * workspace, and every customer provisioned through such a form joins the
+   * allow-list a purge deletes from.
+   */
+  isTest: z.boolean().optional().default(false),
 });
 export type ProvisionInput = z.infer<typeof ProvisionInput>;
 

@@ -678,10 +678,25 @@ begin
   -- behaviour that had to stop, and a SECURITY DEFINER function which grants
   -- org_admin is not something to leave in the schema behind a comment.
   --
-  -- to_regprocedure, not to_regproc: only the former accepts an argument list.
-  -- to_regproc returns null for a signature with parentheses, which once made a
-  -- guard here permanently false and skipped every assertion below without a word.
-  if to_regprocedure('public.provision_organization(text,text,text,text,text)') is not null then
+  -- BY NAME, NOT BY SIGNATURE — and this is the SECOND time.
+  --
+  -- The note this replaces warned that `to_regproc` on a signature with
+  -- parentheses "once made a guard here permanently false and skipped every
+  -- assertion below without a word". The fix at the time was `to_regprocedure`
+  -- with the five-argument list, which had the same failure waiting inside it:
+  -- on 8 Aug 2026 `_is_test boolean` was added (20260821100000), the function
+  -- was dropped and recreated with six arguments, and lines 684–1115 went dead
+  -- — 24 assertion sites including "an ordinary user made themselves a platform
+  -- admin", "a tenant org_admin provisioned an organisation", and the whole D42
+  -- staff-read-no-tenant-data block. The file still printed
+  -- "--- RLS verification passed ---".
+  --
+  -- Pinning a signature to test for existence is the bug, not which catalogue
+  -- function does the pinning. Ask for the name.
+  if exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'provision_organization'
+  ) then
 
     if to_regprocedure('public.signup_organization(text,text,text)') is not null then
       raise exception 'RLS FAIL: signup_organization still exists — self-serve signup is meant to be gone (D39)';

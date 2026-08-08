@@ -9,6 +9,8 @@ import {
   listOrganizationModules,
   setOrganizationModule,
   provisionOrganization,
+  markTestOrganization,
+  unmarkTestOrganization,
   suggestSlug,
   type CustomerModule,
   type CustomerWorkspace,
@@ -69,10 +71,41 @@ function AdminConsole() {
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPhone, setAdminPhone] = useState("");
   const [adminName, setAdminName] = useState("");
+  // Defaults to false and is reset to false after every provision, so the
+  // dangerous value is never the sticky one. See the note on `isTest` in
+  // platform/auth/contracts.ts.
+  const [isTest, setIsTest] = useState(false);
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [copied, setCopied] = useState("");
+
+  // Marking a workspace that already exists.
+  //
+  // ONE state, not `markingFor` plus `markReason`.
+  //
+  // As two, `mark()` closed over a stale `markingFor` — the value at the moment
+  // the button was pressed, not the value when the request came back. Start a
+  // write on one row, open another row while it is in flight, and the completion
+  // compared the OLD id, matched, and cleared the form that was now open on a
+  // different row along with everything typed into it. Held together, "which row
+  // is open and what has been typed into it" cannot disagree, and the completion
+  // path is a single functional update that sees the current value.
+  //
+  // `markBusy` stays separate and is keyed by row id, so one row's "Saving…"
+  // cannot appear on another's button.
+  const [marking, setMarking] = useState<{ id: string; reason: string } | null>(null);
+  const [markBusy, setMarkBusy] = useState<string | null>(null);
+  // Keyed by row, and SEPARATE from `error`.
+  //
+  // These refusals used to write to `error`, which has exactly one render site
+  // — inside the "New customer" form. So refusing a reason typed halfway down
+  // the customer list put "Say what this workspace is for." at the top of the
+  // page, directly above "Create workspace and invite", where it reads as a
+  // refusal of provisioning; the field it was about showed nothing, and the
+  // message outlived the form that caused it. `role="alert"` meant a screen
+  // reader announced it with no clue which of the two forms it belonged to.
+  const [markError, setMarkError] = useState<{ id: string; message: string } | null>(null);
 
   // Which customer's modules are open, and what they are. Loaded on demand
   // rather than for every row: the console lists every customer Neuvto has, and
@@ -169,6 +202,45 @@ function AdminConsole() {
     }
   }
 
+  async function mark(orgId: string) {
+    setMarkError(null);
+    setMarkBusy(orgId);
+    try {
+      await markTestOrganization(orgId, marking?.reason ?? "");
+      // Reload rather than patch the row: the badge and its reason both come
+      // from the database, and a locally-invented badge would show a marking
+      // that failed to persist.
+      await load();
+      // Functional, so it reads the CURRENT open row rather than the one this
+      // handler closed over. Only closes the form if it is still this row's —
+      // otherwise a write on row A discards what is being typed into row B.
+      setMarking((current) => (current?.id === orgId ? null : current));
+    } catch (e) {
+      setMarkError({
+        id: orgId,
+        message: isAppError(e) ? e.message : "That workspace couldn't be marked.",
+      });
+    } finally {
+      setMarkBusy(null);
+    }
+  }
+
+  async function unmark(orgId: string) {
+    setMarkError(null);
+    setMarkBusy(orgId);
+    try {
+      await unmarkTestOrganization(orgId);
+      await load();
+    } catch (e) {
+      setMarkError({
+        id: orgId,
+        message: isAppError(e) ? e.message : "That workspace's marking couldn't be removed.",
+      });
+    } finally {
+      setMarkBusy(null);
+    }
+  }
+
   async function onProvision(e: React.FormEvent) {
     e.preventDefault();
     setError("");
@@ -180,6 +252,7 @@ function AdminConsole() {
         adminEmail,
         adminPhone,
         adminName,
+        isTest,
       });
       await load();
       setName("");
@@ -188,6 +261,7 @@ function AdminConsole() {
       setAdminEmail("");
       setAdminPhone("");
       setAdminName("");
+      setIsTest(false);
     } catch (err) {
       setError(
         isAppError(err)
@@ -400,6 +474,35 @@ function AdminConsole() {
             </div>
           </div>
 
+          {/* Neuvto's own rehearsals, marked at the moment the decision is
+              made. Marking afterwards works and is what
+              platform_mark_test_organization is for, but it depends on somebody
+              remembering — which is the failure the marker exists to avoid.
+
+              Deliberately unchecked by default and reset after every submit:
+              an unmarked test workspace is an inconvenience, a real customer
+              wrongly marked is on the allow-list a purge deletes from. */}
+          <label
+            htmlFor="is-test"
+            className="flex min-h-12 items-start gap-3 rounded-md border border-border p-3"
+          >
+            <input
+              id="is-test"
+              type="checkbox"
+              checked={isTest}
+              onChange={(e) => setIsTest(e.target.checked)}
+              data-testid="is-test"
+              className="mt-0.5 size-4 shrink-0 rounded border-border"
+            />
+            <span className="text-sm">
+              This is an internal test workspace
+              <span className="mt-0.5 block text-xs text-muted-foreground">
+                Records it as ours, so it can be deleted later without guessing. Changes nothing
+                about how the workspace behaves.
+              </span>
+            </span>
+          </label>
+
           {error && (
             <p role="alert" data-testid="provision-error" className="text-sm text-destructive">
               {error}
@@ -430,7 +533,21 @@ function AdminConsole() {
             <li key={o.id} data-testid="customer-row" className="p-4">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-baseline sm:justify-between">
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{o.name}</p>
+                  <p className="flex items-center gap-2 text-sm font-medium">
+                    <span className="truncate">{o.name}</span>
+                    {/* The list Sada reads before asking for a purge. Without
+                        this the marking is invisible until something deletes
+                        by it, which is the wrong moment to discover it. */}
+                    {o.isTest && (
+                      <span
+                        data-testid="test-badge"
+                        title={o.testReason ?? undefined}
+                        className="shrink-0 rounded-full border border-border px-2 py-0.5 text-xs font-normal text-muted-foreground"
+                      >
+                        Test
+                      </span>
+                    )}
+                  </p>
                   <p className="text-xs text-muted-foreground">
                     {o.slug} · {o.memberCount} {o.memberCount === 1 ? "person" : "people"} · since{" "}
                     {new Date(o.createdAt).toLocaleDateString(undefined, {
@@ -470,7 +587,94 @@ function AdminConsole() {
                 >
                   {modulesFor === o.id ? "Hide modules" : "Modules"}
                 </button>
+
+                {/* THE TWO DIRECTIONS ARE DELIBERATELY NOT SYMMETRICAL.
+
+                    Unmarking is one click, because removing a marking can only
+                    make a future purge refuse MORE — and it is the correction
+                    somebody reaches for after realising a real customer was
+                    ticked. Nothing about that should be slow.
+
+                    Marking demands a typed reason, which is the friction that
+                    stops a misclick putting a customer on the purge allow-list.
+                    The database requires the reason anyway; asking for it here
+                    is what makes the requirement useful rather than an error
+                    message after the fact. */}
+                {o.isTest ? (
+                  <button
+                    onClick={() => void unmark(o.id)}
+                    disabled={markBusy === o.id}
+                    data-testid="unmark-test"
+                    className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm disabled:opacity-50"
+                  >
+                    {markBusy === o.id ? "Saving…" : "Not a test"}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setMarking((current) =>
+                        current?.id === o.id ? null : { id: o.id, reason: "" },
+                      );
+                      // Cancelling or reopening drops the previous refusal —
+                      // otherwise it sits on a form the person has just closed.
+                      setMarkError(null);
+                    }}
+                    // Disabled while this row is mid-write. Without it, Cancel
+                    // inside the request window closed the form while the write
+                    // still landed: the badge appeared on a workspace somebody
+                    // had just said no to, which is the dangerous direction.
+                    disabled={markBusy === o.id}
+                    data-testid="mark-test"
+                    className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm disabled:opacity-50"
+                  >
+                    {marking?.id === o.id ? "Cancel" : "Mark as test"}
+                  </button>
+                )}
               </div>
+
+              {marking?.id === o.id && (
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void mark(o.id);
+                  }}
+                  className="mt-3 flex flex-col gap-2 rounded-md border border-border p-3 sm:flex-row sm:items-center"
+                >
+                  <label htmlFor={`mark-reason-${o.id}`} className="text-sm">
+                    What is {o.name} being used to test?
+                  </label>
+                  <input
+                    id={`mark-reason-${o.id}`}
+                    value={marking.reason}
+                    onChange={(e) =>
+                      setMarking((current) =>
+                        current ? { ...current, reason: e.target.value } : current,
+                      )
+                    }
+                    required
+                    autoFocus
+                    placeholder="Approval chains, Aug 2026"
+                    data-testid="mark-reason"
+                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                  />
+                  <button
+                    type="submit"
+                    disabled={markBusy === o.id}
+                    data-testid="mark-confirm"
+                    className="inline-flex h-12 shrink-0 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+                  >
+                    {markBusy === o.id ? "Saving…" : "Mark as test"}
+                  </button>
+                </form>
+              )}
+
+              {/* Beside the field it is about, and inside the row it belongs to.
+                  Covers the unmark direction too, which has no form to sit in. */}
+              {markError?.id === o.id && (
+                <p role="alert" data-testid="mark-error" className="mt-2 text-sm text-destructive">
+                  {markError.message}
+                </p>
+              )}
 
               {/*
                 What this customer is entitled to. Granting is Neuvto's decision

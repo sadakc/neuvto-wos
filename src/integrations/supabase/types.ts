@@ -1242,6 +1242,35 @@ export type Database = {
         }
         Relationships: []
       }
+      platform_test_organizations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          organization_id: string
+          reason: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          organization_id: string
+          reason: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          organization_id?: string
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "platform_test_organizations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1841,9 +1870,11 @@ export type Database = {
           admin_invite_url: string
           created_at: string
           id: string
+          is_test: boolean
           member_count: number
           name: string
           slug: string
+          test_reason: string
         }[]
       }
       platform_mail_health: {
@@ -1858,9 +1889,17 @@ export type Database = {
           pending_now: number
         }[]
       }
+      platform_mark_test_organization: {
+        Args: { _org: string; _reason: string }
+        Returns: undefined
+      }
       platform_secret: { Args: { _name: string }; Returns: string }
       platform_set_module: {
         Args: { _granted: boolean; _module_key: string; _org_id: string }
+        Returns: undefined
+      }
+      platform_unmark_test_organization: {
+        Args: { _org: string }
         Returns: undefined
       }
       provision_organization: {
@@ -1868,6 +1907,7 @@ export type Database = {
           _admin_email: string
           _admin_name?: string
           _admin_phone?: string
+          _is_test?: boolean
           _name: string
           _slug: string
         }
