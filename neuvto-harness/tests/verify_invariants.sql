@@ -624,6 +624,84 @@ begin
     end if;
     raise notice 'ok: a new function is granted to nobody until something says otherwise';
 
+    ------------------------------------------------ the browser key holds nothing
+    --
+    -- `anon` is what the PUBLISHABLE KEY resolves to, and that key ships in the
+    -- JavaScript bundle. Until 20260822100000 it held TRUNCATE, REFERENCES,
+    -- TRIGGER and MAINTAIN on 24 of 27 tables locally — and SELECT, INSERT,
+    -- UPDATE and DELETE on 24 tables on PRODUCTION, where a different default ACL
+    -- applies. Nothing leaked, because RLS refused all of it. That was the
+    -- problem: one layer doing the work of two.
+    --
+    -- Asserted here rather than trusted to the ALTER DEFAULT PRIVILEGES in that
+    -- migration, because ONE default cannot be changed from a migration at all:
+    -- `supabase_admin` also holds a default ACL on `public` granting everything
+    -- to both roles, and `postgres` is not a member of it. So the mechanism is
+    -- partly outside our reach and only the property is worth checking.
+    select count(*), string_agg(distinct x.relname, ', ' order by x.relname)
+      into n, offenders
+      from (
+        select c.relname
+        from pg_class c
+        join pg_namespace ns on ns.oid = c.relnamespace
+        cross join unnest(array['SELECT','INSERT','UPDATE','DELETE',
+                                'TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) priv
+        where ns.nspname = 'public' and c.relkind = 'r'
+          and has_table_privilege('anon', c.oid, priv)
+      ) x;
+    if n > 0 then
+      raise exception
+        'INVARIANT FAIL: anon holds % table privilege(s) in public — the publishable key ships in the browser bundle (%)', n, offenders;
+    end if;
+    raise notice 'ok: anon holds no privilege on any table';
+
+    -- `authenticated` keeps its DML — RLS restricts which rows, the grant is what
+    -- lets PostgREST reach the table at all, and revoking it would take the app
+    -- offline. These four are the ones nothing has ever used, and TRUNCATE
+    -- ignores RLS entirely: db-guardian emptied `demo_requests` as an ordinary
+    -- employee of a customer organisation on 8 Aug 2026.
+    select count(*), string_agg(distinct x.relname, ', ' order by x.relname)
+      into n, offenders
+      from (
+        select c.relname
+        from pg_class c
+        join pg_namespace ns on ns.oid = c.relnamespace
+        cross join unnest(array['TRUNCATE','REFERENCES','TRIGGER','MAINTAIN']) priv
+        where ns.nspname = 'public' and c.relkind = 'r'
+          and has_table_privilege('authenticated', c.oid, priv)
+      ) x;
+    if n > 0 then
+      raise exception
+        'INVARIANT FAIL: authenticated holds TRUNCATE/REFERENCES/TRIGGER/MAINTAIN on % table(s) — TRUNCATE ignores RLS and cannot be undone (%)', n, offenders;
+    end if;
+    raise notice 'ok: no signed-in session can truncate a table';
+
+    -- RLS enabled with NO POLICY is this schema's way of saying "reachable only
+    -- through a SECURITY DEFINER function". It refuses everything on its own, so
+    -- a grant there is inert — and inert is not the same as absent. On production
+    -- `platform_admins`, whose own migration calls it the most dangerous table in
+    -- the schema, had been granted SELECT to anon and authenticated by the stock
+    -- default while its comment said no grant existed.
+    select count(*), string_agg(x.relname, ', ' order by x.relname)
+      into n, offenders
+      from (
+        select c.relname
+        from pg_class c
+        join pg_namespace ns on ns.oid = c.relnamespace
+        where ns.nspname = 'public' and c.relkind = 'r' and c.relrowsecurity
+          and not exists (select 1 from pg_policies p
+                           where p.schemaname = 'public' and p.tablename = c.relname)
+          and exists (
+            select 1 from unnest(array['SELECT','INSERT','UPDATE','DELETE']) priv
+             where has_table_privilege('anon', c.oid, priv)
+                or has_table_privilege('authenticated', c.oid, priv))
+      ) x;
+    if n > 0 then
+      raise exception
+        'INVARIANT FAIL: % table(s) have RLS with no policy AND a grant to a browser role — the grant contradicts the design (%)', n, offenders;
+    end if;
+    raise notice 'ok: the tables meant to be unreachable are granted to nobody';
+
     ------------------------------------------- the test-workspace registry (D64)
     --
     -- `platform_test_organizations` is the allow-list a purge of production test
