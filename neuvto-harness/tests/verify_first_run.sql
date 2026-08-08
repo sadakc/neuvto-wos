@@ -91,7 +91,22 @@ declare
   v_fy_from text;
   n         bigint;
 begin
-  if to_regprocedure('public.provision_organization(text,text,text,text,text)') is null then
+  -- BY NAME, NOT BY SIGNATURE.
+  --
+  -- This read `to_regprocedure('public.provision_organization(text,text,text,
+  -- text,text)')` until 8 Aug 2026, when `_is_test boolean` was added
+  -- (20260821100000) and the function was dropped and recreated with six
+  -- arguments. The five-argument signature stopped resolving, this guard went
+  -- permanently null, and all 317 lines below skipped with one notice and
+  -- **exit 0** — the file whose own header says it exists because "three faults
+  -- lived through a green harness".
+  --
+  -- A signature is a detail of how the function is called. Whether provisioning
+  -- exists is the question being asked, and only the name answers it.
+  if not exists (
+    select 1 from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+     where n.nspname = 'public' and p.proname = 'provision_organization'
+  ) then
     raise notice 'skipped: first-run checks (provisioning not built yet)';
     return;
   end if;
