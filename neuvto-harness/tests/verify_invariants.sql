@@ -564,7 +564,15 @@ begin
     -- database and does nothing to a hosted one, because the two disagree about
     -- what a new function is granted, and `anon` holds an EXPLICIT grant there
     -- that a revoke from PUBLIC never touches.
-    select count(*) into n
+    -- NAMES THEM. This used to report only a count, and "4 function(s)" sends
+    -- the next person to write their own query before they can start. It fired
+    -- for real on 8 Aug 2026 when 20260821100000 added `_is_test` to
+    -- `provision_organization`: `drop function` takes the PUBLIC revoke with it,
+    -- `create` re-grants EXECUTE to PUBLIC, and `anon` inherits PUBLIC. Two of
+    -- the four had been explicitly revoked in 20260808100000 and got it back.
+    select count(*), string_agg(p.proname || '(' ||
+             pg_get_function_identity_arguments(p.oid) || ')', '; ' order by p.proname)
+      into n, offenders
       from pg_proc p
       join pg_namespace ns on ns.oid = p.pronamespace
      where ns.nspname = 'public'
@@ -572,7 +580,7 @@ begin
        and has_function_privilege('anon', p.oid, 'EXECUTE');
     if n > 0 then
       raise exception
-        'INVARIANT FAIL: % SECURITY DEFINER function(s) are executable by anon — they bypass RLS by definition', n;
+        'INVARIANT FAIL: % SECURITY DEFINER function(s) are executable by anon — they bypass RLS by definition: %', n, offenders;
     end if;
     raise notice 'ok: no SECURITY DEFINER function is executable without signing in';
 
@@ -615,6 +623,63 @@ begin
         'INVARIANT FAIL: default privileges grant anon EXECUTE on new functions — every future migration ships exposed';
     end if;
     raise notice 'ok: a new function is granted to nobody until something says otherwise';
+
+    ------------------------------------------- the test-workspace registry (D64)
+    --
+    -- `platform_test_organizations` is the allow-list a purge of production test
+    -- data will delete from (docs/operations/TEST_DATA_PURGE.md). The dangerous
+    -- direction is not disclosure — it is a REAL CUSTOMER appearing in it, or an
+    -- entry nobody can read well enough to review before acting on it.
+    if to_regclass('public.platform_test_organizations') is not null then
+
+      -- has_table_privilege, NOT `information_schema.role_table_grants`.
+      --
+      -- A grant made to PUBLIC has grantee 'PUBLIC' in that view, and `anon`
+      -- inherits it — so the obvious `grantee in ('anon','authenticated')` form
+      -- reports zero while anon can read the table. That blindness is exactly
+      -- what let the PUBLIC EXECUTE grant above through. has_table_privilege
+      -- answers the question Postgres answers at query time.
+      select count(*) into n
+        from unnest(array['SELECT','INSERT','UPDATE','DELETE','TRUNCATE','REFERENCES','TRIGGER']) priv
+        cross join unnest(array['anon','authenticated']) grantee
+       where has_table_privilege(grantee, 'public.platform_test_organizations', priv);
+      if n > 0 then
+        raise exception
+          'INVARIANT FAIL: anon/authenticated hold % privilege(s) on platform_test_organizations — it must be reachable only through is_platform_admin() functions', n;
+      end if;
+      raise notice 'ok: the test-workspace registry is unreachable from any session';
+
+      -- Nothing but the platform functions may read it. A product query that
+      -- joins here is how a test workspace starts behaving differently from a
+      -- real one, which is the thing the separate table exists to prevent.
+      select count(*), string_agg(p.proname, ', ' order by p.proname)
+        into n, offenders
+        from pg_proc p
+        join pg_namespace ns on ns.oid = p.pronamespace
+       where ns.nspname = 'public'
+         -- prokind = 'f' — plain functions only. pg_get_functiondef raises
+         -- '"array_agg" is an aggregate function' on anything else, and an
+         -- extension can put an aggregate in public.
+         and p.prokind = 'f'
+         and pg_get_functiondef(p.oid) like '%platform_test_organizations%';
+      if n <> 4 then
+        raise exception
+          'INVARIANT FAIL: % function(s) reference platform_test_organizations, expected 4 (%). A product query that joins the registry makes a test workspace behave differently from a real one', n, offenders;
+      end if;
+      raise notice 'ok: only the platform functions read the test-workspace registry';
+
+      -- Every marking has to be legible months later, when the question is
+      -- "what was I testing" rather than "is this a test". A tab satisfied the
+      -- original btrim() guard and rendered as an empty tooltip.
+      select count(*) into n
+        from public.platform_test_organizations
+       where reason !~ '[[:alnum:]]';
+      if n > 0 then
+        raise exception
+          'INVARIANT FAIL: % test-workspace marking(s) carry no readable reason', n;
+      end if;
+      raise notice 'ok: every test-workspace marking says why';
+    end if;
 
     ------------------------------------------------- the count explains itself
     -- working_days_excluded is the complement of calculate_working_days. If the

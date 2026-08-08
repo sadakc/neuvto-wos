@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -18,18 +18,21 @@ deployed onto it multi-tenant. Leave Management is the first module, not the
 point. If a document here reads as though the leave product is the product, it
 predates 31 Jul 2026 and is wrong.
 
-| If you want to know                                  | Read                                                                                       |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| What is being built, in what order, and what is done | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
-| Why something was built differently from the PRD     | the **D1–D46** decision table in the same file                                             |
-| Whether the platform itself is finished              | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
-| How to run the thing on your own machine             | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
-| How code and schema reach the hosted site            | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
-| Who hosts `neuvto.com`, and how a deploy is proved   | [operations/PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)                       |
-| What each tool in the stack is for, in plain English | Plate 05 of [architecture/neuvto-architecture.html](architecture/neuvto-architecture.html) |
-| Where the backups are, and whether they restore      | [operations/BACKUPS.md](operations/BACKUPS.md)                                             |
-| Why email works in one environment and not another   | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)              |
-| How the system is shaped, for an investor or advisor | [architecture/](architecture/)                                                             |
+| If you want to know                                                 | Read                                                                                       |
+| ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| What is being built, in what order, and what is done                | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
+| Why something was built differently from the PRD                    | the **D1–D46** decision table in the same file                                             |
+| Whether the platform itself is finished                             | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
+| How to run the thing on your own machine                            | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
+| How code and schema reach the hosted site                           | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
+| Who hosts `neuvto.com`, and how a deploy is proved                  | [operations/PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)                       |
+| What each tool in the stack is for, in plain English                | Plate 05 of [architecture/neuvto-architecture.html](architecture/neuvto-architecture.html) |
+| Where the backups are, and whether they restore                     | [operations/BACKUPS.md](operations/BACKUPS.md)                                             |
+| Why email works in one environment and not another                  | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)              |
+| How the system is shaped, for an investor or advisor                | [architecture/](architecture/)                                                             |
+| What leaving Supabase for AWS would actually cost                   | [architecture/PORTABILITY.md](architecture/PORTABILITY.md)                                 |
+| How the production test data gets deleted, later                    | [operations/TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                             |
+| What the QA/UAT stacks are, and why hosting is moving to Cloudflare | [operations/ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                                   |
 
 ---
 
@@ -50,9 +53,13 @@ wrong are decisions.
 
 ### [architecture/](architecture/)
 
-Eight Mermaid diagrams (`diagrams/*.mmd`) and the rendered investor-facing page.
+Nine Mermaid diagrams (`diagrams/*.mmd`) and the rendered investor-facing page.
 Platform stack, reuse economics, tenant isolation, request flow, components,
 leave submission, the approval state machine, and the data model.
+
+**[PORTABILITY.md](architecture/PORTABILITY.md)** — what a move to AWS would
+cost, measured rather than guessed, and the rules that stop the number growing.
+Read it before adding a dependency on anything Supabase-specific.
 
 ### [standards/](standards/)
 
@@ -79,6 +86,8 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 | [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives    |
 | [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                        |
 | [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out     |
+| [TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                     | production is the test environment — how that data gets hard-deleted later without guesswork   |
+| [ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                           | the QA/UAT stacks, the second Supabase org, and the in-progress Cloudflare hosting migration   |
 | [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm             |
 | [REVIEWING_LOVABLE_CHANGES.md](operations/REVIEWING_LOVABLE_CHANGES.md) | what Lovable may never do, what needs your approval, and why it is not CODEOWNERS              |
 

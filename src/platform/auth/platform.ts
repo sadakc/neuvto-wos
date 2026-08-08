@@ -26,6 +26,17 @@ export interface CustomerWorkspace {
   adminAccepted: boolean;
   /** Present only while the administrator's invitation is unaccepted. */
   adminInviteUrl: string | null;
+  /**
+   * One of Neuvto's own test workspaces, not a customer's.
+   *
+   * Read from `platform_test_organizations` through the console's existing read
+   * function rather than from the table, which no session can reach at all —
+   * see the migration. Shown so that the list Sada looks at before asking for a
+   * purge says which rows are his own rehearsals.
+   */
+  isTest: boolean;
+  /** Why it was created, recorded when it was marked. Null when not a test. */
+  testReason: string | null;
 }
 
 /**
@@ -103,6 +114,12 @@ export async function listOrganizations(): Promise<CustomerWorkspace[]> {
     adminEmail: r.admin_email,
     adminAccepted: r.admin_accepted,
     adminInviteUrl: r.admin_invite_url,
+    // `=== true`, not a truthiness coercion. The safe reading of anything that
+    // is not plainly true — null from an older database, an absent column
+    // against a deployment that predates the migration — is "this is a real
+    // customer", because that is the answer that refuses a later deletion.
+    isTest: r.is_test === true,
+    testReason: r.test_reason ?? null,
   }));
 }
 
@@ -121,6 +138,10 @@ export async function provisionOrganization(input: unknown): Promise<{ organizat
     _admin_email: parsed.adminEmail,
     _admin_phone: parsed.adminPhone || undefined,
     _admin_name: parsed.adminName || undefined,
+    // Sent always, never `|| undefined`. Omitting it would fall through to the
+    // database default — which is also false, so the bug would be invisible
+    // until somebody changed one of the two defaults and not the other.
+    _is_test: parsed.isTest,
   });
 
   if (error) {
@@ -154,6 +175,70 @@ export async function provisionOrganization(input: unknown): Promise<{ organizat
 
   if (!data) throw new AppError("INTERNAL_ERROR", "The workspace could not be created.", 500);
   return { organizationId: data as string };
+}
+
+/**
+ * Records an existing workspace as one of Neuvto's own rehearsals (D64).
+ *
+ * The provisioning checkbox covers workspaces created from now on. This covers
+ * the ones that already exist — including the workspace that was in production
+ * before the registry did, which `20260821100000` deliberately does not backfill
+ * because a migration cannot tell a rehearsal from a customer provisioned the
+ * day before it ran.
+ *
+ * Without this the only way to mark anything was the SQL editor, which meant the
+ * screen somebody reads before asking for a purge could not correct what it was
+ * showing them. Found independently by both verification agents.
+ *
+ * The reason is required by the database (`reason ~ '[[:alnum:]]'`) and checked
+ * here first so the refusal arrives beside the field rather than as a constraint
+ * violation.
+ */
+export async function markTestOrganization(organizationId: string, reason: string): Promise<void> {
+  // Same rule as the CHECK: at least one letter or digit. A tab, an NBSP or a
+  // zero-width space are not answers to "what was I testing".
+  if (!/[\p{L}\p{N}]/u.test(reason)) {
+    throw new AppError("VALIDATION_FAILED", "Say what this workspace is for.", 400, {
+      field: "reason",
+    });
+  }
+
+  const { error } = await supabase.rpc("platform_mark_test_organization", {
+    _org: organizationId,
+    _reason: reason,
+  });
+  if (error) {
+    if (error.message.includes("FORBIDDEN")) {
+      throw new AppError("FORBIDDEN", "Only Neuvto staff can mark a workspace.", 403);
+    }
+    if (error.message.includes("REASON_REQUIRED")) {
+      throw new AppError("VALIDATION_FAILED", "Say what this workspace is for.", 400, {
+        field: "reason",
+      });
+    }
+    throw toAppError(error, "markTestOrganization");
+  }
+}
+
+/**
+ * Withdraws the marking — for a rehearsal that turned into a real customer, and
+ * for the case that matters more: a real customer marked by mistake.
+ *
+ * This is the ONLY way a marking is ever removed. `on delete cascade` cannot do
+ * it, because `profiles` and `departments` are `RESTRICT` — any workspace with a
+ * member refuses a hard delete outright. And a workspace that is both marked and
+ * soft-deleted appears on no list, so it must be corrected before that happens.
+ */
+export async function unmarkTestOrganization(organizationId: string): Promise<void> {
+  const { error } = await supabase.rpc("platform_unmark_test_organization", {
+    _org: organizationId,
+  });
+  if (error) {
+    if (error.message.includes("FORBIDDEN")) {
+      throw new AppError("FORBIDDEN", "Only Neuvto staff can change a workspace's marking.", 403);
+    }
+    throw toAppError(error, "unmarkTestOrganization");
+  }
 }
 
 /** Whether mail is actually being delivered, and why not. Platform admins only. */

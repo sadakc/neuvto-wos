@@ -31,6 +31,8 @@ export {
   listOrganizationModules,
   setOrganizationModule,
   provisionOrganization,
+  markTestOrganization,
+  unmarkTestOrganization,
   type CustomerWorkspace,
   type MailHealth,
   type ClientErrorGroup,
