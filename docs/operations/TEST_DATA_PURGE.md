@@ -1,6 +1,6 @@
 # Purging test data from production
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 9 Aug 2026
 
 Neuvto is being tested **in production**, on purpose — it is the only environment
 that proves the real thing works. Sada's instruction, 8 Aug 2026:
@@ -9,8 +9,20 @@ that proves the real thing works. Sada's instruction, 8 Aug 2026:
 > hard delete later, once all my testing is done.
 
 This document is what makes that possible in one command instead of a forensic
-exercise. It is written now, while there is one organisation and 146 audit rows,
-because the cheap moment to prepare for a deletion is before the data exists.
+exercise. It was written while production still held one organisation, because
+the cheap moment to prepare for a deletion is before the data exists.
+
+> ## ⚠️ Which workspaces are which, as of 9 Aug 2026
+>
+> | Workspace                                                     | Marked                          |
+> | ------------------------------------------------------------- | ------------------------------- |
+> | **Acme Services** (`acme`)                                    | **test** — "End to End Testing" |
+> | **Extreme Security Solutions** (`extreme-security-solutions`) | **NO — a real customer**        |
+>
+> Confirmed by Sada on 9 Aug 2026 and verified in the database, not inferred.
+> **Nothing may ever delete Extreme Security Solutions.** It is unmarked, so the
+> registry already refuses it; this note exists so that nobody "helpfully" marks
+> it later on the strength of the word "Security" looking like a test fixture.
 
 ---
 
@@ -29,33 +41,38 @@ week rather than in October. What it deliberately does **not** include is a purg
 function: a registry with no purge is inert and safe, a purge with no registry is
 the accident.
 
-### One step still outstanding
+### Done, and the margin was one day
 
-**The existing production workspace is not yet marked.** The migration performs no
-backfill, on purpose — a migration cannot tell whether a real customer was
-provisioned between the day it was written and the day it was applied, and the
-failure that would cause is a customer silently joining the allow-list a purge
-deletes from. A person looks at the list instead:
+**The existing production workspace was marked on 9 Aug 2026.** The migration
+performed no backfill, on purpose — a migration cannot tell whether a real
+customer was provisioned between the day it was written and the day it was
+applied, and the failure that would cause is a customer silently joining the
+allow-list a purge deletes from.
+
+That was not a theoretical worry. **Extreme Security Solutions was provisioned
+while this change was being built** — between the analysis that found "production
+holds exactly one organisation" and the deploy that shipped the marker. A backfill
+written the day before would have enrolled a paying customer in the purge list,
+and nothing would have said so.
+
+A person looks at the list instead:
 
 ```sql
 select id, name, slug, created_at from public.organizations where deleted_at is null;
 ```
 
-As of 8 Aug 2026 that returns exactly one row — **Acme Services** (`acme`,
-created 6 Aug 2026), which is Sada's own.
-
-**Do it from the console, not in SQL.** Once the migration reaches production,
-open the customer list, press **Mark as test** on the row, and type what it is
-being used for. Nothing else is needed.
+**Do it from the console, not in SQL.** Open the customer list, press **Mark as
+test** on the row, and type what it is being used for. Nothing else is needed.
 
 The reason field is not ceremony: marking is the direction that puts a workspace
 on the purge allow-list, so it asks for a typed answer rather than accepting a
 single click. Removing a marking — **Not a test** — is one click, because that
 can only make a purge refuse more.
 
-**Read the row before you press it** rather than trusting the name above. The
-whole reason there is no backfill is that this document cannot know what was
-provisioned after it was written.
+**Read the row before you press it** rather than trusting the table at the top of
+this page. The whole reason there is no backfill is that this document cannot
+know what was provisioned after it was written — which is exactly what happened
+between its two versions.
 
 For any workspace created from now on, tick **This is an internal test
 workspace** while provisioning instead — it marks in the same transaction and
@@ -95,8 +112,7 @@ sequence, not a statement.
 | `audit_logs`    | has `organization_id` but **no foreign key** to `organizations` |
 | `demo_requests` | has no `organization_id` — a prospect belongs to no workspace   |
 
-`audit_logs` (146 rows today) would be left pointing at an organisation id that
-no longer exists. `demo_requests` is worse in kind: it holds **real strangers'
+`audit_logs` would be left pointing at an organisation id that no longer exists. `demo_requests` is worse in kind: it holds **real strangers'
 names and email addresses** from the landing page, is subject to the 24-month
 retention in `NEUVTO_DATA_STANDARDS.md` §2, and has nothing to do with test data.
 Deleting test rows must not touch it; deleting it needs its own reason.
