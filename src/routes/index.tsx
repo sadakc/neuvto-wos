@@ -52,6 +52,7 @@ function Index() {
         <ProblemSolution />
         <LeavePreview />
         <Roadmap />
+        <Websites />
         <DemoForm />
       </main>
       <Footer />
@@ -301,6 +302,102 @@ function Roadmap() {
               <p className="mt-1 text-xs text-white/60">{i.s}</p>
             </div>
           ))}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+/**
+ * The second thing this company does.
+ *
+ * THE ONLY EVIDENCE OF TRACK RECORD THIS SECTION MAY OFFER IS THE PAGE IT IS ON.
+ *
+ * There is no client list, no logo wall, no testimonial and no case study here,
+ * and that is a decision rather than an omission waiting to be filled in. Every
+ * one of those would have to be invented today, and the first prospect who
+ * checks an invented one is the prospect who was going to buy. So the copy
+ * claims capability, and points at the only work it can honestly point at —
+ * which the reader is already looking at.
+ *
+ * Every concrete detail below is true of this repository and can be checked:
+ * the canonical at the top of this file, `sitemap[.]xml.ts`, the own-origin
+ * social card (D63), the label/input joins in `Field` at the bottom of this
+ * file, the WCAG contrast gate in `tokens.test.ts`, and the OS-preference dark
+ * mode in `platform/design/theme.ts`. Nothing here is a claim we would have to
+ * retract.
+ *
+ * `index.test.tsx` enforces the rule structurally — no <img>, <blockquote>, <q>,
+ * <cite> or <figure> inside this section — because the way a fabricated claim
+ * actually arrives is somebody pasting in a logo strip after copying a
+ * competitor's layout, and no list of banned phrases sees that coming.
+ */
+function Websites() {
+  return (
+    // Tinted, and the choice is close to forced. This sits directly under
+    // `Roadmap`, which is `bg-ink`: a second dark band would read as one
+    // continuous slab and the change of subject — the entire point of the
+    // section — would be invisible. Plain `bg-background` has the opposite
+    // problem, merging it into the demo form below. `bg-secondary/40` is the
+    // only treatment on this page distinct from both neighbours.
+    <section id="websites" className="border-t border-border bg-secondary/40 py-24">
+      <div className="mx-auto max-w-6xl px-6">
+        <div className="max-w-2xl">
+          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+            Design & build
+          </p>
+          <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
+            We build websites for other companies, too.
+          </h2>
+          <p className="mt-4 text-lg text-muted-foreground">
+            You're reading one. This page — its type, its colour, the dark mode it followed your
+            system into — is our own work, built by the same people who build the platform. Web
+            design and build is the second thing Neuvto does, and we're as serious about it as we
+            are about the first.
+          </p>
+        </div>
+        <div className="mt-14 grid gap-6 md:grid-cols-3">
+          <Card
+            title="Designed once, then applied"
+            body="Colour, type and spacing get decided up front and written down, so the tenth page still looks like the first. Dark mode included, not bolted on afterwards."
+          />
+          <Card
+            title="Built to be found"
+            body="Real titles and descriptions, a canonical URL, a sitemap, and a share card served from your own domain. The unglamorous half of a site that works."
+          />
+          <Card
+            title="Legible for everyone"
+            body="Every label joined to its input, every colour pairing measured against WCAG rather than eyeballed, and tap targets a thumb can actually hit."
+          />
+        </div>
+        <p className="mt-12 max-w-3xl text-sm text-muted-foreground">
+          Marketing sites, product and launch pages, company sites, and the public front of an app —
+          this page is the last of those. Plain React and Tailwind on a domain you own, with no page
+          builder to keep paying for.
+        </p>
+        <div className="mt-8 flex flex-wrap gap-3">
+          {/* `hover:bg-accent`, not the `hover:bg-secondary` that "See the
+              vision" uses in the hero. That button sits on `bg-background`;
+              this one sits on `bg-secondary/40`, where the hovered fill lands
+              within ~0.02 lightness of the band itself and the control
+              dissolves into its own ground instead of lifting off it. `accent`
+              differs in chroma as well as lightness, and its foreground token
+              is byte-identical to `--foreground`, so the contrast pairing is
+              one `tokens.test.ts` already passes. */}
+          {/* `py-3.5`, not the `py-3` the hero's buttons use, and the extra
+              2px is not a style preference. `MIN_TOUCH_TARGET` in tokens.ts is
+              48 and DESIGN_SYSTEM §6 says the same; `py-3` measures 46px, which
+              every button on this page quietly fails. Measured, not assumed.
+              That is a page-wide shortfall to fix page-wide — but a card two
+              inches above this one says "tap targets a thumb can actually hit",
+              so this is the one control on the site that cannot be 46px without
+              the section disproving itself in its own viewport. */}
+          <a
+            href="#demo"
+            className="inline-flex items-center rounded-md border border-border bg-background px-5 py-3.5 text-sm font-semibold text-foreground hover:bg-accent"
+          >
+            Talk to us about a site
+          </a>
         </div>
       </div>
     </section>

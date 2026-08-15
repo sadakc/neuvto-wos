@@ -281,6 +281,62 @@ describe("landing page — what red is still allowed to mean", () => {
   });
 });
 
+// ── the second thing this company sells
+//
+// The page advertised one product. Neuvto also builds websites for other
+// companies, and a visitor had no way to learn that — so the section below is
+// new positioning rather than a copy tweak.
+//
+// The rule it ships under is the part worth pinning. THE ONLY EVIDENCE OF TRACK
+// RECORD THIS SECTION MAY OFFER IS THE PAGE IT IS ON. No client names, no
+// counts, no testimonials, no prices, no turnaround times — we have not shipped
+// those clients, and a prospect who checks one invented logo is the prospect who
+// was going to buy.
+//
+// That is a product rule, not a markup rule, so the guard below is structural
+// rather than a list of banned phrases — the same shape as DESTRUCTIVE_FILL
+// above and for the same reason. Nobody will re-add a fabricated claim by
+// writing "trusted by 40 companies" in a string; they will paste in a logo wall,
+// a screenshot of somebody else's homepage, or a pull-quote, having copied the
+// layout off a competitor's site. A phrase blacklist sees none of that.
+
+describe("landing page — the second thing this company sells", () => {
+  it("puts the websites section behind the id, with its heading inside it", () => {
+    // The h2 and the section id are what a reader and any future anchor
+    // respectively depend on, and nothing else on this page ties them together.
+    render(<Index />);
+
+    const heading = screen.getByRole("heading", { level: 2, name: /websites/i });
+    expect(heading.closest("section")?.id).toBe("websites");
+  });
+
+  it("says enough to be an offering rather than a line", () => {
+    render(<Index />);
+    const section = document.getElementById("websites");
+    expect(section, "no #websites section on the page").not.toBeNull();
+
+    // The h2 plus three cards. A floor, not a count — a fourth card is somebody's
+    // decision, a section that quietly decayed to a heading and a sentence is
+    // not, and only one of those should fail here.
+    const headings = within(section!).getAllByRole("heading");
+    expect(headings.length).toBeGreaterThanOrEqual(4);
+  });
+
+  it("makes no claim of track record beyond being one of ours", () => {
+    // THE GUARD. Listed as what it found rather than asserted as a count, so a
+    // regression prints the logo or the quote it caught and the reader knows
+    // immediately which thing to take back out.
+    render(<Index />);
+    const section = document.getElementById("websites");
+    expect(section, "no #websites section on the page").not.toBeNull();
+
+    const fabricated = [...section!.querySelectorAll("img, blockquote, q, cite, figure")].map(
+      (el) => `<${el.tagName.toLowerCase()}> ${(el.textContent ?? "").trim().slice(0, 40)}`,
+    );
+    expect(fabricated).toEqual([]);
+  });
+});
+
 // ── the demo form: five fields that had no names at all
 //
 // There WERE five `<label>` elements. Not one of them was attached to anything:
