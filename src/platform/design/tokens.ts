@@ -113,6 +113,20 @@ const P = {
   sky400: { l: 0.79, c: 0.118, h: 237.32 },
   /** Dark enough to be a visible focus ring on white (WCAG 1.4.11). */
   sky700: { l: 0.55, c: 0.115, h: 237.32 },
+  /**
+   * Dark enough to be AA BODY TEXT on every light surface, which is a stricter
+   * bar than the focus ring above: 1.4.11 asks 3:1 of a non-text boundary,
+   * 1.4.3 asks 4.5:1 of text. sky700 clears paper (4.76) and the composited
+   * `bg-secondary/40` band (4.56) but not `secondary` itself (4.24), and a
+   * token that is safe on three surfaces and not the fourth is a token
+   * somebody will eventually put on the fourth.
+   *
+   * L 0.53 is the first step down that clears all of them — paper 5.18,
+   * card 5.18, secondary 4.62 — and the last one still inside sRGB at this
+   * chroma. L 0.52 measures better and cannot be displayed, which the gamut
+   * assertion in tokens.test.ts would have caught.
+   */
+  sky750: { l: 0.53, c: 0.115, h: 237.32 },
   sky100: { l: 0.95, c: 0.025, h: 237.32 },
   sky950: { l: 0.28, c: 0.058, h: 237.32 },
 
@@ -157,6 +171,7 @@ export type SemanticToken =
   | "primaryForeground"
   | "brand"
   | "brandForeground"
+  | "brandStrong"
   | "secondary"
   | "secondaryForeground"
   | "muted"
@@ -215,6 +230,32 @@ export const SEMANTIC: Record<ThemeName, Record<SemanticToken, Oklch>> = {
     primaryForeground: P.ink900,
     brand: P.sky500,
     brandForeground: P.ink900,
+    /*
+     * The brand blue when it is TEXT rather than a fill.
+     *
+     * `primary` is #0ea5e9, the published brand colour, and the note above
+     * explains why it is preserved exactly. As a *fill* it is correct and
+     * `primaryForeground` was darkened to sit on it. As *text on a light
+     * ground* it measures 2.77:1 on paper and 2.65:1 on a `bg-secondary/40`
+     * band — barely half of AA's 4.5:1 — and the landing page had been using
+     * it that way for every section eyebrow since the page was written.
+     *
+     * Nothing caught it because `["primary", "background"]` was never in
+     * TEXT_PAIRS: the suite checks the label on a primary fill, which is the
+     * opposite direction. It is in TEXT_PAIRS now, for this token.
+     *
+     * sky750 is the same hue (237.32) at L 0.53 — 5.18:1 on paper, 5.18:1 on
+     * a card, 4.62:1 on `secondary`. sky700 was tried first and rejected: it
+     * passes the COMPOSITED `bg-secondary/40` band at 4.56:1 but fails
+     * `secondary` itself at 4.24:1, and the assertion added alongside this is
+     * against the token rather than the composite precisely so the stricter of
+     * the two is the one that has to hold.
+     *
+     * NOT for eyebrows on `bg-ink`: this is 4.13:1 or worse on ink. Those keep
+     * `primary`, which is 7.10:1 there. Two grounds, two tokens — the
+     * alternative is one token that is wrong on one of them.
+     */
+    brandStrong: P.sky750,
 
     secondary: P.grey100,
     secondaryForeground: P.ink900,
@@ -297,6 +338,14 @@ export const SEMANTIC: Record<ThemeName, Record<SemanticToken, Oklch>> = {
     primaryForeground: P.ink900,
     brand: P.sky400,
     brandForeground: P.ink900,
+    /*
+     * Identical to `primary` here, and deliberately so. On a dark ground the
+     * brand blue is already 10.35:1 on the page and 9.75:1 on the band — dark
+     * mode never had this defect. The token exists so the light theme can
+     * differ; darkening it here would make the eyebrow recede into the page
+     * to fix a problem this theme does not have.
+     */
+    brandStrong: P.sky400,
 
     secondary: P.ink750,
     secondaryForeground: P.grey50,
