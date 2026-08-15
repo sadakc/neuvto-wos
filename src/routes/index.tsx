@@ -181,7 +181,14 @@ function ProblemSolution() {
     <section id="vision" className="border-t border-border bg-secondary/40 py-24">
       <div className="mx-auto max-w-6xl px-6">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">The problem</p>
+          {/* `brand-strong`, not `primary`. Every eyebrow on this page was the
+              brand blue as text on a light ground — 2.65:1, well under half of
+              AA. `primary` stays the fill; this is the same hue dark enough to
+              be read. The one on `bg-ink` below keeps `primary`, where it is
+              7.10:1 and this token would be the one that fails. */}
+          <p className="text-sm font-semibold uppercase tracking-wider text-brand-strong">
+            The problem
+          </p>
           <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
             HRMS was built for HR. Not for the workforce.
           </h2>
@@ -225,7 +232,7 @@ function LeavePreview() {
       <div className="mx-auto max-w-6xl px-6">
         <div className="grid gap-12 lg:grid-cols-2 lg:items-center">
           <div>
-            <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+            <p className="text-sm font-semibold uppercase tracking-wider text-brand-strong">
               MVP · Module 1
             </p>
             <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
@@ -290,6 +297,10 @@ function Roadmap() {
   return (
     <section id="roadmap" className="border-t border-border bg-ink py-24 text-white">
       <div className="mx-auto max-w-6xl px-6">
+        {/* THE ONE EYEBROW THAT KEEPS `primary`, AND IT IS NOT AN OVERSIGHT.
+            This band is `bg-ink`. `primary` measures 7.10:1 on it and
+            `brand-strong` — the token every other eyebrow moved to — is
+            4.13:1 and fails. Making all five match would break this one. */}
         <p className="text-sm font-semibold uppercase tracking-wider text-primary">Roadmap</p>
         <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
           One platform. Shipping module by module.
@@ -343,7 +354,7 @@ function Websites() {
     <section id="websites" className="border-t border-border bg-secondary/40 py-24">
       <div className="mx-auto max-w-6xl px-6">
         <div className="max-w-2xl">
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+          <p className="text-sm font-semibold uppercase tracking-wider text-brand-strong">
             Design & build
           </p>
           <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
@@ -433,15 +444,22 @@ function DemoForm() {
     <section id="demo" className="py-24">
       <div className="mx-auto grid max-w-6xl gap-12 px-6 lg:grid-cols-2">
         <div>
-          <p className="text-sm font-semibold uppercase tracking-wider text-primary">
+          <p className="text-sm font-semibold uppercase tracking-wider text-brand-strong">
             Get in touch
           </p>
           <h2 className="mt-2 font-display text-4xl font-bold tracking-tight">
             Be first in line for the Neuvto WOS preview.
           </h2>
+          {/* "…and anyone who needs a site built" is load-bearing, not padding.
+              The websites section's call to action lands here, and before this
+              line the visitor arrived at a heading about the WOS preview
+              addressed to investors and early customers, was asked how many
+              employees they have, and was offered one button reading "Request
+              demo". Someone who wants a website is none of those things and
+              would reasonably conclude they had followed the wrong link. */}
           <p className="mt-4 text-lg text-muted-foreground">
-            Investors, design partners, and early customers — tell us a bit about you and we'll set
-            up a walkthrough.
+            Investors, design partners, early customers — and anyone who needs a site built. Tell us
+            a bit about you and we'll set up a walkthrough.
           </p>
         </div>
         <form

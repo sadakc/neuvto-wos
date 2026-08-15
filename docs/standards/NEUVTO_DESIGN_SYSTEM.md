@@ -1,6 +1,6 @@
 # NEUVTO WOS — Design System
 
-**Version:** 1.0 · **Status:** Active
+**Version:** 1.1 · **Status:** Active
 **Audience:** designers, engineers, and AI build tools — all three work from this file
 
 The contract between design and code. A designer should be able to open this, look at a
@@ -64,13 +64,14 @@ every platform by construction rather than by transcription.
 
 ### Brand
 
-| Token                  | Value                              | Use                                                              |
-| ---------------------- | ---------------------------------- | ---------------------------------------------------------------- |
-| `--primary`            | `#0EA5E9` sky blue                 | Primary actions, links, focus rings, active nav                  |
-| `--primary-foreground` | white                              | Text on primary                                                  |
-| `--brand`              | = primary                          | Logo lockup, marketing surfaces                                  |
-| `--secondary`          | light grey `oklch(0.97 0.005 240)` | **Secondary _button_ fill** — a surface role, not a brand colour |
-| `--brand-accent`       | `#0088AA` teal                     | Optional: icon accents, second chart series                      |
+| Token                  | Value                                | Use                                                                                                                                                                                                                                                            |
+| ---------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `--primary`            | `#0EA5E9` sky blue                   | Primary actions, links, focus rings, active nav                                                                                                                                                                                                                |
+| `--primary-foreground` | white                                | Text on primary                                                                                                                                                                                                                                                |
+| `--brand`              | = primary                            | Logo lockup, marketing surfaces                                                                                                                                                                                                                                |
+| `--brand-strong`       | `#0574A6` (light) · = primary (dark) | **The brand hue as TEXT on a light ground** — section eyebrows, brand-coloured labels. `--primary` is 2.65:1 as text on paper and must not be used this way. On a dark ground use `--primary`: `--brand-strong` fails there (4.13:1) and `--primary` is 7.10:1 |
+| `--secondary`          | light grey `oklch(0.97 0.005 240)`   | **Secondary _button_ fill** — a surface role, not a brand colour                                                                                                                                                                                               |
+| `--brand-accent`       | `#0088AA` teal                       | Optional: icon accents, second chart series                                                                                                                                                                                                                    |
 
 > **Resolved 28 Jul 2026: `#0EA5E9` sky blue is authoritative.** `05_LANDING_PAGE.md`
 > line 607 specifies `#0066CC`; that document is superseded on this point and should be

@@ -42,6 +42,22 @@ const TEXT_PAIRS: Array<[SemanticToken, SemanticToken]> = [
   ["infoForeground", "info"],
   ["neutralForeground", "neutral"],
 
+  // The brand hue used as TEXT rather than as a fill.
+  //
+  // Every pair above this line checks a foreground against the fill it sits on
+  // — `primaryForeground` on `primary`. Not one of them checks the brand colour
+  // itself being used as text on the page, which is what a section eyebrow is,
+  // and which `primary` had been doing at 2.65:1 on every eyebrow of the
+  // landing page. The suite was full and the defect was in the gap between its
+  // entries.
+  //
+  // `secondary` stands in for the tinted band: `bg-secondary/40` composites to
+  // a LIGHTER pixel than `secondary` itself, so asserting against the token is
+  // the stricter of the two and cannot pass while the painted band fails.
+  ["brandStrong", "background"],
+  ["brandStrong", "card"],
+  ["brandStrong", "secondary"],
+
   // Secondary text. The single most-skipped pairing in every design system,
   // and the one that fails most often — it is grey on purpose, and "grey
   // enough to be quiet" and "grey enough to be unreadable" are three tenths of
