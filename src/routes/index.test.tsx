@@ -130,7 +130,7 @@ describe("landing header — what must survive the deletion", () => {
     expect(within(navRow).queryByRole("link", { name: "Sign in" })).toBeNull();
   });
 
-  it("still resolves the three nav destinations", () => {
+  it("still resolves every nav destination", () => {
     const header = renderLanding();
     const navRow = within(header).getByRole("navigation");
 
@@ -143,11 +143,15 @@ describe("landing header — what must survive the deletion", () => {
       "href",
       "#roadmap",
     );
+    expect(within(navRow).getByRole("link", { name: "Websites" })).toHaveAttribute(
+      "href",
+      "#websites",
+    );
 
     // Each one lands on a section that is actually on the page — a nav link to a
     // renamed anchor scrolls nowhere and reports nothing. Compared as a list so
     // the failure names the anchor that went missing, not just "expected null".
-    const wanted = ["vision", "leave", "roadmap"];
+    const wanted = ["vision", "leave", "roadmap", "websites"];
     expect(wanted.filter((id) => document.getElementById(id) !== null)).toEqual(wanted);
   });
 });
