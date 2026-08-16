@@ -67,13 +67,22 @@ function Nav() {
         <a href="#top" aria-label="Neuvto — home" className="inline-flex min-h-12 items-center">
           <NeuvtoLockup />
         </a>
-        {/* `gap-4 px-2` rather than `gap-8` with no padding, and the visual
-            result is identical: 8px of padding either side of a link plus a
-            16px gap is the same 32px of space between two labels that `gap-8`
-            gave. What changes is the part you cannot see — each link went from
-            a 20px-tall, 41px-wide sliver of bare text to a 48px target. This
-            row only exists at ≥768px, which is a tablet, which is a finger. */}
-        <nav className="hidden items-center gap-4 text-sm font-medium text-muted-foreground md:flex">
+        {/* `px-2` rather than bare text, and the visual result is identical at
+            `lg`: 8px of padding either side of a link plus a 16px gap is the
+            same 32px between two labels that `gap-8` gave. What changes is the
+            part you cannot see — each link went from a 20px-tall, 41px-wide
+            sliver to a 48px target. This row only exists at ≥768px, which is a
+            tablet, which is a finger.
+
+            `gap-2 lg:gap-4` because the fourth link does not fit otherwise.
+            Measured at 768: the row's natural width is 722px inside a 720px
+            container, so flex was absorbing the difference and the header sat
+            at EXACTLY ZERO SLACK — nothing clipped, and one wider font fallback
+            or one longer label away from clipping. The tighter gap buys 24px
+            back for the one breakpoint that needs it and changes nothing at
+            desktop. Do not fold this back to a single gap without re-measuring
+            at 768. */}
+        <nav className="hidden items-center gap-2 text-sm font-medium text-muted-foreground md:flex lg:gap-4">
           <a
             href="#vision"
             className="inline-flex min-h-12 items-center px-2 hover:text-foreground"
@@ -88,6 +97,12 @@ function Nav() {
             className="inline-flex min-h-12 items-center px-2 hover:text-foreground"
           >
             Roadmap
+          </a>
+          <a
+            href="#websites"
+            className="inline-flex min-h-12 items-center px-2 hover:text-foreground"
+          >
+            Websites
           </a>
         </nav>
         {/* No "Request Demo" in this nav row. It used to sit here next to
