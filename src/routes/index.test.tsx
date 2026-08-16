@@ -82,8 +82,8 @@ describe("landing header — Request Demo appears once", () => {
     // The filled primary button, not a muted text link. Both halves matter: the
     // duplicate that keeps coming back is precisely a `text-muted-foreground`
     // one, so a survivor with that class is the wrong survivor.
-    expect(cta.className).toContain("bg-primary");
-    expect(cta.className).not.toContain("text-muted-foreground");
+    expect(paintedClassesOf(cta)).toContain("bg-primary");
+    expect(paintedClassesOf(cta)).not.toContain("text-muted-foreground");
   });
 
   it("keeps the call to action out of the row that disappears on mobile", () => {
@@ -179,6 +179,25 @@ function classesOf(el: Element): string[] {
 }
 
 /**
+ * Every class that PAINTS this control — its own and its descendants'.
+ *
+ * A control's fill does not have to sit on the control. The header's Request
+ * Demo puts `min-h-12` on the <a> and the coloured pill on a <span> inside it,
+ * so that the touch target can be 48px while the button stays 36px. The moment
+ * that became possible, a guard reading only `el.getAttribute("class")` stopped
+ * being able to see the fill it exists to check: a red pill inside a link would
+ * have passed the sweep below while rendering exactly the thing it forbids.
+ *
+ * Found by making that change and watching the header's own assertion fail on
+ * `expected 'group inline-flex min-h-12 items-cent…' to contain 'bg-primary'`.
+ * That test caught its own case; this function is what stops the next one being
+ * a control nobody happens to have written an assertion for.
+ */
+function paintedClassesOf(el: Element): string[] {
+  return [el, ...el.querySelectorAll("*")].flatMap(classesOf);
+}
+
+/**
  * Matches `destructive` used as a *fill*, under any variant prefix and any
  * opacity: `bg-destructive`, `hover:bg-destructive/90`, `dark:md:bg-destructive`,
  * `text-destructive-foreground`.
@@ -244,7 +263,7 @@ describe("landing page — no invitation is painted as a warning", () => {
     expect(actions).toContain(screen.getByRole("button", { name: "Request demo" }));
 
     const redFilled = actions
-      .filter((el) => classesOf(el).some((c) => DESTRUCTIVE_FILL.test(c)))
+      .filter((el) => paintedClassesOf(el).some((c) => DESTRUCTIVE_FILL.test(c)))
       .map(describeAction);
 
     expect(redFilled).toEqual([]);

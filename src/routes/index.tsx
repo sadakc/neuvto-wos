@@ -104,10 +104,15 @@ function Nav() {
             are a logo wrapping an SVG (38px of content), bare text links (20px)
             and padded buttons, so the `py-*` that reaches 48 is different for
             each and no single rule is true of all of them.
-            This button is the one that changed most — `py-2` made it 36px, and
-            it is now 48px in a 65px header, which is a visibly heavier button.
-            That is the cost of the rule, taken deliberately rather than by
-            exempting the page's primary call to action from it. */}
+            The Request Demo button below is the only one where the floor and
+            the design disagreed. Putting `min-h-12` on it directly made the
+            painted pill 48px in a 65px header — the fill sits on the element,
+            so growing the target grew the button — and it read as heavy.
+            So the two are separated: the <a> is the 48px TARGET and paints
+            nothing, the <span> inside is the 36px PILL. A click anywhere in
+            the link's box still lands, `group-hover` keeps the whole target
+            lighting the pill, and the thumb gets 48px while the eye gets the
+            button that was there before. */}
         <div className="flex items-center gap-3 sm:gap-4">
           <a
             href="/auth"
@@ -115,11 +120,10 @@ function Nav() {
           >
             Sign in
           </a>
-          <a
-            href="#demo"
-            className="inline-flex min-h-12 items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            Request Demo
+          <a href="#demo" className="group inline-flex min-h-12 items-center">
+            <span className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground group-hover:bg-primary/90">
+              Request Demo
+            </span>
           </a>
         </div>
       </div>
