@@ -82,8 +82,8 @@ describe("landing header — Request Demo appears once", () => {
     // The filled primary button, not a muted text link. Both halves matter: the
     // duplicate that keeps coming back is precisely a `text-muted-foreground`
     // one, so a survivor with that class is the wrong survivor.
-    expect(cta.className).toContain("bg-primary");
-    expect(cta.className).not.toContain("text-muted-foreground");
+    expect(paintedClassesOf(cta)).toContain("bg-primary");
+    expect(paintedClassesOf(cta)).not.toContain("text-muted-foreground");
   });
 
   it("keeps the call to action out of the row that disappears on mobile", () => {
@@ -179,6 +179,25 @@ function classesOf(el: Element): string[] {
 }
 
 /**
+ * Every class that PAINTS this control — its own and its descendants'.
+ *
+ * A control's fill does not have to sit on the control. The header's Request
+ * Demo puts `min-h-12` on the <a> and the coloured pill on a <span> inside it,
+ * so that the touch target can be 48px while the button stays 36px. The moment
+ * that became possible, a guard reading only `el.getAttribute("class")` stopped
+ * being able to see the fill it exists to check: a red pill inside a link would
+ * have passed the sweep below while rendering exactly the thing it forbids.
+ *
+ * Found by making that change and watching the header's own assertion fail on
+ * `expected 'group inline-flex min-h-12 items-cent…' to contain 'bg-primary'`.
+ * That test caught its own case; this function is what stops the next one being
+ * a control nobody happens to have written an assertion for.
+ */
+function paintedClassesOf(el: Element): string[] {
+  return [el, ...el.querySelectorAll("*")].flatMap(classesOf);
+}
+
+/**
  * Matches `destructive` used as a *fill*, under any variant prefix and any
  * opacity: `bg-destructive`, `hover:bg-destructive/90`, `dark:md:bg-destructive`,
  * `text-destructive-foreground`.
@@ -244,7 +263,7 @@ describe("landing page — no invitation is painted as a warning", () => {
     expect(actions).toContain(screen.getByRole("button", { name: "Request demo" }));
 
     const redFilled = actions
-      .filter((el) => classesOf(el).some((c) => DESTRUCTIVE_FILL.test(c)))
+      .filter((el) => paintedClassesOf(el).some((c) => DESTRUCTIVE_FILL.test(c)))
       .map(describeAction);
 
     expect(redFilled).toEqual([]);
@@ -278,6 +297,76 @@ describe("landing page — what red is still allowed to mean", () => {
 
     // And it is not an action, so the guard cannot ever be what removes it.
     expect(actionsOnPage()).not.toContain(markers[0] as HTMLElement);
+  });
+});
+
+// ── every control big enough to hit with a thumb
+//
+// `MIN_TOUCH_TARGET` is 48 (src/platform/design/tokens.ts) and DESIGN_SYSTEM §6
+// says "Touch targets ≥ 48×48px". Measured in real headless Chrome at a 375px
+// mobile viewport, FOUR of this page's seven controls were under it:
+//
+//     Sign in (header)             48px   py-3.5
+//     Request Demo (header)        36px   py-2      ← the worst
+//     Request early access (hero)  44px   py-3
+//     See the vision (hero)        46px   py-3
+//     Talk to us about a site      50px   py-3.5
+//     Request demo (form submit)   44px   py-3      ← the conversion point
+//     Sign in to your workspace    48px   py-3.5
+//
+// The form submit is the one that matters most: it is where a prospect actually
+// converts, and this page is the only way anyone reaches Neuvto.
+//
+// The THREE NAV LINKS were the ones nobody would have found by looking. They are
+// bare 20px text with no padding at all, and they sit in a `hidden md:flex` row —
+// so at a phone width they are `display: none` and measure zero, and a sweep that
+// skips zero-height elements skips them entirely. They only exist at ≥768px,
+// which is a tablet, which is a touchscreen. "Vision" is 41px wide as well as
+// 20px tall: under the floor on BOTH axes.
+//
+// WHAT THIS TEST CAN AND CANNOT SEE, stated plainly rather than implied.
+// happy-dom does no layout — every `getBoundingClientRect()` here returns zeroes
+// — so a test that appears to measure pixel heights would measure nothing and
+// pass forever. That is worse than no test, because it reads as coverage. This
+// asserts the DECLARATION instead: `min-h-12` is Tailwind's 3rem, exactly the
+// 48 in `MIN_TOUCH_TARGET`, and it is one class meaning one thing.
+//
+// A declaration rather than padding arithmetic, because the eight controls here
+// are a logo wrapping an SVG, three bare text links, three padded buttons and a
+// form submit — their content heights are 38, 20 and 20-ish px, so the padding
+// that yields 48 is different for each and no single `py-*` rule is true of all
+// of them. `min-h-12` is true of all of them and says why it is there.
+//
+// The real heights were measured in a browser, at 375, 768 and 1280, and are
+// recorded above. This guard exists to keep them there.
+
+/** Does this control declare the 48px floor? */
+function declaresFloor(el: Element): boolean {
+  const classes = el.getAttribute("class") ?? "";
+  // `min-h-12` is 48px. Anything larger is fine too; `h-16` and up are explicit
+  // fixed heights that already clear it.
+  return /(?:^|\s)(?:min-h-1[2-9]|min-h-2\d|h-1[2-9]|h-2\d)(?:\s|$)/.test(classes);
+}
+
+describe("landing page — every control is big enough to hit", () => {
+  it("declares the 48px floor on every link and button", () => {
+    render(<Index />);
+    const controls = [...screen.queryAllByRole("link"), ...screen.queryAllByRole("button")];
+
+    // A guard over an empty list passes forever. Eight is the count at the time
+    // of writing; asserted as a floor so adding a control cannot silently
+    // shrink what this sweeps.
+    expect(controls.length).toBeGreaterThanOrEqual(8);
+
+    const undersized = controls
+      .filter((el) => !declaresFloor(el))
+      .map(
+        (el) =>
+          `<${el.tagName.toLowerCase()}> "${(el.textContent ?? "").trim() || el.getAttribute("aria-label")}" ` +
+          `— class="${el.getAttribute("class") ?? ""}"`,
+      );
+
+    expect(undersized).toEqual([]);
   });
 });
 

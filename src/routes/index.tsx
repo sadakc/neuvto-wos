@@ -64,17 +64,29 @@ function Nav() {
   return (
     <header className="sticky top-0 z-50 border-b border-border/60 bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-6">
-        <a href="#top" aria-label="Neuvto — home">
+        <a href="#top" aria-label="Neuvto — home" className="inline-flex min-h-12 items-center">
           <NeuvtoLockup />
         </a>
-        <nav className="hidden gap-8 text-sm font-medium text-muted-foreground md:flex">
-          <a href="#vision" className="hover:text-foreground">
+        {/* `gap-4 px-2` rather than `gap-8` with no padding, and the visual
+            result is identical: 8px of padding either side of a link plus a
+            16px gap is the same 32px of space between two labels that `gap-8`
+            gave. What changes is the part you cannot see — each link went from
+            a 20px-tall, 41px-wide sliver of bare text to a 48px target. This
+            row only exists at ≥768px, which is a tablet, which is a finger. */}
+        <nav className="hidden items-center gap-4 text-sm font-medium text-muted-foreground md:flex">
+          <a
+            href="#vision"
+            className="inline-flex min-h-12 items-center px-2 hover:text-foreground"
+          >
             Vision
           </a>
-          <a href="#leave" className="hover:text-foreground">
+          <a href="#leave" className="inline-flex min-h-12 items-center px-2 hover:text-foreground">
             Leave Management
           </a>
-          <a href="#roadmap" className="hover:text-foreground">
+          <a
+            href="#roadmap"
+            className="inline-flex min-h-12 items-center px-2 hover:text-foreground"
+          >
             Roadmap
           </a>
         </nav>
@@ -86,18 +98,32 @@ function Nav() {
         {/* Sign in sits outside the `md:flex` row above: that row is hidden on
             mobile, and someone who has lost their invitation email arrives on a
             phone. It is the only way into the product from this page. */}
+        {/* `min-h-12` is on EVERY link and button on this page, and it is the
+            48 in `MIN_TOUCH_TARGET` written where a person can see it. Padding
+            was the obvious way to do this and does not work: the controls here
+            are a logo wrapping an SVG (38px of content), bare text links (20px)
+            and padded buttons, so the `py-*` that reaches 48 is different for
+            each and no single rule is true of all of them.
+            The Request Demo button below is the only one where the floor and
+            the design disagreed. Putting `min-h-12` on it directly made the
+            painted pill 48px in a 65px header — the fill sits on the element,
+            so growing the target grew the button — and it read as heavy.
+            So the two are separated: the <a> is the 48px TARGET and paints
+            nothing, the <span> inside is the 36px PILL. A click anywhere in
+            the link's box still lands, `group-hover` keeps the whole target
+            lighting the pill, and the thumb gets 48px while the eye gets the
+            button that was there before. */}
         <div className="flex items-center gap-3 sm:gap-4">
           <a
             href="/auth"
-            className="inline-flex items-center px-1 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground"
+            className="inline-flex min-h-12 items-center px-1 py-3.5 text-sm font-medium text-muted-foreground hover:text-foreground"
           >
             Sign in
           </a>
-          <a
-            href="#demo"
-            className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-          >
-            Request Demo
+          <a href="#demo" className="group inline-flex min-h-12 items-center">
+            <span className="inline-flex items-center rounded-md bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground group-hover:bg-primary/90">
+              Request Demo
+            </span>
           </a>
         </div>
       </div>
@@ -133,13 +159,13 @@ function Hero() {
                 warning about the thing it is inviting you to do. */}
             <a
               href="#demo"
-              className="inline-flex items-center rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
+              className="inline-flex min-h-12 items-center rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-sm hover:bg-primary/90"
             >
               Request early access
             </a>
             <a
               href="#vision"
-              className="inline-flex items-center rounded-md border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground hover:bg-secondary"
+              className="inline-flex min-h-12 items-center rounded-md border border-border bg-background px-5 py-3 text-sm font-semibold text-foreground hover:bg-secondary"
             >
               See the vision
             </a>
@@ -405,7 +431,7 @@ function Websites() {
               the section disproving itself in its own viewport. */}
           <a
             href="#demo"
-            className="inline-flex items-center rounded-md border border-border bg-background px-5 py-3.5 text-sm font-semibold text-foreground hover:bg-accent"
+            className="inline-flex min-h-12 items-center rounded-md border border-border bg-background px-5 py-3.5 text-sm font-semibold text-foreground hover:bg-accent"
           >
             Talk to us about a site
           </a>
@@ -510,7 +536,7 @@ function DemoForm() {
             <button
               type="submit"
               disabled={loading}
-              className="mt-2 inline-flex items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
+              className="mt-2 inline-flex min-h-12 items-center justify-center rounded-md bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 disabled:opacity-60"
             >
               {loading ? "Sending…" : "Request demo"}
             </button>
@@ -594,7 +620,7 @@ function Footer() {
         <p>© {new Date().getFullYear()} Neuvto. All rights reserved.</p>
         <a
           href="/auth"
-          className="inline-flex items-center py-3.5 font-medium hover:text-foreground"
+          className="inline-flex min-h-12 items-center py-3.5 font-medium hover:text-foreground"
         >
           Sign in to your workspace
         </a>
