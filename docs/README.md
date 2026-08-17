@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 16 Aug 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -21,7 +21,7 @@ predates 31 Jul 2026 and is wrong.
 | If you want to know                                                 | Read                                                                                       |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | What is being built, in what order, and what is done                | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
-| Why something was built differently from the PRD                    | the **D1–D46** decision table in the same file                                             |
+| Why something was built differently from the PRD                    | the **D1–D66** decision table in the same file                                             |
 | Whether the platform itself is finished                             | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
 | How to run the thing on your own machine                            | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
 | How code and schema reach the hosted site                           | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
@@ -33,6 +33,7 @@ predates 31 Jul 2026 and is wrong.
 | What leaving Supabase for AWS would actually cost                   | [architecture/PORTABILITY.md](architecture/PORTABILITY.md)                                 |
 | How the production test data gets deleted, later                    | [operations/TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                             |
 | What the QA/UAT stacks are, and why hosting is moving to Cloudflare | [operations/ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                                   |
+| How Neuvto is run without Claude Code, and who could take it over   | [operations/CONTINUITY.md](operations/CONTINUITY.md)                                       |
 
 ---
 
@@ -43,7 +44,7 @@ predates 31 Jul 2026 and is wrong.
 **[NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)** — the single
 source of truth. The platform and its services, the module contract, the build
 sequence with its status column, the verification gate for every step, and the
-**D1–D46 decision table** recording every deliberate deviation from the PRD with
+**D1–D66 decision table** recording every deliberate deviation from the PRD with
 its reason. Its "Known gaps" section is the live list of launch blockers; there
 is no separate blockers file, because two lists of blockers means one of them is
 wrong.
@@ -78,18 +79,19 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 
 ### [operations/](operations/)
 
-| File                                                                    | Covers                                                                                         |
-| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------- |
-| [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                        |
-| [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud        |
-| [PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)               | why `neuvto.com` is built by GitHub Actions and served by Netlify, written for a non-developer |
-| [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives    |
-| [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                        |
-| [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out     |
-| [TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                     | production is the test environment — how that data gets hard-deleted later without guesswork   |
-| [ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                           | the QA/UAT stacks, the second Supabase org, and the in-progress Cloudflare hosting migration   |
-| [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm             |
-| [REVIEWING_LOVABLE_CHANGES.md](operations/REVIEWING_LOVABLE_CHANGES.md) | what Lovable may never do, what needs your approval, and why it is not CODEOWNERS              |
+| File                                                                    | Covers                                                                                                                 |
+| ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                                                |
+| [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud                                |
+| [PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)               | why `neuvto.com` is built by GitHub Actions and served by Netlify, written for a non-developer                         |
+| [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives                            |
+| [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                                                |
+| [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out                             |
+| [TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                     | production is the test environment — how that data gets hard-deleted later without guesswork                           |
+| [ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                           | the QA/UAT stacks, the second Supabase org, and the in-progress Cloudflare hosting migration                           |
+| [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm                                     |
+| [REVIEWING_LOVABLE_CHANGES.md](operations/REVIEWING_LOVABLE_CHANGES.md) | what Lovable may never do, what needs your approval, and why it is not CODEOWNERS                                      |
+| [CONTINUITY.md](operations/CONTINUITY.md)                               | which jobs already need no developer, the options if Claude Code stops, and the three risks that are not about tooling |
 
 ### [agents/](agents/)
 
