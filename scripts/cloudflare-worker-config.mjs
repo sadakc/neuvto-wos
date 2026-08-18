@@ -64,7 +64,7 @@ import { readFileSync, writeFileSync } from "node:fs";
  * Rollback is to remove it here, redeploy, and restore the `A` record to
  * 75.2.60.5 — the Netlify site stays deployed and is not torn down.
  */
-const CUSTOM_DOMAINS = ["wos.neuvto.com"];
+const CUSTOM_DOMAINS = ["neuvto.com", "wos.neuvto.com"];
 
 const CONFIG = ".output/server/wrangler.json";
 
