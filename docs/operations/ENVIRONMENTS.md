@@ -1,6 +1,6 @@
 # Four stacks, and why hosting is moving to get them
 
-**Version:** 1.0 · **Status:** In progress · **Updated:** 8 Aug 2026
+**Version:** 1.1 · **Status:** In progress · **Updated:** 18 Aug 2026
 
 Sada's instruction, 8 Aug 2026:
 
@@ -103,15 +103,42 @@ connector access. This document gets updated as each phase lands.
 
 ---
 
-## Status as of 8 Aug 2026
+## Status as of 18 Aug 2026
 
 - [x] `qa` and `uat` branches pushed, both currently identical to `main`
 - [x] Netlify site shells created (`neuvto-wos-qa`, `neuvto-wos-uat`) — empty,
-      nothing linked, zero deploy credits spent. On hold pending the Cloudflare
-      decision; likely unused once Cloudflare is live.
-- [x] DNS baseline captured (above)
+      nothing linked, zero deploy credits spent. Unused now that Cloudflare is
+      live; delete once the cutover has held.
+- [x] DNS baseline captured (above) — **and it was incomplete.** See below.
+- [x] **Zone moved to Cloudflare, 17 Aug 2026.** `edna`/`woz.ns.cloudflare.com`.
+      All records carried over DNS-only (grey cloud) so the site kept serving
+      from Netlify unchanged. DKIM verified intact at 218 characters, and a real
+      demo-request email landed in the inbox rather than spam afterwards — the
+      only check that actually proves the mail path.
+- [x] **Worker proven on `wos.neuvto.com`, 18 Aug 2026.** Sign-in, `/app` and
+      `/neuvto-hq` all exercised against real Supabase. Roughly 2–3× faster than
+      Netlify on first-byte.
+- [x] **`deploy.yml` publishes to Cloudflare Workers.**
+- [ ] **The cutover itself** — add `neuvto.com` to `CUSTOM_DOMAINS` in
+      `scripts/cloudflare-worker-config.mjs`. One line, deliberately: it swaps
+      the apex `A` record from Netlify to the Worker.
 - [ ] Second Supabase organization ("Neuvto QA") — waiting on Sada
 - [ ] QA and UAT Supabase projects — waiting on the organization
-- [ ] Cloudflare account and zone migration — waiting on Sada
-- [ ] Cloudflare Pages/Workers projects and `deploy.yml` update — waiting on a
-      Cloudflare API token
+
+### What the 8 Aug baseline missed
+
+It recorded six records. The zone had ten. `_lovable` (a verification TXT plus a
+literal `"(value from Lovable dialog)"` paste), `notify` delegated to
+`ns3/ns4.lovable.cloud`, and `_domainconnect` were all absent from it — so the
+pre-cutover check compared against an incomplete list and reported a clean match.
+
+`notify.neuvto.com` served **Mailgun MX and SPF records** for the second email
+system Lovable scaffolded on 30 Jul 2026 and which was reverted in #14. The
+revert cleaned the repository; nothing cleaned GoDaddy, so the DNS half outlived
+the code by eighteen days. None of the three were carried into Cloudflare, which
+retired them.
+
+The lesson is about the check, not the records: Cloudflare's scan guesses common
+names and a hand-written baseline records what somebody thought to look for.
+Neither enumerates a zone. The registrar's own record list is the only complete
+source, and reading it is what found these.

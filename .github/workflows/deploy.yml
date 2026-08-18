@@ -19,7 +19,14 @@
 # can already see it. The artefact check is what makes a wrong build unpublishable
 # rather than merely regrettable.
 
-# A DEPLOY COSTS MONEY, SO A COMMIT THAT CANNOT CHANGE THE SITE MUST NOT CAUSE ONE
+# A DEPLOY USED TO COST MONEY, AND THE GUARD STAYS ANYWAY
+#
+# Hosting moved to Cloudflare Workers on 18 Aug 2026 (D61), where deploys are
+# metered at no tier — so the arithmetic below no longer bites. It is kept
+# because the reasoning outlived the bill: a commit that cannot change the site
+# should not appear in the deploy history claiming it did.
+#
+# The original constraint, for the record:
 #
 # Netlify's free plan is 300 credits a month and charges 15 per production
 # deploy. Twenty deploys, total. On this workflow's first day — 7 Aug 2026 — it
@@ -91,7 +98,18 @@ jobs:
           # VITE_-prefixed: anything so named is copied into the browser bundle.
           SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.VITE_SUPABASE_PUBLISHABLE_KEY }}
-          NITRO_PRESET: netlify
+          # No NITRO_PRESET: Cloudflare is Nitro's default target here, so the
+          # plain build emits a Worker. Netlify was the override, not the norm.
+          #
+          # PINNED, and not decorative. Nitro defaults the Worker's compatibility
+          # date to "today" from the BUILD MACHINE'S LOCAL CLOCK; Cloudflare
+          # validates it against UTC and rejects anything ahead of it. India is
+          # UTC+5:30, so a build between 00:00 and 05:30 IST is refused with
+          # "Can't set compatibility date in the future". It failed exactly that
+          # way at 01:31 IST on 18 Aug 2026. Runners are UTC and would never
+          # reproduce it. Pinning also stops the runtime's behaviour changing
+          # between two builds of identical source.
+          NITRO_COMPATIBILITY_DATE: "2026-08-17"
         run: bun run build
 
       # ─────────────────────────────────────────────── the gate
@@ -102,22 +120,29 @@ jobs:
       # nothing. Proven by building against pre-prod on purpose and watching
       # this step fail.
       - name: Verify the build before publishing it
-        run: bash scripts/verify-deploy.sh --dir dist --dir .netlify
+        run: bash scripts/verify-deploy.sh --dir .output
 
-      - name: Publish to Netlify
+      # Which hostnames this Worker answers on, and a refusal if the generated
+      # config is unusable. Runs BEFORE publish for the same reason the artefact
+      # check does: a bad config should stop the job, not the deploy.
+      - name: Set the Worker's custom domains
+        run: bun scripts/cloudflare-worker-config.mjs
+
+      - name: Publish to Cloudflare Workers
         id: publish
         env:
-          NETLIFY_AUTH_TOKEN: ${{ secrets.NETLIFY_AUTH_TOKEN }}
-          NETLIFY_SITE_ID: ${{ secrets.NETLIFY_SITE_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
         run: |
-          # Prebuilt: Netlify publishes what we built, and never builds it
-          # itself. Letting Netlify build would reintroduce exactly the problem
-          # this workflow exists to remove — a build environment we do not own.
-          bunx netlify-cli@17 deploy \
-            --prod \
-            --dir=dist \
-            --functions=.netlify/functions-internal \
-            --message="${GITHUB_SHA::7} — $(git log -1 --pretty=%s)"
+          # Prebuilt, for the same reason Netlify was: Cloudflare publishes what
+          # we built here and never builds it itself. A build environment we do
+          # not own is the problem this workflow exists to remove.
+          #
+          # Cloudflare meters no deploys at any tier, so unlike Netlify's 15
+          # credits a publish, a redundant run here costs nothing. `paths-ignore`
+          # above stays anyway: a deploy that cannot change the site is still
+          # noise in the deploy history.
+          bunx wrangler@4 deploy --config .output/server/wrangler.json
 
       # The artefact check above proves what we built. This proves what is being
       # SERVED, which is a different claim: a stale cache, a half-finished
@@ -129,7 +154,12 @@ jobs:
           sleep 30
           bash scripts/verify-deploy.sh --url "${DEPLOY_URL:-https://neuvto.com}"
         env:
-          # Until DNS moves, point this at the Netlify address by setting a
-          # DEPLOY_URL repository variable. Once neuvto.com is switched, delete
-          # the variable and this checks the real thing.
+          # DNS moved to Cloudflare on 17 Aug 2026, but neuvto.com is still
+          # SERVED BY NETLIFY and is not in CUSTOM_DOMAINS yet — so this must
+          # check the hostname this workflow actually publishes to. Set the
+          # DEPLOY_URL repository variable to https://wos.neuvto.com until the
+          # cutover, then delete it and this checks the real thing.
+          #
+          # Leaving it unset would check neuvto.com and pass against a site this
+          # job did not deploy — a green tick for a claim nobody made.
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}
