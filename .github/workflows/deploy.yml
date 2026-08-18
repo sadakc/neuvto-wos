@@ -154,12 +154,13 @@ jobs:
           sleep 30
           bash scripts/verify-deploy.sh --url "${DEPLOY_URL:-https://neuvto.com}"
         env:
-          # DNS moved to Cloudflare on 17 Aug 2026, but neuvto.com is still
-          # SERVED BY NETLIFY and is not in CUSTOM_DOMAINS yet — so this must
-          # check the hostname this workflow actually publishes to. Set the
-          # DEPLOY_URL repository variable to https://wos.neuvto.com until the
-          # cutover, then delete it and this checks the real thing.
+          # Checks neuvto.com, which this job now publishes. The DEPLOY_URL
+          # repository variable was deleted at the cutover on 18 Aug 2026 and
+          # should stay deleted; the fallback above is the real target.
           #
-          # Leaving it unset would check neuvto.com and pass against a site this
-          # job did not deploy — a green tick for a claim nobody made.
+          # It existed because before the cutover neuvto.com was served by
+          # NETLIFY while this workflow published the Worker to wos.neuvto.com.
+          # Checking neuvto.com then would have passed against a site this job
+          # did not deploy — a green tick for a claim nobody made. Set it again
+          # only if the two ever diverge again, and delete it when they converge.
           DEPLOY_URL: ${{ vars.DEPLOY_URL }}

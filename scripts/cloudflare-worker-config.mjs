@@ -56,13 +56,32 @@ import { readFileSync, writeFileSync } from "node:fs";
 /**
  * Every hostname this Worker serves.
  *
- * ADDING `neuvto.com` HERE IS THE PRODUCTION CUTOVER. Cloudflare will replace
- * the apex `A` record that currently points at Netlify (75.2.60.5) with a
- * proxied record pointing at this Worker, and issue a certificate for it. That
- * is a one-line change on purpose: it should be a reviewed diff, not a click.
+ * THE HOSTNAME MUST HAVE NO DNS RECORD BEFORE IT IS ADDED HERE. A Custom
+ * Domain creates the record and issues the certificate itself, so Cloudflare
+ * refuses to attach one to a hostname that already has a hand-made record:
  *
- * Rollback is to remove it here, redeploy, and restore the `A` record to
- * 75.2.60.5 — the Netlify site stays deployed and is not torn down.
+ *     Hostname 'neuvto.com' already has externally managed DNS records
+ *     (A, CNAME, etc). Delete them first.            [code: 100117]
+ *
+ * There is no atomic swap and no override. Every apex cutover therefore has a
+ * window where the hostname does not resolve at all. On 18 Aug 2026 that
+ * window was ten minutes for `neuvto.com`. Sequence it as: merge the hostname
+ * here, delete the existing DNS record, trigger the deploy immediately.
+ *
+ * Do NOT create the Custom Domain in the dashboard instead. Its `Add Domain`
+ * field takes the subdomain LABEL and appends the zone, so typing `neuvto.com`
+ * creates `neuvto.com.neuvto.com` — a live record under a nonsense hostname,
+ * discovered while the apex was down. This list is exact hostnames and has no
+ * such ambiguity.
+ *
+ * Rollback is to remove the hostname here, redeploy, and restore its `A`
+ * record — for `neuvto.com` that is 75.2.60.5, and the Netlify site stays
+ * deployed and is not torn down.
+ *
+ * `www.neuvto.com` is deliberately absent: Custom Domains match the hostname
+ * exactly, so a Worker on the apex never sees `www`. It still CNAMEs to
+ * Netlify, which 301s to the apex. Replace that with a Cloudflare redirect
+ * rule before the Netlify site is deleted.
  */
 const CUSTOM_DOMAINS = ["neuvto.com", "wos.neuvto.com"];
 
