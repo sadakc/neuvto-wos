@@ -1,13 +1,20 @@
 # Publishing neuvto.com ourselves
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 18 Aug 2026
+**Version:** 1.2 · **Status:** Historical · **Updated:** 18 Aug 2026
 
-> **Hosting is moving to Cloudflare Workers (D61).** Everything below is still
-> true — Netlify still serves `neuvto.com` today, and remains the rollback — but
-> `deploy.yml` now publishes the Worker, and the apex swaps over when
-> `neuvto.com` is added to `CUSTOM_DOMAINS` in
-> `scripts/cloudflare-worker-config.mjs`. See
-> [ENVIRONMENTS.md](ENVIRONMENTS.md) for where that has got to.
+> **`neuvto.com` is served by Cloudflare Workers as of 18 Aug 2026, 13:58 UTC.**
+> Netlify no longer serves the site. This document describes the Netlify setup
+> it replaced.
+>
+> It is kept, rather than deleted, for two reasons: the Netlify site is still
+> deployed and is the rollback until this has held for a week, and `www` still
+> CNAMEs to it. Steps 1 and 5 (the Supabase keys, and what is safe to paste
+> where) are hosting-agnostic and still correct.
+>
+> For how the site is published today, see [ENVIRONMENTS.md](ENVIRONMENTS.md)
+> and `scripts/cloudflare-worker-config.mjs`. **This file needs rewriting for
+> Cloudflare** — a walkthrough for a non-developer, which is what made this one
+> worth having, and which nothing currently replaces.
 
 Written for somebody who is not a developer. Every step says where to click and
 what to copy. If a step does not match what you see, stop and ask — a screen

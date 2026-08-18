@@ -1,6 +1,6 @@
 # Four stacks, and why hosting is moving to get them
 
-**Version:** 1.1 · **Status:** In progress · **Updated:** 18 Aug 2026
+**Version:** 1.2 · **Status:** In progress · **Updated:** 18 Aug 2026
 
 Sada's instruction, 8 Aug 2026:
 
@@ -119,9 +119,19 @@ connector access. This document gets updated as each phase lands.
       `/neuvto-hq` all exercised against real Supabase. Roughly 2–3× faster than
       Netlify on first-byte.
 - [x] **`deploy.yml` publishes to Cloudflare Workers.**
-- [ ] **The cutover itself** — add `neuvto.com` to `CUSTOM_DOMAINS` in
-      `scripts/cloudflare-worker-config.mjs`. One line, deliberately: it swaps
-      the apex `A` record from Netlify to the Worker.
+- [x] **Cutover done, 18 Aug 2026, 13:58 UTC.** `neuvto.com` is served by the
+      Worker. Apex now answers `104.21.22.34` / `172.67.202.58`, certificate
+      `CN=neuvto.com` (Google Trust Services, to 21 Oct 2026), `server:
+cloudflare` with no `x-nf-request-id`. It cost about ten minutes of
+      downtime — see below.
+- [x] `DEPLOY_URL` repository variable deleted, so `deploy.yml` now verifies
+      `neuvto.com` itself rather than the hostname it was standing in for.
+- [ ] **`www` is still Netlify.** It CNAMEs to `neuvto-wos.netlify.app`, which
+      301s to the apex, so it works — but Custom Domains match the hostname
+      exactly, and a Worker on `neuvto.com` never sees `www`. Replace with a
+      Cloudflare redirect rule (free) before the Netlify site is deleted.
+- [ ] Delete the unused Netlify QA/UAT shells, and the production site, once
+      this has held for a week.
 - [ ] Second Supabase organization ("Neuvto QA") — waiting on Sada
 - [ ] QA and UAT Supabase projects — waiting on the organization
 
@@ -142,3 +152,43 @@ The lesson is about the check, not the records: Cloudflare's scan guesses common
 names and a hand-written baseline records what somebody thought to look for.
 Neither enumerates a zone. The registrar's own record list is the only complete
 source, and reading it is what found these.
+
+### What the cutover actually cost, 18 Aug 2026
+
+Ten minutes of downtime on the apex. The plan predicted one to three.
+
+Cloudflare will not attach a Custom Domain to a hostname that already has a
+hand-made DNS record:
+
+```
+Hostname 'neuvto.com' already has externally managed DNS records
+(A, CNAME, etc). Delete them first or try a different hostname.  [code: 100117]
+```
+
+That is by design — a Custom Domain _creates_ the record and issues the
+certificate, so it refuses to fight an existing one. There is no atomic swap and
+no override, in the dashboard or the API. **The hostname must be empty first**,
+which means every apex cutover to a Worker has a gap in it. Plan for the gap;
+it cannot be engineered away.
+
+The gap was ten minutes rather than one because of how the domain was created,
+not because of the rule. The dashboard's **Add Domain** field takes the
+subdomain _label_ and appends the zone, so typing `neuvto.com` produced
+`neuvto.com.neuvto.com` — a live Custom Domain and DNS record under a nonsense
+hostname, while the apex had nothing at all. Finding and undoing that is where
+the time went.
+
+`wrangler` has no such ambiguity: `CUSTOM_DOMAINS` in
+`scripts/cloudflare-worker-config.mjs` is an exact hostname list, and the deploy
+that used it succeeded first time and took 1m37s end to end.
+
+**So the order for any future apex cutover is:** declare the hostname in
+`CUSTOM_DOMAINS` and merge it; delete the existing record; trigger the deploy
+immediately. Never type a hostname into the dashboard — the one screen where a
+typo becomes a live DNS record is the worst place to be improvising.
+
+Two things kept the blast radius small, and both were deliberate:
+`wos.neuvto.com` stayed up throughout on the same Worker and was a working URL
+to hand anyone, and the Netlify site was never torn down, so a rollback was
+always two screens away. Neither was needed, but the cutover was only
+comfortable because they existed.
