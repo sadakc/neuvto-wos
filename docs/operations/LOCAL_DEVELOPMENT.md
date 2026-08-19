@@ -177,11 +177,11 @@ instead.
 
 ## Two databases, and which is which
 
-|                   | Used by                                                         | Contains                         |
-| ----------------- | --------------------------------------------------------------- | -------------------------------- |
-| Local Supabase    | `bun run dev` (with `.env.local`), `bun run harness`            | Whatever your migrations create  |
-| Lovable Cloud     | Lovable's preview only — no longer the published site           | Pre-production — treat as shared |
-| `neuvto-wos-prod` | **`neuvto.com`**, built by GitHub Actions and served by Netlify | Real customer data, Mumbai       |
+|                   | Used by                                                                    | Contains                         |
+| ----------------- | -------------------------------------------------------------------------- | -------------------------------- |
+| Local Supabase    | `bun run dev` (with `.env.local`), `bun run harness`                       | Whatever your migrations create  |
+| Lovable Cloud     | Lovable's preview only — no longer the published site                      | Pre-production — treat as shared |
+| `neuvto-wos-prod` | **`neuvto.com`**, built by GitHub Actions and served by Cloudflare Workers | Real customer data, Mumbai       |
 
 Migrations do **not** reach Lovable Cloud by merging to `main` — that syncs code
 only. Applying them there is a deliberate, separate step.

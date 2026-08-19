@@ -1,6 +1,6 @@
 # Four stacks, and why hosting is moving to get them
 
-**Version:** 1.3 · **Status:** In progress · **Updated:** 18 Aug 2026
+**Version:** 1.4 · **Status:** In progress · **Updated:** 19 Aug 2026
 
 Sada's instruction, 8 Aug 2026:
 
@@ -103,12 +103,11 @@ connector access. This document gets updated as each phase lands.
 
 ---
 
-## Status as of 18 Aug 2026
+## Status as of 19 Aug 2026
 
 - [x] `qa` and `uat` branches pushed, both currently identical to `main`
-- [x] Netlify site shells created (`neuvto-wos-qa`, `neuvto-wos-uat`) — empty,
-      nothing linked, zero deploy credits spent. Unused now that Cloudflare is
-      live; delete once the cutover has held.
+- [x] Netlify site shells created (`neuvto-wos-qa`, `neuvto-wos-uat`) and later
+      deleted — see below. QA and UAT will be Cloudflare, not Netlify.
 - [x] DNS baseline captured (above) — **and it was incomplete.** See below.
 - [x] **Zone moved to Cloudflare, 17 Aug 2026.** `edna`/`woz.ns.cloudflare.com`.
       All records carried over DNS-only (grey cloud) so the site kept serving
@@ -130,8 +129,10 @@ cloudflare` with no `x-nf-request-id`. It cost about ten minutes of
       301s it to the apex at the edge; Netlify is no longer in the path at all.
       See "The www redirect" below for the rule, which lives in the dashboard
       and not in this repository.
-- [ ] Delete the unused Netlify QA/UAT shells, and the production site, once
-      this has held for a week.
+- [x] **All three Netlify sites deleted, 19 Aug 2026** — `neuvto-wos`,
+      `neuvto-wos-qa`, `neuvto-wos-uat`. Earlier than planned, and it broke
+      `http://www`; see "Deleting Netlify" below. **Netlify is no longer part of
+      this system in any form.**
 - [ ] Second Supabase organization ("Neuvto QA") — waiting on Sada
 - [ ] QA and UAT Supabase projects — waiting on the organization
 
@@ -212,20 +213,54 @@ somebody deletes it, so it is written down here:
 | Status       | 301                                                      |
 | Query string | preserved                                                |
 
-The `www` DNS record is **still a CNAME to `neuvto-wos.netlify.app`, proxied
-(orange cloud)**. That is deliberate, and it is the reason this change carried no
-downtime: proxying means the rule fires at Cloudflare's edge and the origin is
-never contacted, and it means a rule that fails to match falls through to
-Netlify — which 301s to the apex anyway. The failure mode is the old behaviour,
-not an error.
+The `www` DNS record is a **proxied `A` record to `192.0.2.0`** — Cloudflare's
+reserved placeholder for an originless setup. Because the record is proxied the
+request never travels to that address; Cloudflare intercepts it and applies the
+rule. There is no origin behind `www` and there is not meant to be one.
 
-Cloudflare's own documentation recommends replacing the CNAME with a proxied `A`
-record to the placeholder `192.0.2.0` for an originless setup. That is the
-cleaner end state and it is **not** done yet on purpose: it converts a rule
-mismatch from "works via Netlify" into "points at a blackhole". Do it in the same
-change that deletes the Netlify site, not before.
+**The rule matches `https://` only, so `Always Use HTTPS` is load-bearing.**
+SSL/TLS → Edge Certificates → Always Use HTTPS is on, which 301s HTTP to HTTPS at
+the edge before any origin is consulted; the rule then takes it the rest of the
+way. Turn that off and every plain-HTTP request to `www` falls through to a
+placeholder address that answers nothing. The two settings are a pair and neither
+is safe to change alone.
 
-Verified end to end: `http://www` → 301 → `https://www` → 301 →
-`https://neuvto.com/` → 200, certificate `CN=www.neuvto.com` issued by Google
-Trust Services, paths and query strings preserved, and no Netlify header
-anywhere in the chain.
+Verified 19 Aug 2026, all four combinations:
+
+| request                  | result                                 |
+| ------------------------ | -------------------------------------- |
+| `http://neuvto.com`      | 301 → `https://neuvto.com` → 200       |
+| `https://neuvto.com`     | 200                                    |
+| `http://www.neuvto.com`  | 301 → `https://www` → 301 → apex → 200 |
+| `https://www.neuvto.com` | 301 → apex → 200                       |
+
+Paths and query strings survive: `/pricing?utm_source=test&a=b` arrives intact.
+Certificate `CN=www.neuvto.com`, Google Trust Services, to 21 Oct 2026.
+
+### Deleting Netlify
+
+All three sites were deleted on 19 Aug 2026, a day after the cutover rather than
+the week that was planned. Two things are worth recording from that.
+
+**It broke `http://www`, and not for the obvious reason.** The redirect rule
+matches `https://` only. Plain-HTTP requests had never matched it — they fell
+through to Netlify, which force-redirected to HTTPS, and the rule caught them on
+the way back. That fallthrough was doing real work while looking like a safety
+net nobody needed. With the site gone, HTTP requests reached a dead origin and
+Cloudflare returned **404**. HTTPS, and the apex on both schemes, were unaffected
+throughout. `Always Use HTTPS` is the fix and is now the thing keeping it working.
+
+**A deleted Netlify site frees its `*.netlify.app` name for anyone to claim.**
+For as long as `www` still CNAMEd to `neuvto-wos.netlify.app`, any request that
+missed the rule would have been proxied to whoever registered that name — a
+dangling-CNAME takeover. Removing the CNAME closed it. The general rule: **delete
+the DNS record before the thing it points at, never after.** The `notify` →
+`ns3.lovable.cloud` delegation that outlived its code by eighteen days is the
+same mistake in a slower form.
+
+**The rollback that was lost was worth less than it looked.** Reverting to
+Netlify would have meant repointing DNS — but DNS is on Cloudflare's nameservers,
+so any failure large enough to need it would have taken DNS with it. It only ever
+covered app-level faults on the Worker, and Workers → Deployments already rolls
+those back in one click without touching DNS. Recreating the site was considered
+and rejected.

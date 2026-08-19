@@ -1,6 +1,6 @@
 # Deployment — how code and schema actually reach each environment
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 19 Aug 2026
 
 **The single most important fact:** merging to `main` deploys **code** and not
 **schema**. Nothing about a green CI run or a successful Lovable sync tells you
@@ -19,8 +19,9 @@ build against a broken database.
 | **Production**     | `udrzhfgwqgolvyimbwto` | `bash scripts/prod-cutover.sh` · `psql` · the harness · `neuvto.com` | Real customer data             |
 
 **Hosting and database are separate choices**, and this is the fact the whole
-arrangement rests on. Since 7 Aug 2026 the site is built by GitHub Actions and
-served by **Netlify**; Lovable still builds its own preview, pointed at
+arrangement rests on. Since 7 Aug 2026 the site is built by GitHub Actions, and
+since 18 Aug 2026 it is served by **Cloudflare Workers**; Lovable still builds
+its own preview, pointed at
 pre-production, which is where a preview belongs. The app is plain `supabase-js`
 reading `VITE_SUPABASE_URL` — `src/integrations/lovable/index.ts` is
 auto-generated and imported by nothing.
@@ -438,21 +439,27 @@ integration landing unreviewed on `main` is worse than losing one-click sync.
 
 ---
 
-## ⚠️ Publishing is metered — a deploy costs 15 credits
+## Publishing is no longer metered — but `paths-ignore` stays
 
-Netlify's free plan is **300 credits a month** and charges **15 credits per
-production deploy**. That is **twenty publishes a month, total**, and when they
-run out the project **pauses**: visitors get `Site not available`, no further
-deploy is accepted, and credits cannot be bought on the free plan. `neuvto.com`
-resolves to Netlify, so exhausting them is a customer-visible outage rather than
-an inconvenience.
+**This section used to open "a deploy costs 15 credits".** It no longer does.
+Since the move to Cloudflare Workers on 18 Aug 2026, deploys are **unmetered at
+every tier** — there is no publish budget, no pausing project, and no risk of
+`neuvto.com` serving _Site not available_ because a fortnight of documentation
+commits used up the month.
 
-On this pipeline's first day — 7 Aug 2026 — it published **eight** times and four
-of those shipped a **byte-identical site**: two documentation pull requests, one
-change to `verify-deploy.sh`, and one manual re-run of a commit already live.
-Sixty credits, a fifth of the month, for no change at all.
+The history is worth keeping, because it is why `paths-ignore` exists. Netlify's
+free plan was 300 credits a month at 15 per production deploy — **twenty
+publishes**, after which the project paused and visitors got an error. On this
+pipeline's first day, 7 Aug 2026, it published **eight** times and four of those
+shipped a **byte-identical site**: two documentation pull requests, one change to
+`verify-deploy.sh`, and one manual re-run of a commit already live. A fifth of
+the month, for no change at all.
 
-So `deploy.yml` now carries a `paths-ignore` list. What it does and does not do:
+**`paths-ignore` stays anyway**, because not publishing an identical site was
+always the right behaviour and cost was only the thing that made it urgent. A
+build that changes nothing still burns CI minutes, still restarts the Worker, and
+still produces a deployment record that has to be reasoned about later. What it
+does and does not do:
 
 - **It skips a push only when _every_ changed file matches.** A pull request
   touching both `src/` and `docs/` still publishes — which is correct, and is why
@@ -463,13 +470,12 @@ So `deploy.yml` now carries a `paths-ignore` list. What it does and does not do:
 - **`workflow_dispatch` is kept** precisely so either of those can still be
   published deliberately when you want the live site rebuilt anyway.
 
-**This is a stopgap, not the answer.** At this project's real pace — 42
+**The move landed on 18 Aug 2026 (D61, D66).** At this project's real pace — 42
 site-changing commits in the fortnight to 7 Aug, roughly 90 deploys a month, some
-1,350 credits — no Netlify tier below Pro at $20/user/month carries it, and Pro
-still meters every deploy. Hosting moves to **Cloudflare Workers**, where deploys
-are unmetered at every tier, static asset requests are free, there is no egress
-charge, and the paid tier is $5/month. Until that move lands, treat the twenty
-publishes a month as a real budget.
+1,350 credits — no Netlify tier below Pro at $20/user/month would have carried
+it, and Pro meters every deploy too. Cloudflare Workers meters none at any tier,
+serves static assets free, charges no egress, and is $5/month when paid. Nothing
+here is a budget any more. See [ENVIRONMENTS.md](ENVIRONMENTS.md).
 
 ---
 

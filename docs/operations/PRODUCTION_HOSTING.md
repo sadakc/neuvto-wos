@@ -1,15 +1,19 @@
 # Publishing neuvto.com ourselves
 
-**Version:** 1.2 · **Status:** Historical · **Updated:** 18 Aug 2026
+**Version:** 1.3 · **Status:** Historical · **Updated:** 19 Aug 2026
 
 > **`neuvto.com` is served by Cloudflare Workers as of 18 Aug 2026, 13:58 UTC.**
 > Netlify no longer serves the site. This document describes the Netlify setup
 > it replaced.
 >
-> It is kept, rather than deleted, for two reasons: the Netlify site is still
-> deployed and is the rollback until this has held for a week, and `www` still
-> CNAMEs to it. Steps 1 and 5 (the Supabase keys, and what is safe to paste
-> where) are hosting-agnostic and still correct.
+> **The Netlify sites were deleted on 19 Aug 2026** — production and both
+> shells. There is no Netlify account state left to roll back to, and nothing in
+> DNS points at it. This file is history, not a runbook.
+>
+> It is kept because Steps 1 and 5 — the Supabase keys, and what is safe to
+> paste where — are hosting-agnostic and still correct, and because the failure
+> it was written to prevent (a published site talking to the wrong database) is
+> not specific to Netlify.
 >
 > For how the site is published today, see [ENVIRONMENTS.md](ENVIRONMENTS.md)
 > and `scripts/cloudflare-worker-config.mjs`. **This file needs rewriting for

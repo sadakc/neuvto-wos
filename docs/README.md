@@ -83,7 +83,7 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 | ----------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
 | [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                                                |
 | [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud                                |
-| [PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)               | why `neuvto.com` is built by GitHub Actions and served by Netlify, written for a non-developer                         |
+| [PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)               | **historical** — the Netlify setup Cloudflare Workers replaced on 18 Aug 2026; still correct on Supabase keys          |
 | [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives                            |
 | [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                                                |
 | [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out                             |

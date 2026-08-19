@@ -343,7 +343,8 @@ its own backend variables, so the bundle at `neuvto.com` resolved to
 3 Aug and again on 6 Aug 2026.
 
 **Resolved 7 Aug 2026.** The site is now built by GitHub Actions with variables
-we supply and served by Netlify; Lovable no longer publishes production. Verified
+we supply, and served by Cloudflare Workers since 18 Aug 2026; Lovable no longer
+publishes production. Verified
 by a real sign-in code sent from `neuvto.com` through the production project, and
 guarded on every deploy by `scripts/verify-deploy.sh`. See
 [PRODUCTION_HOSTING.md](PRODUCTION_HOSTING.md).
