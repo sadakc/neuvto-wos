@@ -60,7 +60,9 @@ on:
   workflow_dispatch:
 
 # A second push while the first is deploying would race to publish. Newest wins;
-# cancelling mid-deploy is safe because Netlify promotes atomically.
+# cancelling mid-deploy is safe because Cloudflare promotes atomically too — a
+# new Worker version serves traffic only once it is fully uploaded, so a killed
+# run leaves the previous version live rather than a half-published one.
 concurrency:
   group: deploy-production
   cancel-in-progress: true

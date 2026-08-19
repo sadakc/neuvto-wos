@@ -74,9 +74,12 @@ import { readFileSync, writeFileSync } from "node:fs";
  * discovered while the apex was down. This list is exact hostnames and has no
  * such ambiguity.
  *
- * Rollback is to remove the hostname here, redeploy, and restore its `A`
- * record — for `neuvto.com` that is 75.2.60.5, and the Netlify site stays
- * deployed and is not torn down.
+ * Rollback is NOT to Netlify — those sites were deleted on 19 Aug 2026 and
+ * there is nothing to point DNS back at. Roll a bad release back through
+ * Workers -> Deployments, which restores a previous version in one click and
+ * touches no DNS. That is the better rollback anyway: DNS is on Cloudflare's
+ * nameservers, so any failure big enough to need a host switch would have taken
+ * DNS with it.
  *
  * `www.neuvto.com` is deliberately absent and adding it here will not work:
  * Custom Domains match the hostname exactly, so a Worker on the apex never sees

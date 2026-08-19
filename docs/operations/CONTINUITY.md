@@ -1,6 +1,6 @@
 # Continuity
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 16 Aug 2026
+**Version:** 1.1 · **Status:** Active · **Updated:** 19 Aug 2026
 
 **The question this answers:** Neuvto is currently built and operated largely
 through Claude Code. If that stops — a lapsed subscription, a different machine,
@@ -141,15 +141,19 @@ of which tool they have.
 Worth deciding: a sealed record of where each secret lives (not the values) so a
 trusted second person could recover access.
 
-### 4.3 The Netlify deploy budget is a clock
+### 4.3 ~~The Netlify deploy budget is a clock~~ — resolved 18 Aug 2026
 
-300 credits per month, **15 per production deploy** — twenty deploys, after which
-the project pauses and `neuvto.com` serves _Site not available_ (D61). Three
-deploys were spent on 16 Aug 2026 alone.
+`neuvto.com` is served by Cloudflare Workers, which meters no deploys at any
+tier. The clock this section described — 300 credits a month at 15 per deploy,
+twenty publishes before the project paused — is gone, and the Netlify sites were
+deleted on 19 Aug 2026.
 
-Cloudflare Workers meters no deploys at any tier and is the standing fix. It is
-blocked on a Cloudflare account and two GitHub secrets, and the build already
-emits a working Worker. See `ENVIRONMENTS.md`.
+Kept rather than removed because it is the clearest example of the risk this
+whole document is about: **a free tier with a hard limit is a deadline nobody put
+in a calendar.** The replacement has its own limits — Workers' free tier is
+100,000 requests a day and a 3 MB compressed script, against a bundle currently
+at about 0.7 MB. Neither is close, and both should be checked before they are
+assumed. See `ENVIRONMENTS.md`.
 
 ---
 
