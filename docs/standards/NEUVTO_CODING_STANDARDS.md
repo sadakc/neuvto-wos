@@ -1,6 +1,6 @@
 # NEUVTO WOS — Coding Standards
 
-**Version:** 1.1 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 19 Aug 2026
 
 Two goals: consistency across every module, and **portability out of Lovable at any time**. §9 is the portability contract — treat it as non-negotiable.
 
@@ -48,6 +48,7 @@ src/
 2. `modules/a/**` **must not** import from `modules/b/**`. Cross-module data goes through a published interface, per `03` §Cross-Module Data.
 3. Anything importing a module does so via `modules/leave` — never a deep path like `modules/leave/handlers/submit`.
 4. `lib/**` contains no domain concepts. A function that knows what a leave balance is does not belong there.
+5. **Nothing imports `integrations/supabase/client.server`.** It exports an RLS-bypassing service-role client and needs `SUPABASE_SERVICE_ROLE_KEY`, which the Worker deliberately does not hold (D66). Privileged work goes through a `SECURITY DEFINER` RPC that checks `is_platform_admin()` — see [ENVIRONMENTS.md § The service role key](../operations/ENVIRONMENTS.md).
 
 Rule 1 is the one that decays first. When Attendance arrives and the Approval Engine "just needs one leave-specific thing," that is the moment the platform stops being a platform.
 
