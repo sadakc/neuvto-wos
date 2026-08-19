@@ -1,6 +1,6 @@
 # Four stacks, and why hosting is moving to get them
 
-**Version:** 1.2 · **Status:** In progress · **Updated:** 18 Aug 2026
+**Version:** 1.3 · **Status:** In progress · **Updated:** 18 Aug 2026
 
 Sada's instruction, 8 Aug 2026:
 
@@ -126,10 +126,10 @@ cloudflare` with no `x-nf-request-id`. It cost about ten minutes of
       downtime — see below.
 - [x] `DEPLOY_URL` repository variable deleted, so `deploy.yml` now verifies
       `neuvto.com` itself rather than the hostname it was standing in for.
-- [ ] **`www` is still Netlify.** It CNAMEs to `neuvto-wos.netlify.app`, which
-      301s to the apex, so it works — but Custom Domains match the hostname
-      exactly, and a Worker on `neuvto.com` never sees `www`. Replace with a
-      Cloudflare redirect rule (free) before the Netlify site is deleted.
+- [x] **`www` moved off Netlify, 18 Aug 2026.** A Cloudflare Redirect Rule now
+      301s it to the apex at the edge; Netlify is no longer in the path at all.
+      See "The www redirect" below for the rule, which lives in the dashboard
+      and not in this repository.
 - [ ] Delete the unused Netlify QA/UAT shells, and the production site, once
       this has held for a week.
 - [ ] Second Supabase organization ("Neuvto QA") — waiting on Sada
@@ -192,3 +192,40 @@ Two things kept the blast radius small, and both were deliberate:
 to hand anyone, and the Netlify site was never torn down, so a rollback was
 always two screens away. Neither was needed, but the cutover was only
 comfortable because they existed.
+
+### The www redirect
+
+`www.neuvto.com` is not a Custom Domain and never will be. Custom Domains match
+the hostname exactly, so a Worker attached to `neuvto.com` never sees `www` —
+Cloudflare's documented answer is a Redirect Rule, and that is what is in place.
+
+The rule is **zone configuration in the Cloudflare dashboard**, not code. Nothing
+in this repository would tell you it exists, and it disappears silently if
+somebody deletes it, so it is written down here:
+
+|              |                                                          |
+| ------------ | -------------------------------------------------------- |
+| Where        | neuvto.com → Rules → Redirect Rules                      |
+| Name         | `www to Apex`                                            |
+| Match        | Wildcard pattern, request URL `https://www.neuvto.com/*` |
+| Target       | `https://neuvto.com/${1}`                                |
+| Status       | 301                                                      |
+| Query string | preserved                                                |
+
+The `www` DNS record is **still a CNAME to `neuvto-wos.netlify.app`, proxied
+(orange cloud)**. That is deliberate, and it is the reason this change carried no
+downtime: proxying means the rule fires at Cloudflare's edge and the origin is
+never contacted, and it means a rule that fails to match falls through to
+Netlify — which 301s to the apex anyway. The failure mode is the old behaviour,
+not an error.
+
+Cloudflare's own documentation recommends replacing the CNAME with a proxied `A`
+record to the placeholder `192.0.2.0` for an originless setup. That is the
+cleaner end state and it is **not** done yet on purpose: it converts a rule
+mismatch from "works via Netlify" into "points at a blackhole". Do it in the same
+change that deletes the Netlify site, not before.
+
+Verified end to end: `http://www` → 301 → `https://www` → 301 →
+`https://neuvto.com/` → 200, certificate `CN=www.neuvto.com` issued by Google
+Trust Services, paths and query strings preserved, and no Netlify header
+anywhere in the chain.

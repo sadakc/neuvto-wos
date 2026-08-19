@@ -78,10 +78,10 @@ import { readFileSync, writeFileSync } from "node:fs";
  * record — for `neuvto.com` that is 75.2.60.5, and the Netlify site stays
  * deployed and is not torn down.
  *
- * `www.neuvto.com` is deliberately absent: Custom Domains match the hostname
- * exactly, so a Worker on the apex never sees `www`. It still CNAMEs to
- * Netlify, which 301s to the apex. Replace that with a Cloudflare redirect
- * rule before the Netlify site is deleted.
+ * `www.neuvto.com` is deliberately absent and adding it here will not work:
+ * Custom Domains match the hostname exactly, so a Worker on the apex never sees
+ * `www`. It is handled by a Cloudflare Redirect Rule instead — zone config, not
+ * code, which is why ENVIRONMENTS.md records it under "The www redirect".
  */
 const CUSTOM_DOMAINS = ["neuvto.com", "wos.neuvto.com"];
 
