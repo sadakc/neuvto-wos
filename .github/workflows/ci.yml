@@ -67,9 +67,30 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: supabase/setup-cli@v1
+      # PINNED, not `latest`, and the pin is the point.
+      #
+      # This job is what proves tenant isolation — the harness impersonates
+      # authenticated roles and asserts one customer cannot reach another's
+      # rows. Running it against whichever CLI shipped this morning means a
+      # green tick certifies a slightly different thing every day, and it means
+      # this job can break on a day nobody touched the repository.
+      #
+      # That is not hypothetical here. On 19 Aug 2026 Homebrew moved node to 26
+      # overnight and sixteen tests failed the next morning against unchanged
+      # code. Same mechanism, different tool.
+      #
+      # It also closes a gap that was already open: `latest` resolved to 2.115.0
+      # while this project's own machine ran 2.110.0, so "passes in CI" and
+      # "passes locally" were claims about two different programs. 2.110.0 is
+      # the version the harness is actually developed against.
+      #
+      # Upgrading is a one-line reviewed diff, which is how custom domains and
+      # everything else that decides behaviour is handled here. There is no
+      # Dependabot, so it will not happen on its own — check it when the CLI
+      # is upgraded locally.
+      - uses: supabase/setup-cli@v3
         with:
-          version: latest
+          version: 2.110.0
 
       # Starts the full local Supabase stack. Needed rather than a bare Postgres
       # container because the harness impersonates authenticated roles and relies
