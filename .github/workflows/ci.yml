@@ -20,9 +20,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # No bun-version here on purpose. Omitted, setup-bun reads
+      # `packageManager` from package.json — so the version lives in ONE place
+      # and the build, the tests and the harness cannot end up on three
+      # different bun releases. `latest` used to sit here, which meant a bun
+      # release could change what shipped on a day nobody touched the repo.
+      # Guarded in the architecture job: package.json must pin an exact bun.
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -126,6 +130,30 @@ jobs:
         with:
           # Full history — the migration check diffs against origin/main.
           fetch-depth: 0
+
+      # The bun version is pinned in ONE place — package.json's `packageManager`
+      # — and every workflow reads it by omitting `bun-version`. That is only
+      # safe while the field exists: setup-bun's documented fallback order is
+      # packageManager, then engines.bun, then `latest`. So deleting the field,
+      # or loosening it to a range, silently restores the exact drift the pin
+      # removed, and every job would still be green while doing it.
+      #
+      # This makes that loud. An exact version only — "bun@1.3.14" passes,
+      # "bun@^1.3.14" and "bun@latest" do not.
+      - name: The bun version is pinned, and pinned exactly
+        run: |
+          python3 - <<'PY'
+          import json, re, sys
+          pm = json.load(open("package.json")).get("packageManager")
+          if not pm:
+              sys.exit("::error::package.json has no `packageManager`. "
+                       "setup-bun would silently fall back to `latest`. "
+                       'Add "packageManager": "bun@<exact version>".')
+          if not re.fullmatch(r"bun@\d+\.\d+\.\d+", pm):
+              sys.exit(f"::error::packageManager is {pm!r}. It must pin an exact "
+                       "bun version, e.g. bun@1.3.14 — a range or a tag reintroduces drift.")
+          print(f"packageManager: {pm}")
+          PY
 
       # Cheap greps for the violations that are easy to introduce during a hurried
       # fix and expensive to find later. Each mirrors a rule in
@@ -371,9 +399,13 @@ jobs:
           # Full history — the gate reads commit authors between base and head.
           fetch-depth: 0
 
+      # No bun-version here on purpose. Omitted, setup-bun reads
+      # `packageManager` from package.json — so the version lives in ONE place
+      # and the build, the tests and the harness cannot end up on three
+      # different bun releases. `latest` used to sit here, which meant a bun
+      # release could change what shipped on a day nobody touched the repo.
+      # Guarded in the architecture job: package.json must pin an exact bun.
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       # An approving review from someone with write access is the go-ahead.
       # Defaults to false, so a failure to read the API fails closed.
