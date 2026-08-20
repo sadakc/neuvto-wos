@@ -1,6 +1,6 @@
 # Local development
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.1 · **Status:** Active · **Updated:** 20 Aug 2026
 
 ## The one thing that will catch you
 
@@ -75,6 +75,43 @@ Tests use their own `vitest.config.ts` rather than `vite.config.ts`. That is
 deliberate: `vite.config.ts` loads the TanStack plugin, which regenerates the
 MCP route files every time it loads — so running tests under it left four source
 files modified on every run.
+
+### Your node version can break the tests
+
+The tests run under **node**, not bun: `bun run test` runs the `vitest` binary,
+whose shebang hands it to node. So the node on your PATH decides how they behave,
+even though nothing in the repo names a node version.
+
+Node 26 ships its own experimental `localStorage`, gated behind
+`--localstorage-file`. Without that flag the global still exists but reads as
+`undefined`, and since the name is already taken on `globalThis`, vitest's
+happy-dom setup never installs the real one over it. A DOM test then gets a
+working `window` and `document` and no storage, and every line touching
+`localStorage` fails with:
+
+```
+TypeError: Cannot read properties of undefined (reading 'clear')
+```
+
+Upgrading Homebrew node to 26.7.0 on 19 Aug 2026 did this to all sixteen tests in
+`src/platform/auth/idle.test.ts`. **`src/test/setup.ts` now puts happy-dom's own
+`Storage` back** whenever it finds the global missing, so this is handled rather
+than waiting to be re-diagnosed.
+
+Two things that look like fixes and are not. `window.localStorage` is the same
+lookup — under vitest `window` **is** `globalThis`. And `--localstorage-file`
+opts the whole suite into an experimental node feature in order to satisfy a
+test, which is worse than the problem.
+
+CI does not hit this **yet**: `.github/workflows/ci.yml` sets up bun and never
+sets up node, so it inherits whatever the GitHub runner ships. When runners reach
+node 26 the repair above is already in place. Confirmed by running the full suite
+with the flag forced into every worker — `localStorage` present, repair skipped,
+595 tests still passing.
+
+If a DOM global goes missing again, `src/test/setup.ts` fails the file once with
+a sentence naming it, rather than once per test with a `TypeError`. Check
+`node --version` first.
 
 ## Signing in locally
 
