@@ -101,6 +101,65 @@ export default tseslint.config(
     },
   },
 
+  /**
+   * The payroll engine imports nothing but itself.
+   *
+   * `src/payroll-core/` is arithmetic — given the same input it must return the
+   * same output forever, which is what lets its tests assert a real month
+   * against the spreadsheet Payroll replaces. An engine that can reach a
+   * database, a clock, or a React context is an engine whose output depends on
+   * one, and the golden test stops meaning anything.
+   *
+   * It is also the seam that keeps the engine portable: a native client or a
+   * REST route consumes it unchanged, and it lifts out to its own package
+   * without touching a line.
+   *
+   * TWO BLOCKS, BECAUSE THE ESCAPE DEPTH DEPENDS ON THE FILE'S DEPTH. From
+   * `payroll-core/engine.ts`, `../` is already `src/` and leaves. From
+   * `payroll-core/__fixtures__/july-2026.ts`, `../` is still inside the package
+   * and `../../` is what leaves. A single `../*` pattern blocks the fixture's
+   * legitimate `../types` import; a single `../../*` pattern lets
+   * `engine.ts` reach `../platform` unchallenged.
+   *
+   * Relative forms are listed at all because `@/*` covers only the alias —
+   * `../platform/errors` resolves perfectly well without it, which is exactly
+   * the hole found in the service-role guard (D66).
+   */
+  {
+    files: ["src/payroll-core/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*", "src/*", "../*"],
+              message:
+                "src/payroll-core is pure arithmetic and imports nothing outside itself — no database, no platform, no React. That is what makes its golden test meaningful and the engine portable. Pass what you need in as an argument instead; the types live in ./types.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    files: ["src/payroll-core/*/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["@/*", "src/*", "../../*"],
+              message:
+                "src/payroll-core is pure arithmetic and imports nothing outside itself — no database, no platform, no React. That is what makes its golden test meaningful and the engine portable. Pass what you need in as an argument instead; the types live in ../types.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+
   // The quarantine itself, and generated files, are exempt from their own rules.
   {
     files: ["src/integrations/lovable/**", "src/integrations/supabase/types.ts"],
