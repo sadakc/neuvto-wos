@@ -33,8 +33,18 @@ export const payroll: ModuleDefinition = {
     { path: "payroll/payslips", component: lazy(() => import("./components/MyPayslip")) },
   ],
 
-  // What an administrator configures. Contributed rather than routed, so the
-  // platform's settings page renders it without importing anything here.
+  /**
+   * What an administrator configures, in the order it has to be done.
+   *
+   * Components first, because a salary structure is an amount against each of
+   * them and the structure screen can do nothing until they exist. Structures
+   * second, because a pay run computes nothing without them. Statutory details
+   * last, because no figure on a payslip depends on them — they decide only
+   * whether the returns and the bank file can be filed.
+   *
+   * Contributed rather than routed, so the platform's settings page renders all
+   * three without importing anything here.
+   */
   adminSections: () => [
     {
       id: "salary-components",
@@ -43,6 +53,22 @@ export const payroll: ModuleDefinition = {
         "The parts a salary is made of, and which of them count towards provident fund wages. Set these up before anybody's salary structure.",
       component: lazy(() => import("./components/SalaryComponents")),
       order: 10,
+    },
+    {
+      id: "salary-structures",
+      title: "Salary structures",
+      description:
+        "What each person is paid each month, and from when. Anybody without one cannot be paid, and is named here rather than quietly left out of the run.",
+      component: lazy(() => import("./components/SalaryStructures")),
+      order: 20,
+    },
+    {
+      id: "employee-payroll-details",
+      title: "Statutory and bank details",
+      description:
+        "UAN, ESI number, PAN, and where the salary is sent. None of it changes a payslip; all of it decides whether the PF return, the ESI return and the bank file can be filed at all.",
+      component: lazy(() => import("./components/EmployeePayrollDetails")),
+      order: 30,
     },
   ],
 
@@ -138,6 +164,8 @@ export {
   getRunLines,
   listRuns,
   listComponents,
+  listStructures,
+  listEmployeePayroll,
   saveComponent,
   saveDays,
   saveStructure,
@@ -153,8 +181,10 @@ export {
   PayrollSettings,
   PAY_RUN_STATUSES,
   payrollErrorMessage,
+  type EmployeePayrollRow,
   type PayRunStatus,
   type PayRunSummary,
   type PayslipLine,
   type SalaryComponent,
+  type StructureRow,
 } from "./contracts";

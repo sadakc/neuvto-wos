@@ -26,10 +26,12 @@ import {
   EmployeePayrollInput,
   StructureInput,
   payrollErrorMessage,
+  type EmployeePayrollRow,
   type PayRunStatus,
   type PayRunSummary,
   type PayslipLine,
   type SalaryComponent,
+  type StructureRow,
 } from "./contracts";
 
 /**
@@ -220,6 +222,116 @@ export async function saveComponent(input: ComponentInput): Promise<void> {
         organization_id: await currentOrgId(),
       });
   if (error) throw toPayrollError(error.message);
+}
+
+/**
+ * Everybody a pay run would consider, in the order a pay run considers them.
+ *
+ * The filter is `is_active`, matching `payroll_run_inputs` exactly. A
+ * configuration screen listing people the run will skip — or skipping people
+ * the run will include — sends an administrator to look for a name that is not
+ * there, or lets them set up somebody who will never be paid.
+ */
+async function roster(): Promise<
+  { employeeId: string; employeeName: string | null; employeeCode: string | null }[]
+> {
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, full_name, employee_code")
+    .eq("is_active", true)
+    .is("deleted_at", null)
+    .order("employee_code", { nullsFirst: false })
+    .order("full_name");
+  if (error) throw toPayrollError(error.message);
+
+  return (data ?? []).map((r) => ({
+    employeeId: r.id,
+    employeeName: r.full_name,
+    employeeCode: r.employee_code,
+  }));
+}
+
+/**
+ * The roster, each person carrying whatever statutory identifiers they have.
+ *
+ * EVERY ACTIVE PERSON APPEARS, including the ones with nothing filled in — they
+ * are the entire point of the screen. A list of only the rows that exist in
+ * `payroll_employee_details` would show an administrator their completed work
+ * and hide what is left, which is the wrong half.
+ */
+export async function listEmployeePayroll(): Promise<EmployeePayrollRow[]> {
+  const [people, details] = await Promise.all([
+    roster(),
+    supabase
+      .from("payroll_employee_details")
+      .select("employee_id, uan, esi_number, pan, bank_name, bank_account_number, bank_ifsc")
+      .is("deleted_at", null),
+  ]);
+  if (details.error) throw toPayrollError(details.error.message);
+
+  const byEmployee = new Map((details.data ?? []).map((d) => [d.employee_id, d]));
+
+  return people.map((p) => {
+    const d = byEmployee.get(p.employeeId);
+    return {
+      ...p,
+      uan: d?.uan ?? null,
+      esiNumber: d?.esi_number ?? null,
+      pan: d?.pan ?? null,
+      bankName: d?.bank_name ?? null,
+      bankAccountNumber: d?.bank_account_number ?? null,
+      bankIfsc: d?.bank_ifsc ?? null,
+    };
+  });
+}
+
+/**
+ * The roster, each person carrying the structure a run would actually use.
+ *
+ * `effectiveFrom` null means no structure at all — the state that until now
+ * removed somebody from the pay run entirely rather than flagging them
+ * (20260823130000). It is surfaced here because this is the screen that fixes
+ * it.
+ *
+ * The structure chosen is the latest one already in force, matching
+ * `payroll_run_inputs`. A future-dated structure exists and is not shown as
+ * current, because it is not.
+ */
+export async function listStructures(): Promise<StructureRow[]> {
+  const [people, structures] = await Promise.all([
+    roster(),
+    supabase
+      .from("salary_structures")
+      .select("id, employee_id, effective_from, salary_structure_lines(component_id, amount)")
+      .is("deleted_at", null)
+      .lte("effective_from", new Date().toISOString().slice(0, 10))
+      .order("effective_from", { ascending: false }),
+  ]);
+  if (structures.error) throw toPayrollError(structures.error.message);
+
+  // Ordered newest first, so the first one seen for a person is the current
+  // one. Later rows are older and must not overwrite it.
+  const current = new Map<string, (typeof structures.data)[number]>();
+  for (const s of structures.data ?? []) {
+    if (!current.has(s.employee_id)) current.set(s.employee_id, s);
+  }
+
+  return people.map((p) => {
+    const s = current.get(p.employeeId);
+    const amounts = (s?.salary_structure_lines ?? []).map((l) => ({
+      componentId: l.component_id,
+      amount: Number(l.amount),
+    }));
+    return {
+      ...p,
+      effectiveFrom: s?.effective_from ?? null,
+      amounts,
+      // Derived, never stored. The workbook's components sum exactly to gross
+      // for all 44 of its employees, so gross is what the parts add up to
+      // rather than a number that could disagree with them.
+      fixedGross: amounts.reduce((total, a) => total + a.amount, 0),
+    };
+  });
 }
 
 export async function saveEmployeePayroll(input: EmployeePayrollInput): Promise<void> {

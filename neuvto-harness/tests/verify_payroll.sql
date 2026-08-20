@@ -337,6 +337,42 @@ begin
   else raise notice 'FAIL: a manager read % structure line(s)', n; failed := failed + 1; end if;
   perform pg_temp.as_postgres();
 
+  -- ═════════════════════ nobody vanishes for want of a salary structure
+  --
+  -- emp_a has a structure; mgr_a has none. Before 20260823130000 the lateral
+  -- join onto salary_structures was INNER, so mgr_a produced no row and was
+  -- simply not in the pay run — no warning, no zero, no line. That is the
+  -- workbook's row-49 failure rebuilt in SQL, and it defeated the screen test
+  -- that was supposed to catch it: PayRuns.test.tsx mocks this function and
+  -- hands it an employee with `fixedComponents: []`, a shape the function
+  -- could not produce. The screen was proved to render a warning it could
+  -- never be given the data to raise.
+  perform pg_temp.as_user(admin_a);
+
+  select count(*) into n
+    from jsonb_array_elements(public.payroll_run_inputs(run_a) -> 'employees') e
+   where (e ->> 'employeeId')::uuid = mgr_a;
+  if n = 1 then raise notice 'ok: somebody with no salary structure still appears in the run';
+  else raise notice 'FAIL: an employee with no salary structure vanished from the run'; failed := failed + 1; end if;
+
+  select count(*) into n
+    from jsonb_array_elements(public.payroll_run_inputs(run_a) -> 'employees') e
+   where (e ->> 'employeeId')::uuid = mgr_a
+     and e -> 'fixedComponents' = '[]'::jsonb;
+  if n = 1 then raise notice 'ok: and carries no components, which is what the screen names them for';
+  else raise notice 'FAIL: they arrived carrying components they do not have'; failed := failed + 1; end if;
+
+  -- The person who DOES have a structure still carries it, so the left join
+  -- did not simply blank everybody out.
+  select count(*) into n
+    from jsonb_array_elements(public.payroll_run_inputs(run_a) -> 'employees') e
+   where (e ->> 'employeeId')::uuid = emp_a
+     and jsonb_array_length(e -> 'fixedComponents') > 0;
+  if n = 1 then raise notice 'ok: and somebody who has a structure still carries it';
+  else raise notice 'FAIL: a structure that exists was not returned'; failed := failed + 1; end if;
+
+  perform pg_temp.as_postgres();
+
   -- ═══════════════════════════════════════════════ the module boundary again
 
   perform pg_temp.as_postgres();

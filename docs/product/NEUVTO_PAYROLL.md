@@ -1,6 +1,6 @@
 # Payroll
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 20 Aug 2026
+**Version:** 1.1 · **Status:** Active · **Updated:** 20 Aug 2026
 
 The second module. It replaces an eleven-sheet Excel workbook that runs a real
 payroll every month, and its acceptance criterion is that workbook's own July
@@ -136,6 +136,35 @@ a return filed from it declares 44 members when 11 are covered.
 
 ---
 
+## The row-49 bug, rebuilt and removed
+
+Worth recording because it is the exact failure this module was built to end,
+and it survived a screen test that was supposed to catch it.
+
+`payroll_run_inputs` joined each person to their salary structure with a plain
+`join lateral` — an INNER join. Somebody with no structure yet produced no row,
+so they were not in the pay run at all: no warning, no zero, no line. That is
+`VLOOKUP` stopping at row 49 with different syntax, and it fired hardest on the
+people most likely to be missed — the ones just added.
+
+**How it passed the tests.** `PayRuns.test.tsx` asserts that a person with no
+structure is named on screen, and it passed — because it mocks `getRunInputs`
+and hands it an employee carrying `fixedComponents: []`, a shape the real
+function could not return. The screen was proved to render a warning it could
+never be given the data to raise. The mocked test was right about what the
+screen should do and wrong about what it would receive.
+
+Fixed in `20260823130000_nobody_vanishes_from_a_pay_run.sql` (`left join
+lateral`). The harness now asserts it against the real function: somebody with
+no structure appears, carries no components, and somebody who has one still
+carries it — watched failing with the inner join restored before being trusted.
+
+**The general lesson, for the next module.** A mocked handler proves the screen,
+never the contract. Where a screen's warning depends on a shape the database
+produces, something has to assert the database produces it.
+
+---
+
 ## Known divergences from statute
 
 Recorded rather than silently corrected. The instruction was to mirror the
@@ -155,6 +184,30 @@ deliberate later decision, not an oversight.
 
 The single correction made: **the PT report is Karnataka's, not Andhra
 Pradesh's.**
+
+---
+
+## Setting it up, in the order it has to be done
+
+Three admin sections, contributed to the platform's settings screen. The order
+is not cosmetic — each one is unusable until the one before it exists.
+
+1. **Salary components** — the parts a salary is made of, and the single flag
+   the arithmetic reads: whether a component counts towards PF wages.
+2. **Salary structures** — what each person is paid, and from when. Gross is
+   **the sum of the components, added up as they are typed and never stored**,
+   so it cannot drift from the parts it is made of. Anybody with no structure is
+   named here; without one they cannot be paid.
+3. **Statutory and bank details** — UAN, ESI number, PAN, account and IFSC.
+   None of it changes a payslip by a rupee; all of it decides whether the PF
+   return, the ESI return and the bank file can be filed at all. Every field is
+   optional, because payroll is configured over weeks and a person whose UAN has
+   not arrived is ordinary — but the screen names who would drop out of which
+   file, in that file's own words, while it can still be fixed.
+
+The shapes are validated on the way in because the database validates them too.
+The case worth stopping is an eleven-digit UAN: the EPFO portal accepts the
+upload and rejects the batch hours later without naming a row.
 
 ---
 
@@ -221,8 +274,8 @@ person's net pay.
   itself cannot pass.
 - `neuvto-harness/tests/verify_payroll.sql` — 30 refusals, each asserted by
   attempting the thing and requiring it to fail.
-- Render tests for the pay run and payslip screens, every one watched failing
-  first.
+- Render tests for the pay run, payslip, salary-structure and statutory-details
+  screens, every one watched failing first.
 
 The fixture holds **no names**. The engine never reads one, so none is stored.
 

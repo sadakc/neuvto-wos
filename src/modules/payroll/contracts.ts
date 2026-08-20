@@ -143,6 +143,35 @@ export interface SalaryComponent {
   status: "active" | "archived";
 }
 
+/** One person on the statutory-details screen. Nulls are ordinary, not errors. */
+export interface EmployeePayrollRow {
+  employeeId: string;
+  employeeName: string | null;
+  employeeCode: string | null;
+  uan: string | null;
+  esiNumber: string | null;
+  pan: string | null;
+  bankName: string | null;
+  bankAccountNumber: string | null;
+  bankIfsc: string | null;
+}
+
+/**
+ * One person on the salary-structure screen.
+ *
+ * `effectiveFrom: null` means they have no structure in force and cannot be
+ * paid. `fixedGross` is the sum of `amounts` — derived on read, never stored,
+ * so it cannot disagree with the parts it is made of.
+ */
+export interface StructureRow {
+  employeeId: string;
+  employeeName: string | null;
+  employeeCode: string | null;
+  effectiveFrom: string | null;
+  amounts: { componentId: string; amount: number }[];
+  fixedGross: number;
+}
+
 export interface PayRunSummary {
   id: string;
   periodMonth: string;
