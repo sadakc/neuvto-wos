@@ -75,9 +75,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
+      # No bun-version here on purpose. Omitted, setup-bun reads
+      # `packageManager` from package.json — so the version lives in ONE place
+      # and the build, the tests and the harness cannot end up on three
+      # different bun releases. `latest` used to sit here, which meant a bun
+      # release could change what shipped on a day nobody touched the repo.
+      # Guarded in the architecture job: package.json must pin an exact bun.
       - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: latest
 
       - name: Install
         run: bun install --frozen-lockfile
