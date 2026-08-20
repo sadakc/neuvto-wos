@@ -33,7 +33,7 @@ flowchart TB
 
     subgraph INF["INFRASTRUCTURE<br/>bought, not built"]
         direction LR
-        NT["Netlify<br/>hosts neuvto.com"]
+        NT["Cloudflare Workers<br/>hosts neuvto.com<br/>and answers its DNS"]
         PG[("Supabase Postgres<br/>row-level security")]
         SA["Supabase Auth"]
         RE["Resend<br/>email delivery"]
