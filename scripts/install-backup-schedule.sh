@@ -94,6 +94,74 @@ MSG
   exit 1
 fi
 
+# THE SECOND THING A SCHEDULE CANNOT RUN WITHOUT: a usable PATH.
+#
+# launchd does NOT give a job your shell's environment. It runs with a minimal
+# PATH that excludes both Homebrew and /usr/local/bin, so the tools the backup
+# needs are simply not found and it exits before doing anything useful.
+#
+# This is not hypothetical. Installing this schedule on 20 Aug 2026 failed twice
+# in a row, one layer at a time:
+#
+#   1. "supabase CLI not found"    — /opt/homebrew/bin was missing
+#   2. "failed to run docker"      — /usr/local/bin was missing, where Docker
+#                                    Desktop symlinks its CLI. `supabase db dump`
+#                                    shells out to a container.
+#
+# Both would have failed silently every night at 03:00. They were caught in
+# minutes only because the alarm was installed alongside the backup, which is
+# the entire argument for the alarm.
+#
+# So every tool is RESOLVED here, from the shell that demonstrably works, and
+# the directories are baked into the plists. Resolved rather than hardcoded:
+# /opt/homebrew is an Apple-silicon default and /usr/local/bin is where Docker
+# happens to land, neither of which is a guarantee on another machine.
+REQUIRED_TOOLS=(supabase docker)      # backup-prod.sh needs both: supabase db dump uses a container
+OPTIONAL_TOOLS=(psql)                 # backup-prod.sh has its own libpq fallback
+
+AGENT_PATH=""
+MISSING=()
+
+add_dir() {
+  local dir="$1"
+  [[ -z "$dir" ]] && return
+  case ":$AGENT_PATH:" in *":$dir:"*) return ;; esac      # no duplicates
+  AGENT_PATH="${AGENT_PATH:+$AGENT_PATH:}$dir"
+}
+
+for tool in "${REQUIRED_TOOLS[@]}"; do
+  bin="$(command -v "$tool" || true)"
+  if [[ -z "$bin" ]]; then MISSING+=("$tool"); else add_dir "$(dirname "$bin")"; fi
+done
+
+if (( ${#MISSING[@]} )); then
+  cat >&2 <<MSG
+REFUSED — not on PATH: ${MISSING[*]}
+
+backup-prod.sh needs all of these, and a scheduled job that cannot find one
+fails every night. Install them, confirm each runs in this shell, and run this
+script again.
+MSG
+  exit 1
+fi
+
+for tool in "${OPTIONAL_TOOLS[@]}"; do
+  bin="$(command -v "$tool" || true)"
+  [[ -n "$bin" ]] && add_dir "$(dirname "$bin")"
+done
+[[ -x /opt/homebrew/opt/libpq/bin/psql ]] && add_dir /opt/homebrew/opt/libpq/bin
+
+for d in /usr/bin /bin /usr/sbin /sbin; do add_dir "$d"; done
+
+# Docker being INSTALLED is not the same as Docker RUNNING, and 03:00 is exactly
+# when it might not be. This cannot be fixed from here — it is a real fragility
+# of backing up through a CLI that shells out to a container. Say so now rather
+# than let it be discovered from an empty backup directory.
+if ! docker info >/dev/null 2>&1; then
+  echo "  WARNING: the Docker daemon is not running. It must be running at 03:00" >&2
+  echo "           or the backup will fail. The alarm will tell you if it does." >&2
+fi
+
 mkdir -p "$AGENTS" "$LOG_DIR"
 
 cat > "$AGENTS/$BACKUP_LABEL.plist" <<PLIST
@@ -101,6 +169,9 @@ cat > "$AGENTS/$BACKUP_LABEL.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>$BACKUP_LABEL</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>$AGENT_PATH</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
@@ -125,6 +196,9 @@ cat > "$AGENTS/$CHECK_LABEL.plist" <<PLIST
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0"><dict>
   <key>Label</key><string>$CHECK_LABEL</string>
+  <key>EnvironmentVariables</key><dict>
+    <key>PATH</key><string>$AGENT_PATH</string>
+  </dict>
   <key>ProgramArguments</key>
   <array>
     <string>/bin/bash</string>
@@ -157,14 +231,19 @@ bash "$REPO/scripts/backup-staleness-check.sh" --quiet || true
 
 cat <<'MSG'
 
-Two things worth doing once, today:
+Two things worth doing once, now:
 
-  1. Watch the alarm fire, so you know what it looks like before it matters:
+  1. Run the backup THROUGH launchd, which is the only way to find out whether
+     the scheduled path works rather than the script:
+         launchctl kickstart -k gui/$UID/com.neuvto.backup
+         tail -f ~/neuvto-backups/backup.log
+     A Keychain prompt may appear the first time — click Always Allow. This is
+     the step that catches an environment the agent does not have; running the
+     script by hand proves nothing about 03:00.
+
+  2. Watch the alarm fire, so you know what it looks like before it matters:
          bash scripts/backup-staleness-check.sh --max-age 0
      That should raise a modal dialog. If it does not, the exit code and
-     ~/neuvto-backups/backup-check.log still carry the message, but you will
+     ~/neuvto-backups/backup-check.log still carry the message, but you would
      have to go and look — which is the thing this was built to avoid.
-
-  2. Take a backup by hand tonight and check backup.log tomorrow. A schedule
-     nobody has seen produce a file is a belief, not a backup.
 MSG

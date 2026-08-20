@@ -221,6 +221,14 @@ Two things that look like backups and are deliberately not counted:
 Age comes from the directory's own UTC name, not its mtime, so nothing that
 merely touches a directory can make a stale backup look fresh.
 
+**A fresh backup is not the same as a healthy schedule**, so the alarm also
+counts `.partial` directories and fires at three or more even when the newest
+backup is minutes old. `backup-prod.sh` leaves one per failed run and retention
+deliberately never prunes them — deleting the evidence of a failure would be the
+wrong instinct. A week where Docker is up on Sunday and down the other six
+nights produces one good backup and six partials, and an age check alone calls
+that healthy.
+
 ```bash
 bash scripts/backup-staleness-check.sh              # alert if older than 2 days
 bash scripts/backup-staleness-check.sh --max-age 7  # a different threshold
@@ -236,6 +244,38 @@ bash scripts/backup-staleness-check.sh --max-age 0
 If no dialog appears, the alarm is not reaching you — the exit code and the log
 still carry it, but you would have to go and look, which is the thing it was
 built to avoid.
+
+### Two things the schedule needs, both found by it failing
+
+Installing this on 20 Aug 2026 failed twice before it worked, one layer at a
+time, and both failures would have been silent at 03:00:
+
+1. **`supabase CLI not found`.** launchd does not give a job your shell's
+   environment — it runs with a minimal `PATH` that excludes Homebrew.
+2. **`failed to run docker`.** `/usr/local/bin`, where Docker Desktop symlinks
+   its CLI, was missing too. `supabase db dump` shells out to a container.
+
+`install-backup-schedule.sh` now resolves every required tool at install time
+and bakes the directories into the agents, and **refuses to install** if any is
+missing. Resolved rather than hardcoded, because `/opt/homebrew` and
+`/usr/local/bin` are conventions and not guarantees.
+
+**The backup needs the Docker daemon running at 03:00.** Docker being installed
+is not the same as Docker running, and 03:00 is exactly when it might not be.
+This cannot be fixed from the script — it is a real fragility of backing up
+through a CLI that shells out to a container. The installer warns if the daemon
+is down, and the `.partial` count above is what catches it happening night after
+night.
+
+**None of this was found by reading the code.** It was found by running the
+backup through `launchctl kickstart` — the scheduled path — rather than by hand.
+Running the script yourself proves nothing about 03:00, because your shell is
+not the environment the agent gets:
+
+```bash
+launchctl kickstart -k gui/$UID/com.neuvto.backup
+tail -f ~/neuvto-backups/backup.log
+```
 
 ### What this still does not fix
 

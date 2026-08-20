@@ -4,6 +4,7 @@
 #
 #   bash scripts/backup-staleness-check.sh                 alert if the newest backup is over 2 days old
 #   bash scripts/backup-staleness-check.sh --max-age 7     a different threshold
+#   bash scripts/backup-staleness-check.sh --max-partials 5  tolerate more failed runs before alarming
 #   bash scripts/backup-staleness-check.sh --quiet         no GUI alert, exit code and stdout only
 #
 # WHY THIS EXISTS
@@ -53,12 +54,14 @@
 set -euo pipefail
 
 MAX_AGE_DAYS=2
+MAX_PARTIALS=3
 QUIET=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
-    --max-age)   MAX_AGE_DAYS="${2:-}"; shift ;;
-    --max-age=*) MAX_AGE_DAYS="${1#--max-age=}" ;;
+    --max-age)       MAX_AGE_DAYS="${2:-}"; shift ;;
+    --max-age=*)     MAX_AGE_DAYS="${1#--max-age=}" ;;
+    --max-partials)  MAX_PARTIALS="${2:-}"; shift ;;
     --quiet)     QUIET=true ;;
     -h|--help)   sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)           echo "Unknown argument: $1" >&2; exit 2 ;;
@@ -67,6 +70,7 @@ while [[ $# -gt 0 ]]; do
 done
 
 [[ "$MAX_AGE_DAYS" =~ ^[0-9]+$ ]] || { echo "--max-age needs a number, got: $MAX_AGE_DAYS" >&2; exit 2; }
+[[ "$MAX_PARTIALS" =~ ^[0-9]+$ ]] || { echo "--max-partials needs a number, got: $MAX_PARTIALS" >&2; exit 2; }
 
 DEST_ROOT="${NEUVTO_BACKUP_DIR:-$HOME/neuvto-backups}"
 PROD_DIR="$DEST_ROOT/prod"
@@ -123,6 +127,34 @@ if (( AGE_DAYS > MAX_AGE_DAYS )); then
   alarm "Production backup is $AGE_DAYS days old" \
         "Newest: $STAMP (${AGE_HOURS}h ago), threshold ${MAX_AGE_DAYS}d. The scheduled backup has stopped working. Run: bash scripts/backup-prod.sh"
   exit 1
+fi
+
+# A FRESH BACKUP IS NOT THE SAME AS A HEALTHY SCHEDULE.
+#
+# backup-prod.sh leaves a .partial directory on every failed run, and retention
+# deliberately never prunes them — deleting the evidence of a failure would be
+# the wrong instinct. So they accumulate, one per failure, and nothing surfaces
+# the pile.
+#
+# That matters because of a specific failure this schedule is exposed to:
+# `supabase db dump` shells out to a container, so the backup needs the Docker
+# daemon RUNNING at 03:00. A week where Docker is up on Sunday and down the
+# other six nights produces one good backup and six partials — and the age check
+# alone reports that as healthy, because the newest backup really is fresh.
+#
+# Counting partials is what tells those two situations apart.
+PARTIALS=$(find "$PROD_DIR" -mindepth 1 -maxdepth 1 -type d -name '*.partial' 2>/dev/null | wc -l | tr -d ' ')
+
+if (( PARTIALS >= MAX_PARTIALS )); then
+  alarm "Backups are mostly failing" \
+        "Newest is only ${AGE_HOURS}h old, but there are $PARTIALS failed runs (.partial) in $PROD_DIR. Something fails most nights — check $DEST_ROOT/backup.log. Docker must be running at 03:00."
+  exit 1
+fi
+
+if (( PARTIALS > 0 )); then
+  echo "backup-staleness-check: ok — newest $STAMP, ${AGE_HOURS}h old, threshold ${MAX_AGE_DAYS}d"
+  echo "  note: $PARTIALS failed run(s) (.partial) in $PROD_DIR — alarm at $MAX_PARTIALS"
+  exit 0
 fi
 
 echo "backup-staleness-check: ok — newest $STAMP, ${AGE_HOURS}h old, threshold ${MAX_AGE_DAYS}d"
