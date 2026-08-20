@@ -18,7 +18,7 @@ jobs:
     name: Lint · Types · Tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -65,7 +65,7 @@ jobs:
     name: Migrations · Tenant isolation · Data integrity
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: supabase/setup-cli@v1
         with:
@@ -101,7 +101,7 @@ jobs:
     name: Architecture guardrails
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history — the migration check diffs against origin/main.
           fetch-depth: 0
@@ -345,7 +345,7 @@ jobs:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request'
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           # Full history — the gate reads commit authors between base and head.
           fetch-depth: 0
