@@ -1,6 +1,6 @@
 # Backups
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.1 · **Status:** Active · **Updated:** 19 Aug 2026
 
 **Supabase's Free plan has no automatic backups.** Not short retention — none at
 all. Daily backups with 7-day retention begin on Pro (~$25/month). Until Neuvto
@@ -163,57 +163,131 @@ the two Vault rows resolve with the query `prod-cutover.sh` prints.
 
 ---
 
-## Running it unattended
+## Running it on a schedule
 
 Interactive password entry is right for a human-initiated backup and useless for
-a scheduled one. For unattended runs, store the password in the macOS Keychain —
+a scheduled one. For unattended runs the password lives in the macOS Keychain —
 free, encrypted at rest, unlocked with the login session:
 
 ```bash
 security add-generic-password -a "$USER" -s neuvto-prod-db -w
 ```
 
-Then `bash scripts/backup-prod.sh --keychain` needs no terminal.
+Then install the schedule:
 
-A daily `launchd` agent at `~/Library/LaunchAgents/com.neuvto.backup.plist`:
-
-```xml
-<?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN"
-  "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
-<plist version="1.0"><dict>
-  <key>Label</key><string>com.neuvto.backup</string>
-  <key>ProgramArguments</key>
-  <array>
-    <string>/bin/bash</string>
-    <string>/Users/sada/Neuvto/neuvto-wos/scripts/backup-prod.sh</string>
-    <string>--keychain</string>
-  </array>
-  <key>StartCalendarInterval</key><dict>
-    <key>Hour</key><integer>3</integer><key>Minute</key><integer>0</integer>
-  </dict>
-  <key>RunAtLoad</key><false/>
-  <key>StandardOutPath</key><string>/Users/sada/neuvto-backups/backup.log</string>
-  <key>StandardErrorPath</key><string>/Users/sada/neuvto-backups/backup.log</string>
-</dict></plist>
+```bash
+bash scripts/install-backup-schedule.sh
 ```
 
 ```bash
-launchctl load ~/Library/LaunchAgents/com.neuvto.backup.plist
+bash scripts/install-backup-schedule.sh --status   what is installed, and how old the newest backup is
+bash scripts/install-backup-schedule.sh --remove   unload and delete both agents
 ```
 
-Three honest caveats:
+It **refuses to install** if the Keychain item is missing, rather than
+scheduling a job that fails every night. It writes two launchd agents:
 
-- **The laptop has to be awake at 03:00.** `launchd` runs a missed
+| agent                     | when        | what                                          |
+| ------------------------- | ----------- | --------------------------------------------- |
+| `com.neuvto.backup`       | daily 03:00 | `backup-prod.sh --keychain`                   |
+| `com.neuvto.backup-check` | daily 10:00 | `backup-staleness-check.sh` — the alarm below |
+
+Logs land in `~/neuvto-backups/backup.log` and `backup-check.log`.
+
+### The alarm, and why it does not ask the backup job anything
+
+**A launchd job that fails every night fails silently.** Nothing mails you, the
+exit code goes to a log nobody opens, and the observable state is identical to a
+job that is working. That is the failure this whole section exists to prevent,
+because a schedule you believe in is worse than no schedule at all.
+
+So `backup-staleness-check.sh` never asks the backup job how it went. **It looks
+in the directory**, and raises a modal alert if the newest backup is older than
+two days.
+
+That distinction is not academic. `backup-prod.sh --check` exits 0 having
+deliberately written nothing — that is what `--check` means — and a run of it has
+already been reported as a successful backup. An exit code would have confirmed
+that belief. A file listing destroyed it.
+
+Two things that look like backups and are deliberately not counted:
+
+- **a `.partial` directory** — `backup-prod.sh` leaves one when verification
+  fails, precisely so a half-written dump is never mistaken for a backup;
+- **a directory with no `data.sql.gz`** — schema is in git and roles are
+  re-creatable, but the rows are not. A run that produced a MANIFEST and no data
+  is a failure that left tidy wreckage.
+
+Age comes from the directory's own UTC name, not its mtime, so nothing that
+merely touches a directory can make a stale backup look fresh.
+
+**A fresh backup is not the same as a healthy schedule**, so the alarm also
+counts `.partial` directories and fires at three or more even when the newest
+backup is minutes old. `backup-prod.sh` leaves one per failed run and retention
+deliberately never prunes them — deleting the evidence of a failure would be the
+wrong instinct. A week where Docker is up on Sunday and down the other six
+nights produces one good backup and six partials, and an age check alone calls
+that healthy.
+
+```bash
+bash scripts/backup-staleness-check.sh              # alert if older than 2 days
+bash scripts/backup-staleness-check.sh --max-age 7  # a different threshold
+bash scripts/backup-staleness-check.sh --quiet      # exit code only, no dialog
+```
+
+**Watch it fire once before you need it:**
+
+```bash
+bash scripts/backup-staleness-check.sh --max-age 0
+```
+
+If no dialog appears, the alarm is not reaching you — the exit code and the log
+still carry it, but you would have to go and look, which is the thing it was
+built to avoid.
+
+### Two things the schedule needs, both found by it failing
+
+Installing this on 20 Aug 2026 failed twice before it worked, one layer at a
+time, and both failures would have been silent at 03:00:
+
+1. **`supabase CLI not found`.** launchd does not give a job your shell's
+   environment — it runs with a minimal `PATH` that excludes Homebrew.
+2. **`failed to run docker`.** `/usr/local/bin`, where Docker Desktop symlinks
+   its CLI, was missing too. `supabase db dump` shells out to a container.
+
+`install-backup-schedule.sh` now resolves every required tool at install time
+and bakes the directories into the agents, and **refuses to install** if any is
+missing. Resolved rather than hardcoded, because `/opt/homebrew` and
+`/usr/local/bin` are conventions and not guarantees.
+
+**The backup needs the Docker daemon running at 03:00.** Docker being installed
+is not the same as Docker running, and 03:00 is exactly when it might not be.
+This cannot be fixed from the script — it is a real fragility of backing up
+through a CLI that shells out to a container. The installer warns if the daemon
+is down, and the `.partial` count above is what catches it happening night after
+night.
+
+**None of this was found by reading the code.** It was found by running the
+backup through `launchctl kickstart` — the scheduled path — rather than by hand.
+Running the script yourself proves nothing about 03:00, because your shell is
+not the environment the agent gets:
+
+```bash
+launchctl kickstart -k gui/$UID/com.neuvto.backup
+tail -f ~/neuvto-backups/backup.log
+```
+
+### What this still does not fix
+
+- **The laptop has to be awake.** `launchd` runs a missed
   `StartCalendarInterval` job once on wake, so a closed lid means a late backup
-  rather than no backup — but a laptop that is off all week produces nothing.
-- **The first Keychain read may prompt.** Click _Always Allow_ once; after that
-  it is silent while the login keychain is unlocked.
-- **Nothing tells you when it stops working.** Read `backup.log`, or check that
-  `~/neuvto-backups/prod/` has a directory from today. A scheduled backup that
-  quietly stopped is worse than no scheduled backup, because you believe in it.
+  rather than no backup — but a laptop that is off all week produces nothing, and
+  the alarm can only fire once it is on again.
+- **The first Keychain read may prompt.** Click _Always Allow_ once.
+- **The alarm needs a GUI session.** Under launchd without one, `osascript`
+  fails and the message survives only in the log and the exit code.
 
-This is why a laptop cron job is a stopgap, not the answer. The answer is Pro's
+This is a stopgap with a known ceiling, not a backup service. The answer is Pro's
 daily backups, on the day Neuvto has revenue to pay for them.
 
 ---
