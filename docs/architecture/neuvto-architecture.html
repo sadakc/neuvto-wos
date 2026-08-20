@@ -502,8 +502,8 @@
       These nine plates show how, and what carries it into production.
     </p>
     <div class="specs">
-      <span>Version 1.1</span>
-      <span>7 August 2026</span>
+      <span>Version 1.2</span>
+      <span>20 August 2026</span>
       <span>Status Live in production</span>
     </div>
   </header>
@@ -576,7 +576,7 @@ flowchart TB
 
     subgraph INF["INFRASTRUCTURE<br/>bought, not built"]
         direction LR
-        NT["Netlify<br/>hosts neuvto.com"]
+        NT["Cloudflare Workers<br/>hosts neuvto.com<br/>and answers its DNS"]
         PG[("Supabase Postgres<br/>row-level security")]
         SA["Supabase Auth"]
         RE["Resend<br/>email delivery"]
@@ -761,7 +761,7 @@ flowchart TB
 
     subgraph GATE["AUTOMATED CHECKS<br/>nothing reaches a customer without passing"]
         direction LR
-        CI["CI<br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
+        CI["CI<br/>lint · types · 595 tests<br/>migrations · tenant isolation"]
         BUILD["Build<br/>GitHub Actions<br/>our variables, our machine"]
         VER1["Gate 1<br/>which database does<br/>this build talk to?"]
         VER2["Gate 2<br/>which database does<br/>the LIVE SITE talk to?"]
@@ -769,7 +769,7 @@ flowchart TB
 
     subgraph RUN["WHAT A CUSTOMER TOUCHES"]
         direction LR
-        NET["Netlify<br/>hosts neuvto.com"]
+        NET["Cloudflare Workers<br/>hosts neuvto.com"]
         SUP[("Supabase<br/>Postgres · Auth<br/>ap-south-1")]
         RES["Resend<br/>sign-in codes<br/>&amp; notifications"]
     end
@@ -826,16 +826,22 @@ flowchart TB
             <td>GitHub</td>
             <td>Holds the code, and runs the automated checks on every proposed change.</td>
             <td>One place that is the truth. Nothing reaches customers without passing
-                lint, types, 403 tests, and a full migration and tenant-isolation run.</td>
+                lint, types, 595 tests, and a full migration and tenant-isolation run.</td>
           </tr>
           <tr>
-            <td>Netlify</td>
-            <td>Serves <code>neuvto.com</code> to the world.</td>
-            <td>Chosen on 7&nbsp;Aug&nbsp;2026 after the published site twice went live
-                wired to the <em>wrong database</em> — the previous host supplied its own
-                settings at build time and silently overrode ours. Building it ourselves
-                and handing Netlify the finished result makes that impossible rather than
-                unlikely.</td>
+            <td>Cloudflare</td>
+            <td>Serves <code>neuvto.com</code> to the world, and answers its DNS.</td>
+            <td>We build the site ourselves and hand over the finished result, because
+                the published site twice went live wired to the <em>wrong database</em> —
+                a host that supplied its own settings at build time and silently overrode
+                ours. That is why the build happens here rather than there, and it is the
+                part that has not changed.
+                <br><br>
+                What changed on 18&nbsp;Aug&nbsp;2026 is <em>which</em> host. The previous
+                one metered publishing: twenty deploys a month, after which the site
+                served an error page. Cloudflare meters none. The worker also holds
+                <em>no secrets at all</em> — the key that could read every customer's row
+                lives inside Supabase and never reaches the edge.</td>
           </tr>
           <tr>
             <td>Supabase</td>
@@ -1226,7 +1232,8 @@ erDiagram
       <h4>Stack</h4>
       <p>
         TanStack Start · TypeScript · Tailwind · shadcn/ui · Supabase Postgres with
-        row-level security · Resend. Built by GitHub Actions, served by Netlify.
+        row-level security · Resend. Built by GitHub Actions, served by Cloudflare
+        Workers.
         Production database in <code>ap-south-1</code>. Plate&nbsp;05 explains what each
         piece is for.
       </p>

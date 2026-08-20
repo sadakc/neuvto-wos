@@ -11,7 +11,7 @@ flowchart TB
 
     subgraph GATE["AUTOMATED CHECKS<br/>nothing reaches a customer without passing"]
         direction LR
-        CI["CI<br/>lint · types · 403 tests<br/>migrations · tenant isolation"]
+        CI["CI<br/>lint · types · 595 tests<br/>migrations · tenant isolation"]
         BUILD["Build<br/>GitHub Actions<br/>our variables, our machine"]
         VER1["Gate 1<br/>which database does<br/>this build talk to?"]
         VER2["Gate 2<br/>which database does<br/>the LIVE SITE talk to?"]
@@ -19,7 +19,7 @@ flowchart TB
 
     subgraph RUN["WHAT A CUSTOMER TOUCHES"]
         direction LR
-        NET["Netlify<br/>hosts neuvto.com"]
+        NET["Cloudflare Workers<br/>hosts neuvto.com"]
         SUP[("Supabase<br/>Postgres · Auth<br/>ap-south-1")]
         RES["Resend<br/>sign-in codes<br/>&amp; notifications"]
     end
