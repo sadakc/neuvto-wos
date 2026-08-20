@@ -1,6 +1,6 @@
 # NEUVTO WOS — Build Spec
 
-**Version:** 1.6 · **Status:** Active · **Updated:** 18 Aug 2026
+**Version:** 1.7 · **Status:** Active · **Updated:** 20 Aug 2026
 
 ## The platform is the product
 
@@ -35,7 +35,7 @@ first used by somebody who was not building it.
 ### The shape
 
 ```
-MODULES            Leave  ·  Attendance (Q4)  ·  Payroll (2027)
+MODULES            Leave  ·  Payroll  ·  Attendance (later)
                               ↓ deployed onto, per customer
 PLATFORM           Tenancy · Provisioning · Invitations · Identity · RBAC
                    Approval Engine · Notification Engine · Audit Log

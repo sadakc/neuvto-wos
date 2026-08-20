@@ -21,6 +21,7 @@ predates 31 Jul 2026 and is wrong.
 | If you want to know                                                 | Read                                                                                       |
 | ------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
 | What is being built, in what order, and what is done                | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
+| How payroll works, and what the spreadsheet it replaces got wrong   | [product/NEUVTO_PAYROLL.md](product/NEUVTO_PAYROLL.md)                                     |
 | Why something was built differently from the PRD                    | the **D1–D66** decision table in the same file                                             |
 | Whether the platform itself is finished                             | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
 | How to run the thing on your own machine                            | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
@@ -48,6 +49,12 @@ sequence with its status column, the verification gate for every step, and the
 its reason. Its "Known gaps" section is the live list of launch blockers; there
 is no separate blockers file, because two lists of blockers means one of them is
 wrong.
+
+**[NEUVTO_PAYROLL.md](product/NEUVTO_PAYROLL.md)** — the second module. What the
+eleven-sheet workbook it replaces was doing wrong, why the arithmetic lives in a
+peer package rather than in SQL, the one finding that changed the design (the
+50%/40% component rules hold for a quarter of the workforce, not all of it), the
+four divergences from statute kept deliberately, and who can see whose salary.
 
 Read the D-table before concluding something is a bug. Several things that look
 wrong are decisions.

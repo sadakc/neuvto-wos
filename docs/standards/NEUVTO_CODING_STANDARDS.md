@@ -1,6 +1,6 @@
 # NEUVTO WOS — Coding Standards
 
-**Version:** 1.2 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 19 Aug 2026
+**Version:** 1.3 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 20 Aug 2026
 
 Two goals: consistency across every module, and **portability out of Lovable at any time**. §9 is the portability contract — treat it as non-negotiable.
 
@@ -49,6 +49,7 @@ src/
 3. Anything importing a module does so via `modules/leave` — never a deep path like `modules/leave/handlers/submit`.
 4. `lib/**` contains no domain concepts. A function that knows what a leave balance is does not belong there.
 5. **Nothing imports `integrations/supabase/client.server`.** It exports an RLS-bypassing service-role client and needs `SUPABASE_SERVICE_ROLE_KEY`, which the Worker deliberately does not hold (D66). Privileged work goes through a `SECURITY DEFINER` RPC that checks `is_platform_admin()` — see [ENVIRONMENTS.md § The service role key](../operations/ENVIRONMENTS.md).
+6. **`payroll-core/**`imports nothing outside itself** — not the platform, not a module, not the Supabase client, not React. It is arithmetic, and an engine that can reach a database is an engine whose output depends on one; its golden test against a real month would stop meaning anything. Two ESLint blocks enforce it, because the escape depth differs by file depth:`../`already leaves from`payroll-core/engine.ts`, while from `payroll-core/**fixtures**/`it is still inside and`../../` is what leaves. A single pattern gets one of those two wrong. See [NEUVTO_PAYROLL.md](../product/NEUVTO_PAYROLL.md).
 
 Rule 1 is the one that decays first. When Attendance arrives and the Approval Engine "just needs one leave-specific thing," that is the moment the platform stops being a platform.
 

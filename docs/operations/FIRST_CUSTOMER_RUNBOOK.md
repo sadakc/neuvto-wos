@@ -1,6 +1,6 @@
 # First Customer — Onboarding Runbook
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 20 Aug 2026
 
 **Purpose:** not marketing. This is a **product test.** Walking through what a real customer
 must actually do to go live is how the missing bulk import and opening balances were found,
@@ -68,8 +68,9 @@ they have proved they control the address before they hold the role (D39).
 
 **2. Grant their modules** on the same screen (D44). A module Neuvto has not granted cannot be
 switched on by the customer, and its functions refuse in the database rather than merely
-hiding a menu item. Leave is the only one available today; Attendance and Payroll are seeded
-as `coming_soon`.
+hiding a menu item. Leave and Payroll are available today; Attendance is seeded as `coming_soon`.
+Payroll was flipped to `available` on 20 Aug 2026 — granting it to a customer is
+still a separate decision, per organisation.
 
 **3. They accept the invitation** and land on the **setup wizard**, not a dashboard. If the
 email is slow, `/neuvto-hq` shows a copyable link until it is accepted. TOTP enrolment (D21) is
