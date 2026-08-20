@@ -2,6 +2,8 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { getModuleReports, type ModuleReport } from "@/platform/modules";
+
+type ReportTab = ModuleReport & { moduleKey: string; moduleName: string };
 import { ScheduledReports } from "@/platform/reports";
 
 export const Route = createFileRoute("/app/reports")({
@@ -25,7 +27,7 @@ export const Route = createFileRoute("/app/reports")({
  */
 function ReportsPage() {
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
-  const [reports, setReports] = useState<(ModuleReport & { moduleKey: string })[]>([]);
+  const [reports, setReports] = useState<ReportTab[]>([]);
   const [activeId, setActiveId] = useState("");
 
   useEffect(() => {
@@ -100,32 +102,62 @@ function ReportsPage() {
   const active = reports.find((r) => r.id === activeId) ?? reports[0];
   const Active = active.component;
 
+  // Insertion-ordered: getModuleReports returns module-major, so a Map preserves
+  // the order the registry installed modules in rather than sorting names
+  // alphabetically. Leave stays first because it was installed first.
+  const groups = [
+    ...reports
+      .reduce((acc, r) => {
+        const existing = acc.get(r.moduleKey);
+        if (existing) existing[2].push(r);
+        else acc.set(r.moduleKey, [r.moduleKey, r.moduleName, [r]]);
+        return acc;
+      }, new Map<string, [string, string, ReportTab[]]>())
+      .values(),
+  ];
+
   return (
     <div className="mx-auto max-w-6xl">
       <h1 className="font-display text-xl font-semibold tracking-tight">Reports</h1>
 
-      <div
-        role="tablist"
-        aria-label="Reports"
-        className="mt-4 flex flex-wrap gap-2 border-b border-border"
-      >
-        {reports.map((r) => (
-          <button
-            key={`${r.moduleKey}:${r.id}`}
-            role="tab"
-            aria-selected={r.id === active.id}
-            data-testid={`report-tab-${r.id}`}
-            onClick={() => setActiveId(r.id)}
-            className={`min-h-12 rounded-t-md px-4 py-2 text-sm ${
-              r.id === active.id
-                ? "border-b-2 border-foreground font-medium text-foreground"
-                : "text-muted-foreground"
-            }`}
+      {/* ─────────────────────────────────────────── grouped by module
+          One flat strip until 20 Aug 2026, when Payroll took the count from
+          three tabs to nine. Sada: "The reports can be more scalable. There can
+          be a section under Reports, like one report for the leave module,
+          another report for payroll, and any other upcoming module."
+
+          Still names no module. The heading is `moduleName`, which the module
+          declared about itself — this file learns it the same way it learns a
+          report title, and a third module groups itself for free (D30). */}
+      {groups.map(([moduleKey, moduleName, items]) => (
+        <section key={moduleKey} className="mt-4">
+          <h2 className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+            {moduleName}
+          </h2>
+          <div
+            role="tablist"
+            aria-label={`${moduleName} reports`}
+            className="mt-1 flex flex-wrap gap-2 border-b border-border"
           >
-            {r.title}
-          </button>
-        ))}
-      </div>
+            {items.map((r) => (
+              <button
+                key={`${r.moduleKey}:${r.id}`}
+                role="tab"
+                aria-selected={r.id === active.id}
+                data-testid={`report-tab-${r.id}`}
+                onClick={() => setActiveId(r.id)}
+                className={`min-h-12 rounded-t-md px-4 py-2 text-sm ${
+                  r.id === active.id
+                    ? "border-b-2 border-foreground font-medium text-foreground"
+                    : "text-muted-foreground"
+                }`}
+              >
+                {r.title}
+              </button>
+            ))}
+          </div>
+        </section>
+      ))}
 
       {active.description && (
         <p className="mt-4 max-w-prose text-sm text-muted-foreground">{active.description}</p>

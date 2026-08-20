@@ -31,6 +31,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { AppError } from "@/platform/errors";
 import type { CurrentUser } from "@/platform/auth";
 import type { ModuleReport } from "@/platform/modules";
@@ -51,7 +52,9 @@ vi.mock("@/platform/auth", async () => {
   return { isAdmin, getCurrentUser: () => getCurrentUser() };
 });
 
-const getModuleReports = vi.fn<() => Promise<(ModuleReport & { moduleKey: string })[]>>();
+type ReportTab = ModuleReport & { moduleKey: string; moduleName: string };
+
+const getModuleReports = vi.fn<() => Promise<ReportTab[]>>();
 
 vi.mock("@/platform/modules", () => ({
   getModuleReports: () => getModuleReports(),
@@ -85,9 +88,10 @@ const userWith = (roles: CurrentUser["roles"]): CurrentUser => ({
   roles,
 });
 
-const REPORTS: (ModuleReport & { moduleKey: string })[] = [
+const REPORTS: ReportTab[] = [
   {
     moduleKey: "leave",
+    moduleName: "Leave Management",
     id: "balances",
     title: "Leave balances",
     description: "Where everybody stands today.",
@@ -95,6 +99,7 @@ const REPORTS: (ModuleReport & { moduleKey: string })[] = [
   },
   {
     moduleKey: "leave",
+    moduleName: "Leave Management",
     id: "requests",
     title: "Every request",
     component: () => <p data-testid="report-body">requests</p>,
@@ -171,5 +176,77 @@ describe("Reports — who the page is for", () => {
     expect(
       await screen.findByText(/We couldn't load your scheduled reports just now/),
     ).toBeInTheDocument();
+  });
+});
+
+/**
+ * Grouping by module.
+ *
+ * Added 20 Aug 2026 with Payroll, which took the tab count from three to nine.
+ * Sada asked for a section per module rather than one strip, and these assert
+ * the arrangement rather than the count — a flat strip of nine still "works"
+ * and is the thing being replaced.
+ */
+describe("Reports — grouped by module", () => {
+  const TWO_MODULES: ReportTab[] = [
+    {
+      moduleKey: "leave",
+      moduleName: "Leave Management",
+      id: "balances",
+      title: "Leave balances",
+      component: () => <p data-testid="report-body">balances</p>,
+    },
+    {
+      moduleKey: "payroll",
+      moduleName: "Payroll",
+      id: "salary-register",
+      title: "Salary register",
+      component: () => <p data-testid="report-body">register</p>,
+    },
+    {
+      moduleKey: "payroll",
+      moduleName: "Payroll",
+      id: "bank-statement",
+      title: "Bank statement",
+      component: () => <p data-testid="report-body">bank</p>,
+    },
+  ];
+
+  beforeEach(() => {
+    getCurrentUser.mockResolvedValue(userWith(["org_admin"]));
+    getModuleReports.mockResolvedValue(TWO_MODULES);
+  });
+
+  it("gives each module its own heading and its own tablist", async () => {
+    render(<ReportsPage />);
+
+    expect(await screen.findByRole("heading", { name: "Leave Management" })).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Payroll" })).toBeInTheDocument();
+
+    // Two tablists, not one. The accessible name is what tells somebody using a
+    // screen reader which group they have arrowed into.
+    expect(screen.getByRole("tablist", { name: "Leave Management reports" })).toBeInTheDocument();
+    expect(screen.getByRole("tablist", { name: "Payroll reports" })).toBeInTheDocument();
+  });
+
+  it("keeps each report inside its own module's group", async () => {
+    render(<ReportsPage />);
+
+    const payrollTabs = within(
+      await screen.findByRole("tablist", { name: "Payroll reports" }),
+    ).getAllByRole("tab");
+
+    expect(payrollTabs.map((t) => t.textContent)).toEqual(["Salary register", "Bank statement"]);
+    // The leave report must not have leaked into payroll's group — which is
+    // exactly what a single strip does.
+    expect(payrollTabs.map((t) => t.textContent)).not.toContain("Leave balances");
+  });
+
+  it("still selects across groups", async () => {
+    const user = userEvent.setup();
+    render(<ReportsPage />);
+
+    await user.click(await screen.findByTestId("report-tab-bank-statement"));
+    expect(screen.getByTestId("report-body")).toHaveTextContent("bank");
   });
 });

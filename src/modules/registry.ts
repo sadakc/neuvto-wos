@@ -16,5 +16,6 @@
 
 import type { ModuleDefinition } from "@/platform/modules";
 import { leave } from "./leave";
+import { payroll } from "./payroll";
 
-export const MODULES: readonly ModuleDefinition[] = [leave];
+export const MODULES: readonly ModuleDefinition[] = [leave, payroll];

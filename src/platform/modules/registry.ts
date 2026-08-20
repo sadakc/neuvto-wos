@@ -175,12 +175,22 @@ export async function getAdminSections(
  */
 export async function getModuleReports(
   user: CurrentUser | null,
-): Promise<(ModuleReport & { moduleKey: string })[]> {
+): Promise<(ModuleReport & { moduleKey: string; moduleName: string })[]> {
   const enabled = await getEnabledModules();
 
-  return enabled
-    .flatMap((m) => (m.reports?.(user) ?? []).map((r) => ({ ...r, moduleKey: m.key })))
-    .sort((a, b) => (a.order ?? 0) - (b.order ?? 0));
+  // `moduleName` as well as `moduleKey`, so the Reports screen can GROUP by
+  // module without looking a display name up — which would mean naming modules
+  // in a file that must not know one exists (D30).
+  //
+  // The sort is now module-major. With Leave contributing three reports and
+  // Payroll six, a single `order`-sorted strip interleaves them: a leave report
+  // at order 10, a payroll one at 10, then leave 20. Nine tabs in no discernible
+  // sequence is the arrangement this replaced.
+  return enabled.flatMap((m) =>
+    (m.reports?.(user) ?? [])
+      .map((r) => ({ ...r, moduleKey: m.key, moduleName: m.name }))
+      .sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+  );
 }
 
 /**
