@@ -61,10 +61,40 @@ export default function SalaryStructures() {
 
   const unpayable = useMemo(() => rows.filter((r) => r.effectiveFrom === null), [rows]);
 
-  /** The live total of what is being typed — the same sum the engine will use. */
+  /**
+   * What a salary structure is made of: earnings and standing deductions.
+   *
+   * A benefit or a reimbursement is not part of somebody's structure — both
+   * need a claim before they mean anything — and a component whose
+   * `partOfStructure` is off has been deliberately kept out of the CTC.
+   */
+  const structural = useMemo(
+    () =>
+      components.filter(
+        (c) =>
+          c.status === "active" &&
+          c.partOfStructure &&
+          (c.category === "earning" || c.category === "deduction"),
+      ),
+    [components],
+  );
+  const earnings = useMemo(() => structural.filter((c) => c.category === "earning"), [structural]);
+  const deductions = useMemo(
+    () => structural.filter((c) => c.category === "deduction"),
+    [structural],
+  );
+
+  /**
+   * The live total of what is being typed — the same sum the engine will use.
+   *
+   * EARNINGS ONLY. A deduction on a salary structure is not negative pay:
+   * letting a canteen recovery into gross would pull PF wages and ESI down with
+   * it, so somebody with a canteen bill would quietly contribute less to their
+   * own provident fund. The engine keeps them apart and so does this.
+   */
   const draftGross = useMemo(
-    () => components.reduce((total, c) => total + (Number(amounts[c.id]) || 0), 0),
-    [amounts, components],
+    () => earnings.reduce((total, c) => total + (Number(amounts[c.id]) || 0), 0),
+    [amounts, earnings],
   );
 
   function open(row: StructureRow) {
@@ -73,7 +103,7 @@ export default function SalaryStructures() {
     setEffectiveFrom(row.effectiveFrom ?? firstOfThisMonth());
     const byComponent = new Map(row.amounts.map((a) => [a.componentId, a.amount]));
     setAmounts(
-      Object.fromEntries(components.map((c) => [c.id, String(byComponent.get(c.id) ?? "")])),
+      Object.fromEntries(structural.map((c) => [c.id, String(byComponent.get(c.id) ?? "")])),
     );
   }
 
@@ -87,7 +117,7 @@ export default function SalaryStructures() {
       effectiveFrom,
       // An untouched box is zero, not absent — a component somebody does not
       // receive is a legitimate zero, and the database accepts it.
-      amounts: components.map((c) => ({ componentId: c.id, amount: Number(amounts[c.id]) || 0 })),
+      amounts: structural.map((c) => ({ componentId: c.id, amount: Number(amounts[c.id]) || 0 })),
     });
     if (!parsed.success) {
       setError(parsed.error.issues[0]?.message ?? "Check the form.");
@@ -121,7 +151,7 @@ export default function SalaryStructures() {
 
   // Nothing here works without components, and saying so beats an empty grid
   // with a save button that cannot succeed.
-  if (components.length === 0) {
+  if (structural.length === 0) {
     return (
       <p
         data-testid="no-components-yet"
@@ -206,13 +236,21 @@ export default function SalaryStructures() {
             {openId === row.employeeId && (
               <form onSubmit={save} className="mt-3 space-y-3">
                 <div className="grid gap-3 sm:grid-cols-2">
-                  {components.map((c) => (
+                  {earnings.map((c) => (
                     <label key={c.id} className="text-sm">
                       <span className="text-muted-foreground">{c.name}</span>
-                      {!c.countsForPfWages && (
+                      {c.epf === "off" && (
                         <span className="ml-1 text-xs text-muted-foreground">
                           — excluded from PF wages
                         </span>
+                      )}
+                      {c.epf === "under_threshold" && (
+                        <span className="ml-1 text-xs text-muted-foreground">
+                          — PF wages below the ceiling only
+                        </span>
+                      )}
+                      {!c.isProRata && (
+                        <span className="ml-1 text-xs text-muted-foreground">— paid whole</span>
                       )}
                       <input
                         type="number"
@@ -227,6 +265,33 @@ export default function SalaryStructures() {
                     </label>
                   ))}
                 </div>
+
+                {/* Below the earnings and headed as deductions, because a
+                    number in the same grid as Basic reads as pay. */}
+                {deductions.length > 0 && (
+                  <div data-testid="structure-deductions">
+                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                      Taken off every month
+                    </p>
+                    <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                      {deductions.map((c) => (
+                        <label key={c.id} className="text-sm">
+                          <span className="text-muted-foreground">{c.name}</span>
+                          <input
+                            type="number"
+                            min={0}
+                            step={1}
+                            inputMode="numeric"
+                            value={amounts[c.id] ?? ""}
+                            onChange={(e) => setAmounts({ ...amounts, [c.id]: e.target.value })}
+                            aria-label={`${c.name} for ${row.employeeName ?? "this person"}`}
+                            className="mt-1 h-9 w-full rounded-md border border-input bg-background px-2 text-right tabular-nums"
+                          />
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 <div className="flex flex-wrap items-end justify-between gap-3 rounded-md bg-muted p-3">
                   <label className="text-sm">

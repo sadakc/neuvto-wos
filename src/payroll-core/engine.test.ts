@@ -238,3 +238,225 @@ describe("edge cases the spreadsheet cannot express", () => {
     expect(run.byDepartment).toHaveLength(0);
   });
 });
+
+/**
+ * The three things the workbook cannot prove.
+ *
+ * The golden fixture is one month of one spreadsheet, and that spreadsheet has
+ * no conditional PF component, nothing paid whole regardless of days, and no
+ * standing deduction. Mapping it into the categorised model left every figure
+ * untouched — which is exactly why it cannot vouch for the new treatments.
+ * These cases are written for them.
+ */
+describe("EPF: a component that counts only below the ceiling", () => {
+  const withSpecial = [
+    ...COMPONENTS,
+    {
+      code: "special",
+      name: "Special allowance",
+      category: "earning" as const,
+      epf: "under_threshold" as const,
+      proRata: true,
+      order: 60,
+    },
+  ];
+
+  const person = (basic: number, special: number) =>
+    employee({
+      fixedComponents: [
+        { code: "basic", amount: basic },
+        { code: "special", amount: special },
+      ],
+    });
+
+  it("tops a low earner up towards the ceiling", () => {
+    // Basic alone is 10,000 — under the 15,000 ceiling — so the special
+    // allowance joins it. This is what an employer means by "consider for EPF
+    // only when PF wage is below 15,000".
+    const line = computeEmployee(person(10_000, 3_000), withSpecial, POLICY);
+    expect(line.pfWages).toBe(13_000);
+  });
+
+  it("computes the same as `always` while wages are restricted to the ceiling", () => {
+    // Worth stating rather than discovering. Capped, `min(base, cap)` and
+    // `min(base + extra, cap)` agree above the ceiling and below it, so this
+    // treatment is INVISIBLE while the cap is on. A test asserting 15,000 here
+    // would pass with the condition deleted.
+    const asAlways = withSpecial.map((c) =>
+      c.code === "special" ? { ...c, epf: "always" as const } : c,
+    );
+    for (const [basic, special] of [
+      [10_000, 3_000],
+      [16_000, 5_000],
+      [15_000, 4_000],
+    ] as const) {
+      expect(computeEmployee(person(basic, special), withSpecial, POLICY).pfWages).toBe(
+        computeEmployee(person(basic, special), asAlways, POLICY).pfWages,
+      );
+    }
+  });
+
+  it("leaves a high earner alone once wages are NOT restricted to the ceiling", () => {
+    // Where the treatment finally means something: "12% of actual PF wage".
+    // Base is already over the ceiling, so the allowance is not added, and PF
+    // is charged on 16,000 rather than 21,000.
+    const actual: PayrollPolicy = { ...POLICY, restrictPfWagesToCeiling: false };
+    expect(computeEmployee(person(16_000, 5_000), withSpecial, actual).pfWages).toBe(16_000);
+  });
+
+  it("still tops a low earner up when wages are not restricted", () => {
+    const actual: PayrollPolicy = { ...POLICY, restrictPfWagesToCeiling: false };
+    expect(computeEmployee(person(10_000, 3_000), withSpecial, actual).pfWages).toBe(13_000);
+  });
+
+  it("charges PF on the whole wage when the ceiling is not applied", () => {
+    const actual: PayrollPolicy = { ...POLICY, restrictPfWagesToCeiling: false };
+    const restricted = computeEmployee(person(30_000, 0), withSpecial, POLICY);
+    const unrestricted = computeEmployee(person(30_000, 0), withSpecial, actual);
+    expect(restricted.pfWages).toBe(15_000);
+    expect(unrestricted.pfWages).toBe(30_000);
+    expect(unrestricted.pfEmployee).toBe(3_600);
+  });
+
+  it("ignores a component switched off entirely", () => {
+    const off = [
+      ...COMPONENTS,
+      {
+        code: "special",
+        name: "Special",
+        category: "earning" as const,
+        epf: "off" as const,
+        proRata: true,
+        order: 60,
+      },
+    ];
+    const line = computeEmployee(person(10_000, 3_000), off, POLICY);
+    expect(line.pfWages).toBe(10_000);
+  });
+});
+
+describe("Proration: what is paid whole", () => {
+  const withBonus = [
+    ...COMPONENTS,
+    {
+      code: "joining",
+      name: "Joining bonus",
+      category: "earning" as const,
+      epf: "off" as const,
+      proRata: false,
+      order: 60,
+    },
+  ];
+
+  it("pays a non-prorated component in full on a part month", () => {
+    // A joining bonus does not become 19/31 of itself because the person
+    // started mid-month — which is the entire reason they are getting it.
+    const line = computeEmployee(
+      employee({
+        fixedComponents: [
+          { code: "basic", amount: 31_000 },
+          { code: "joining", amount: 5_000 },
+        ],
+        daysPayable: 10,
+      }),
+      withBonus,
+      POLICY,
+    );
+
+    expect(line.earned.find((c) => c.code === "joining")?.amount).toBe(5_000);
+    expect(line.earned.find((c) => c.code === "basic")?.amount).toBe(10_000);
+    expect(line.earnedGross).toBe(15_000);
+  });
+});
+
+describe("Deductions carried by the salary structure", () => {
+  const withRecovery = [
+    ...COMPONENTS,
+    {
+      code: "canteen",
+      name: "Canteen recovery",
+      category: "deduction" as const,
+      epf: "off" as const,
+      proRata: false,
+      order: 10,
+    },
+  ];
+
+  const person = () =>
+    employee({
+      fixedComponents: [
+        { code: "basic", amount: 20_000 },
+        { code: "canteen", amount: 500 },
+      ],
+    });
+
+  it("takes the amount off without touching gross", () => {
+    // A deduction is not negative pay. Letting it into earned gross would
+    // reduce PF wages and ESI along with it, so somebody with a canteen bill
+    // would quietly contribute less to their own provident fund.
+    const line = computeEmployee(person(), withRecovery, POLICY);
+
+    expect(line.earnedGross).toBe(20_000);
+    expect(line.earned.find((c) => c.code === "canteen")).toBeUndefined();
+    expect(line.componentDeductions).toBe(500);
+    expect(line.deductions).toEqual([{ code: "canteen", amount: 500 }]);
+  });
+
+  it("reaches the total deduction and therefore the net", () => {
+    const withOut = computeEmployee(
+      employee({ fixedComponents: [{ code: "basic", amount: 20_000 }] }),
+      withRecovery,
+      POLICY,
+    );
+    const withIn = computeEmployee(person(), withRecovery, POLICY);
+
+    expect(withIn.totalDeduction - withOut.totalDeduction).toBe(500);
+    expect(withOut.netPayable - withIn.netPayable).toBe(500);
+  });
+
+  it("says nothing about a deduction this person does not have", () => {
+    // Every employee is measured against every component the organisation
+    // defines. A zero-rupee canteen line on the payslip of somebody who never
+    // uses the canteen is noise that invites a question.
+    const line = computeEmployee(
+      employee({ fixedComponents: [{ code: "basic", amount: 20_000 }] }),
+      withRecovery,
+      POLICY,
+    );
+    expect(line.deductions).toEqual([]);
+    expect(line.componentDeductions).toBe(0);
+  });
+});
+
+describe("Benefits and reimbursements are configured, not computed", () => {
+  it("leaves a benefit out of the payslip entirely", () => {
+    // Deliberate, and stated so nobody reads its absence as a bug. A benefit
+    // needs a claims flow to mean anything; until it has one, computing it
+    // would put a figure on a payslip that nothing behind it can honour.
+    const withVpf = [
+      ...COMPONENTS,
+      {
+        code: "vpf",
+        name: "Voluntary provident fund",
+        category: "benefit" as const,
+        epf: "off" as const,
+        proRata: true,
+        order: 60,
+      },
+    ];
+    const line = computeEmployee(
+      employee({
+        fixedComponents: [
+          { code: "basic", amount: 20_000 },
+          { code: "vpf", amount: 1_000 },
+        ],
+      }),
+      withVpf,
+      POLICY,
+    );
+
+    expect(line.earnedGross).toBe(20_000);
+    expect(line.componentDeductions).toBe(0);
+    expect(line.earned.find((c) => c.code === "vpf")).toBeUndefined();
+  });
+});

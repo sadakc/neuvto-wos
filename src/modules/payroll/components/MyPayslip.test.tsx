@@ -60,6 +60,8 @@ const line = (over: Partial<PayslipLine> = {}): PayslipLine => ({
   employeeName: "Sam Christopher",
   departmentName: "Engineering",
   earned: [{ code: "basic", amount: 26613 }],
+  deductions: [],
+  componentDeductions: 0,
   fixedGross: 55000,
   daysPayable: 30,
   arrears: 0,
@@ -192,5 +194,30 @@ describe("Payslip — what the administrator has decided to show", () => {
     await screen.findByText("Net pay");
     expect(screen.queryByTestId("pay-date")).not.toBeInTheDocument();
     expect(getPayDate).not.toHaveBeenCalled();
+  });
+});
+
+describe("Payslip — a standing deduction is always explained", () => {
+  it("itemises it even when the statutory breakdown is switched off", async () => {
+    // PF and ESI are statutory and predictable, and an administrator may
+    // reasonably want a shorter payslip. A canteen recovery is not: hiding it
+    // leaves an unexplained gap between gross and net, which is the one thing
+    // an employee will ask about.
+    getPayrollSettings.mockResolvedValue(portal({ showStatutoryBreakdown: false }));
+    getRunLines.mockResolvedValue([
+      line({
+        deductions: [{ code: "canteen", amount: 450 }],
+        componentDeductions: 450,
+        totalDeduction: 2450,
+        netPayable: 50776,
+      }),
+    ]);
+
+    render(<MyPayslip />);
+    await screen.findByText("Net pay");
+
+    expect(screen.getByText("canteen")).toBeInTheDocument();
+    expect(screen.getByText("₹450")).toBeInTheDocument();
+    expect(screen.queryByText("Provident fund")).not.toBeInTheDocument();
   });
 });

@@ -15,12 +15,57 @@ import type { ComponentDefinition, EmployeeInput } from "../types";
 
 export const DAYS_IN_MONTH = 31;
 
+/**
+ * The workbook's five components, restated in the categorised model.
+ *
+ * `countsForPfWages: true` became `epf: "always"` and `false` became `"off"`,
+ * which is the mapping that leaves every figure below untouched. NOTHING here
+ * uses `under_threshold` or a non-prorated component, deliberately: this
+ * fixture's job is to prove agreement with a specific month of a specific
+ * spreadsheet, and the workbook has neither. The new treatments are proved
+ * against cases written for them in `engine.test.ts`.
+ */
 export const COMPONENTS: readonly ComponentDefinition[] = [
-  { code: "basic", name: "Basic and DA", countsForPfWages: true, order: 10 },
-  { code: "hra", name: "House rent allowance", countsForPfWages: false, order: 20 },
-  { code: "conveyance", name: "Conveyance allowance", countsForPfWages: true, order: 30 },
-  { code: "medical", name: "Medical allowance", countsForPfWages: true, order: 40 },
-  { code: "other", name: "Other allowance", countsForPfWages: true, order: 50 },
+  {
+    code: "basic",
+    name: "Basic and DA",
+    category: "earning",
+    epf: "always",
+    proRata: true,
+    order: 10,
+  },
+  {
+    code: "hra",
+    name: "House rent allowance",
+    category: "earning",
+    epf: "off",
+    proRata: true,
+    order: 20,
+  },
+  {
+    code: "conveyance",
+    name: "Conveyance allowance",
+    category: "earning",
+    epf: "always",
+    proRata: true,
+    order: 30,
+  },
+  {
+    code: "medical",
+    name: "Medical allowance",
+    category: "earning",
+    epf: "always",
+    proRata: true,
+    order: 40,
+  },
+  {
+    code: "other",
+    name: "Other allowance",
+    category: "earning",
+    epf: "always",
+    proRata: true,
+    order: 50,
+  },
 ];
 
 export interface ExpectedLine {

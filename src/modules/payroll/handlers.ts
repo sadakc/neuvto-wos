@@ -28,6 +28,8 @@ import {
   EmployeePayrollInput,
   StructureInput,
   payrollErrorMessage,
+  type ComponentCategory,
+  type EpfTreatment,
   type EmployeePayrollRow,
   type PayRunStatus,
   type PayRunSummary,
@@ -55,7 +57,14 @@ interface RunInputs {
   periodMonth: string;
   daysInMonth: number;
   status: PayRunStatus;
-  components: { code: string; name: string; countsForPfWages: boolean; order: number }[];
+  components: {
+    code: string;
+    name: string;
+    category: ComponentCategory;
+    epf: EpfTreatment;
+    proRata: boolean;
+    order: number;
+  }[];
   employees: {
     employeeId: string;
     employeeCode: string | null;
@@ -104,7 +113,9 @@ export async function computeRun(runId: string): Promise<ComputeResult> {
   const components: ComponentDefinition[] = inputs.components.map((c) => ({
     code: c.code,
     name: c.name,
-    countsForPfWages: c.countsForPfWages,
+    category: c.category,
+    epf: c.epf,
+    proRata: c.proRata,
     order: c.order,
   }));
 
@@ -162,6 +173,11 @@ function toStoredLine(line: PayrollLine, source: RunInputs["employees"][number] 
     employeeCode: source?.employeeCode ?? null,
     departmentName: line.departmentName,
     earnedComponents: line.earned,
+    // Frozen alongside the earnings, and separate from `otherDeduction` — a
+    // standing deduction and a one-off correction are different things, and a
+    // payslip that merged them could explain neither.
+    deductions: line.deductions,
+    componentDeductions: line.componentDeductions,
     fixedGross: line.fixedGross,
     daysPayable: line.daysPayable,
     arrears: line.arrears,
@@ -191,30 +207,84 @@ export async function submitRun(runId: string): Promise<string> {
 
 // ─────────────────────────────────────────────────────────────── configuration
 
+/**
+ * Every component this organisation defines, in every category.
+ *
+ * `inUse` is derived here rather than stored: one query for which component ids
+ * any salary structure line names. A stored flag and the structures it
+ * describes drift, and it is the flag that lies — locking a component nobody is
+ * on, or leaving one editable that half the workforce is paid through.
+ *
+ * The lookup is allowed to fail closed. If the structure lines cannot be read,
+ * every component is treated as in use — the worst case is an administrator
+ * being asked to create a new component instead of editing one, which is
+ * inconvenient. The other direction lets somebody flip a component out of PF
+ * wages and restate every payslip since April.
+ */
 export async function listComponents(): Promise<SalaryComponent[]> {
-  const { data, error } = await supabase
-    .from("salary_components")
-    .select("id, code, name, counts_for_pf_wages, display_order, status")
-    .is("deleted_at", null)
-    .order("display_order");
-  if (error) throw toPayrollError(error.message);
+  const [components, used] = await Promise.all([
+    supabase
+      .from("salary_components")
+      .select(
+        "id, category, code, name, name_in_payslip, calculation_type, default_amount, default_percentage, epf, esi, is_taxable, is_pro_rata, is_fbp, show_on_payslip, part_of_structure, frequency, max_amount_per_month, unclaimed_policy, display_order, status",
+      )
+      .is("deleted_at", null)
+      .order("display_order"),
+    supabase.from("salary_structure_lines").select("component_id").is("deleted_at", null),
+  ]);
 
-  return (data ?? []).map((r) => ({
+  if (components.error) throw toPayrollError(components.error.message);
+
+  const inUse = used.error ? null : new Set((used.data ?? []).map((r) => r.component_id as string));
+
+  return (components.data ?? []).map((r) => ({
     id: r.id,
+    category: r.category as SalaryComponent["category"],
     code: r.code,
     name: r.name,
-    countsForPfWages: r.counts_for_pf_wages,
+    nameInPayslip: r.name_in_payslip ?? r.name,
+    calculationType: r.calculation_type as SalaryComponent["calculationType"],
+    defaultAmount: r.default_amount === null ? null : Number(r.default_amount),
+    defaultPercentage: r.default_percentage === null ? null : Number(r.default_percentage),
+    epf: r.epf as SalaryComponent["epf"],
+    esi: r.esi,
+    isTaxable: r.is_taxable,
+    isProRata: r.is_pro_rata,
+    isFbp: r.is_fbp,
+    showOnPayslip: r.show_on_payslip,
+    partOfStructure: r.part_of_structure,
+    frequency: r.frequency as SalaryComponent["frequency"],
+    maxAmountPerMonth: r.max_amount_per_month === null ? null : Number(r.max_amount_per_month),
+    unclaimedPolicy: r.unclaimed_policy as SalaryComponent["unclaimedPolicy"],
     displayOrder: r.display_order,
     status: r.status as "active" | "archived",
+    inUse: inUse === null ? true : inUse.has(r.id),
   }));
 }
 
 export async function saveComponent(input: ComponentInput): Promise<void> {
   const parsed = ComponentInput.parse(input);
   const row = {
+    category: parsed.category,
     code: parsed.code,
     name: parsed.name,
-    counts_for_pf_wages: parsed.countsForPfWages,
+    // Blank means "same as the internal name". Storing the fallback rather than
+    // resolving it on every read means a payslip says the same thing after
+    // somebody renames the component for their own convenience.
+    name_in_payslip: parsed.nameInPayslip.trim() || parsed.name,
+    calculation_type: parsed.calculationType,
+    default_amount: parsed.defaultAmount,
+    default_percentage: parsed.defaultPercentage,
+    epf: parsed.epf,
+    esi: parsed.esi,
+    is_taxable: parsed.isTaxable,
+    is_pro_rata: parsed.isProRata,
+    is_fbp: parsed.isFbp,
+    show_on_payslip: parsed.showOnPayslip,
+    part_of_structure: parsed.partOfStructure,
+    frequency: parsed.frequency,
+    max_amount_per_month: parsed.maxAmountPerMonth,
+    unclaimed_policy: parsed.unclaimedPolicy,
     display_order: parsed.displayOrder,
   };
 
@@ -224,6 +294,16 @@ export async function saveComponent(input: ComponentInput): Promise<void> {
         ...row,
         organization_id: await currentOrgId(),
       });
+  if (error) throw toPayrollError(error.message);
+}
+
+/**
+ * Active or archived — the reversible half of the spec's "soft status, hard
+ * delete". Deleting is a different, destructive action and is never conflated
+ * with this one.
+ */
+export async function setComponentStatus(id: string, status: "active" | "archived"): Promise<void> {
+  const { error } = await supabase.from("salary_components").update({ status }).eq("id", id);
   if (error) throw toPayrollError(error.message);
 }
 
@@ -455,6 +535,8 @@ export async function getRunLines(runId: string): Promise<PayslipLine[]> {
     employeeName: r.profiles?.full_name ?? null,
     departmentName: r.department_name,
     earned: (r.earned_components as { code: string; amount: number }[]) ?? [],
+    deductions: (r.deductions as { code: string; amount: number }[]) ?? [],
+    componentDeductions: Number(r.component_deductions ?? 0),
     fixedGross: Number(r.fixed_gross),
     daysPayable: Number(r.days_payable),
     arrears: Number(r.arrears),

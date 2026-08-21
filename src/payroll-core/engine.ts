@@ -13,6 +13,7 @@
 import { round0, roundUp0 } from "./money";
 import type {
   ComponentDefinition,
+  EpfTreatment,
   EmployeeInput,
   PayRunResult,
   PayrollLine,
@@ -24,6 +25,9 @@ import type {
 /** The statutory position as at FY 2026-27, Karnataka. */
 export const DEFAULT_POLICY: Omit<PayrollPolicy, "daysInMonth"> = {
   pfWageCeiling: 15000,
+  // The workbook's position, and the common one: PF is charged on wages
+  // restricted to the ceiling.
+  restrictPfWagesToCeiling: true,
   pfRate: 0.12,
   epsRate: 0.0833,
   esiGrossCeiling: 21000,
@@ -43,26 +47,61 @@ export function computeEmployee(
 
   const fixedGross = employee.fixedComponents.reduce((sum, c) => sum + c.amount, 0);
 
+  const ordered = [...components].sort((a, b) => a.order - b.order);
+
   // Proration is by calendar day. A July salary and a February salary therefore
   // differ for identical attendance, which is what the workbook does and what
-  // the customer's staff already expect to see.
-  const earned = [...components]
-    .sort((a, b) => a.order - b.order)
-    .map((definition) => ({
-      code: definition.code,
-      amount: round0((amountOf(definition.code) / policy.daysInMonth) * employee.daysPayable),
-    }));
+  // the customer's staff already expect to see. A component with `proRata` off
+  // is paid whole — a joining bonus does not become 19/31 of itself.
+  const prorate = (definition: ComponentDefinition) => {
+    const monthly = amountOf(definition.code);
+    return definition.proRata
+      ? round0((monthly / policy.daysInMonth) * employee.daysPayable)
+      : round0(monthly);
+  };
+
+  const earnings = ordered.filter((c) => c.category === "earning");
+  const earned = earnings.map((definition) => ({
+    code: definition.code,
+    amount: prorate(definition),
+  }));
 
   const earnedGross = earned.reduce((sum, c) => sum + c.amount, 0) + employee.arrears;
 
-  // PF wages are earned gross less the components excluded from it — HRA, for
-  // every organisation seen so far. Capped, never floored: somebody who worked
-  // four days has PF wages of four days' pay.
-  const excluded = new Set(components.filter((c) => !c.countsForPfWages).map((c) => c.code));
+  /**
+   * PF wages, in two passes because one of the three treatments depends on the
+   * answer the other two produce.
+   *
+   * `always` components make up the base. If that base has NOT already reached
+   * the ceiling, the `under_threshold` components are added to it — which is
+   * what an employer means by "consider for EPF only when PF wage is below
+   * ₹15,000": top the low earners up towards the statutory minimum, and leave
+   * everybody above it alone.
+   *
+   * Capped, never floored. Somebody who worked four days has PF wages of four
+   * days' pay.
+   */
+  const sumWhere = (treatment: EpfTreatment) =>
+    earned
+      .filter((c) => earnings.find((d) => d.code === c.code)?.epf === treatment)
+      .reduce((sum, c) => sum + c.amount, 0);
+
+  const alwaysWages = sumWhere("always") + employee.arrears;
   const pfEligibleEarnings =
-    earned.filter((c) => !excluded.has(c.code)).reduce((sum, c) => sum + c.amount, 0) +
-    employee.arrears;
-  const pfWages = Math.min(pfEligibleEarnings, policy.pfWageCeiling);
+    alwaysWages < policy.pfWageCeiling ? alwaysWages + sumWhere("under_threshold") : alwaysWages;
+  const pfWages = policy.restrictPfWagesToCeiling
+    ? Math.min(pfEligibleEarnings, policy.pfWageCeiling)
+    : pfEligibleEarnings;
+
+  // Standing deductions carried by the salary structure, itemised and kept
+  // apart from `otherDeduction` — that is a figure typed into one run, and a
+  // payslip merging a standing deduction with a one-off correction cannot
+  // explain either of them.
+  const deductions = ordered
+    .filter((c) => c.category === "deduction")
+    .map((definition) => ({ code: definition.code, amount: prorate(definition) }))
+    .filter((d) => d.amount !== 0);
+  const componentDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
 
   const pfEmployee = round0(pfWages * policy.pfRate);
   const eps = round0(pfWages * policy.epsRate);
@@ -84,6 +123,7 @@ export function computeEmployee(
     professionalTax +
     employee.tds +
     employee.lwf +
+    componentDeductions +
     employee.otherDeduction;
 
   return {
@@ -92,6 +132,8 @@ export function computeEmployee(
     fixedGross,
     daysPayable: employee.daysPayable,
     earned,
+    deductions,
+    componentDeductions,
     arrears: employee.arrears,
     earnedGross,
     pfWages,

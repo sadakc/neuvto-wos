@@ -32,7 +32,9 @@ const runInputs = {
   components: COMPONENTS.map((c) => ({
     code: c.code,
     name: c.name,
-    countsForPfWages: c.countsForPfWages,
+    category: c.category,
+    epf: c.epf,
+    proRata: c.proRata,
     order: c.order,
   })),
   employees: EMPLOYEES.map((e) => ({

@@ -39,11 +39,26 @@ const C_HRA = "44444444-4444-4444-8444-444444444444";
 
 const component = (over: Partial<SalaryComponent> = {}): SalaryComponent => ({
   id: C_BASIC,
+  category: "earning",
   code: "basic",
   name: "Basic and DA",
-  countsForPfWages: true,
+  nameInPayslip: "Basic and DA",
+  calculationType: "flat_amount",
+  defaultAmount: null,
+  defaultPercentage: null,
+  epf: "always",
+  esi: true,
+  isTaxable: true,
+  isProRata: true,
+  isFbp: false,
+  showOnPayslip: true,
+  partOfStructure: true,
+  frequency: null,
+  maxAmountPerMonth: null,
+  unclaimedPolicy: null,
   displayOrder: 10,
   status: "active",
+  inUse: false,
   ...over,
 });
 

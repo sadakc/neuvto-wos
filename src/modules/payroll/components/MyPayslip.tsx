@@ -248,6 +248,17 @@ export default function MyPayslip() {
                   only a layout choice: these are the reader's own figures either
                   way. The total is never hidden — a deduction with no
                   explanation and no total is just money gone. */}
+              {/* Standing deductions are always itemised, whatever the
+                  statutory-breakdown preference says. PF and ESI are statutory
+                  and predictable; a canteen recovery is a number the person has
+                  every reason to want explained, and hiding it leaves an
+                  unexplained gap between gross and net. */}
+              {line.deductions.map((d) => (
+                <div key={d.code} className="flex justify-between gap-4">
+                  <dt className="text-muted-foreground">{d.code}</dt>
+                  <dd className="tabular-nums">{money(d.amount)}</dd>
+                </div>
+              ))}
               {portal?.showStatutoryBreakdown !== false &&
                 statutory.map(([label, amount]) => (
                   <div key={label} className="flex justify-between gap-4">

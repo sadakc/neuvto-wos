@@ -116,10 +116,10 @@ begin
 
   -- ═══════════════════════════════════════════ a line that contradicts itself
 
-  insert into public.salary_components (organization_id, code, name, counts_for_pf_wages, display_order)
-  values (org_a, 'basic', 'Basic and DA', true, 10) returning id into comp_basic;
-  insert into public.salary_components (organization_id, code, name, counts_for_pf_wages, display_order)
-  values (org_a, 'hra', 'House rent allowance', false, 20) returning id into comp_hra;
+  insert into public.salary_components (organization_id, code, name, category, epf, display_order)
+  values (org_a, 'basic', 'Basic and DA', 'earning', 'always', 10) returning id into comp_basic;
+  insert into public.salary_components (organization_id, code, name, category, epf, display_order)
+  values (org_a, 'hra', 'House rent allowance', 'earning', 'off', 20) returning id into comp_hra;
 
   begin
     insert into public.pay_run_lines (
@@ -376,6 +376,84 @@ begin
   if n = 0 then raise notice 'ok: nor the component amounts behind it';
   else raise notice 'FAIL: a manager read % structure line(s)', n; failed := failed + 1; end if;
   perform pg_temp.as_postgres();
+
+  -- ═════════════ a component stops meaning something else once somebody is on it
+  --
+  -- 20260824110000. The source spec repeats this on every category: after a
+  -- component reaches a real employee, only its name and its default stay
+  -- editable. The reason is reproducibility — flipping `basic` out of PF wages
+  -- in November silently restates every payslip computed against it since
+  -- April, and every one of those has already been shown to somebody.
+  --
+  -- comp_basic is on emp_a's structure by this point, and comp_hra is on
+  -- nobody's. The pair is the point: the rule has to bite for one and not the
+  -- other, or it is just a table that cannot be edited.
+
+  begin
+    update public.salary_components set epf = 'off' where id = comp_basic;
+    raise notice 'FAIL: a component somebody is paid through changed what it means';
+    failed := failed + 1;
+  exception when others then
+    if sqlerrm like '%COMPONENT_IN_USE%'
+      then raise notice 'ok: a component in use cannot change what it means';
+      else raise notice 'FAIL: wrong refusal changing a component in use: %', sqlerrm;
+           failed := failed + 1; end if;
+  end;
+
+  -- Renaming is not restating. An organisation that decides "Basic and DA"
+  -- should read "Basic Salary" on the payslip must be able to say so.
+  begin
+    update public.salary_components
+       set name = 'Basic Salary', name_in_payslip = 'Basic Salary'
+     where id = comp_basic;
+    raise notice 'ok: and can still be renamed';
+  exception when others then
+    raise notice 'FAIL: a component in use could not be renamed: %', sqlerrm;
+    failed := failed + 1;
+  end;
+
+  begin
+    update public.salary_components set epf = 'under_threshold' where id = comp_hra;
+    raise notice 'ok: a component nobody is on is still fully editable';
+  exception when others then
+    raise notice 'FAIL: an unused component was frozen: %', sqlerrm;
+    failed := failed + 1;
+  end;
+
+  -- ══════════════════════════ the categories the arithmetic is allowed to have
+  --
+  -- Mirrors the CHECK constraints. A percentage on a canteen recovery is not
+  -- something anybody means, and an unknown category would reach the engine as
+  -- a component it silently ignores — pay quietly missing from a payslip with
+  -- every total still reconciling.
+
+  begin
+    insert into public.salary_components (organization_id, code, name, category, epf, display_order)
+    values (org_a, 'nonsense', 'Nonsense', 'bonus_thing', 'off', 90);
+    raise notice 'FAIL: a component was created with an unknown category';
+    failed := failed + 1;
+  exception when check_violation then
+    raise notice 'ok: an unknown component category is refused';
+  end;
+
+  begin
+    insert into public.salary_components
+      (organization_id, code, name, category, epf, calculation_type, default_percentage, display_order)
+    values (org_a, 'silly', 'Silly', 'deduction', 'off', 'percent_of_basic', 40, 91);
+    raise notice 'FAIL: a deduction was defined as a percentage of basic';
+    failed := failed + 1;
+  exception when check_violation then
+    raise notice 'ok: only an earning can be a percentage';
+  end;
+
+  begin
+    insert into public.salary_components (organization_id, code, name, category, epf, display_order)
+    values (org_a, 'wrongpf', 'Wrong PF', 'earning', 'sometimes', 92);
+    raise notice 'FAIL: a component was created with an unknown PF treatment';
+    failed := failed + 1;
+  exception when check_violation then
+    raise notice 'ok: an unknown provident fund treatment is refused';
+  end;
 
   -- ═════════════════════ nobody vanishes for want of a salary structure
   --

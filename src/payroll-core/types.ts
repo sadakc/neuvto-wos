@@ -6,19 +6,45 @@
  * database constraints, and this package must not know that a database exists.
  */
 
+/** What kind of thing a component is. Only earnings and deductions reach a run. */
+export type ComponentCategory = "earning" | "deduction" | "benefit" | "reimbursement";
+
+/**
+ * How a component contributes to provident fund wages.
+ *
+ * `off` is the workbook's house rent allowance — PF wages are earned gross less
+ * HRA, stated as "which components make up PF wages" rather than "subtract
+ * HRA", so the rule survives an employer who calls it something else or has two
+ * of them.
+ *
+ * `under_threshold` is the awkward one, and it is real: employers add
+ * allowances to PF wages for people earning under the ceiling, so their
+ * contribution reaches the statutory minimum, and leave them out for everybody
+ * above it. Read as "include this only if the components that always count have
+ * not already reached the ceiling".
+ */
+export type EpfTreatment = "off" | "always" | "under_threshold";
+
 /**
  * A salary component as the organisation defines it.
  *
- * `countsForPfWages` is the only flag the arithmetic reads, and it exists
- * because the source workbook computes PF wages as `earnedGross − earnedHRA`.
- * Stated as "which components make up PF wages" rather than "subtract HRA", the
- * rule survives an organisation that calls the component something else, or has
- * two of them.
+ * Four categories exist in configuration; two of them reach the arithmetic.
+ * An `earning` becomes a line of pay, prorated unless `proRata` says otherwise;
+ * a `deduction` is a fixed monthly amount taken off. `benefit` and
+ * `reimbursement` are configured and deliberately compute nothing yet — they
+ * need a claims flow, and a component that looks configured while changing no
+ * payslip is worse than one that was never offered.
  */
 export interface ComponentDefinition {
   readonly code: string;
   readonly name: string;
-  readonly countsForPfWages: boolean;
+  readonly category: ComponentCategory;
+  readonly epf: EpfTreatment;
+  /**
+   * Off means the full monthly amount is paid however many days were worked —
+   * a joining bonus does not become 19/31 of itself.
+   */
+  readonly proRata: boolean;
   /** Display order on the payslip and the register. */
   readonly order: number;
 }
@@ -65,6 +91,18 @@ export interface PayrollPolicy {
   /** Calendar days in the month. Proration is by calendar day, not a fixed 30. */
   readonly daysInMonth: number;
   readonly pfWageCeiling: number;
+  /**
+   * Whether PF wages are capped at the ceiling ("restricted PF wage") or
+   * charged on what the person actually earned ("actual PF wage"). Employers
+   * choose, and the EPF configuration screen asks.
+   *
+   * THIS IS WHAT MAKES `under_threshold` MEAN ANYTHING. While wages are capped,
+   * `min(base, cap)` and `min(base + extra, cap)` agree whether the base is
+   * above the ceiling or below it — so the treatment computes identically to
+   * `always` and the distinction is invisible. Uncapped, it is the difference
+   * between charging PF on 20,000 and on 25,000.
+   */
+  readonly restrictPfWagesToCeiling: boolean;
   readonly pfRate: number;
   readonly epsRate: number;
   /** Tested against FIXED gross, not earned — see `computeEmployee`. */
@@ -89,6 +127,15 @@ export interface PayrollLine {
   readonly earned: readonly EarnedComponent[];
   readonly arrears: number;
   readonly earnedGross: number;
+
+  /**
+   * Recurring deductions this person's salary structure carries, itemised.
+   * Separate from `otherDeduction`, which is a figure typed into one run — a
+   * standing deduction and a one-off correction are different things and a
+   * payslip that merges them cannot explain either.
+   */
+  readonly deductions: readonly EarnedComponent[];
+  readonly componentDeductions: number;
 
   readonly pfWages: number;
   readonly pfEmployee: number;

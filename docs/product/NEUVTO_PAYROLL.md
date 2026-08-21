@@ -1,6 +1,6 @@
 # Payroll
 
-**Version:** 1.2 · **Status:** Active · **Updated:** 21 Aug 2026
+**Version:** 1.3 · **Status:** Active · **Updated:** 21 Aug 2026
 
 The second module. It replaces an eleven-sheet Excel workbook that runs a real
 payroll every month, and its acceptance criterion is that workbook's own July
@@ -224,6 +224,67 @@ exists.
 The shapes are validated on the way in because the database validates them too.
 The case worth stopping is an eleven-digit UAN: the EPFO portal accepts the
 upload and rejects the batch hours later without naming a row.
+
+---
+
+## What a component can be
+
+Four categories in one list/edit shell, from the Zoho settings spec. Two of them
+reach the arithmetic and two deliberately do not.
+
+| Category          | Reaches a payslip                                   |
+| ----------------- | --------------------------------------------------- |
+| **Earning**       | Yes — a line of pay, prorated unless told otherwise |
+| **Deduction**     | Yes — a standing amount off, itemised on its own    |
+| **Benefit**       | No. Configured only                                 |
+| **Reimbursement** | No. Configured only                                 |
+
+The last two are honest rather than unfinished. Both need a claims flow before
+they mean anything, and a component that looks configured while changing no
+payslip is worse than one that was never offered — so the screen says so on the
+tab, the engine ignores them, and a test asserts that it does.
+
+**A deduction is not negative pay.** Letting a canteen recovery into gross would
+pull PF wages and ESI down with it, so somebody with a canteen bill would
+quietly contribute less to their own provident fund. Earnings and deductions are
+summed separately all the way through — engine, structure screen and payslip.
+
+**A standing deduction is always itemised**, even when the statutory breakdown is
+switched off. PF and ESI are statutory and predictable; an unexplained ₹450 gap
+between gross and net is the one thing an employee will ask about.
+
+### The PF treatment that was nearly a no-op
+
+`counts_for_pf_wages` was a boolean. It is now three positions: `off`, `always`,
+and `under_threshold` — the last being what employers mean by "consider for EPF
+only when PF wage is below ₹15,000".
+
+It was nearly shipped doing nothing. **While PF wages are restricted to the
+ceiling, `min(base, cap)` and `min(base + extra, cap)` give the same answer both
+above the ceiling and below it**, so the treatment is invisible. It only means
+anything once an employer chooses to charge on _actual_ PF wages rather than
+restricted ones — which is a switch on the EPF scheme, not on the component.
+
+Both halves are now real: `restrictPfWagesToCeiling` on the policy, and a note
+on the component screen telling an administrator that the option they just
+picked does nothing until they change the other one.
+
+### Frozen once somebody is paid through it
+
+The spec repeats this rule on every category, and it is about reproducibility:
+flipping `basic` out of PF wages in November silently restates every payslip
+computed against it since April, and every one of those has been shown to
+somebody.
+
+So once a component is named by any salary structure line, what it **means** is
+fixed — category, code, PF and ESI treatment, proration, taxability — while what
+it is **called** and what it **defaults to** stay editable. A rename is not a
+restatement.
+
+Enforced by a trigger (`COMPONENT_IN_USE`), not by the screen, because the
+screen is not what a stale browser tab, an import or a future handler goes
+through. `inUse` is derived on read from the structure lines themselves — a
+stored flag and the structures it describes drift, and it is the flag that lies.
 
 ---
 

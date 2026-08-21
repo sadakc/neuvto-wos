@@ -12,26 +12,121 @@ import { z } from "zod";
 export const PAY_RUN_STATUSES = ["draft", "pending_approval", "approved", "paid"] as const;
 export type PayRunStatus = (typeof PAY_RUN_STATUSES)[number];
 
-/** salary_component_code_shape. The code reaches a CSV column header. */
-export const ComponentInput = z.object({
-  id: z.string().uuid().optional(),
-  code: z
-    .string()
-    .trim()
-    .min(1, "Give this component a code")
-    .max(40, "That code is too long")
-    .regex(
-      /^[a-z][a-z0-9_]*$/,
-      "Use lower-case letters, numbers and underscores — basic, hra, special_allowance",
-    ),
-  name: z.string().trim().min(1, "Give this component a name").max(60, "That name is too long"),
-  /**
-   * The only flag the arithmetic reads. False for HRA in every organisation
-   * seen so far, because PF wages are earned gross less HRA.
-   */
-  countsForPfWages: z.boolean(),
-  displayOrder: z.number().int().min(0).max(999),
-});
+export const COMPONENT_CATEGORIES = ["earning", "deduction", "benefit", "reimbursement"] as const;
+export type ComponentCategory = (typeof COMPONENT_CATEGORIES)[number];
+
+export const EPF_TREATMENTS = ["off", "always", "under_threshold"] as const;
+export type EpfTreatment = (typeof EPF_TREATMENTS)[number];
+
+export const CALCULATION_TYPES = ["flat_amount", "percent_of_ctc", "percent_of_basic"] as const;
+export type CalculationType = (typeof CALCULATION_TYPES)[number];
+
+export const DEDUCTION_FREQUENCIES = ["one_time", "recurring"] as const;
+export const UNCLAIMED_POLICIES = ["carry_forward", "encash_monthly"] as const;
+
+/**
+ * A salary component, in any of its four categories.
+ *
+ * One schema rather than four, because the list and the edit form are one shell
+ * with a different field set per category — which is the source spec's own
+ * observation, and the reason it says build the shell once. The rules that
+ * genuinely differ are in `superRefine` below, where they can say WHY.
+ *
+ * `salary_component_code_shape` — the code reaches a payslip and a CSV column
+ * header, so spaces and punctuation in it become a file the EPFO portal or a
+ * bank rejects.
+ */
+export const ComponentInput = z
+  .object({
+    id: z.string().uuid().optional(),
+    category: z.enum(COMPONENT_CATEGORIES).default("earning"),
+    code: z
+      .string()
+      .trim()
+      .min(1, "Give this component a code")
+      .max(40, "That code is too long")
+      .regex(
+        /^[a-z][a-z0-9_]*$/,
+        "Use lower-case letters, numbers and underscores — basic, hra, special_allowance",
+      ),
+    name: z.string().trim().min(1, "Give this component a name").max(60, "That name is too long"),
+    /** What the employee sees. Falls back to `name` when left blank. */
+    nameInPayslip: z.string().trim().max(60, "That name is too long").default(""),
+    calculationType: z.enum(CALCULATION_TYPES).default("flat_amount"),
+    /** A template for setting the NEXT person up. The amount that gets paid lives on the person. */
+    defaultAmount: z
+      .number()
+      .min(0, "An amount cannot be negative")
+      .max(99_999_999, "That amount is too large")
+      .nullable()
+      .default(null),
+    defaultPercentage: z
+      .number()
+      .min(0, "A percentage cannot be negative")
+      .max(100, "A percentage cannot be over 100")
+      .nullable()
+      .default(null),
+    /**
+     * How this component contributes to provident fund wages. `under_threshold`
+     * is only observable once EPF is set to charge on actual rather than
+     * restricted wages — see the EPF scheme.
+     */
+    epf: z.enum(EPF_TREATMENTS).default("always"),
+    esi: z.boolean().default(true),
+    isTaxable: z.boolean().default(true),
+    isProRata: z.boolean().default(true),
+    isFbp: z.boolean().default(false),
+    showOnPayslip: z.boolean().default(true),
+    partOfStructure: z.boolean().default(true),
+    frequency: z.enum(DEDUCTION_FREQUENCIES).nullable().default(null),
+    maxAmountPerMonth: z
+      .number()
+      .min(0, "A limit cannot be negative")
+      .max(99_999_999, "That limit is too large")
+      .nullable()
+      .default(null),
+    unclaimedPolicy: z.enum(UNCLAIMED_POLICIES).nullable().default(null),
+    displayOrder: z.number().int().min(0).max(999),
+  })
+  .superRefine((v, ctx) => {
+    // Mirrors salary_component_percentage_is_an_earning. "40% of basic" is not
+    // something anybody means by a canteen recovery, and offering it would put
+    // a number on screen that nothing computes.
+    if (v.calculationType !== "flat_amount" && v.category !== "earning") {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["calculationType"],
+        message: "Only an earning can be a percentage. Give this one an amount.",
+      });
+    }
+
+    if (v.calculationType !== "flat_amount" && v.defaultPercentage === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["defaultPercentage"],
+        message: "Enter a percentage",
+      });
+    }
+
+    // A deduction with no frequency is a deduction nobody can tell you will
+    // happen again next month, which is the only thing an employee wants to
+    // know about it.
+    if (v.category === "deduction" && v.frequency === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["frequency"],
+        message: "Say whether this happens once or every month",
+      });
+    }
+
+    if (v.category === "reimbursement" && v.unclaimedPolicy === null) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ["unclaimedPolicy"],
+        message: "Say what happens to an unclaimed balance",
+      });
+    }
+  });
 export type ComponentInput = z.infer<typeof ComponentInput>;
 
 /**
@@ -187,6 +282,8 @@ const MESSAGES: Record<string, string> = {
   CROSS_TENANT_EMPLOYEE: "That employee is not in this workspace.",
   INVALID_LINES: "The computed pay run could not be read. Try computing it again.",
   NO_APPROVER: "Nobody is set up to approve a pay run. Configure an approval chain first.",
+  COMPONENT_IN_USE:
+    "Somebody's salary already uses this component, so only its name and default amount can change. Add a new component instead.",
 };
 
 export function payrollErrorMessage(code: string): string {
@@ -202,11 +299,36 @@ export function payrollErrorMessage(code: string): string {
 
 export interface SalaryComponent {
   id: string;
+  category: ComponentCategory;
   code: string;
   name: string;
-  countsForPfWages: boolean;
+  nameInPayslip: string;
+  calculationType: CalculationType;
+  defaultAmount: number | null;
+  defaultPercentage: number | null;
+  epf: EpfTreatment;
+  esi: boolean;
+  isTaxable: boolean;
+  isProRata: boolean;
+  isFbp: boolean;
+  showOnPayslip: boolean;
+  partOfStructure: boolean;
+  frequency: "one_time" | "recurring" | null;
+  maxAmountPerMonth: number | null;
+  unclaimedPolicy: "carry_forward" | "encash_monthly" | null;
   displayOrder: number;
   status: "active" | "archived";
+  /**
+   * True once at least one person's salary structure names this component.
+   *
+   * Derived on read, never stored — a stored flag and the structures it
+   * describes drift, and it is the flag that lies. What it gates is the source
+   * spec's rule repeated on every category: after somebody is on it, only the
+   * name and the default amount stay editable, because flipping a component out
+   * of PF wages in November would silently restate every payslip computed
+   * against it since April.
+   */
+  inUse: boolean;
 }
 
 /** One person on the statutory-details screen. Nulls are ordinary, not errors. */
@@ -257,6 +379,9 @@ export interface PayslipLine {
   employeeName: string | null;
   departmentName: string | null;
   earned: { code: string; amount: number }[];
+  /** Standing deductions from the salary structure, frozen with the rest. */
+  deductions: { code: string; amount: number }[];
+  componentDeductions: number;
   fixedGross: number;
   daysPayable: number;
   arrears: number;

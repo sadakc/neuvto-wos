@@ -1297,9 +1297,11 @@ export type Database = {
       pay_run_lines: {
         Row: {
           arrears: number
+          component_deductions: number
           created_at: string
           created_by: string | null
           days_payable: number
+          deductions: Json
           deleted_at: string | null
           department_name: string | null
           earned_components: Json
@@ -1329,9 +1331,11 @@ export type Database = {
         }
         Insert: {
           arrears?: number
+          component_deductions?: number
           created_at?: string
           created_by?: string | null
           days_payable: number
+          deductions?: Json
           deleted_at?: string | null
           department_name?: string | null
           earned_components?: Json
@@ -1361,9 +1365,11 @@ export type Database = {
         }
         Update: {
           arrears?: number
+          component_deductions?: number
           created_at?: string
           created_by?: string | null
           days_payable?: number
+          deductions?: Json
           deleted_at?: string | null
           department_name?: string | null
           earned_components?: Json
@@ -1768,44 +1774,86 @@ export type Database = {
       }
       salary_components: {
         Row: {
+          calculation_type: string
+          category: string
           code: string
-          counts_for_pf_wages: boolean
           created_at: string
           created_by: string | null
+          default_amount: number | null
+          default_percentage: number | null
           deleted_at: string | null
           display_order: number
+          epf: string
+          esi: boolean
+          frequency: string | null
           id: string
+          is_fbp: boolean
+          is_pro_rata: boolean
+          is_taxable: boolean
+          max_amount_per_month: number | null
           name: string
+          name_in_payslip: string | null
           organization_id: string
+          part_of_structure: boolean
+          show_on_payslip: boolean
           status: string
+          unclaimed_policy: string | null
           updated_at: string
           updated_by: string | null
         }
         Insert: {
+          calculation_type?: string
+          category?: string
           code: string
-          counts_for_pf_wages?: boolean
           created_at?: string
           created_by?: string | null
+          default_amount?: number | null
+          default_percentage?: number | null
           deleted_at?: string | null
           display_order?: number
+          epf?: string
+          esi?: boolean
+          frequency?: string | null
           id?: string
+          is_fbp?: boolean
+          is_pro_rata?: boolean
+          is_taxable?: boolean
+          max_amount_per_month?: number | null
           name: string
+          name_in_payslip?: string | null
           organization_id: string
+          part_of_structure?: boolean
+          show_on_payslip?: boolean
           status?: string
+          unclaimed_policy?: string | null
           updated_at?: string
           updated_by?: string | null
         }
         Update: {
+          calculation_type?: string
+          category?: string
           code?: string
-          counts_for_pf_wages?: boolean
           created_at?: string
           created_by?: string | null
+          default_amount?: number | null
+          default_percentage?: number | null
           deleted_at?: string | null
           display_order?: number
+          epf?: string
+          esi?: boolean
+          frequency?: string | null
           id?: string
+          is_fbp?: boolean
+          is_pro_rata?: boolean
+          is_taxable?: boolean
+          max_amount_per_month?: number | null
           name?: string
+          name_in_payslip?: string | null
           organization_id?: string
+          part_of_structure?: boolean
+          show_on_payslip?: boolean
           status?: string
+          unclaimed_policy?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -2338,6 +2386,7 @@ export type Database = {
       }
       org_today: { Args: { _org_id: string }; Returns: string }
       organization_display_name: { Args: { _org_id: string }; Returns: string }
+      payroll_employee_portal: { Args: { _key: string }; Returns: boolean }
       payroll_open_run: { Args: { _period_month: string }; Returns: string }
       payroll_replace_run_lines: {
         Args: { _lines: Json; _run_id: string }
