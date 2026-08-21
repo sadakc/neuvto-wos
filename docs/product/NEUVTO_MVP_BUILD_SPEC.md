@@ -1,6 +1,6 @@
 # NEUVTO WOS — Build Spec
 
-**Version:** 1.8 · **Status:** Active · **Updated:** 21 Aug 2026
+**Version:** 1.9 · **Status:** Active · **Updated:** 21 Aug 2026
 
 ## The platform is the product
 
@@ -149,6 +149,11 @@ These override the source docs where they conflict. Deviations are deliberate an
 | D68 | **Configuration belongs to the module that invented it; anything true with every module switched off belongs to the organisation.** Departments, the working week and holidays are shared. | Sada, 21 Aug 2026 — departments named explicitly. The test is not importance but survival: a department outlives Leave being switched off, a leave type does not. Payroll's pay schedule deliberately does NOT get its own working week, because a workspace with two weekends pays against one and counts leave against the other |
 | D69 | **A switch controlling what an employee may see is enforced where the data is READ**, or it is labelled as presentation and enforced nowhere. | `getRunLines` selects straight from `pay_run_lines`, so a switch honoured only in React leaves every figure one fetch away in the console. `payslipsVisible` is read by the policy itself (20260824100000); the statutory-breakdown switch hides an employee's own PF from the employee, which is layout, and the screen says so rather than implying a boundary |
 | D70 | **A pay date is stated as which month it falls in, not left to be inferred.** `last_working_day` is the month being paid; `day_of_next_month` is the month after. | The source spec offers "Day N of every month" and never says which month. For July's run, day 5 is either 5 July — a salary credited four weeks before it is earned — or 5 August. Inheriting that ambiguity would put it in the data |
+| D71 | **A salary component has a category, and two of the four compute nothing.** Benefits and reimbursements are configured and ignored by the engine, which the screen says on the tab. | Both need a claims flow to mean anything. A component that looks configured while changing no payslip is worse than one that was never offered — a gap that announces itself is a gap, a silent one is a bug report |
+| D72 | **A component is frozen once somebody is paid through it.** What it MEANS is fixed; what it is CALLED is not. Enforced by a trigger; `inUse` is derived on read. | Flipping `basic` out of PF wages in November silently restates every payslip computed against it since April, all of which have been shown to somebody. The screen is not what a stale tab, an import or a future handler goes through |
+| D73 | **Statutory schemes are configuration, and their defaults are what already runs.** PF, ESI and PT default ON; labour welfare fund and statutory bonus default off. | The source spec ships all five off behind an Enable button. Correct for onboarding, wrong here: all three have been computed on every pay run this module has produced, so defaulting them off would strip them from the next payslip of every existing workspace. A release must not restate a payslip |
+| D74 | **Professional tax is a list of bands, not a threshold and an amount.** An empty list is a state that levies none. | It is a state tax and the states disagree — Karnataka has two bands, Maharashtra three. Encoding Karnataka's shape as the shape means rewriting the engine to sell to somebody in Pune |
+| D75 | **Applying a salary template copies its amounts and forgets it.** No link back. | A live link restates the pay of everybody on a template the moment somebody edits it, from a screen that looks like configuration. And the workbook would be unrepresentable: its stated percentage rules hold for 12 and 20 of 44 employees, so three quarters are paid something a little different from the shape they started on |
 
 **D15 is unchanged and still deferred.** Company identity (D45) is not theming.
 A name and a logo are _facts about the customer_, stored as columns and rendered
