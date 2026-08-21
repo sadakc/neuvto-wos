@@ -44,6 +44,7 @@ export default function MyPayslip() {
   const [line, setLine] = useState<PayslipLine | null>(null);
   const [payDate, setPayDate] = useState("");
   const [portal, setPortal] = useState<PayrollSettings["employeePortal"] | null>(null);
+  const [slip, setSlip] = useState<PayrollSettings["payslip"] | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
 
@@ -59,6 +60,7 @@ export default function MyPayslip() {
         const approved = list.filter((r) => r.status === "approved" || r.status === "paid");
         setRuns(approved);
         setPortal(settings.employeePortal);
+        setSlip(settings.payslip);
         setRunId(approved[0]?.id ?? "");
         if (approved.length === 0) setState("ready");
       } catch (e) {
@@ -151,6 +153,17 @@ export default function MyPayslip() {
     );
   }
 
+  // An announcement stops showing on its own. A notice with no end date is how
+  // "salary is late this month" is still on screen in March — so a date that
+  // has passed hides it here rather than waiting for somebody to remember.
+  const banner =
+    portal?.bannerMessage &&
+    (!portal.bannerUntil || portal.bannerUntil >= new Date().toISOString().slice(0, 10))
+      ? portal.bannerMessage
+      : "";
+
+  const layout = slip?.layout ?? "standard";
+
   const statutory: [string, number][] = [
     ["Provident fund", line.pfEmployee],
     ["Employee state insurance", line.esiEmployee],
@@ -192,6 +205,17 @@ export default function MyPayslip() {
         </div>
       </div>
 
+      {banner && (
+        <p
+          data-testid="portal-banner"
+          role="status"
+          data-print="hide"
+          className="rounded-lg border border-border bg-secondary/40 p-4 text-sm"
+        >
+          {banner}
+        </p>
+      )}
+
       {/* Printed as well as shown: a payslip on paper has to say whose it is and
           which month it is, or it is a column of numbers. */}
       <div className="rounded-lg border border-border p-4" data-print="keep-together">
@@ -203,6 +227,12 @@ export default function MyPayslip() {
             {monthLabel(runs.find((r) => r.id === runId)?.periodMonth ?? "")}
           </p>
         </div>
+
+        {slip?.letterhead && (
+          <p data-testid="payslip-letterhead" className="text-xs text-muted-foreground">
+            {slip.letterhead}
+          </p>
+        )}
 
         <p className="mt-1 text-sm text-muted-foreground">
           {line.employeeCode ? `${line.employeeCode} · ` : ""}
@@ -218,69 +248,84 @@ export default function MyPayslip() {
           </p>
         )}
 
-        <div className="mt-4 grid gap-6 sm:grid-cols-2">
-          <section>
-            <h2 className="font-display text-sm font-semibold">Earnings</h2>
-            <dl className="mt-2 space-y-1 text-sm">
-              {line.earned.map((c) => (
-                <div key={c.code} className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">{c.code}</dt>
-                  <dd className="tabular-nums">{money(c.amount)}</dd>
+        {layout === "compact" ? (
+          // One block, no breakdown. The gross and the deduction total are the
+          // two figures that must never be missing, whatever the layout.
+          <dl data-testid="payslip-compact" className="mt-4 space-y-1 text-sm">
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Earned gross</dt>
+              <dd className="tabular-nums">{money(line.earnedGross)}</dd>
+            </div>
+            <div className="flex justify-between gap-4">
+              <dt className="text-muted-foreground">Total deductions</dt>
+              <dd className="tabular-nums">{money(line.totalDeduction)}</dd>
+            </div>
+          </dl>
+        ) : (
+          <div className="mt-4 grid gap-6 sm:grid-cols-2">
+            <section>
+              <h2 className="font-display text-sm font-semibold">Earnings</h2>
+              <dl className="mt-2 space-y-1 text-sm">
+                {line.earned.map((c) => (
+                  <div key={c.code} className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">{c.code}</dt>
+                    <dd className="tabular-nums">{money(c.amount)}</dd>
+                  </div>
+                ))}
+                {line.arrears > 0 && (
+                  <div className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">Arrears</dt>
+                    <dd className="tabular-nums">{money(line.arrears)}</dd>
+                  </div>
+                )}
+                <div className="flex justify-between gap-4 border-t border-border pt-1 font-medium">
+                  <dt>Earned gross</dt>
+                  <dd className="tabular-nums">{money(line.earnedGross)}</dd>
                 </div>
-              ))}
-              {line.arrears > 0 && (
-                <div className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">Arrears</dt>
-                  <dd className="tabular-nums">{money(line.arrears)}</dd>
-                </div>
-              )}
-              <div className="flex justify-between gap-4 border-t border-border pt-1 font-medium">
-                <dt>Earned gross</dt>
-                <dd className="tabular-nums">{money(line.earnedGross)}</dd>
-              </div>
-            </dl>
-          </section>
+              </dl>
+            </section>
 
-          <section>
-            <h2 className="font-display text-sm font-semibold">Deductions</h2>
-            <dl className="mt-2 space-y-1 text-sm">
-              {/* Itemised or not is the administrator's layout choice, and it is
+            <section>
+              <h2 className="font-display text-sm font-semibold">Deductions</h2>
+              <dl className="mt-2 space-y-1 text-sm">
+                {/* Itemised or not is the administrator's layout choice, and it is
                   only a layout choice: these are the reader's own figures either
                   way. The total is never hidden — a deduction with no
                   explanation and no total is just money gone. */}
-              {/* Standing deductions are always itemised, whatever the
+                {/* Standing deductions are always itemised, whatever the
                   statutory-breakdown preference says. PF and ESI are statutory
                   and predictable; a canteen recovery is a number the person has
                   every reason to want explained, and hiding it leaves an
                   unexplained gap between gross and net. */}
-              {line.deductions.map((d) => (
-                <div key={d.code} className="flex justify-between gap-4">
-                  <dt className="text-muted-foreground">{d.code}</dt>
-                  <dd className="tabular-nums">{money(d.amount)}</dd>
-                </div>
-              ))}
-              {portal?.showStatutoryBreakdown !== false &&
-                statutory.map(([label, amount]) => (
-                  <div key={label} className="flex justify-between gap-4">
-                    <dt className="text-muted-foreground">{label}</dt>
-                    <dd className="tabular-nums">
-                      {label === "Employee state insurance" && !line.esiEligible ? (
-                        // Exempt is not zero, and the person reading this is the
-                        // one most likely to ask why the line is blank.
-                        <span className="text-muted-foreground">not applicable</span>
-                      ) : (
-                        money(amount)
-                      )}
-                    </dd>
+                {line.deductions.map((d) => (
+                  <div key={d.code} className="flex justify-between gap-4">
+                    <dt className="text-muted-foreground">{d.code}</dt>
+                    <dd className="tabular-nums">{money(d.amount)}</dd>
                   </div>
                 ))}
-              <div className="flex justify-between gap-4 border-t border-border pt-1 font-medium">
-                <dt>Total deductions</dt>
-                <dd className="tabular-nums">{money(line.totalDeduction)}</dd>
-              </div>
-            </dl>
-          </section>
-        </div>
+                {portal?.showStatutoryBreakdown !== false &&
+                  statutory.map(([label, amount]) => (
+                    <div key={label} className="flex justify-between gap-4">
+                      <dt className="text-muted-foreground">{label}</dt>
+                      <dd className="tabular-nums">
+                        {label === "Employee state insurance" && !line.esiEligible ? (
+                          // Exempt is not zero, and the person reading this is the
+                          // one most likely to ask why the line is blank.
+                          <span className="text-muted-foreground">not applicable</span>
+                        ) : (
+                          money(amount)
+                        )}
+                      </dd>
+                    </div>
+                  ))}
+                <div className="flex justify-between gap-4 border-t border-border pt-1 font-medium">
+                  <dt>Total deductions</dt>
+                  <dd className="tabular-nums">{money(line.totalDeduction)}</dd>
+                </div>
+              </dl>
+            </section>
+          </div>
+        )}
 
         <div className="mt-4 flex justify-between gap-4 border-t border-border pt-3">
           <p className="font-display font-semibold">Net pay</p>
@@ -288,7 +333,25 @@ export default function MyPayslip() {
             {money(line.netPayable)}
           </p>
         </div>
+
+        {slip?.footerNote && (
+          <p data-testid="payslip-footer" className="mt-4 text-2xs text-muted-foreground">
+            {slip.footerNote}
+          </p>
+        )}
       </div>
+
+      {(portal?.contactName || portal?.contactEmail) && (
+        <p
+          data-testid="payslip-contact"
+          data-print="hide"
+          className="text-sm text-muted-foreground"
+        >
+          Questions about your payslip: {portal.contactName}
+          {portal.contactName && portal.contactEmail ? " · " : ""}
+          {portal.contactEmail}
+        </p>
+      )}
     </div>
   );
 }

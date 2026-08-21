@@ -13,7 +13,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StatutorySchemes, type PayrollSettings } from "../contracts";
+import { PayrollSettings } from "../contracts";
 
 const getPayrollSettings = vi.fn<() => Promise<PayrollSettings>>();
 const savePayrollSettings = vi.fn();
@@ -25,24 +25,25 @@ vi.mock("../handlers", () => ({
 
 import EmployeePortal from "./EmployeePortal";
 
-const settings = (over: Partial<PayrollSettings["employeePortal"]> = {}): PayrollSettings => ({
-  // Deliberately NOT the schema defaults, for the same reason as the pay
-  // schedule test: every field carries a `.default()`, so a fixture matching
-  // them cannot tell a preserved value from a reset one.
-  paySchedule: {
-    calculationMethod: "fixed_days",
-    fixedDays: 26,
-    payDateRule: "day_of_next_month",
-    payDay: 7,
-  },
-  statutory: StatutorySchemes.parse({}),
-  employeePortal: {
-    payslipsVisible: true,
-    showStatutoryBreakdown: true,
-    showPayDate: true,
-    ...over,
-  },
-});
+const settings = (over: Partial<PayrollSettings["employeePortal"]> = {}): PayrollSettings =>
+  // Parsed through the schema so a new field cannot make this fixture stale —
+  // and the pay schedule is deliberately NOT the default, because with every
+  // field defaulted a fixture that matches them cannot tell a preserved value
+  // from a reset one.
+  PayrollSettings.parse({
+    paySchedule: {
+      calculationMethod: "fixed_days",
+      fixedDays: 26,
+      payDateRule: "day_of_next_month",
+      payDay: 7,
+    },
+    employeePortal: {
+      payslipsVisible: true,
+      showStatutoryBreakdown: true,
+      showPayDate: true,
+      ...over,
+    },
+  });
 
 beforeEach(() => {
   vi.resetAllMocks();

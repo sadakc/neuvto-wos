@@ -34,6 +34,8 @@ import {
   EmployeePayrollInput,
   StructureInput,
   payrollErrorMessage,
+  TemplateInput,
+  type SalaryTemplate,
   type ComponentCategory,
   type EpfTreatment,
   type EmployeePayrollRow,
@@ -703,4 +705,115 @@ export async function getPayDate(periodMonth: string): Promise<string> {
 export async function getDaysBasis(daysInMonth: number): Promise<number> {
   const settings = await getPayrollSettings();
   return payableDaysBasis(settings.paySchedule, daysInMonth);
+}
+
+// ═════════════════════════════════════════════════════════════ salary templates
+
+/**
+ * The salary shapes this organisation uses, with their component amounts.
+ *
+ * `gross` is derived from the EARNING components only, and derived on read —
+ * the same rule as a salary structure. A stored gross and the parts it is made
+ * of drift, and it is the stored one that lies.
+ */
+export async function listTemplates(): Promise<SalaryTemplate[]> {
+  const [templates, lines, components] = await Promise.all([
+    supabase
+      .from("salary_templates")
+      .select("id, name, description")
+      .is("deleted_at", null)
+      .order("name"),
+    supabase
+      .from("salary_template_lines")
+      .select("template_id, component_id, amount")
+      .is("deleted_at", null),
+    listComponents(),
+  ]);
+
+  if (templates.error) throw toPayrollError(templates.error.message);
+  if (lines.error) throw toPayrollError(lines.error.message);
+
+  const earning = new Set(components.filter((c) => c.category === "earning").map((c) => c.id));
+  const byTemplate = new Map<string, { componentId: string; amount: number }[]>();
+  for (const l of lines.data ?? []) {
+    const list = byTemplate.get(l.template_id) ?? [];
+    list.push({ componentId: l.component_id, amount: Number(l.amount) });
+    byTemplate.set(l.template_id, list);
+  }
+
+  return (templates.data ?? []).map((t) => {
+    const amounts = byTemplate.get(t.id) ?? [];
+    return {
+      id: t.id,
+      name: t.name,
+      description: t.description ?? "",
+      amounts,
+      gross: amounts
+        .filter((a) => earning.has(a.componentId))
+        .reduce((sum, a) => sum + a.amount, 0),
+    };
+  });
+}
+
+/**
+ * Creates or replaces a template and its lines.
+ *
+ * Lines are replaced rather than merged, for the same reason a recomputed pay
+ * run is: a component dropped from the template has to STOP being in it, and a
+ * merge leaves the old amount behind where nothing on screen shows it.
+ */
+export async function saveTemplate(input: TemplateInput): Promise<string> {
+  const parsed = TemplateInput.parse(input);
+  const orgId = await currentOrgId();
+
+  let templateId = parsed.id;
+  if (templateId) {
+    const { error } = await supabase
+      .from("salary_templates")
+      .update({ name: parsed.name, description: parsed.description })
+      .eq("id", templateId);
+    if (error) throw toPayrollError(mapTemplateError(error.message));
+  } else {
+    const { data, error } = await supabase
+      .from("salary_templates")
+      .insert({ organization_id: orgId, name: parsed.name, description: parsed.description })
+      .select("id")
+      .single();
+    if (error) throw toPayrollError(mapTemplateError(error.message));
+    templateId = data.id;
+  }
+
+  // Soft-delete then re-insert, so an application that ran against the previous
+  // shape last month can still be explained from the audit log.
+  const { error: cleared } = await supabase
+    .from("salary_template_lines")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("template_id", templateId)
+    .is("deleted_at", null);
+  if (cleared) throw toPayrollError(cleared.message);
+
+  const { error } = await supabase.from("salary_template_lines").insert(
+    parsed.amounts.map((a) => ({
+      organization_id: orgId,
+      template_id: templateId as string,
+      component_id: a.componentId,
+      amount: a.amount,
+    })),
+  );
+  if (error) throw toPayrollError(error.message);
+
+  return templateId as string;
+}
+
+export async function removeTemplate(id: string): Promise<void> {
+  const { error } = await supabase
+    .from("salary_templates")
+    .update({ deleted_at: new Date().toISOString() })
+    .eq("id", id);
+  if (error) throw toPayrollError(error.message);
+}
+
+/** A unique-violation on the name, in words rather than as a constraint name. */
+function mapTemplateError(message: string): string {
+  return /uq_salary_template_name|duplicate key/i.test(message) ? "TEMPLATE_NAME_TAKEN" : message;
 }

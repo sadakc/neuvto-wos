@@ -24,8 +24,19 @@ import { isAppError } from "@/platform/errors";
 import { getPayrollSettings, savePayrollSettings } from "../handlers";
 import { PayrollSettings } from "../contracts";
 
+/**
+ * Only the switches. The portal block also carries a banner and a contact,
+ * which are text and not toggles — typing this as `keyof` would let one of them
+ * be listed below and rendered as a checkbox holding a sentence.
+ */
+type ToggleKey = {
+  [K in keyof PayrollSettings["employeePortal"]]: PayrollSettings["employeePortal"][K] extends boolean
+    ? K
+    : never;
+}[keyof PayrollSettings["employeePortal"]];
+
 interface Toggle {
-  key: keyof PayrollSettings["employeePortal"];
+  key: ToggleKey;
   label: string;
   description: string;
   /** True when switching it off stops the data, not only the drawing of it. */
@@ -57,7 +68,7 @@ const TOGGLES: Toggle[] = [
 ];
 
 export default function EmployeePortal() {
-  const [settings, setSettings] = useState<PayrollSettings | null>(null);
+  const [config, setConfig] = useState<PayrollSettings | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
   const [saved, setSaved] = useState(false);
@@ -68,12 +79,12 @@ export default function EmployeePortal() {
     getPayrollSettings()
       .then((s) => {
         if (cancelled) return;
-        setSettings(s);
+        setConfig(s);
         setState("ready");
       })
       .catch((e) => {
         if (cancelled) return;
-        setError(isAppError(e) ? e.message : "We couldn't load these settings.");
+        setError(isAppError(e) ? e.message : "We couldn't load these config.");
         setState("error");
       });
     return () => {
@@ -82,12 +93,12 @@ export default function EmployeePortal() {
   }, []);
 
   async function toggle(key: Toggle["key"], value: boolean) {
-    if (!settings) return;
+    if (!config) return;
     const next: PayrollSettings = {
-      ...settings,
-      employeePortal: { ...settings.employeePortal, [key]: value },
+      ...config,
+      employeePortal: { ...config.employeePortal, [key]: value },
     };
-    setSettings(next);
+    setConfig(next);
     setSaved(false);
     setError("");
     setSaving(true);
@@ -95,10 +106,35 @@ export default function EmployeePortal() {
       // Saved on change rather than behind a button. Each of these is one
       // decision on its own, and a switch that looks flipped but is not saved is
       // an administrator believing payslips are hidden when they are not.
-      setSettings(await savePayrollSettings(next));
+      setConfig(await savePayrollSettings(next));
       setSaved(true);
     } catch (e) {
-      setSettings(settings); // put it back; the server did not take it
+      setConfig(config); // put it back; the server did not take it
+      setError(isAppError(e) ? e.message : "That didn't save. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  /** Text fields are edited locally and saved on a button. See the note above. */
+  function draft(patch: Partial<PayrollSettings["employeePortal"]>) {
+    setSaved(false);
+    setConfig((c) => (c ? { ...c, employeePortal: { ...c.employeePortal, ...patch } } : c));
+  }
+
+  async function saveDraft() {
+    if (!config) return;
+    setError("");
+    const parsed = PayrollSettings.safeParse(config);
+    if (!parsed.success) {
+      setError(parsed.error.issues[0]?.message ?? "Check the form.");
+      return;
+    }
+    setSaving(true);
+    try {
+      setConfig(await savePayrollSettings(parsed.data));
+      setSaved(true);
+    } catch (e) {
       setError(isAppError(e) ? e.message : "That didn't save. Please try again.");
     } finally {
       setSaving(false);
@@ -107,7 +143,7 @@ export default function EmployeePortal() {
 
   if (state === "loading") return <div className="h-48 animate-pulse rounded-lg bg-muted" />;
 
-  if (state === "error" || !settings) {
+  if (state === "error" || !config) {
     return (
       <p role="alert" className="rounded-lg border border-border p-6 text-sm text-destructive">
         {error}
@@ -119,7 +155,7 @@ export default function EmployeePortal() {
     <div className="space-y-4">
       <ul className="divide-y divide-border rounded-lg border border-border">
         {TOGGLES.map((t) => {
-          const on = settings.employeePortal[t.key];
+          const on = config.employeePortal[t.key];
           return (
             <li key={t.key} className="flex items-start justify-between gap-4 p-4">
               <span className="min-w-0">
@@ -155,6 +191,73 @@ export default function EmployeePortal() {
           );
         })}
       </ul>
+
+      {/* ─────────────────────────────────────── the announcement and who to ask
+          Saved behind a button rather than on change, unlike the switches
+          above: a half-typed sentence saved on every keystroke would put a
+          half-typed sentence in front of everybody in the workspace. */}
+      <div className="space-y-3 rounded-lg border border-border p-4">
+        <p className="text-sm font-medium">What the payslip screen says</p>
+
+        <label className="block text-sm">
+          <span className="text-muted-foreground">Announcement</span>
+          <textarea
+            rows={2}
+            value={config.employeePortal.bannerMessage}
+            onChange={(e) => draft({ bannerMessage: e.target.value })}
+            placeholder="Salary for March will be credited a day late."
+            aria-label="Announcement"
+            className="mt-1 w-full rounded-md border border-input bg-background p-3 text-sm"
+          />
+        </label>
+
+        <label className="block text-sm">
+          <span className="text-muted-foreground">Shown until</span>
+          <input
+            type="date"
+            value={config.employeePortal.bannerUntil}
+            onChange={(e) => draft({ bannerUntil: e.target.value })}
+            aria-label="Shown until"
+            className="mt-1 h-12 rounded-md border border-input bg-background px-3 text-sm"
+          />
+          <span className="mt-1 block text-xs text-muted-foreground">
+            Leave this empty and the notice stays until somebody takes it down — which is how
+            &ldquo;salary is late this month&rdquo; ends up on screen in March.
+          </span>
+        </label>
+
+        <div className="grid gap-3 sm:grid-cols-2">
+          <label className="text-sm">
+            <span className="text-muted-foreground">Who to ask about a payslip</span>
+            <input
+              value={config.employeePortal.contactName}
+              onChange={(e) => draft({ contactName: e.target.value })}
+              aria-label="Contact name"
+              className="mt-1 h-12 w-full rounded-md border border-input bg-background px-3"
+            />
+          </label>
+          <label className="text-sm">
+            <span className="text-muted-foreground">Their email</span>
+            <input
+              type="email"
+              value={config.employeePortal.contactEmail}
+              onChange={(e) => draft({ contactEmail: e.target.value })}
+              aria-label="Contact email"
+              className="mt-1 h-12 w-full rounded-md border border-input bg-background px-3"
+            />
+          </label>
+        </div>
+
+        <button
+          type="button"
+          onClick={saveDraft}
+          disabled={saving}
+          data-testid="save-portal-message"
+          className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-50"
+        >
+          Save announcement
+        </button>
+      </div>
 
       {error && (
         <p role="alert" className="text-sm text-destructive">

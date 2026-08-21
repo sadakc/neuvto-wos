@@ -154,6 +154,40 @@ export const EmployeePayrollInput = z.object({
 });
 export type EmployeePayrollInput = z.infer<typeof EmployeePayrollInput>;
 
+/**
+ * A named salary shape, applied when somebody is being set up.
+ *
+ * Copied on application and then forgotten — see the migration. A template that
+ * stayed attached would restate the pay of everybody on it the moment somebody
+ * edited it, from a screen that looks like configuration.
+ */
+export const TemplateInput = z.object({
+  id: z.string().uuid().optional(),
+  name: z.string().trim().min(1, "Give this template a name").max(60, "That name is too long"),
+  description: z.string().trim().max(200, "That description is too long").default(""),
+  amounts: z
+    .array(
+      z.object({
+        componentId: z.string().uuid(),
+        amount: z
+          .number({ invalid_type_error: "Enter an amount" })
+          .min(0, "An amount cannot be negative")
+          .max(99_999_999, "That amount is too large"),
+      }),
+    )
+    .min(1, "A template needs at least one component"),
+});
+export type TemplateInput = z.infer<typeof TemplateInput>;
+
+export interface SalaryTemplate {
+  id: string;
+  name: string;
+  description: string;
+  amounts: { componentId: string; amount: number }[];
+  /** Sum of the earning amounts. Derived, like every other gross in this module. */
+  gross: number;
+}
+
 export const StructureInput = z.object({
   employeeId: z.string().uuid(),
   effectiveFrom: z
@@ -211,11 +245,20 @@ export type DaysInput = z.infer<typeof DaysInput>;
  */
 export const PayScheduleInput = z.object({
   calculationMethod: z.enum(["actual_days", "fixed_days"]).default("actual_days"),
+  /**
+   * The denominator, when proration does not follow the calendar.
+   *
+   * 1 to 31, NOT 28 to 31. It was the latter, on the reasoning that a month has
+   * at least 28 days — but this is not a count of days in a month, it is the
+   * figure a monthly salary is divided by, and dividing by 26 working days is
+   * standard practice on a six-day week. The narrower rule refused a real
+   * arrangement.
+   */
   fixedDays: z
     .number()
     .int()
-    .min(28, "A month is at least 28 days")
-    .max(31, "A month is at most 31 days")
+    .min(1, "A month must be divided by at least one day")
+    .max(31, "A month has at most 31 days")
     .default(30),
   payDateRule: z.enum(["last_working_day", "day_of_next_month"]).default("last_working_day"),
   payDay: z
@@ -248,6 +291,26 @@ export const EmployeePortalInput = z.object({
   payslipsVisible: z.boolean().default(true),
   showStatutoryBreakdown: z.boolean().default(true),
   showPayDate: z.boolean().default(true),
+  /** An announcement on the payslip screen. Empty means none. */
+  bannerMessage: z.string().trim().max(280, "Keep it under 280 characters").default(""),
+  /**
+   * The day the banner stops showing, `YYYY-MM-DD`. Empty means it stays until
+   * somebody takes it down — which is how a "salary delayed this month" notice
+   * ends up on screen in March.
+   */
+  bannerUntil: z
+    .string()
+    .regex(/^\d{4}-\d{2}-\d{2}$/, "Choose a date")
+    .or(z.literal(""))
+    .default(""),
+  /** Who to ask about a payslip. A name and an address, shown together. */
+  contactName: z.string().trim().max(80).default(""),
+  contactEmail: z
+    .string()
+    .trim()
+    .email("That doesn't look like an email address")
+    .or(z.literal(""))
+    .default(""),
 });
 export type EmployeePortalInput = z.infer<typeof EmployeePortalInput>;
 
@@ -383,6 +446,53 @@ export const StatutorySchemes = z.object({
 export type StatutorySchemes = z.infer<typeof StatutorySchemes>;
 
 /**
+ * The organisation's own tax identifiers.
+ *
+ * None of these changes a payslip by a rupee, and all of them decide whether a
+ * TDS return can be filed at all — the same argument as an employee's UAN, one
+ * level up. Every field optional and every field shaped, because a malformed
+ * PAN is rejected by the portal hours later without saying which one.
+ */
+const optionalShape = (re: RegExp, message: string) =>
+  z.string().trim().toUpperCase().regex(re, message).or(z.literal("")).default("");
+
+export const TaxDetails = z.object({
+  pan: optionalShape(/^[A-Z]{5}[0-9]{4}[A-Z]$/, "A PAN looks like AAAAA0000A"),
+  tan: optionalShape(/^[A-Z]{4}[0-9]{5}[A-Z]$/, "A TAN looks like AAAA00000A"),
+  /** Four segments: area code / AO type / range code / AO number. */
+  tdsCircle: z.string().trim().max(40, "That is too long").default(""),
+  paymentFrequency: z.enum(["monthly", "quarterly"]).default("monthly"),
+  deductorType: z.enum(["employee", "non_employee"]).default("employee"),
+  deductorName: z.string().trim().max(80, "That name is too long").default(""),
+  deductorFatherName: z.string().trim().max(80, "That name is too long").default(""),
+});
+export type TaxDetails = z.infer<typeof TaxDetails>;
+
+export const PAYSLIP_LAYOUTS = ["standard", "detailed", "compact"] as const;
+export type PayslipLayout = (typeof PAYSLIP_LAYOUTS)[number];
+
+/**
+ * How a payslip is laid out, and what a workspace announces on it.
+ *
+ * Layouts rather than "PDF templates": the payslip goes to paper through the
+ * browser's own print dialog, so a variant is a print layout and not a document
+ * format. Three, doing genuinely different things — not six that differ by
+ * margin.
+ */
+export const PayslipTemplate = z.object({
+  layout: z.enum(PAYSLIP_LAYOUTS).default("standard"),
+  /** Shown under the company name. A registered address, usually. */
+  letterhead: z.string().trim().max(200, "That is too long").default(""),
+  showYearToDate: z.boolean().default(false),
+  footerNote: z
+    .string()
+    .trim()
+    .max(200, "That is too long")
+    .default("This is a system-generated document."),
+});
+export type PayslipTemplate = z.infer<typeof PayslipTemplate>;
+
+/**
  * Everything this module lets a customer configure, stored as one row in
  * `module_settings` (D7).
  *
@@ -393,6 +503,8 @@ export type StatutorySchemes = z.infer<typeof StatutorySchemes>;
 export const PayrollSettings = z.object({
   paySchedule: PayScheduleInput.default({}),
   statutory: StatutorySchemes.default({}),
+  taxDetails: TaxDetails.default({}),
+  payslip: PayslipTemplate.default({}),
   employeePortal: EmployeePortalInput.default({}),
 });
 export type PayrollSettings = z.infer<typeof PayrollSettings>;
@@ -414,6 +526,7 @@ const MESSAGES: Record<string, string> = {
   CROSS_TENANT_EMPLOYEE: "That employee is not in this workspace.",
   INVALID_LINES: "The computed pay run could not be read. Try computing it again.",
   NO_APPROVER: "Nobody is set up to approve a pay run. Configure an approval chain first.",
+  TEMPLATE_NAME_TAKEN: "A salary template with that name already exists.",
   COMPONENT_IN_USE:
     "Somebody's salary already uses this component, so only its name and default amount can change. Add a new component instead.",
 };

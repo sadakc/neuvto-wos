@@ -18,15 +18,17 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { SalaryComponent, StructureRow } from "../contracts";
+import type { SalaryComponent, SalaryTemplate, StructureRow } from "../contracts";
 
 const listStructures = vi.fn<() => Promise<StructureRow[]>>();
 const listComponents = vi.fn<() => Promise<SalaryComponent[]>>();
 const saveStructure = vi.fn();
+const listTemplates = vi.fn<() => Promise<SalaryTemplate[]>>();
 
 vi.mock("../handlers", () => ({
   listStructures: () => listStructures(),
   listComponents: () => listComponents(),
+  listTemplates: () => listTemplates(),
   saveStructure: (input: unknown) => saveStructure(input),
 }));
 
@@ -76,6 +78,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   listComponents.mockResolvedValue([component()]);
   listStructures.mockResolvedValue([person()]);
+  listTemplates.mockResolvedValue([]);
 });
 
 describe("Salary structures — nobody is unpayable in silence", () => {
@@ -160,5 +163,39 @@ describe("Salary structures — the order of setup", () => {
     expect(
       screen.queryByRole("button", { name: /Save salary structure/i }),
     ).not.toBeInTheDocument();
+  });
+});
+
+describe("Salary structures — starting from a template", () => {
+  const T = "55555555-5555-4555-8555-555555555555";
+
+  it("offers nothing when there are no templates", async () => {
+    render(<SalaryStructures />);
+    await screen.findByText("Priya Employee");
+    expect(screen.queryByTestId("apply-template")).not.toBeInTheDocument();
+  });
+
+  it("fills the amounts from the template, leaving them editable", async () => {
+    // A copy, not a link. The fixture's own amount is 10,000; the template says
+    // 25,000, and what ends up on the person is the template's — until they
+    // change it, which they can.
+    listTemplates.mockResolvedValue([
+      {
+        id: T,
+        name: "Manager",
+        description: "",
+        amounts: [{ componentId: C_BASIC, amount: 25000 }],
+        gross: 25000,
+      },
+    ]);
+
+    const user = userEvent.setup();
+    render(<SalaryStructures />);
+
+    await user.click(await screen.findByRole("button", { name: /Edit/i }));
+    await user.selectOptions(screen.getByTestId("apply-template"), T);
+
+    expect(screen.getByLabelText(/Basic and DA for Priya Employee/i)).toHaveValue(25000);
+    expect(screen.getByTestId("draft-gross")).toHaveTextContent("₹25,000");
   });
 });

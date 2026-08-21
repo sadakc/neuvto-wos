@@ -24,8 +24,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { isAppError } from "@/platform/errors";
-import { listComponents, listStructures, saveStructure } from "../handlers";
-import { StructureInput, type SalaryComponent, type StructureRow } from "../contracts";
+import { listComponents, listStructures, listTemplates, saveStructure } from "../handlers";
+import {
+  StructureInput,
+  type SalaryComponent,
+  type SalaryTemplate,
+  type StructureRow,
+} from "../contracts";
 
 const money = (n: number) => `₹${Math.round(n).toLocaleString("en-IN")}`;
 
@@ -38,6 +43,7 @@ function firstOfThisMonth(): string {
 export default function SalaryStructures() {
   const [rows, setRows] = useState<StructureRow[]>([]);
   const [components, setComponents] = useState<SalaryComponent[]>([]);
+  const [templates, setTemplates] = useState<SalaryTemplate[]>([]);
   const [openId, setOpenId] = useState<string | null>(null);
   const [amounts, setAmounts] = useState<Record<string, string>>({});
   const [effectiveFrom, setEffectiveFrom] = useState(firstOfThisMonth());
@@ -46,7 +52,15 @@ export default function SalaryStructures() {
   const [saving, setSaving] = useState(false);
 
   async function load() {
-    const [people, comps] = await Promise.all([listStructures(), listComponents()]);
+    const [people, comps, temps] = await Promise.all([
+      listStructures(),
+      listComponents(),
+      // Allowed to fail quietly. Templates are a convenience for data entry;
+      // a structure can always be typed out, and a hiccup fetching them must
+      // not be why somebody cannot be paid.
+      listTemplates().catch(() => [] as SalaryTemplate[]),
+    ]);
+    setTemplates(temps);
     setRows(people);
     setComponents(comps.filter((c) => c.status === "active"));
     setState("ready");
@@ -235,6 +249,42 @@ export default function SalaryStructures() {
 
             {openId === row.employeeId && (
               <form onSubmit={save} className="mt-3 space-y-3">
+                {/* A copy, not a link. Applying fills the boxes below and then
+                    forgets the template — see SalaryTemplates for why. */}
+                {templates.length > 0 && (
+                  <label className="flex flex-wrap items-center gap-2 text-sm">
+                    <span className="text-muted-foreground">Start from</span>
+                    <select
+                      defaultValue=""
+                      aria-label={`Start from a template for ${row.employeeName ?? "this person"}`}
+                      data-testid="apply-template"
+                      onChange={(e) => {
+                        const t = templates.find((x) => x.id === e.target.value);
+                        if (!t) return;
+                        const byComponent = new Map(
+                          t.amounts.map((a) => [a.componentId, a.amount]),
+                        );
+                        setAmounts(
+                          Object.fromEntries(
+                            structural.map((c) => [c.id, String(byComponent.get(c.id) ?? 0)]),
+                          ),
+                        );
+                      }}
+                      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+                    >
+                      <option value="">a template…</option>
+                      {templates.map((t) => (
+                        <option key={t.id} value={t.id}>
+                          {t.name}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="text-xs text-muted-foreground">
+                      Fills the amounts below. You can change any of them.
+                    </span>
+                  </label>
+                )}
+
                 <div className="grid gap-3 sm:grid-cols-2">
                   {earnings.map((c) => (
                     <label key={c.id} className="text-sm">

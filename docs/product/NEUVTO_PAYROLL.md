@@ -1,6 +1,6 @@
 # Payroll
 
-**Version:** 1.4 · **Status:** Active · **Updated:** 21 Aug 2026
+**Version:** 1.5 · **Status:** Active · **Updated:** 21 Aug 2026
 
 The second module. It replaces an eleven-sheet Excel workbook that runs a real
 payroll every month, and its acceptance criterion is that workbook's own July
@@ -345,6 +345,70 @@ EDLI and administration charges are employer-side, opt-in, computed on PF wages
 and **never deducted from anybody**. They are frozen on the line like every
 other figure, because a return filed in November for July must show July's
 rates, and rates change by notification.
+
+---
+
+## Salary templates, and why applying one is a copy
+
+Setting somebody up means typing an amount against every component, and most
+organisations pay most people one of a small number of shapes. A template is a
+named set of amounts, applied when a structure is created.
+
+**Applying copies and then forgets.** There is no link back, and that is the
+design rather than a shortcut:
+
+- The workbook this replaces appears to derive Basic as 50% of gross and HRA as
+  40% of Basic. Those rules hold for 12 and 20 of its 44 employees. Everyone
+  else has hand-keyed amounts — so a template that stayed attached would make
+  three quarters of that workforce unrepresentable.
+- A live link means editing a template restates the pay of everybody on it,
+  retroactively, from a screen that looks like configuration. Freeze-after-
+  association again, one table over, and this time with no trigger to catch it.
+
+**Administrators only, for reading as well as writing.** A template is not one
+person's salary, but "the Manager template is ₹85,000" tells an employee what
+their manager earns to within a rounding.
+
+---
+
+## Payslip layouts, not PDF templates
+
+The spec offers six variants of one document in a thumbnail gallery. This offers
+three **layouts** — standard, detailed, compact — and the word is the mechanism:
+a payslip reaches paper through the browser's own print dialog, so a variant is
+a print layout rather than a file format. Three that differ in what they _say_
+beats six that differ by margin; a gallery of near-identical thumbnails is a
+decision nobody can make on the evidence in front of them.
+
+Compact drops the breakdown. It never drops earned gross or total deductions —
+whatever the layout, an unexplained distance between gross and net is the one
+thing an employee will ask about.
+
+The letterhead and footer note print with the slip. The announcement and the
+"who to ask" contact do not: they are screen furniture, and a printed payslip
+carrying last month's notice is worse than one carrying none.
+
+**An announcement takes itself down.** A notice with no end date is how "salary
+is late this month" is still on screen in March, which teaches everybody to stop
+reading the banner.
+
+---
+
+## What is recorded and not computed, and why
+
+| Thing                      | Status                                                                                                                                                         |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Tax details (PAN, TAN, AO) | Recorded. TDS is entered per person on a run, as the workbook does                                                                                             |
+| Statutory bonus            | Recorded. Bonus runs are out of scope for this MVP                                                                                                             |
+| Benefits, reimbursements   | Configured. Both need a claims flow to mean anything                                                                                                           |
+| Income tax declarations    | **Not built.** A declaration form feeding no computation would be a form that lies                                                                             |
+| Reimbursement claims       | **Not built.** Needs submit → approve → pay, which is module-sized                                                                                             |
+| Email and letter templates | **Not built.** The platform's Notification Engine owns email; payroll never sends one, and a second template system would be two places to change one sentence |
+| Reporting tags, web tabs   | **Not built.** No consumer                                                                                                                                     |
+
+Each of the first three says so on its own screen. That is the rule this module
+keeps returning to: a gap that announces itself is a gap, and a silent one is a
+bug report.
 
 ---
 

@@ -104,6 +104,8 @@ describe("payroll's declared surface", () => {
       "salary_components",
       "salary_structure_lines",
       "salary_structures",
+      "salary_template_lines",
+      "salary_templates",
     ]);
   });
 

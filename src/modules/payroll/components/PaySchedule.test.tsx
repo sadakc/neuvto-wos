@@ -16,7 +16,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { StatutorySchemes, type PayrollSettings } from "../contracts";
+import { PayrollSettings } from "../contracts";
 
 const getPayrollSettings = vi.fn<() => Promise<PayrollSettings>>();
 const savePayrollSettings = vi.fn();
@@ -38,21 +38,21 @@ vi.mock("@tanstack/react-router", () => ({
 
 import PaySchedule from "./PaySchedule";
 
-const settings = (over: Partial<PayrollSettings["paySchedule"]> = {}): PayrollSettings => ({
-  paySchedule: {
-    calculationMethod: "actual_days",
-    fixedDays: 30,
-    payDateRule: "last_working_day",
-    payDay: 1,
-    ...over,
-  },
-  // Deliberately NOT the schema defaults. With every field carrying a
-  // `.default()`, saving a partial object does not fail — Zod refills it — so a
-  // fixture that matches the defaults cannot tell "preserved" from "reset". The
-  // first version of this file did exactly that and passed a sabotage.
-  statutory: StatutorySchemes.parse({}),
-  employeePortal: { payslipsVisible: false, showStatutoryBreakdown: false, showPayDate: true },
-});
+const settings = (over: Partial<PayrollSettings["paySchedule"]> = {}): PayrollSettings =>
+  // The portal block is deliberately NOT at its defaults. With every field
+  // defaulted, Zod refills whatever a partial save drops — so a fixture that
+  // matches the defaults cannot tell "preserved" from "reset", and the first
+  // version of this file passed a sabotage because of it.
+  PayrollSettings.parse({
+    paySchedule: {
+      calculationMethod: "actual_days",
+      fixedDays: 30,
+      payDateRule: "last_working_day",
+      payDay: 1,
+      ...over,
+    },
+    employeePortal: { payslipsVisible: false, showStatutoryBreakdown: false, showPayDate: true },
+  });
 
 beforeEach(() => {
   vi.resetAllMocks();

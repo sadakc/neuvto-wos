@@ -31,7 +31,7 @@ do $$
 declare
   org_a uuid; org_b uuid;
   admin_a uuid; emp_a uuid; mgr_a uuid; admin_b uuid; emp_b uuid;
-  comp_basic uuid; comp_hra uuid; struct_a uuid;
+  comp_basic uuid; comp_hra uuid; struct_a uuid; template_a uuid;
   run_a uuid; n bigint; failed int := 0;
 
   procedure_note text;
@@ -377,6 +377,52 @@ begin
   else raise notice 'FAIL: a manager read % structure line(s)', n; failed := failed + 1; end if;
   perform pg_temp.as_postgres();
 
+  -- ═══════════════════ nor the SHAPE of a salary, which is nearly as revealing
+  --
+  -- 20260824130000. A salary template is not one person's pay, but "the Manager
+  -- template is ₹85,000" tells an employee what their manager earns to within a
+  -- rounding — so templates are administrators-only for READING as well as
+  -- writing, which is the half that is easy to forget when a table is filed
+  -- under configuration.
+
+  insert into public.salary_templates (organization_id, name)
+  values (org_a, 'Manager') returning id into template_a;
+  insert into public.salary_template_lines (organization_id, template_id, component_id, amount)
+  values (org_a, template_a, comp_basic, 85000);
+
+  perform pg_temp.as_user(mgr_a);
+  select count(*) into n from public.salary_templates;
+  if n = 0 then raise notice 'ok: a manager cannot read the salary templates';
+  else raise notice 'FAIL: a manager read % salary template(s)', n; failed := failed + 1; end if;
+
+  select count(*) into n from public.salary_template_lines;
+  if n = 0 then raise notice 'ok: nor the amounts in them';
+  else raise notice 'FAIL: a manager read % template line(s)', n; failed := failed + 1; end if;
+
+  perform pg_temp.as_user(emp_a);
+  select count(*) into n from public.salary_templates;
+  if n = 0 then raise notice 'ok: nor can an employee';
+  else raise notice 'FAIL: an employee read % salary template(s)', n; failed := failed + 1; end if;
+
+  perform pg_temp.as_user(admin_a);
+  select count(*) into n from public.salary_templates;
+  if n = 1 then raise notice 'ok: and an administrator can';
+  else raise notice 'FAIL: an administrator read % salary template(s)', n; failed := failed + 1; end if;
+
+  perform pg_temp.as_user(admin_b);
+  select count(*) into n from public.salary_templates;
+  if n = 0 then raise notice 'ok: another organisation''s admin reads none of them';
+  else raise notice 'FAIL: a foreign admin read % salary template(s)', n; failed := failed + 1; end if;
+  perform pg_temp.as_postgres();
+
+  begin
+    insert into public.salary_template_lines (organization_id, template_id, component_id, amount)
+    values (org_a, template_a, comp_hra, -1);
+    raise notice 'FAIL: a negative template amount was accepted'; failed := failed + 1;
+  exception when check_violation then
+    raise notice 'ok: a negative template amount is refused';
+  end;
+
   -- ═════════════ a component stops meaning something else once somebody is on it
   --
   -- 20260824110000. The source spec repeats this on every category: after a
@@ -526,6 +572,12 @@ begin
   delete from public.salary_structure_lines where structure_id = struct_a;
   delete from public.salary_structures where id = struct_a;
   delete from public.payroll_employee_details where employee_id = emp_a;
+  -- Templates before components. `salary_template_lines.component_id` is ON
+  -- DELETE RESTRICT, which is the point — a component a template still names
+  -- cannot be removed out from under it — and it means the teardown has to
+  -- unwind in the same order the guard enforces.
+  delete from public.salary_template_lines where template_id = template_a;
+  delete from public.salary_templates where id = template_a;
   delete from public.salary_components where id in (comp_basic, comp_hra);
   delete from public.organization_modules where organization_id = org_a and module_key = 'payroll';
 

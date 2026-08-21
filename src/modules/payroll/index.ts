@@ -97,6 +97,30 @@ export const payroll: ModuleDefinition = {
       order: 30,
     },
     {
+      id: "salary-templates",
+      title: "Salary templates",
+      description:
+        "Named salary shapes, so setting somebody up is not typing eight amounts. Applying one copies its figures onto the person and then forgets it — editing a template afterwards changes nobody's pay.",
+      component: lazy(() => import("./components/SalaryTemplates")),
+      order: 25,
+    },
+    {
+      id: "tax-details",
+      title: "Tax details",
+      description:
+        "PAN, TAN and who signs the return. None of it changes a payslip; all of it decides whether a TDS return can be filed. Income tax itself is entered per person on a run, not computed here.",
+      component: lazy(() => import("./components/TaxDetails")),
+      order: 35,
+    },
+    {
+      id: "payslip-template",
+      title: "Payslip layout",
+      description:
+        "What a payslip looks like on screen and on paper, and what it says at the top and the bottom. Downloading one goes through the browser's own print dialog, so these are layouts rather than file templates.",
+      component: lazy(() => import("./components/PayslipTemplate")),
+      order: 38,
+    },
+    {
       id: "employee-portal",
       title: "What employees see",
       description:
@@ -181,6 +205,8 @@ export const payroll: ModuleDefinition = {
 
   ownedTables: [
     "salary_components",
+    "salary_templates",
+    "salary_template_lines",
     "payroll_employee_details",
     "salary_structures",
     "salary_structure_lines",
@@ -200,6 +226,9 @@ export {
   listComponents,
   listStructures,
   listEmployeePayroll,
+  listTemplates,
+  saveTemplate,
+  removeTemplate,
   getPayrollSettings,
   savePayrollSettings,
   getPayDate,
@@ -219,6 +248,8 @@ export {
   StructureInput,
   PayrollSettings,
   PayScheduleInput,
+  TemplateInput,
+  StatutorySchemes,
   EmployeePortalInput,
   PAY_RUN_STATUSES,
   payrollErrorMessage,
@@ -227,5 +258,6 @@ export {
   type PayRunSummary,
   type PayslipLine,
   type SalaryComponent,
+  type SalaryTemplate,
   type StructureRow,
 } from "./contracts";

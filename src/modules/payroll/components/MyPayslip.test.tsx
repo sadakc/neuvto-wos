@@ -10,8 +10,8 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import { StatutorySchemes } from "../contracts";
-import type { PayRunSummary, PayrollSettings, PayslipLine } from "../contracts";
+import { PayrollSettings } from "../contracts";
+import type { PayRunSummary, PayslipLine } from "../contracts";
 
 const listRuns = vi.fn<() => Promise<PayRunSummary[]>>();
 const getRunLines = vi.fn<() => Promise<PayslipLine[]>>();
@@ -25,21 +25,19 @@ vi.mock("../handlers", () => ({
   getPayDate: () => getPayDate(),
 }));
 
-const portal = (over: Partial<PayrollSettings["employeePortal"]> = {}): PayrollSettings => ({
-  paySchedule: {
-    calculationMethod: "actual_days",
-    fixedDays: 30,
-    payDateRule: "last_working_day",
-    payDay: 1,
-  },
-  statutory: StatutorySchemes.parse({}),
-  employeePortal: {
-    payslipsVisible: true,
-    showStatutoryBreakdown: true,
-    showPayDate: true,
-    ...over,
-  },
-});
+const portal = (
+  over: Partial<PayrollSettings["employeePortal"]> = {},
+  slip: Partial<PayrollSettings["payslip"]> = {},
+): PayrollSettings =>
+  PayrollSettings.parse({
+    payslip: slip,
+    employeePortal: {
+      payslipsVisible: true,
+      showStatutoryBreakdown: true,
+      showPayDate: true,
+      ...over,
+    },
+  });
 
 import MyPayslip from "./MyPayslip";
 
@@ -223,5 +221,68 @@ describe("Payslip — a standing deduction is always explained", () => {
     expect(screen.getByText("canteen")).toBeInTheDocument();
     expect(screen.getByText("₹450")).toBeInTheDocument();
     expect(screen.queryByText("Provident fund")).not.toBeInTheDocument();
+  });
+});
+
+describe("Payslip — the layout the workspace chose", () => {
+  it("drops the breakdown on the compact layout but never the two totals", async () => {
+    getPayrollSettings.mockResolvedValue(portal({}, { layout: "compact" }));
+    render(<MyPayslip />);
+
+    const compact = await screen.findByTestId("payslip-compact");
+    expect(compact).toHaveTextContent("Earned gross");
+    expect(compact).toHaveTextContent("Total deductions");
+    expect(screen.queryByText("Provident fund")).not.toBeInTheDocument();
+  });
+
+  it("keeps the breakdown on the standard layout", async () => {
+    render(<MyPayslip />);
+    await screen.findByText("Net pay");
+    expect(screen.queryByTestId("payslip-compact")).not.toBeInTheDocument();
+    expect(screen.getByText("Provident fund")).toBeInTheDocument();
+  });
+
+  it("prints the letterhead and the footer when they are set", async () => {
+    getPayrollSettings.mockResolvedValue(
+      portal({}, { letterhead: "12 MG Road, Madikeri", footerNote: "System generated." }),
+    );
+    render(<MyPayslip />);
+    expect(await screen.findByTestId("payslip-letterhead")).toHaveTextContent("12 MG Road");
+    expect(screen.getByTestId("payslip-footer")).toHaveTextContent("System generated.");
+  });
+});
+
+describe("Payslip — an announcement that takes itself down", () => {
+  it("shows a notice that has not expired", async () => {
+    getPayrollSettings.mockResolvedValue(
+      portal({ bannerMessage: "Salary is a day late this month.", bannerUntil: "2099-01-01" }),
+    );
+    render(<MyPayslip />);
+    expect(await screen.findByTestId("portal-banner")).toHaveTextContent(/a day late/i);
+  });
+
+  it("hides one whose date has passed, rather than waiting to be remembered", async () => {
+    // The failure this prevents: "salary is late this month" still on screen in
+    // March, which teaches everybody to stop reading the banner.
+    getPayrollSettings.mockResolvedValue(
+      portal({ bannerMessage: "Salary is a day late this month.", bannerUntil: "2020-01-01" }),
+    );
+    render(<MyPayslip />);
+    await screen.findByText("Net pay");
+    expect(screen.queryByTestId("portal-banner")).not.toBeInTheDocument();
+  });
+
+  it("keeps a notice with no end date", async () => {
+    getPayrollSettings.mockResolvedValue(portal({ bannerMessage: "Payroll closes on the 25th." }));
+    render(<MyPayslip />);
+    expect(await screen.findByTestId("portal-banner")).toBeInTheDocument();
+  });
+
+  it("says who to ask", async () => {
+    getPayrollSettings.mockResolvedValue(
+      portal({ contactName: "Hema", contactEmail: "hema@acme.test" }),
+    );
+    render(<MyPayslip />);
+    expect(await screen.findByTestId("payslip-contact")).toHaveTextContent("hema@acme.test");
   });
 });
