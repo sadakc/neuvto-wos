@@ -10,15 +10,34 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
-import type { PayRunSummary, PayslipLine } from "../contracts";
+import type { PayRunSummary, PayrollSettings, PayslipLine } from "../contracts";
 
 const listRuns = vi.fn<() => Promise<PayRunSummary[]>>();
 const getRunLines = vi.fn<() => Promise<PayslipLine[]>>();
+const getPayrollSettings = vi.fn<() => Promise<PayrollSettings>>();
+const getPayDate = vi.fn<() => Promise<string>>();
 
 vi.mock("../handlers", () => ({
   listRuns: () => listRuns(),
   getRunLines: () => getRunLines(),
+  getPayrollSettings: () => getPayrollSettings(),
+  getPayDate: () => getPayDate(),
 }));
+
+const portal = (over: Partial<PayrollSettings["employeePortal"]> = {}): PayrollSettings => ({
+  paySchedule: {
+    calculationMethod: "actual_days",
+    fixedDays: 30,
+    payDateRule: "last_working_day",
+    payDay: 1,
+  },
+  employeePortal: {
+    payslipsVisible: true,
+    showStatutoryBreakdown: true,
+    showPayDate: true,
+    ...over,
+  },
+});
 
 import MyPayslip from "./MyPayslip";
 
@@ -66,6 +85,8 @@ beforeEach(() => {
   vi.resetAllMocks();
   listRuns.mockResolvedValue([approvedRun]);
   getRunLines.mockResolvedValue([line()]);
+  getPayrollSettings.mockResolvedValue(portal());
+  getPayDate.mockResolvedValue("2026-07-31");
 });
 
 describe("Payslip — exempt is not zero", () => {
@@ -113,5 +134,63 @@ describe("Payslip — which months are visible", () => {
     listRuns.mockResolvedValue([]);
     render(<MyPayslip />);
     expect(await screen.findByText(/You have no payslips yet/i)).toBeInTheDocument();
+  });
+});
+
+describe("Payslip — the question an employee asks first", () => {
+  it("says when the money lands, not only how much", async () => {
+    // Sada's rule for the employee view is two facts: the slip, and when it is
+    // credited. The second had no answer anywhere in the product before the pay
+    // schedule existed — `pay_runs` knew the month and not the day.
+    render(<MyPayslip />);
+    const date = await screen.findByTestId("pay-date");
+    expect(date).toHaveTextContent(/31 July 2026|July 31, 2026/);
+  });
+
+  it("still shows the payslip when the calendar cannot answer", async () => {
+    // A pay date is worth having and is not worth blanking a payslip for.
+    getPayDate.mockRejectedValue(new Error("calendar down"));
+    render(<MyPayslip />);
+    expect(await screen.findByText("Net pay")).toBeInTheDocument();
+    expect(screen.queryByTestId("pay-date")).not.toBeInTheDocument();
+  });
+
+  it("offers a copy to keep", async () => {
+    render(<MyPayslip />);
+    expect(await screen.findByTestId("download-payslip")).toBeInTheDocument();
+  });
+});
+
+describe("Payslip — what the administrator has decided to show", () => {
+  it("says payslips are switched off rather than that none exist", async () => {
+    // The distinction the screen has to make. Somebody paid for a year, told
+    // "you have no payslips yet", is being told something untrue by the product
+    // — and would reasonably conclude payroll had lost their record.
+    getPayrollSettings.mockResolvedValue(portal({ payslipsVisible: false }));
+    getRunLines.mockResolvedValue([]); // the policy already refused them
+
+    render(<MyPayslip />);
+    expect(await screen.findByTestId("payslips-switched-off")).toBeInTheDocument();
+    expect(screen.queryByText(/You have no payslips yet/i)).not.toBeInTheDocument();
+  });
+
+  it("hides the itemised statutory lines but never the total", async () => {
+    // Itemising is a layout choice. A deduction with neither explanation nor
+    // total is just money gone, so the total is not the administrator's to hide.
+    getPayrollSettings.mockResolvedValue(portal({ showStatutoryBreakdown: false }));
+    render(<MyPayslip />);
+
+    await screen.findByText("Net pay");
+    expect(screen.queryByText("Provident fund")).not.toBeInTheDocument();
+    expect(screen.getByText("Total deductions")).toBeInTheDocument();
+    expect(screen.getByText("₹2,000")).toBeInTheDocument();
+  });
+
+  it("drops the credit date when it has been switched off", async () => {
+    getPayrollSettings.mockResolvedValue(portal({ showPayDate: false }));
+    render(<MyPayslip />);
+    await screen.findByText("Net pay");
+    expect(screen.queryByTestId("pay-date")).not.toBeInTheDocument();
+    expect(getPayDate).not.toHaveBeenCalled();
   });
 });

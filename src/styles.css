@@ -166,3 +166,47 @@
     letter-spacing: -0.02em;
   }
 }
+
+/* ───────────────────────────────────────────────────────────────── printing
+   Below the GENERATED markers, so `bun run tokens` leaves it alone.
+
+   A payslip has to leave the product as a file. The way it does that is the
+   browser's own print dialog and its "Save as PDF" — no library, no dependency,
+   no bundle weight, and it works on a phone. What it costs is honest: the
+   person chooses the filename, so a payslip cannot carry the organisation's own
+   naming the way a CSV export does (D9).
+
+   Printing a page laid out for a screen produces a navigation bar and a Sign
+   out button on an A4 sheet, so anything marked `data-print="hide"` is dropped
+   and the payslip is allowed the full width. Colour is forced to black on white:
+   Nocturne is the default theme, and a dark payslip is a page of toner. */
+@media print {
+  [data-print="hide"] {
+    display: none !important;
+  }
+
+  html,
+  body {
+    background: #fff !important;
+    color: #000 !important;
+  }
+
+  /* The shell's padding exists to clear a tab bar that is not being printed. */
+  main {
+    padding: 0 !important;
+  }
+
+  [data-print="sheet"] {
+    max-width: none !important;
+    margin: 0 !important;
+  }
+
+  /* Keep a payslip's earnings and deductions on one sheet where they fit. */
+  [data-print="keep-together"] {
+    break-inside: avoid;
+  }
+
+  @page {
+    margin: 14mm;
+  }
+}

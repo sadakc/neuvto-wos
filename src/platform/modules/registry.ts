@@ -231,3 +231,31 @@ export async function resolveModuleRoute(path: string) {
   }
   return undefined;
 }
+
+/**
+ * One module's configuration blocks, for its own settings page.
+ *
+ * Returns nothing at all when the organisation has not switched the module on —
+ * which is what `/app/settings/<key>` needs to distinguish "this module has no
+ * settings" from "this module is not yours". A disabled module's configuration
+ * must stop existing rather than merely stop being linked, exactly as its pages
+ * do in the catch-all route.
+ *
+ * The display name comes back with the sections so the page can title itself
+ * without looking one up — which would mean naming modules in a file that must
+ * not know one exists (D30).
+ */
+export async function getModuleAdminSections(
+  user: CurrentUser | null,
+  moduleKey: string,
+): Promise<{ moduleKey: string; moduleName: string; sections: ModuleAdminSection[] } | undefined> {
+  const enabled = await getEnabledModules();
+  const m = enabled.find((x) => x.key === moduleKey);
+  if (!m) return undefined;
+
+  return {
+    moduleKey: m.key,
+    moduleName: m.name,
+    sections: [...(m.adminSections?.(user) ?? [])].sort((a, b) => (a.order ?? 0) - (b.order ?? 0)),
+  };
+}

@@ -102,7 +102,73 @@ export const DaysInput = z.object({
 });
 export type DaysInput = z.infer<typeof DaysInput>;
 
-export const PayrollSettings = z.object({}).passthrough();
+/**
+ * When people are paid, and how a month's worth of days is counted.
+ *
+ * Mirrors `PaySchedule` in `src/payroll-core/schedule.ts`, which is where the
+ * arithmetic lives — the engine has no Zod and this file has no dates.
+ *
+ * The WORKING WEEK is deliberately absent. The source spec puts it here, and it
+ * already exists once, in the platform's working calendar, where Leave counts
+ * against it and Attendance will too. A second copy owned by payroll is a
+ * workspace with two weekends, and the one that pays people would eventually
+ * disagree with the one that counts their days off.
+ */
+export const PayScheduleInput = z.object({
+  calculationMethod: z.enum(["actual_days", "fixed_days"]).default("actual_days"),
+  fixedDays: z
+    .number()
+    .int()
+    .min(28, "A month is at least 28 days")
+    .max(31, "A month is at most 31 days")
+    .default(30),
+  payDateRule: z.enum(["last_working_day", "day_of_next_month"]).default("last_working_day"),
+  payDay: z
+    .number()
+    .int()
+    .min(1, "Choose a day of the month")
+    .max(31, "A month has at most 31 days")
+    .default(1),
+});
+export type PayScheduleInput = z.infer<typeof PayScheduleInput>;
+
+/**
+ * What an employee is shown of their own pay.
+ *
+ * Two of these are NOT the same kind of switch, and the difference is the whole
+ * reason this comment exists.
+ *
+ * `payslipsVisible` is a permission. Turning it off has to stop the data
+ * reaching the person, not stop the screen drawing it — so `pay_run_lines`
+ * reads this setting itself and refuses a non-administrator when it is off. A
+ * toggle that only hides a link is not a permission.
+ *
+ * `showStatutoryBreakdown` is presentation, and honestly so. The figures it
+ * hides are the employee's own PF and ESI on their own payslip; concealing them
+ * from the person they belong to is a matter of how much detail a workspace
+ * wants on screen, not of who may see what. It is enforced nowhere but the
+ * component, and that is correct.
+ */
+export const EmployeePortalInput = z.object({
+  payslipsVisible: z.boolean().default(true),
+  showStatutoryBreakdown: z.boolean().default(true),
+  showPayDate: z.boolean().default(true),
+});
+export type EmployeePortalInput = z.infer<typeof EmployeePortalInput>;
+
+/**
+ * Everything this module lets a customer configure, stored as one row in
+ * `module_settings` (D7).
+ *
+ * Every field carries a default, all the way down, so that `parse({})` answers
+ * fully. A workspace that has never opened this screen still has to be paid,
+ * and "unconfigured" must never be a state a payslip can meet.
+ */
+export const PayrollSettings = z.object({
+  paySchedule: PayScheduleInput.default({}),
+  employeePortal: EmployeePortalInput.default({}),
+});
+export type PayrollSettings = z.infer<typeof PayrollSettings>;
 
 /**
  * Every refusal the database raises, in words an administrator can act on.

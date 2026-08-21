@@ -18,7 +18,9 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { AppError } from "@/platform/errors";
-import { computePayRun, DEFAULT_POLICY } from "@/payroll-core";
+import { getModuleSettings, saveModuleSettings } from "@/platform/modules";
+import { getExcludedDays } from "@/platform/calendar";
+import { computePayRun, DEFAULT_POLICY, payableDaysBasis, resolvePayDate } from "@/payroll-core";
 import type { ComponentDefinition, EmployeeInput, PayrollLine } from "@/payroll-core";
 import {
   ComponentInput,
@@ -29,6 +31,7 @@ import {
   type EmployeePayrollRow,
   type PayRunStatus,
   type PayRunSummary,
+  type PayrollSettings,
   type PayslipLine,
   type SalaryComponent,
   type StructureRow,
@@ -477,4 +480,83 @@ async function currentOrgId(): Promise<string> {
   const { data, error } = await supabase.rpc("current_org_id");
   if (error) throw toPayrollError(error.message);
   return data as string;
+}
+
+// ═══════════════════════════════════════════════════ pay schedule and portal
+
+/**
+ * This workspace's payroll configuration, with every unset field defaulted.
+ *
+ * Readable by everybody in the organisation, deliberately: an employee has to
+ * be able to find out when they will be paid. Writing is refused by RLS, not
+ * here.
+ */
+export async function getPayrollSettings(): Promise<PayrollSettings> {
+  return getModuleSettings<PayrollSettings>("payroll");
+}
+
+export async function savePayrollSettings(settings: PayrollSettings): Promise<PayrollSettings> {
+  return saveModuleSettings(await currentOrgId(), "payroll", settings);
+}
+
+/**
+ * The day a month's salary reaches an account, under a schedule you name.
+ *
+ * The arithmetic is `resolvePayDate` in `src/payroll-core`, which is pure and
+ * takes the calendar as a predicate. This function is the part that cannot be
+ * pure: it asks the PLATFORM's working calendar which days are closed, so the
+ * date a salary lands on is decided by the same weekend and the same holiday
+ * list that leave is counted against.
+ *
+ * Takes the schedule rather than reading it, so the settings screen can show
+ * what an unsaved choice would do. A preview computed from the saved value
+ * would answer the previous question.
+ *
+ * The window runs from the first of the pay period to the last day of the month
+ * after it — wide enough to contain either pay-date rule and the walk backwards
+ * off a closed day, which from the 1st of the following month reaches exactly
+ * the 1st of the period month.
+ */
+export async function previewPayDate(
+  periodMonth: string,
+  schedule: PayrollSettings["paySchedule"],
+): Promise<string> {
+  const orgId = await currentOrgId();
+
+  const start = new Date(`${periodMonth}T00:00:00Z`);
+  const windowEnd = new Date(Date.UTC(start.getUTCFullYear(), start.getUTCMonth() + 2, 0));
+
+  let closed = new Set<string>();
+  try {
+    const excluded = await getExcludedDays(
+      orgId,
+      periodMonth,
+      windowEnd.toISOString().slice(0, 10),
+    );
+    closed = new Set(excluded.map((e) => e.day));
+  } catch {
+    // A calendar that will not answer must not mean no pay date at all. The
+    // nominal date is still the configured one and is very nearly always right;
+    // silence here would put "—" where an employee looks for a day.
+  }
+
+  return resolvePayDate(periodMonth, schedule, (day) => closed.has(day));
+}
+
+/** The same question, asked of what this organisation has actually saved. */
+export async function getPayDate(periodMonth: string): Promise<string> {
+  const settings = await getPayrollSettings();
+  return previewPayDate(periodMonth, settings.paySchedule);
+}
+
+/**
+ * How many days this run divides a monthly salary by.
+ *
+ * `actual_days` answers with the month's real length, which is what every pay
+ * run has done until now. `fixed_days` answers with the same number every
+ * month, and changes what people are paid — see `payableDaysBasis`.
+ */
+export async function getDaysBasis(daysInMonth: number): Promise<number> {
+  const settings = await getPayrollSettings();
+  return payableDaysBasis(settings.paySchedule, daysInMonth);
 }

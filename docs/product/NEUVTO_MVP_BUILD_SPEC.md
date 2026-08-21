@@ -1,6 +1,6 @@
 # NEUVTO WOS — Build Spec
 
-**Version:** 1.7 · **Status:** Active · **Updated:** 20 Aug 2026
+**Version:** 1.8 · **Status:** Active · **Updated:** 21 Aug 2026
 
 ## The platform is the product
 
@@ -145,6 +145,10 @@ These override the source docs where they conflict. Deviations are deliberate an
 | D64 | **A test workspace says so, in a table the product cannot read.** `platform_test_organizations` records which workspaces are Neuvto's own rehearsals, with a required non-blank reason. It is set by `provision_organization`'s new `_is_test` argument in the same transaction that creates the workspace, and surfaced on the console list. The console can also mark and unmark an existing workspace, and the two directions are deliberately asymmetric: **Not a test** is one click, because withdrawing a marking can only make a purge refuse more; **Mark as test** opens a required reason field, because a single misclick must never put a customer on the allow-list. RLS on, no policy, no grant, and an explicit `revoke all ... from anon, authenticated` — reachable only through `SECURITY DEFINER` functions that check `is_platform_admin()`. **No purge function exists yet, and no backfill was performed.** | Sada tests in production on purpose and will ask for a hard delete of that data around Oct 2026. Nothing in the schema could answer "which of these is a rehearsal", which cost nothing while production held **one** organisation and becomes unanswerable at the second — so the marker has to land before the data, not before the purge. Not `organizations.is_test`, because a flag on the customer table is one `if` away from a second code path, and a test workspace that behaves differently has stopped testing the real one. No backfill because a migration cannot tell whether a customer was provisioned between its authoring and its application, and the failure it would cause is a real customer silently joining the allow-list a purge deletes from — a person checks the list instead. The new table also had to `revoke` Supabase's stock `grant all`, which hands TRUNCATE to `anon` and `authenticated` on every table created without one. Three defects were found in this migration before it merged and are fixed in it: (a) `drop function` takes a PUBLIC revoke with it, so recreating `provision_organization` and `platform_list_organizations` handed `anon` back EXECUTE on four SECURITY DEFINER functions — the invariant caught it and now names the offenders instead of counting them; (b) `char_length(btrim(reason)) > 0` accepts a tab, an NBSP and the whole zero-width family, so the reason rule is `reason ~ '[[:alnum:]]'`, measured against every blank form rather than assumed; (c) writing `is_test` into `analytics_events.properties` let a customer's own org*admin read Neuvto's classification of them, so it is not recorded there at all |
 | D65 | **The browser key holds nothing, and GRANT is a separate layer from RLS.** `anon` — the role the publishable key in the JavaScript bundle resolves to — is revoked from every table in `public`. `authenticated` keeps `SELECT`/`INSERT`/`UPDATE`/`DELETE`, which PostgREST needs, and loses `TRUNCATE`, `REFERENCES`, `TRIGGER` and `MAINTAIN`. The three tables with RLS and no policy are granted to nobody. `service_role` is untouched. Three invariants enforce it. | Nothing was exposed: RLS refused all of it, which is exactly why nobody noticed. `anon` held four privileges on 24 of 27 tables locally and full DML on 24 tables in **production** — never by decision, always from Supabase's stock default privileges, so RLS was carrying two layers' work alone and one `using (true)` policy was the whole distance to every customer's employee records. **`TRUNCATE` ignores RLS**: db-guardian emptied `demo_requests`, every prospect who had ever used the form, as an ordinary employee of a customer organisation — reproduced here, 1 row to 0, before the fix and refused after. Enforced as invariants rather than trusted to `ALTER DEFAULT PRIVILEGES`, because `supabase_admin` holds a second default ACL on `public` that `postgres` is not a member of and cannot change — attempted, not assumed. `platform_admins` had been granted `SELECT` to both roles while its own migration said no grant existed |
 | D66 | **The site is built here and served by Cloudflare Workers, and the Worker holds no secrets.** `deploy.yml` publishes with `wrangler` instead of `netlify-cli`; the artefact gate, the publish and the live-site check keep their order. Custom domains live in `scripts/cloudflare-worker-config.mjs` under review rather than in a dashboard, and adding `neuvto.com` to that list is the cutover — one reviewed line. The zone moved to Cloudflare on 17 Aug; every record went in **DNS-only**, so DNS moved without hosting moving and each half was verifiable alone. | D61 committed the move for cost: Netlify is 20 production deploys a month and three went on 17 Aug alone. Four things were found doing it, none of which the plan predicted. **(a)** A Cloudflare \_route* is not DNS — `*wos.neuvto.com/*` sat configured and inert because the hostname did not resolve, so nothing ever reached Cloudflare for it to match; a **Custom Domain** creates the record and the certificate, a route creates neither. **(b)** Nitro takes the Worker's compatibility date from the **build machine's local clock** and Cloudflare validates it against UTC, so every build between 00:00 and 05:30 IST is refused as "in the future". It is pinned now, and the config script refuses a future one rather than letting the deploy discover it. **(c)** Sign-in failed on the Worker with a generic error because a hand-run build baked **no Supabase config at all** — `deploy.yml` supplies four variables at build time. `verify-deploy.sh` already fails a build that "names none at all" and would have caught it; it was bypassed by deploying by hand, which is the argument for the pipeline doing it. **(d)** The Worker needs **no runtime secrets**: `client.server.ts` exports a service-role client nothing imports, and `auth-attacher` — the one thing `src/start.ts` uses — reads no environment. Not putting an RLS-bypassing key on an edge worker is a better position than Netlify's, and it was checked rather than assumed. |
+| D67 | **The shell is scoped to one module at a time**, chosen from a switcher top-left. `organisation` holds what every module shares; each enabled module is a world of its own. | Sada, 21 Aug 2026 — "every model should be unique … each of those sections would populate for the admin". The flat navigation was the whole workspace at once and grew by three per module; an employee was shown five destinations and refused three of them |
+| D68 | **Configuration belongs to the module that invented it; anything true with every module switched off belongs to the organisation.** Departments, the working week and holidays are shared. | Sada, 21 Aug 2026 — departments named explicitly. The test is not importance but survival: a department outlives Leave being switched off, a leave type does not. Payroll's pay schedule deliberately does NOT get its own working week, because a workspace with two weekends pays against one and counts leave against the other |
+| D69 | **A switch controlling what an employee may see is enforced where the data is READ**, or it is labelled as presentation and enforced nowhere. | `getRunLines` selects straight from `pay_run_lines`, so a switch honoured only in React leaves every figure one fetch away in the console. `payslipsVisible` is read by the policy itself (20260824100000); the statutory-breakdown switch hides an employee's own PF from the employee, which is layout, and the screen says so rather than implying a boundary |
+| D70 | **A pay date is stated as which month it falls in, not left to be inferred.** `last_working_day` is the month being paid; `day_of_next_month` is the month after. | The source spec offers "Day N of every month" and never says which month. For July's run, day 5 is either 5 July — a salary credited four weeks before it is earned — or 5 August. Inheriting that ambiguity would put it in the data |
 
 **D15 is unchanged and still deferred.** Company identity (D45) is not theming.
 A name and a logo are _facts about the customer_, stored as columns and rendered
@@ -470,6 +474,56 @@ one.
 is **dropped**. It answered `false` for any caller without a profile, which is
 every scheduled job, and it was silently wrong rather than loudly missing.
 
+### The shell is scoped to a module — D67, D68
+
+The navigation was one flat list holding the whole workspace at once, and it grew
+by three entries every time a module shipped. An employee running Leave and
+Payroll was shown eleven destinations and refused four of them.
+
+The shell now resolves to a **scope**, chosen from a switcher at the top left:
+
+| Scope          | Holds                                                                   |
+| -------------- | ----------------------------------------------------------------------- |
+| `organisation` | Dashboard, Approvals, People, Reports, Approval rules, Settings         |
+| one per module | that module's own destinations, then `/app/settings/<key>` for an admin |
+
+```
+src/platform/modules/scopes.ts     organisationScope · moduleScope · scopeForPath
+src/components/shared/scope-switcher.tsx
+src/routes/app/settings.index.tsx        the organisation's configuration
+src/routes/app/settings.$moduleKey.tsx   one module's, and nothing else's
+```
+
+**The current scope is derived from the URL and never stored.** A remembered
+scope disagrees with the address bar the moment somebody follows a link into a
+module, and a wrong sidebar is worse than none — it is quietly wrong rather than
+obviously broken.
+
+**Longest match wins.** The organisation owns `settings` and every module owns
+`settings/<key>`, so `/app/settings/payroll` is claimed by two scopes at once. A
+first-match rule hands it to whichever is listed first, which is always the
+organisation — and the symptom is opening payroll's own configuration while the
+switcher and sidebar insist you are looking at the organisation's. Tested, and
+watched failing.
+
+**What goes where** is decided by survival, not importance: anything still true
+with every module switched off belongs to the organisation. Departments, the
+working week and holidays are shared; a leave type and a pay schedule are not.
+The working week is the case that settles it — payroll wants one, Leave has one,
+Attendance will want one, and three copies is a workspace with three weekends.
+
+This file, `scopes.ts`, and both settings routes **name no module**. Scopes are
+built from manifests and from the `modules` table, so a module the organisation
+has not switched on has no configuration page at all rather than an empty one —
+and Learning renders here the day somebody inserts a row (D30, D32).
+
+Modules that cannot be entered are still listed in the switcher, greyed, with
+the reason — "not switched on" or "coming soon". Same judgement the navigation
+contract's `soon:` already makes: an administrator wondering where Attendance
+went is better served by seeing it than by an interface behaving as though it
+never existed. Administrators only; an employee cannot switch a module on and has
+no use for a list of what they are missing.
+
 ## 1.8 Company identity and onboarding — D45, D46
 
 **`organizations`** gains `display_name`, `logo_path`, `logo_updated_at`,
@@ -763,11 +817,12 @@ There is no separate staging environment during the MVP: production (`neuvto-wos
 
 Supabase Postgres throughout. Lovable Cloud _is_ managed Supabase, so there is no engine migration — only a change of which instance is owned.
 
-| Environment | Project                                    | Region                  | Use                                  |
-| ----------- | ------------------------------------------ | ----------------------- | ------------------------------------ |
-| Development | Lovable Cloud (auto-provisioned)           | Lovable-managed         | MVP build                            |
-| Production  | `neuvto-wos-prod` (`udrzhfgwqgolvyimbwto`) | **ap-south-1 (Mumbai)** | Cutover target                       |
-| _Retired_   | `hmunuegliswufvfgxjmi`                     | ap-northeast-1          | Paused, empty — delete via dashboard |
+| Environment | Project                          | Region          | Use       |
+| ----------- | -------------------------------- | --------------- | --------- |
+| Development | Lovable Cloud (auto-provisioned) | Lovable-managed | MVP build |
+
+| Production | `neuvto-wos-prod` (`udrzhfgwqgolvyimbwto`) | **ap-south-1 (Mumbai)** | Cutover target |
+| _Retired_ | `hmunuegliswufvfgxjmi` | ap-northeast-1 | Paused, empty — delete via dashboard |
 
 Region chosen for Indian customer latency and data residency. **Supabase regions are immutable after creation.**
 

@@ -1,6 +1,14 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { createFileRoute, Outlet, useLocation, useNavigate } from "@tanstack/react-router";
+import { useEffect, useMemo, useState } from "react";
 import { getCurrentUser, signOut, type CurrentUser } from "@/platform/auth";
+import {
+  getUnavailableScopes,
+  getWorkspaceScopes,
+  scopeForPath,
+  type UnavailableScope,
+  type WorkspaceScope,
+} from "@/platform/modules";
+import { ScopeSwitcher } from "@/components/shared/scope-switcher";
 import {
   companyName,
   getLogoUrl,
@@ -19,9 +27,24 @@ export const Route = createFileRoute("/app")({
 
 function AppShell() {
   const navigate = useNavigate();
+  const { pathname } = useLocation();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [message, setMessage] = useState("");
+
+  /**
+   * Which worlds this person has, and which one the address bar is in.
+   *
+   * Resolved here rather than inside the navigation because two things need the
+   * answer — the switcher and the sidebar — and resolving it twice is how they
+   * come to disagree about which module you are looking at.
+   *
+   * Scopes depend on the enabled modules, which is a database read. Failing
+   * quietly to the organisation's own destinations is deliberate: a hiccup
+   * fetching module grants must not blank the shell somebody is standing in.
+   */
+  const [scopes, setScopes] = useState<WorkspaceScope[]>([]);
+  const [unavailable, setUnavailable] = useState<UnavailableScope[]>([]);
 
   // D45. The workspace should look like the customer's, not like ours. Loaded
   // after the user and allowed to fail quietly — a missing logo is a cosmetic
@@ -89,6 +112,38 @@ function AppShell() {
     };
   }, [navigate]);
 
+  useEffect(() => {
+    if (!user) return;
+    let cancelled = false;
+
+    void Promise.all([getWorkspaceScopes(user), getUnavailableScopes(user)])
+      .then(([s, u]) => {
+        if (cancelled) return;
+        setScopes(s);
+        setUnavailable(u);
+      })
+      .catch(() => {
+        // Deliberately not an error state. See the note on `scopes` above.
+        if (!cancelled) setScopes([]);
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [user]);
+
+  /**
+   * Derived from the URL, never stored. A remembered scope is a scope that
+   * disagrees with the address bar the moment somebody follows a link into a
+   * module — and the wrong sidebar is worse than no sidebar, because it is
+   * quietly wrong rather than obviously broken.
+   *
+   * An address no scope claims (a module page for a module since switched off,
+   * a mistyped path) falls back to the first scope, which is always the
+   * organisation. The page itself still renders its own not-found state.
+   */
+  const current = useMemo(() => scopeForPath(scopes, pathname) ?? scopes[0], [scopes, pathname]);
+
   if (state === "loading") {
     return (
       <div className="flex min-h-screen flex-col">
@@ -129,8 +184,15 @@ function AppShell() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-4">
-        <div className="flex min-w-0 items-center gap-3">
+      <header
+        data-print="hide"
+        className="flex h-14 items-center justify-between gap-4 border-b border-border px-4"
+      >
+        <div className="flex min-w-0 items-center gap-2">
+          {/* Top-left, ahead of the company mark: this control decides what the
+              rest of the shell is showing, so it sits before the thing it
+              changes rather than beside it. */}
+          <ScopeSwitcher scopes={scopes} unavailable={unavailable} current={current} />
           {logoUrl && (
             <img
               src={logoUrl}
@@ -161,7 +223,7 @@ function AppShell() {
       </header>
 
       <div className="flex flex-1">
-        <AppNav user={user} />
+        <AppNav items={current?.items ?? []} />
         {/* pb-20 clears the mobile tab bar. */}
         <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6">
           <Outlet />

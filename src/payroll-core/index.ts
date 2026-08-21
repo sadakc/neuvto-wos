@@ -9,6 +9,8 @@
 
 export { computePayRun, computeEmployee, DEFAULT_POLICY } from "./engine";
 export { round0, roundUp0 } from "./money";
+export { resolvePayDate, payableDaysBasis, DEFAULT_PAY_SCHEDULE } from "./schedule";
+export type { PaySchedule } from "./schedule";
 export type {
   ComponentDefinition,
   FixedComponentAmount,

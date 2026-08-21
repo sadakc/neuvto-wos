@@ -14,6 +14,7 @@ export {
   resolveModuleRoute,
   getDashboardCards,
   getAdminSections,
+  getModuleAdminSections,
   getModuleReports,
   getApprovalViews,
 } from "./registry";
@@ -32,3 +33,16 @@ export {
 
 export { ModuleLink } from "./ModuleLink";
 export { OrgModules } from "./OrgModules";
+
+export { getModuleSettings, saveModuleSettings } from "./settings";
+
+export {
+  ORGANISATION_SCOPE,
+  organisationScope,
+  moduleScope,
+  getWorkspaceScopes,
+  getUnavailableScopes,
+  scopeForPath,
+  type WorkspaceScope,
+  type UnavailableScope,
+} from "./scopes";

@@ -1,16 +1,19 @@
 /**
- * Role-aware navigation.
+ * The destinations in the scope you are currently in.
  *
- * What a person can see is decided from their roles, and enforced for real by
- * RLS in the database. Hiding a link is presentation, not security — the
- * database refuses the data either way.
+ * This file used to resolve navigation itself: the platform's own entries,
+ * merged with every enabled module's, in one list. That list was the whole
+ * workspace at once — Dashboard, Apply, My leave, Calendar, Pay runs, Payslips,
+ * Approvals, People, Reports, Approval rules, Settings — and it grew by three
+ * every time a module shipped.
  *
- * **This file knows about no module.** It used to hardcode "Apply", "My leave",
- * "Calendar" and "Approvals", which meant changing Leave meant editing a shared
- * file, and every future module would have added its own line here. Module
- * destinations now come from the manifests of whatever the organisation has
- * switched on; this file contributes only the two entries the platform itself
- * owns.
+ * It is now handed one scope's items and renders them. Which scope that is, is
+ * decided by the URL and offered by the switcher in the header. `mergeNavItems`
+ * is gone with the flat list it interleaved.
+ *
+ * What a person can see is still decided from their roles and enforced for real
+ * by RLS. Hiding a link is presentation, not security — the database refuses the
+ * data either way.
  *
  * Mobile shows a bottom tab bar (employee views are mobile-first); desktop shows
  * a sidebar (admin work is desktop-first). Destinations that are not built yet
@@ -19,9 +22,7 @@
 
 import { Link, useLocation } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import type { CurrentUser } from "@/platform/auth";
-import { isAdmin } from "@/platform/auth";
-import { getModuleNavigation, type ModuleNavItem } from "@/platform/modules";
+import type { ModuleNavItem } from "@/platform/modules";
 import { MAX_VISIBLE_TABS } from "@/platform/design/tokens";
 import { cn } from "@/lib/utils";
 
@@ -34,63 +35,6 @@ const TAB = "flex h-14 flex-1 items-center justify-center px-1 text-xs font-medi
 type NavItem = ModuleNavItem;
 
 /**
- * The platform's own destinations. Dashboard is the shell; Settings configures
- * the organisation, not any one module. Everything else is contributed.
- */
-export function platformNavItems(user: CurrentUser | null): NavItem[] {
-  const items: NavItem[] = [{ label: "Dashboard", to: "/app" }];
-
-  // Approvals is the platform's, not Leave's — and it used to be Leave's, sitting
-  // in that manifest as `{ label: "Approvals", soon: "step 8" }`. A module
-  // claiming this screen would have meant a manager running two modules visiting
-  // two queues to find out what they were holding up. One queue lists everything
-  // waiting on you; each module renders its own rows through `approvalViews`.
-  //
-  // Managers are not administrators, so this cannot hang off isAdmin().
-  if (user?.roles.some((r) => r === "manager" || r === "hr_admin" || r === "org_admin")) {
-    items.push({ label: "Approvals", to: "/app/approvals" });
-  }
-
-  if (isAdmin(user)) {
-    // People and Approval rules are platform concerns, not Leave's: who is in
-    // the workspace and who signs things off are the same questions whatever
-    // modules are switched on.
-    items.push({ label: "People", to: "/app/members" });
-    // Reports is a PLATFORM destination that modules fill, not Leave's own.
-    //
-    // Not merely tidiness. A module nav item lands at position 2–4 (see
-    // mergeNavItems), and the mobile bar shows the first five — so a fourth
-    // Leave entry would push "Approvals" off the bar for an administrator,
-    // which is exactly what the team calendar did in step 10. Here it sits
-    // sixth and falls off deliberately: admin work is desktop-first, and the
-    // sidebar shows everything.
-    items.push({ label: "Reports", to: "/app/reports" });
-    items.push({ label: "Approval rules", to: "/app/approval-rules" });
-    items.push({ label: "Settings", to: "/app/settings" });
-  }
-  return items;
-}
-
-/**
- * Dashboard, then whatever the modules contribute, then the admin destinations.
- *
- * Order matters more than it looks: the mobile bar shows the first FIVE items
- * and nothing else. Putting the admin items before the module ones pushed
- * "Apply" and "My leave" off the bar entirely for an administrator — who is also
- * an employee, and whose own leave is the thing they reach for most. Admin work
- * is desktop-first; the sidebar shows everything either way.
- */
-export function mergeNavItems(platform: NavItem[], modules: NavItem[]): NavItem[] {
-  const dashboardIndex = platform.findIndex((i) => i.to === "/app");
-  if (dashboardIndex === -1) return [...platform, ...modules];
-  return [
-    ...platform.slice(0, dashboardIndex + 1),
-    ...modules,
-    ...platform.slice(dashboardIndex + 1),
-  ];
-}
-
-/**
  * Splits the destinations into the ones on the bar and the ones behind "More".
  *
  * The bar used to be `items.slice(0, 5)` — everything past the fifth was not
@@ -98,6 +42,11 @@ export function mergeNavItems(platform: NavItem[], modules: NavItem[]): NavItem[
  * phone had no route to Approval rules or Settings at all, and nothing on
  * screen suggested anything was missing. That is the failure mode this guards:
  * silent truncation reads as "that feature doesn't exist".
+ *
+ * Scoping the shell makes an overflowing bar much less likely — no single scope
+ * carries the whole workspace any more — but this stays, and stays tested. A cap
+ * respected only because nothing currently exceeds it is a cap nobody is
+ * enforcing, and the organisation scope still hands an administrator six.
  *
  * `MAX_VISIBLE_TABS` is five because iOS caps a `UITabBar` at five and spills
  * the rest into its own "More" — matching it means the web and the eventual
@@ -116,30 +65,11 @@ export function splitNavItems(items: NavItem[]): { visible: NavItem[]; overflow:
   };
 }
 
-export function AppNav({ user }: { user: CurrentUser | null }) {
-  const [moduleItems, setModuleItems] = useState<NavItem[]>([]);
+export function AppNav({ items }: { items: readonly NavItem[] }) {
   const [moreOpen, setMoreOpen] = useState(false);
   const { pathname } = useLocation();
 
-  useEffect(() => {
-    let cancelled = false;
-    // A module's navigation depends on which modules the organisation has
-    // enabled, which is a database read. Failing quietly to the platform's own
-    // items is deliberate: a navigation hiccup must not blank the shell.
-    getModuleNavigation(user)
-      .then((items) => {
-        if (!cancelled) setModuleItems(items);
-      })
-      .catch(() => {
-        if (!cancelled) setModuleItems([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [user]);
-
-  const items = mergeNavItems(platformNavItems(user), moduleItems);
-  const { visible, overflow } = splitNavItems(items);
+  const { visible, overflow } = splitNavItems([...items]);
   const overflowIsActive = overflow.some((i) => i.to === pathname);
 
   // Closed on navigation. Without this the sheet stays open over the page the
@@ -154,6 +84,7 @@ export function AppNav({ user }: { user: CurrentUser | null }) {
       {/* Desktop — sidebar */}
       <nav
         aria-label="Main"
+        data-print="hide"
         className="hidden w-56 shrink-0 flex-col gap-1 border-r border-border p-4 md:flex"
       >
         {items.map((item) =>
@@ -186,6 +117,7 @@ export function AppNav({ user }: { user: CurrentUser | null }) {
       {/* Mobile — bottom tabs. 48px targets per the design system. */}
       <nav
         aria-label="Main"
+        data-print="hide"
         className="fixed inset-x-0 bottom-0 z-10 flex border-t border-border bg-background md:hidden"
       >
         {visible.map((item) =>

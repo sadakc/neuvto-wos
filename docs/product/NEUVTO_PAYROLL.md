@@ -1,6 +1,6 @@
 # Payroll
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 20 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 21 Aug 2026
 
 The second module. It replaces an eleven-sheet Excel workbook that runs a real
 payroll every month, and its acceptance criterion is that workbook's own July
@@ -189,25 +189,74 @@ Pradesh's.**
 
 ## Setting it up, in the order it has to be done
 
-Three admin sections, contributed to the platform's settings screen. The order
-is not cosmetic — each one is unusable until the one before it exists.
+Five admin sections at `/app/settings/payroll`, reached from the module switcher
+top-left (D67). They are contributed through the manifest, so the platform
+renders them without importing anything from this folder.
 
-1. **Salary components** — the parts a salary is made of, and the single flag
+**Payroll does not configure a working week.** The source spec puts one in the
+pay schedule; the platform already has one, under Organisation, and Leave is
+counted against it. A second copy owned by payroll would be a workspace with two
+weekends, and the one paying people would eventually disagree with the one
+counting their days off (D68). Departments and holidays are shared for the same
+reason.
+
+The order is not cosmetic — each section is unusable until the one before it
+exists.
+
+1. **Pay schedule** — when salary is credited, and what a month's worth of days
+   is. First, because it decides the date on every payslip this module will ever
+   issue, and because an employee's first question is _when_, not how much.
+2. **Salary components** — the parts a salary is made of, and the single flag
    the arithmetic reads: whether a component counts towards PF wages.
-2. **Salary structures** — what each person is paid, and from when. Gross is
+3. **Salary structures** — what each person is paid, and from when. Gross is
    **the sum of the components, added up as they are typed and never stored**,
    so it cannot drift from the parts it is made of. Anybody with no structure is
    named here; without one they cannot be paid.
-3. **Statutory and bank details** — UAN, ESI number, PAN, account and IFSC.
+4. **Statutory and bank details** — UAN, ESI number, PAN, account and IFSC.
    None of it changes a payslip by a rupee; all of it decides whether the PF
    return, the ESI return and the bank file can be filed at all. Every field is
    optional, because payroll is configured over weeks and a person whose UAN has
    not arrived is ordinary — but the screen names who would drop out of which
    file, in that file's own words, while it can still be fixed.
 
+5. **What employees see** — how much of their own pay a person can open.
+
 The shapes are validated on the way in because the database validates them too.
 The case worth stopping is an eleven-digit UAN: the EPFO portal accepts the
 upload and rejects the batch hours later without naming a row.
+
+---
+
+## When the money lands
+
+`pay_runs` knew which month it was paying and never which day, so the product
+could not answer the question employees ask first. The pay schedule answers it.
+
+Two rules, and the difference between them is stated rather than inherited:
+
+- **The last working day of the month being paid.**
+- **A numbered day of the month AFTER it.** The source spec offers "Day N of
+  every month" and never says which month. For July's run, day 5 is either
+  5 July — a salary credited four weeks before it is earned — or 5 August. Only
+  one of those is payroll, so the type says so (D70).
+
+A date landing on a closed day moves **backwards**: money arriving early
+inconveniences a finance team, money arriving late is somebody's rent. Closed is
+whatever the organisation's own working calendar says, so a pay date steps off a
+public holiday without payroll holding a second holiday list.
+
+`resolvePayDate` is pure and lives in `src/payroll-core`, taking the calendar as
+a predicate. The awkward months are tested without a workspace existing: a 31st
+in a 30-day month is clamped rather than rolled into the next one, and a
+calendar claiming nothing is ever open answers with the configured date rather
+than one 31 days adrift.
+
+The other half of the schedule is **how a month is counted**. `actual_days`
+divides by the real length of the month; `fixed_days` divides by the same number
+every month, so 31 days present against a 30-day denominator pays _more_ than a
+month's salary. That is a legitimate arrangement and a real change to what
+people are paid, so the screen says so instead of naming the option and moving
+on.
 
 ---
 
@@ -263,6 +312,45 @@ is no argument that they should see their salary or where it is paid. An
 approver sees the run's totals and headcount, because approving a payroll is a
 decision about an amount leaving the company and does not require reading each
 person's net pay.
+
+### What an employee gets, which is deliberately almost nothing
+
+Payroll, for somebody who is not an administrator, is **one destination**: their
+own payslip. "Pay runs" used to be offered to everybody and then refuse them on
+arrival — a link whose only function was to waste a tap. It is now declared for
+administrators, so the shell never draws it (D67).
+
+The payslip carries the figures, the credit date, and a **Download PDF** button
+that opens the browser's own print dialog. No library, no dependency, no cost,
+and it works on a phone. The honest limit: the person saving the file names it,
+so a payslip cannot carry the organisation's own naming the way a CSV export
+does (D9).
+
+### What the administrator can switch off, and what that is worth
+
+Three switches under **What employees see**, and the screen labels each with
+what actually backs it — because they look identical and are not (D69).
+
+| Switch                  | Backed by                                                                                   |
+| ----------------------- | ------------------------------------------------------------------------------------------- |
+| Payslips                | **The database.** The policy on `pay_run_lines` reads the setting itself (`20260824100000`) |
+| The credit date         | The component only — display                                                                |
+| The statutory breakdown | The component only — display                                                                |
+
+The distinction is not pedantry. `getRunLines` selects straight from
+`pay_run_lines`, so a switch honoured only in React leaves every figure one
+fetch away in the browser console. And the two that are display-only genuinely
+are: hiding somebody's own PF figure from _them_ is a question of how much
+detail a workspace wants on a screen, not of who may see what. Enforcing that in
+the database would dress a layout preference as a security boundary and teach an
+administrator to trust a control that protects nothing.
+
+**Absent means visible.** A workspace that has never opened this screen still
+shows payslips — a default of hidden would have meant the migration silently
+switching every existing customer's payslips off. The Zod default and the SQL
+`coalesce` agree, and the harness proves both directions: switched off, an
+employee reads nothing and an administrator still reads everything; switched
+back on, the payslip returns.
 
 ---
 

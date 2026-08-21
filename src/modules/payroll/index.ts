@@ -20,11 +20,21 @@ export const payroll: ModuleDefinition = {
   name: "Payroll",
   version: "1.0.0",
 
-  // Two entries, and the second is for everybody. "Pay runs" refuses a
-  // non-administrator, but a payslip is the one thing in this module that every
-  // person in the workspace has a reason to open.
+  /**
+   * Two entries, and only one of them is for everybody.
+   *
+   * "Pay runs" used to be offered to every person in the workspace and then
+   * refuse them on arrival — a link whose only function was to waste a tap. It
+   * is now declared for administrators, so an employee's payroll is exactly one
+   * destination: their own payslip. That is Sada's rule for the employee view,
+   * expressed where the shell can read it.
+   *
+   * The role list is presentation. `pay_run_lines` and every payroll function
+   * refuse a non-administrator themselves, because a screen that is merely not
+   * linked is not a permission.
+   */
   navigation: () => [
-    { label: "Pay runs", to: "/app/payroll" },
+    { label: "Pay runs", to: "/app/payroll", roles: ["org_admin", "hr_admin"] },
     { label: "Payslips", to: "/app/payroll/payslips" },
   ],
 
@@ -46,6 +56,14 @@ export const payroll: ModuleDefinition = {
    * three without importing anything here.
    */
   adminSections: () => [
+    {
+      id: "pay-schedule",
+      title: "Pay schedule",
+      description:
+        "When salary is credited, and what a month's worth of days is. First, because it decides the date on every payslip this module will ever issue — and because an employee's first question is when, not how much.",
+      component: lazy(() => import("./components/PaySchedule")),
+      order: 5,
+    },
     {
       id: "salary-components",
       title: "Salary components",
@@ -69,6 +87,14 @@ export const payroll: ModuleDefinition = {
         "UAN, ESI number, PAN, and where the salary is sent. None of it changes a payslip; all of it decides whether the PF return, the ESI return and the bank file can be filed at all.",
       component: lazy(() => import("./components/EmployeePayrollDetails")),
       order: 30,
+    },
+    {
+      id: "employee-portal",
+      title: "What employees see",
+      description:
+        "How much of their own pay a person can open. One of these is refused by the database and two are matters of layout, and the screen says which is which — a switch that only hides a link is not a permission.",
+      component: lazy(() => import("./components/EmployeePortal")),
+      order: 40,
     },
   ],
 
@@ -166,6 +192,11 @@ export {
   listComponents,
   listStructures,
   listEmployeePayroll,
+  getPayrollSettings,
+  savePayrollSettings,
+  getPayDate,
+  previewPayDate,
+  getDaysBasis,
   saveComponent,
   saveDays,
   saveStructure,
@@ -179,6 +210,8 @@ export {
   EmployeePayrollInput,
   StructureInput,
   PayrollSettings,
+  PayScheduleInput,
+  EmployeePortalInput,
   PAY_RUN_STATUSES,
   payrollErrorMessage,
   type EmployeePayrollRow,

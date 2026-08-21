@@ -240,6 +240,46 @@ begin
   else raise notice 'FAIL: a foreign employee saw % pay run(s)', n; failed := failed + 1; end if;
   perform pg_temp.as_postgres();
 
+  -- ═══════════════════════ an administrator can switch payslips off, for real
+  --
+  -- 20260824100000. "The administrator decides what the employee can see" is
+  -- only true if switching it off stops the DATA. `getRunLines` selects
+  -- straight from this table, so a switch honoured only in React leaves every
+  -- figure one fetch away in the browser console — which is the difference
+  -- between a permission and a layout preference.
+  --
+  -- The assertion further up — a person reads their own payslip line — ran with
+  -- no settings row in existence at all, and that is the other half of this
+  -- guard: absent means VISIBLE, so shipping the migration does not silently
+  -- switch every existing workspace's payslips off.
+
+  insert into public.module_settings (organization_id, module_key, setting_key, value)
+  values (org_a, 'payroll', 'settings',
+          jsonb_build_object('employeePortal', jsonb_build_object('payslipsVisible', false)))
+  on conflict (organization_id, module_key, setting_key)
+    do update set value = excluded.value, deleted_at = null;
+
+  perform pg_temp.as_user(emp_a);
+  select count(*) into n from public.pay_run_lines;
+  if n = 0 then raise notice 'ok: payslips switched off stops the data, not only the screen';
+  else raise notice 'FAIL: an employee read % payslip line(s) with payslips switched off', n; failed := failed + 1; end if;
+
+  perform pg_temp.as_user(admin_a);
+  select count(*) into n from public.pay_run_lines;
+  if n = 1 then raise notice 'ok: and an administrator can still run payroll';
+  else raise notice 'FAIL: switching payslips off blinded the administrator too (% rows)', n; failed := failed + 1; end if;
+  perform pg_temp.as_postgres();
+
+  update public.module_settings
+     set value = jsonb_build_object('employeePortal', jsonb_build_object('payslipsVisible', true))
+   where organization_id = org_a and module_key = 'payroll' and setting_key = 'settings';
+
+  perform pg_temp.as_user(emp_a);
+  select count(*) into n from public.pay_run_lines;
+  if n = 1 then raise notice 'ok: and switching them back on returns them';
+  else raise notice 'FAIL: payslips did not come back after being switched on (% rows)', n; failed := failed + 1; end if;
+  perform pg_temp.as_postgres();
+
   -- ═══════════════════════════════════════════════════ an approved run is fixed
 
   update public.pay_runs set status = 'approved', locked_at = now() where id = run_a;
