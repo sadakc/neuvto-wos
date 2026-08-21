@@ -55,11 +55,11 @@ export interface ModuleDashboardCard {
 }
 
 /**
- * A block of configuration a module contributes to Settings.
+ * A block of configuration a module contributes to Configurations.
  *
  * Same reasoning as `dashboardCards`, one screen over. Leave types belong to
  * Leave; the settings page belongs to the platform. Without this, configuring
- * leave would mean `src/routes/app/settings.tsx` importing a module — the exact
+ * leave would mean `src/routes/app/configurations.tsx` importing a module — the exact
  * coupling `app-nav.tsx` shed in step 6, reintroduced by the back door.
  *
  * Rendered only for administrators. That is presentation: RLS is what actually
@@ -87,11 +87,11 @@ export interface ModuleAdminSection {
  * `mergeNavItems` places module items at positions 2–4, and the mobile bar shows
  * the first FIVE. A fifth module item pushes "Approvals" off the bar for an
  * administrator — the identical bug the team calendar caused in step 10, found
- * only by opening the app at 280px wide. Reports belong with People and Settings,
+ * only by opening the app at 280px wide. Reports belong with People and Configurations,
  * which sit past position five deliberately, because admin work is desktop-first.
  *
  * So the platform owns a Reports destination and modules fill it, exactly as
- * they fill Settings and the dashboard. D30 holds: the platform renders a page
+ * they fill Configurations and the dashboard. D30 holds: the platform renders a page
  * of reports without knowing that any of them concern leave.
  *
  * Rendered only for administrators. That is presentation — every report function

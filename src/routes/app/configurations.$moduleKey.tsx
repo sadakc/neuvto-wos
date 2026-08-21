@@ -12,7 +12,7 @@
  * here the day they ship, with nothing in this file changing (D30, D32).
  *
  * A module the organisation has not switched on has no configuration page at
- * all, rather than an empty one — its settings stop existing along with its
+ * all, rather than an empty one — its configurations stop existing along with its
  * pages, exactly as the catch-all route already treats its routes. That is
  * presentation; every function behind these sections enforces `module_enabled_for()`
  * itself (D44), because a page that is merely not reachable is not a switch.
@@ -24,13 +24,13 @@ import type { CurrentUser } from "@/platform/auth";
 import { getModuleAdminSections, type ModuleAdminSection } from "@/platform/modules";
 import { AdminGate } from "@/components/shared/admin-gate";
 
-export const Route = createFileRoute("/app/settings/$moduleKey")({
+export const Route = createFileRoute("/app/configurations/$moduleKey")({
   component: ModuleSettingsRoute,
 });
 
 function ModuleSettingsRoute() {
   const { moduleKey } = Route.useParams();
-  // Keyed on the module so switching between two modules' settings remounts
+  // Keyed on the module so switching between two modules' configurations remounts
   // rather than showing the previous module's sections under the new name.
   return (
     <AdminGate key={moduleKey}>
@@ -86,7 +86,7 @@ function ModuleSettings({ user, moduleKey }: { user: CurrentUser; moduleKey: str
         <h1 className="font-display text-lg font-semibold">Nothing to configure here</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This module either doesn&apos;t exist or your organisation hasn&apos;t switched it on. You
-          can switch modules on under Organisation settings.
+          can switch modules on under Organisation.
         </p>
       </div>
     );

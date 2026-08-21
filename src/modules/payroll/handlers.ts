@@ -508,7 +508,7 @@ export async function savePayrollSettings(settings: PayrollSettings): Promise<Pa
  * date a salary lands on is decided by the same weekend and the same holiday
  * list that leave is counted against.
  *
- * Takes the schedule rather than reading it, so the settings screen can show
+ * Takes the schedule rather than reading it, so the configurations screen can show
  * what an unsaved choice would do. A preview computed from the saved value
  * would answer the previous question.
  *

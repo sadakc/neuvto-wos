@@ -4,7 +4,7 @@
  * This file used to resolve navigation itself: the platform's own entries,
  * merged with every enabled module's, in one list. That list was the whole
  * workspace at once — Dashboard, Apply, My leave, Calendar, Pay runs, Payslips,
- * Approvals, People, Reports, Approval rules, Settings — and it grew by three
+ * Approvals, People, Reports, Approval rules, Configurations — and it grew by three
  * every time a module shipped.
  *
  * It is now handed one scope's items and renders them. Which scope that is, is
@@ -39,7 +39,7 @@ type NavItem = ModuleNavItem;
  *
  * The bar used to be `items.slice(0, 5)` — everything past the fifth was not
  * moved anywhere, it was **deleted from the interface**. An administrator on a
- * phone had no route to Approval rules or Settings at all, and nothing on
+ * phone had no route to Approval rules or Configurations at all, and nothing on
  * screen suggested anything was missing. That is the failure mode this guards:
  * silent truncation reads as "that feature doesn't exist".
  *

@@ -189,7 +189,7 @@ Pradesh's.**
 
 ## Setting it up, in the order it has to be done
 
-Five admin sections at `/app/settings/payroll`, reached from the module switcher
+Five admin sections at `/app/configurations/payroll`, reached from the module switcher
 top-left (D67). They are contributed through the manifest, so the platform
 renders them without importing anything from this folder.
 

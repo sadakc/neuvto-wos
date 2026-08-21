@@ -98,7 +98,7 @@ function Dashboard() {
           <h2 className="text-sm font-medium">Administration</h2>
           <div className="mt-3 flex flex-wrap gap-2">
             {[
-              { to: "/app/settings", label: "Settings" },
+              { to: "/app/configurations", label: "Configurations" },
               { to: "/app/members", label: "People" },
               { to: "/app/approval-rules", label: "Approval rules" },
             ].map((l) => (

@@ -2,7 +2,7 @@
  * The mobile tab bar's arithmetic.
  *
  * `items.slice(0, 5)` silently deleted every destination past the fifth: on a
- * phone an administrator had no route to Approval rules or Settings, and
+ * phone an administrator had no route to Approval rules or Configurations, and
  * nothing on screen said so. A missing feature and a hidden feature look
  * identical to the person using it, which is why this is tested at the seam
  * rather than left to a glance at the screen.
@@ -71,13 +71,13 @@ describe("an administrator can reach every screen from a phone", () => {
     organizationName: "Acme",
   } as unknown as CurrentUser;
 
-  it("reaches Approval rules and Settings", () => {
+  it("reaches Approval rules and Configurations", () => {
     const all = organisationScope(admin).items;
     const { visible, overflow } = splitNavItems([...all]);
     const reachable = [...visible, ...overflow].map((i) => i.label);
 
     expect(all.length).toBeGreaterThan(MAX_VISIBLE_TABS); // else this proves nothing
-    for (const label of ["Approval rules", "Settings", "Reports", "Approvals"]) {
+    for (const label of ["Approval rules", "Configurations", "Reports", "Approvals"]) {
       expect(reachable, `${label} is unreachable on mobile`).toContain(label);
     }
   });

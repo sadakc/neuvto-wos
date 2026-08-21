@@ -10,7 +10,7 @@
  * and the spreadsheet import warned "No department called X" on every row that
  * named one. This is the missing write side.
  *
- * Contributed to Settings alongside the working calendar and company identity.
+ * Contributed to Configurations alongside the working calendar and company identity.
  * Hierarchy is deliberately not exposed yet — `parent_department_id` exists and
  * is preserved, but a tree editor is a different screen and nobody has asked for
  * one. A flat list is what makes the reports work.

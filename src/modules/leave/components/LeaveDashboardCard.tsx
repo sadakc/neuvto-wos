@@ -116,7 +116,7 @@ export default function LeaveDashboardCard() {
           </p>
           {admin && (
             <Link
-              to="/app/settings"
+              to="/app/configurations"
               data-testid="setup-leave-types"
               className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
             >

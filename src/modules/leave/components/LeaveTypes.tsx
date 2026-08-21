@@ -5,7 +5,7 @@
  * allowed this write since step 6; nothing was ever built to make it, so a
  * workspace could be signed into and not used.
  *
- * Contributed to Settings through `adminSections`, so the platform's settings
+ * Contributed to Configurations through `adminSections`, so the platform's settings
  * page renders it without importing this module or knowing Leave exists.
  *
  * Entitlement is not set per person here, and that is the design: days per year

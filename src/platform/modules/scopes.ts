@@ -3,9 +3,9 @@
  *
  * One workspace, several worlds. The shell used to show every destination from
  * every module in a single list — Dashboard, Apply, My leave, Calendar, Pay
- * runs, Payslips, Approvals, People, Reports, Approval rules, Settings — and
+ * runs, Payslips, Approvals, People, Reports, Approval rules, Configurations — and
  * then configuration for all of them on one scrolling page. Sada's words for
- * it: every module should have its own settings, and what the whole
+ * it: every module should have its own configurations, and what the whole
  * organisation shares should stay shared.
  *
  * So the shell resolves to a SCOPE. `organisation` holds what is true whatever
@@ -23,7 +23,7 @@
  *    because nothing currently exceeds it is a cap nobody is enforcing.
  *  - **This file still names no module.** Scopes are built from manifests and
  *    from the `modules` registry table, exactly as the navigation, the
- *    dashboard, the reports screen and the settings page already are (D30, D32).
+ *    dashboard, the reports screen and the configurations page already are (D30, D32).
  *
  * The current scope is derived from the URL and never stored. A scope held in
  * state is a scope that disagrees with the address bar the first time somebody
@@ -92,24 +92,33 @@ export function organisationScope(user: CurrentUser | null): WorkspaceScope {
     items.push({ label: "People", to: "/app/members" });
     items.push({ label: "Reports", to: "/app/reports" });
     items.push({ label: "Approval rules", to: "/app/approval-rules" });
-    items.push({ label: "Settings", to: "/app/settings" });
+    items.push({ label: "Configurations", to: "/app/configurations" });
   }
 
   return {
     key: ORGANISATION_SCOPE,
     name: "Organisation",
     items,
-    owns: ["", "approvals", "members", "reports", "approval-rules", "settings", "import", "setup"],
+    owns: [
+      "",
+      "approvals",
+      "members",
+      "reports",
+      "approval-rules",
+      "configurations",
+      "import",
+      "setup",
+    ],
   };
 }
 
 /**
  * One module's world: its own destinations, then its configuration.
  *
- * The Settings entry appears only for an administrator of a module that
+ * The Configurations entry appears only for an administrator of a module that
  * actually contributes configuration. A module with nothing to configure gets
- * no settings link, rather than a link to an empty page — and the link being
- * absent is not what refuses a non-administrator. `/app/settings/<key>` checks
+ * no configurations link, rather than a link to an empty page — and the link being
+ * absent is not what refuses a non-administrator. `/app/configurations/<key>` checks
  * for itself, because a screen that is merely not linked is not a permission.
  */
 export function moduleScope(m: ModuleDefinition, user: CurrentUser | null): WorkspaceScope {
@@ -119,13 +128,13 @@ export function moduleScope(m: ModuleDefinition, user: CurrentUser | null): Work
   });
 
   const configurable = isAdmin(user) && (m.adminSections?.(user) ?? []).length > 0;
-  if (configurable) items.push({ label: "Settings", to: `/app/settings/${m.key}` });
+  if (configurable) items.push({ label: "Configurations", to: `/app/configurations/${m.key}` });
 
   return {
     key: m.key,
     name: m.name,
     items,
-    owns: [...m.routes.map((r) => r.path), `settings/${m.key}`],
+    owns: [...m.routes.map((r) => r.path), `configurations/${m.key}`],
   };
 }
 

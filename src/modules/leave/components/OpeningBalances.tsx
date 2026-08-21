@@ -6,7 +6,7 @@
  * have not got. Everything else in the product assumes it started counting on
  * day one; this is where somebody says otherwise.
  *
- * Contributed as an adminSection rather than routed, so it appears in Settings
+ * Contributed as an adminSection rather than routed, so it appears in Configurations
  * without the platform naming Leave (D30) — the same arrangement as leave types.
  *
  * It lists people whose balance row does not exist yet, showing the entitlement

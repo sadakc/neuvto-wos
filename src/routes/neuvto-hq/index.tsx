@@ -681,7 +681,7 @@ function AdminConsole() {
                 and only Neuvto's — a customer's own administrator cannot insert
                 an entitlement, which the policy before D44 allowed outright.
                 What they CAN do is switch off something they hold, and that
-                switch lives in their Settings, not here.
+                switch lives in their Configurations, not here.
               */}
               {modulesFor === o.id && (
                 <div className="mt-3 rounded-md border border-border bg-secondary/30 p-3">

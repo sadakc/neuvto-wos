@@ -497,7 +497,7 @@ export function MembersPage() {
                 </div>
 
                 {/* D58. Only once departments exist — an empty dropdown reads as
-                    a broken control, and Settings is where they are created. */}
+                    a broken control, and Configurations is where they are created. */}
                 {departments.length > 0 && (
                   <div className="mt-2 flex flex-col gap-2 sm:flex-row sm:items-center">
                     <label

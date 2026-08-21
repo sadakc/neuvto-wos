@@ -223,7 +223,7 @@ export default function ApplyLeave() {
         </p>
         {isAdmin(user) && (
           <Link
-            to="/app/settings"
+            to="/app/configurations"
             className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
           >
             Set up leave types

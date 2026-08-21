@@ -246,7 +246,7 @@ export default function PaySchedule() {
 
       <p className="text-sm text-muted-foreground">
         The working week and holidays this uses are shared with every module and are set under{" "}
-        <Link to="/app/settings" className="underline underline-offset-2">
+        <Link to="/app/configurations" className="underline underline-offset-2">
           Organisation
         </Link>
         .

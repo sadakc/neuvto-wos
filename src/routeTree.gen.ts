@@ -17,17 +17,17 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as NeuvtoHqIndexRouteImport } from './routes/neuvto-hq/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppSetupRouteImport } from './routes/app/setup'
-import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppReportsRouteImport } from './routes/app/reports'
 import { Route as AppMembersRouteImport } from './routes/app/members'
 import { Route as AppImportRouteImport } from './routes/app/import'
+import { Route as AppConfigurationsRouteImport } from './routes/app/configurations'
 import { Route as AppApprovalsRouteImport } from './routes/app/approvals'
 import { Route as AppApprovalRulesRouteImport } from './routes/app/approval-rules'
 import { Route as AppSplatRouteImport } from './routes/app/$'
 import { Route as Char91DotwellKnownChar93OauthProtectedResourceRouteImport } from './routes/[.well-known]/oauth-protected-resource'
 import { Route as Char91DotmcpChar93ListToolsRouteImport } from './routes/[.mcp]/list-tools'
-import { Route as AppSettingsIndexRouteImport } from './routes/app/settings.index'
-import { Route as AppSettingsModuleKeyRouteImport } from './routes/app/settings.$moduleKey'
+import { Route as AppConfigurationsIndexRouteImport } from './routes/app/configurations.index'
+import { Route as AppConfigurationsModuleKeyRouteImport } from './routes/app/configurations.$moduleKey'
 import { Route as Char91DotmcpChar93InvokeToolToolRouteImport } from './routes/[.mcp]/invoke-tool/$tool'
 import { Route as DotlovableOauthConsentRouteImport } from './routes/[.]lovable.oauth.consent'
 
@@ -71,11 +71,6 @@ const AppSetupRoute = AppSetupRouteImport.update({
   path: '/setup',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppSettingsRoute = AppSettingsRouteImport.update({
-  id: '/settings',
-  path: '/settings',
-  getParentRoute: () => AppRouteRoute,
-} as any)
 const AppReportsRoute = AppReportsRouteImport.update({
   id: '/reports',
   path: '/reports',
@@ -89,6 +84,11 @@ const AppMembersRoute = AppMembersRouteImport.update({
 const AppImportRoute = AppImportRouteImport.update({
   id: '/import',
   path: '/import',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppConfigurationsRoute = AppConfigurationsRouteImport.update({
+  id: '/configurations',
+  path: '/configurations',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppApprovalsRoute = AppApprovalsRouteImport.update({
@@ -118,16 +118,17 @@ const Char91DotmcpChar93ListToolsRoute =
     path: '/.mcp/list-tools',
     getParentRoute: () => rootRouteImport,
   } as any)
-const AppSettingsIndexRoute = AppSettingsIndexRouteImport.update({
+const AppConfigurationsIndexRoute = AppConfigurationsIndexRouteImport.update({
   id: '/',
   path: '/',
-  getParentRoute: () => AppSettingsRoute,
+  getParentRoute: () => AppConfigurationsRoute,
 } as any)
-const AppSettingsModuleKeyRoute = AppSettingsModuleKeyRouteImport.update({
-  id: '/$moduleKey',
-  path: '/$moduleKey',
-  getParentRoute: () => AppSettingsRoute,
-} as any)
+const AppConfigurationsModuleKeyRoute =
+  AppConfigurationsModuleKeyRouteImport.update({
+    id: '/$moduleKey',
+    path: '/$moduleKey',
+    getParentRoute: () => AppConfigurationsRoute,
+  } as any)
 const Char91DotmcpChar93InvokeToolToolRoute =
   Char91DotmcpChar93InvokeToolToolRouteImport.update({
     id: '/.mcp/invoke-tool/$tool',
@@ -151,17 +152,17 @@ export interface FileRoutesByFullPath {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/configurations': typeof AppConfigurationsRouteWithChildren
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
-  '/app/settings': typeof AppSettingsRouteWithChildren
   '/app/setup': typeof AppSetupRoute
   '/app/': typeof AppIndexRoute
   '/neuvto-hq/': typeof NeuvtoHqIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/app/settings/$moduleKey': typeof AppSettingsModuleKeyRoute
-  '/app/settings/': typeof AppSettingsIndexRoute
+  '/app/configurations/$moduleKey': typeof AppConfigurationsModuleKeyRoute
+  '/app/configurations/': typeof AppConfigurationsIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -181,8 +182,8 @@ export interface FileRoutesByTo {
   '/neuvto-hq': typeof NeuvtoHqIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/app/settings/$moduleKey': typeof AppSettingsModuleKeyRoute
-  '/app/settings': typeof AppSettingsIndexRoute
+  '/app/configurations/$moduleKey': typeof AppConfigurationsModuleKeyRoute
+  '/app/configurations': typeof AppConfigurationsIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -196,17 +197,17 @@ export interface FileRoutesById {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
+  '/app/configurations': typeof AppConfigurationsRouteWithChildren
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
-  '/app/settings': typeof AppSettingsRouteWithChildren
   '/app/setup': typeof AppSetupRoute
   '/app/': typeof AppIndexRoute
   '/neuvto-hq/': typeof NeuvtoHqIndexRoute
   '/.lovable/oauth/consent': typeof DotlovableOauthConsentRoute
   '/.mcp/invoke-tool/$tool': typeof Char91DotmcpChar93InvokeToolToolRoute
-  '/app/settings/$moduleKey': typeof AppSettingsModuleKeyRoute
-  '/app/settings/': typeof AppSettingsIndexRoute
+  '/app/configurations/$moduleKey': typeof AppConfigurationsModuleKeyRoute
+  '/app/configurations/': typeof AppConfigurationsIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -221,17 +222,17 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
+    | '/app/configurations'
     | '/app/import'
     | '/app/members'
     | '/app/reports'
-    | '/app/settings'
     | '/app/setup'
     | '/app/'
     | '/neuvto-hq/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/app/settings/$moduleKey'
-    | '/app/settings/'
+    | '/app/configurations/$moduleKey'
+    | '/app/configurations/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -251,8 +252,8 @@ export interface FileRouteTypes {
     | '/neuvto-hq'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/app/settings/$moduleKey'
-    | '/app/settings'
+    | '/app/configurations/$moduleKey'
+    | '/app/configurations'
   id:
     | '__root__'
     | '/'
@@ -265,17 +266,17 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
+    | '/app/configurations'
     | '/app/import'
     | '/app/members'
     | '/app/reports'
-    | '/app/settings'
     | '/app/setup'
     | '/app/'
     | '/neuvto-hq/'
     | '/.lovable/oauth/consent'
     | '/.mcp/invoke-tool/$tool'
-    | '/app/settings/$moduleKey'
-    | '/app/settings/'
+    | '/app/configurations/$moduleKey'
+    | '/app/configurations/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -349,13 +350,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSetupRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/app/settings': {
-      id: '/app/settings'
-      path: '/settings'
-      fullPath: '/app/settings'
-      preLoaderRoute: typeof AppSettingsRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
     '/app/reports': {
       id: '/app/reports'
       path: '/reports'
@@ -375,6 +369,13 @@ declare module '@tanstack/react-router' {
       path: '/import'
       fullPath: '/app/import'
       preLoaderRoute: typeof AppImportRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
+    '/app/configurations': {
+      id: '/app/configurations'
+      path: '/configurations'
+      fullPath: '/app/configurations'
+      preLoaderRoute: typeof AppConfigurationsRouteImport
       parentRoute: typeof AppRouteRoute
     }
     '/app/approvals': {
@@ -412,19 +413,19 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof Char91DotmcpChar93ListToolsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/app/settings/': {
-      id: '/app/settings/'
+    '/app/configurations/': {
+      id: '/app/configurations/'
       path: '/'
-      fullPath: '/app/settings/'
-      preLoaderRoute: typeof AppSettingsIndexRouteImport
-      parentRoute: typeof AppSettingsRoute
+      fullPath: '/app/configurations/'
+      preLoaderRoute: typeof AppConfigurationsIndexRouteImport
+      parentRoute: typeof AppConfigurationsRoute
     }
-    '/app/settings/$moduleKey': {
-      id: '/app/settings/$moduleKey'
+    '/app/configurations/$moduleKey': {
+      id: '/app/configurations/$moduleKey'
       path: '/$moduleKey'
-      fullPath: '/app/settings/$moduleKey'
-      preLoaderRoute: typeof AppSettingsModuleKeyRouteImport
-      parentRoute: typeof AppSettingsRoute
+      fullPath: '/app/configurations/$moduleKey'
+      preLoaderRoute: typeof AppConfigurationsModuleKeyRouteImport
+      parentRoute: typeof AppConfigurationsRoute
     }
     '/.mcp/invoke-tool/$tool': {
       id: '/.mcp/invoke-tool/$tool'
@@ -443,28 +444,27 @@ declare module '@tanstack/react-router' {
   }
 }
 
-interface AppSettingsRouteChildren {
-  AppSettingsModuleKeyRoute: typeof AppSettingsModuleKeyRoute
-  AppSettingsIndexRoute: typeof AppSettingsIndexRoute
+interface AppConfigurationsRouteChildren {
+  AppConfigurationsModuleKeyRoute: typeof AppConfigurationsModuleKeyRoute
+  AppConfigurationsIndexRoute: typeof AppConfigurationsIndexRoute
 }
 
-const AppSettingsRouteChildren: AppSettingsRouteChildren = {
-  AppSettingsModuleKeyRoute: AppSettingsModuleKeyRoute,
-  AppSettingsIndexRoute: AppSettingsIndexRoute,
+const AppConfigurationsRouteChildren: AppConfigurationsRouteChildren = {
+  AppConfigurationsModuleKeyRoute: AppConfigurationsModuleKeyRoute,
+  AppConfigurationsIndexRoute: AppConfigurationsIndexRoute,
 }
 
-const AppSettingsRouteWithChildren = AppSettingsRoute._addFileChildren(
-  AppSettingsRouteChildren,
-)
+const AppConfigurationsRouteWithChildren =
+  AppConfigurationsRoute._addFileChildren(AppConfigurationsRouteChildren)
 
 interface AppRouteRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppApprovalRulesRoute: typeof AppApprovalRulesRoute
   AppApprovalsRoute: typeof AppApprovalsRoute
+  AppConfigurationsRoute: typeof AppConfigurationsRouteWithChildren
   AppImportRoute: typeof AppImportRoute
   AppMembersRoute: typeof AppMembersRoute
   AppReportsRoute: typeof AppReportsRoute
-  AppSettingsRoute: typeof AppSettingsRouteWithChildren
   AppSetupRoute: typeof AppSetupRoute
   AppIndexRoute: typeof AppIndexRoute
 }
@@ -473,10 +473,10 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppApprovalRulesRoute: AppApprovalRulesRoute,
   AppApprovalsRoute: AppApprovalsRoute,
+  AppConfigurationsRoute: AppConfigurationsRouteWithChildren,
   AppImportRoute: AppImportRoute,
   AppMembersRoute: AppMembersRoute,
   AppReportsRoute: AppReportsRoute,
-  AppSettingsRoute: AppSettingsRouteWithChildren,
   AppSetupRoute: AppSetupRoute,
   AppIndexRoute: AppIndexRoute,
 }

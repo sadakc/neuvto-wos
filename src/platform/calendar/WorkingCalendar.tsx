@@ -1,7 +1,7 @@
 /**
  * The organisation's working calendar, as an administrator sets it.
  *
- * Shared by Settings and the setup wizard. It was written twice for about ten
+ * Shared by Configurations and the setup wizard. It was written twice for about ten
  * minutes and that was already enough to notice: a weekend picker whose rules
  * live in two files is a weekend that eventually means two different things,
  * and every balance in the product is counted against it.

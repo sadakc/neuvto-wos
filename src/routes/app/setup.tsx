@@ -309,7 +309,7 @@ function SetupWizard() {
           ) : (
             <p className="mt-3 max-w-prose text-sm text-muted-foreground">
               Everything is configured. Your people can sign in and start using it, and you can
-              change any of this later under Settings.
+              change any of this later under Configurations.
             </p>
           )}
 

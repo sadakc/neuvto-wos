@@ -510,7 +510,7 @@ describe("People — the Department dropdown", () => {
   it("renders no department control at all in a workspace that has none", async () => {
     // The default state of every new workspace. An empty dropdown offering only
     // "No department" is a control that looks broken and answers nothing —
-    // Settings is where departments are created, and the field appears here on
+    // Configurations is where departments are created, and the field appears here on
     // its own once they exist.
     listDepartments.mockResolvedValue([]);
     await renderPeople();

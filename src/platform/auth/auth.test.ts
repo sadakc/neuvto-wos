@@ -175,7 +175,7 @@ describe("role helpers", () => {
 
   it("does not make supervisors or coordinators administrators", () => {
     // The distinction the whole role split rests on. A Supervisor signs off
-    // leave for their own reports; Settings, People and the workspace-wide
+    // leave for their own reports; Configurations, People and the workspace-wide
     // reports are is_admin() and stay closed to them.
     expect(isAdmin(user(["supervisor"]))).toBe(false);
     expect(isAdmin(user(["coordinator"]))).toBe(false);

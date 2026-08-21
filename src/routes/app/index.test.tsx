@@ -151,7 +151,7 @@ describe("Dashboard — the role line", () => {
 });
 
 describe("Dashboard — approving is not administering", () => {
-  it("does not offer Settings, People or Approval rules to a Supervisor", async () => {
+  it("does not offer Configurations, People or Approval rules to a Supervisor", async () => {
     // D57's whole point. A Supervisor signs off leave for their own reports and
     // administers nothing — every one of these three screens is is_admin() in
     // the database and would refuse them, so offering the link promises
@@ -160,7 +160,7 @@ describe("Dashboard — approving is not administering", () => {
     render(<Dashboard />);
     await roleLine();
 
-    expect(screen.queryByRole("link", { name: "Settings" })).toBeNull();
+    expect(screen.queryByRole("link", { name: "Configurations" })).toBeNull();
     expect(screen.queryByRole("link", { name: "People" })).toBeNull();
     expect(screen.queryByRole("link", { name: "Approval rules" })).toBeNull();
     expect(screen.queryByText("Administration")).toBeNull();
@@ -178,7 +178,10 @@ describe("Dashboard — approving is not administering", () => {
     await roleLine();
 
     expect(screen.getByText("Administration")).toBeInTheDocument();
-    expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/app/settings");
+    expect(screen.getByRole("link", { name: "Configurations" })).toHaveAttribute(
+      "href",
+      "/app/configurations",
+    );
     expect(screen.getByRole("link", { name: "People" })).toHaveAttribute("href", "/app/members");
     expect(screen.getByRole("link", { name: "Approval rules" })).toHaveAttribute(
       "href",

@@ -2,7 +2,7 @@
  * What each scope contains, and which one an address belongs to.
  *
  * The second question is the one with a trap in it. The organisation scope owns
- * `settings`, and every module owns `settings/<its key>` — so `/app/settings/payroll`
+ * `configurations`, and every module owns `configurations/<its key>` — so `/app/configurations/payroll`
  * is claimed by two scopes at once, and a first-match rule hands it to whichever
  * happens to be listed first. The organisation always is. The symptom would be
  * opening payroll's own settings and watching the switcher and the sidebar
@@ -53,7 +53,7 @@ describe("the organisation scope", () => {
   it("gives a manager the approvals queue without making them an administrator", () => {
     const labels = organisationScope(user(["manager"])).items.map((i) => i.label);
     expect(labels).toContain("Approvals");
-    expect(labels).not.toContain("Settings");
+    expect(labels).not.toContain("Configurations");
     expect(labels).not.toContain("People");
   });
 
@@ -65,7 +65,7 @@ describe("the organisation scope", () => {
       "People",
       "Reports",
       "Approval rules",
-      "Settings",
+      "Configurations",
     ]);
   });
 });
@@ -88,10 +88,10 @@ describe("a module's scope", () => {
     expect(moduleScope(payroll, employee).items.map((i) => i.label)).toEqual(["Payslips"]);
   });
 
-  it("gives an administrator the module's own settings page", () => {
+  it("gives an administrator the module's own configurations page", () => {
     const items = moduleScope(payroll, admin).items;
-    expect(items.map((i) => i.label)).toEqual(["Pay runs", "Payslips", "Settings"]);
-    expect(items.at(-1)?.to).toBe("/app/settings/payroll");
+    expect(items.map((i) => i.label)).toEqual(["Pay runs", "Payslips", "Configurations"]);
+    expect(items.at(-1)?.to).toBe("/app/configurations/payroll");
   });
 
   it("offers no settings link for a module with nothing to configure", () => {
@@ -106,11 +106,11 @@ describe("a module's scope", () => {
     expect(moduleScope(bare, admin).items.map((i) => i.label)).toEqual(["Courses"]);
   });
 
-  it("claims its own routes and its own settings page, and nothing else", () => {
+  it("claims its own routes and its own configurations page, and nothing else", () => {
     expect(moduleScope(payroll, admin).owns).toEqual([
       "payroll",
       "payroll/payslips",
-      "settings/payroll",
+      "configurations/payroll",
     ]);
   });
 });
@@ -152,17 +152,17 @@ describe("which scope an address belongs to", () => {
     expect(scopeForPath(scopes, "/app/leave/apply")?.key).toBe("leave");
   });
 
-  it("gives the organisation its own settings page", () => {
-    expect(scopeForPath(scopes, "/app/settings")?.key).toBe(ORGANISATION_SCOPE);
+  it("gives the organisation its own configurations page", () => {
+    expect(scopeForPath(scopes, "/app/configurations")?.key).toBe(ORGANISATION_SCOPE);
   });
 
-  it("gives a module's settings page to the MODULE, not the organisation", () => {
-    // Both scopes claim this address: the organisation owns `settings`, payroll
-    // owns `settings/payroll`. Longest match is what decides it, and without
+  it("gives a module's configurations page to the MODULE, not the organisation", () => {
+    // Both scopes claim this address: the organisation owns `configurations`, payroll
+    // owns `configurations/payroll`. Longest match is what decides it, and without
     // that rule the sidebar would show the organisation's destinations while
     // the page showed payroll's configuration.
-    expect(scopeForPath(scopes, "/app/settings/payroll")?.key).toBe("payroll");
-    expect(scopeForPath(scopes, "/app/settings/leave")?.key).toBe("leave");
+    expect(scopeForPath(scopes, "/app/configurations/payroll")?.key).toBe("payroll");
+    expect(scopeForPath(scopes, "/app/configurations/leave")?.key).toBe("leave");
   });
 
   it("claims nothing it does not own", () => {

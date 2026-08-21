@@ -34,7 +34,7 @@ export interface Organization {
  *
  * The app shell reads the organisation once when it mounts, and the shell does
  * NOT remount when the page inside it changes. So renaming the company in
- * Settings, or finishing the setup wizard, left the old name and the old logo
+ * Configurations, or finishing the setup wizard, left the old name and the old logo
  * in the header until a full page load. Caught by walking the wizard: the
  * banner said "Testco is ready" while the header above it still said "Testco
  * Facilities".

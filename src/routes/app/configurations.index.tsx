@@ -25,7 +25,7 @@ import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
 import { Departments } from "@/platform/organization/Departments";
 import { WorkingCalendar } from "@/platform/calendar/WorkingCalendar";
 
-export const Route = createFileRoute("/app/settings/")({
+export const Route = createFileRoute("/app/configurations/")({
   component: () => <AdminGate>{(user) => <OrganisationSettings user={user} />}</AdminGate>,
 });
 
@@ -93,7 +93,7 @@ function OrganisationSettings({ user }: { user: CurrentUser }) {
       </section>
 
       {/* ───────────────────────────────────────── the working calendar
-          Shared with the setup wizard. It lived in full on the old settings page
+          Shared with the setup wizard. It lived in full on the old configurations page
           until the wizard needed the same weekend picker, and a weekend whose
           rules exist in two files is a weekend that eventually means two things
           — with every balance in the product counted against it, and now every
@@ -202,7 +202,7 @@ function OrganisationSettings({ user }: { user: CurrentUser }) {
       {/* ─────────────────────────────────────────────── modules
           Last, because it is the one section that decides whether the others
           have neighbours. Switching a module on here is what makes its own
-          settings page reachable from the switcher. */}
+          configurations page reachable from the switcher. */}
       <section className="mt-12">
         <h2 className="font-display text-lg font-semibold tracking-tight">Modules</h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">

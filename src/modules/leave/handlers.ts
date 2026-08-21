@@ -252,7 +252,7 @@ export async function getLeaveTypes(): Promise<{ id: string; name: string }[]> {
 //
 // The screens below were the gap Sada found first: the database has allowed an
 // administrator to write leave_types since step 6 — there is an "admins write
-// leave types" policy — and nothing was ever built to do it. Settings said
+// leave types" policy — and nothing was ever built to do it. Configurations said
 // "editing arrives with the admin screens", and the workspace was unusable
 // until it did.
 //

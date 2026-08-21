@@ -1,7 +1,7 @@
 /**
  * Resolves the signed-in user and renders only for an administrator.
  *
- * Extracted when settings split into one page per module: the loading skeleton,
+ * Extracted when configurations split into one page per module: the loading skeleton,
  * the "administrators only" refusal and the failed-to-load state were about to
  * be written twice, and two copies of a refusal is how one of them quietly
  * stops refusing.
@@ -36,7 +36,7 @@ export function AdminGate({ children }: { children: (user: CurrentUser) => React
       .catch((e) => {
         if (cancelled) return;
         console.error("admin gate failed", e);
-        setMessage("We couldn't load your settings.");
+        setMessage("We couldn't load your configurations.");
         setState("error");
       });
 
@@ -63,7 +63,7 @@ export function AdminGate({ children }: { children: (user: CurrentUser) => React
       <div className="mx-auto max-w-md text-center">
         <h1 className="font-display text-lg font-semibold">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          Workspace settings are managed by your administrator.
+          Workspace configurations are managed by your administrator.
         </p>
       </div>
     );

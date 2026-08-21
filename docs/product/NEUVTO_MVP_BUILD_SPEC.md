@@ -482,16 +482,16 @@ Payroll was shown eleven destinations and refused four of them.
 
 The shell now resolves to a **scope**, chosen from a switcher at the top left:
 
-| Scope          | Holds                                                                   |
-| -------------- | ----------------------------------------------------------------------- |
-| `organisation` | Dashboard, Approvals, People, Reports, Approval rules, Settings         |
-| one per module | that module's own destinations, then `/app/settings/<key>` for an admin |
+| Scope          | Holds                                                                         |
+| -------------- | ----------------------------------------------------------------------------- |
+| `organisation` | Dashboard, Approvals, People, Reports, Approval rules, Configurations         |
+| one per module | that module's own destinations, then `/app/configurations/<key>` for an admin |
 
 ```
 src/platform/modules/scopes.ts     organisationScope · moduleScope · scopeForPath
 src/components/shared/scope-switcher.tsx
-src/routes/app/settings.index.tsx        the organisation's configuration
-src/routes/app/settings.$moduleKey.tsx   one module's, and nothing else's
+src/routes/app/configurations.index.tsx        the organisation's configuration
+src/routes/app/configurations.$moduleKey.tsx   one module's, and nothing else's
 ```
 
 **The current scope is derived from the URL and never stored.** A remembered
@@ -499,8 +499,8 @@ scope disagrees with the address bar the moment somebody follows a link into a
 module, and a wrong sidebar is worse than none — it is quietly wrong rather than
 obviously broken.
 
-**Longest match wins.** The organisation owns `settings` and every module owns
-`settings/<key>`, so `/app/settings/payroll` is claimed by two scopes at once. A
+**Longest match wins.** The organisation owns `configurations` and every module owns
+`configurations/<key>`, so `/app/configurations/payroll` is claimed by two scopes at once. A
 first-match rule hands it to whichever is listed first, which is always the
 organisation — and the symptom is opening payroll's own configuration while the
 switcher and sidebar insist you are looking at the organisation's. Tested, and

@@ -16,7 +16,7 @@ export const Route = createFileRoute("/app/reports")({
  * Reports, owned by the platform and filled by modules.
  *
  * This file names no module, imports none, and knows nothing about leave — the
- * same arrangement as Settings and the dashboard. When a second module reports
+ * same arrangement as Configurations and the dashboard. When a second module reports
  * on something, it appears here by declaring `reports` in its manifest and
  * changing nothing in this file (D30).
  *

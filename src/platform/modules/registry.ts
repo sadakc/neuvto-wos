@@ -236,7 +236,7 @@ export async function resolveModuleRoute(path: string) {
  * One module's configuration blocks, for its own settings page.
  *
  * Returns nothing at all when the organisation has not switched the module on —
- * which is what `/app/settings/<key>` needs to distinguish "this module has no
+ * which is what `/app/configurations/<key>` needs to distinguish "this module has no
  * settings" from "this module is not yours". A disabled module's configuration
  * must stop existing rather than merely stop being linked, exactly as its pages
  * do in the catch-all route.

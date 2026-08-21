@@ -1,7 +1,7 @@
 /**
  * Inviting people, on its own.
  *
- * Extracted from the Members screen so the setup wizard and Settings share one
+ * Extracted from the Members screen so the setup wizard and Configurations share one
  * form. The rules an invitation can break are already stated in three places —
  * a CHECK constraint, a SECURITY DEFINER function, and the error map in
  * `members.ts` — and a fourth copy of the form would be a fourth place for the
@@ -169,7 +169,7 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
       </div>
 
       {/* Only when there are any. An empty dropdown is a control that looks
-          broken; Settings is where departments are created, and this field
+          broken; Configurations is where departments are created, and this field
           appears on its own once they exist. */}
       {departments.length > 0 && (
         <div className="grid gap-4 sm:grid-cols-2">

@@ -135,7 +135,7 @@ export function isAdmin(user: CurrentUser | null): boolean {
  *
  * Note what is absent: `employee`. And note that this is deliberately NOT
  * `isAdmin` plus extras — a Supervisor approves leave for their own reports and
- * administers nothing, so Settings, People and the workspace-wide reports stay
+ * administers nothing, so Configurations, People and the workspace-wide reports stay
  * closed to them.
  *
  * This function was never the enforcement. Approvals resolve through

@@ -2,7 +2,7 @@
  * The company's own details — the first thing their administrator configures.
  *
  * Used twice, deliberately: as a step in the setup wizard and as a section in
- * Settings. Somebody who skipped it on day one must be able to finish it on day
+ * Configurations. Somebody who skipped it on day one must be able to finish it on day
  * ten, and two copies of a form is two places for the validation to drift.
  */
 

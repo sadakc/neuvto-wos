@@ -14,7 +14,7 @@
  * calls never happened rather than that its markup is absent.
  *
  * The second is that scheduling is attached to the reports it schedules — below
- * the tabs, on the same screen, rather than filed somewhere in Settings where
+ * the tabs, on the same screen, rather than filed somewhere in Configurations where
  * the person looking at a report would never find it.
  *
  * Mocked at the seam and no further: the router, `getCurrentUser`,
