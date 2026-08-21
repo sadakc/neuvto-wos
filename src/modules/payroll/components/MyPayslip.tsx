@@ -5,12 +5,21 @@
  * Nothing else. "Pay runs" is no longer offered to an employee at all, so this
  * is not one screen of several they are refused — it is the destination.
  *
- * Reads `pay_run_lines` directly and gets exactly one person's rows back,
- * because that is what the policy allows — there is no "mine" filter here to
- * forget. A screen that filtered client-side would be one bug away from showing
- * a colleague's salary. The same policy also enforces the administrator's
+ * Reads `pay_run_lines` directly. For an employee the policy hands back exactly
+ * one row — their own — and the same policy enforces the administrator's
  * `payslipsVisible` switch (20260824100000), so when payslips are off this
  * screen is not hiding data it holds; it does not have it.
+ *
+ * FOR AN ADMINISTRATOR IT HANDS BACK EVERY ROW, and this screen used to take
+ * the first of them. An administrator is also an employee, so opening their own
+ * payslip showed whoever sorted first by employee code — Hema's payslip with
+ * Alice's name and Alice's salary on it. Not a disclosure, since an
+ * administrator may read every line anyway, but plainly wrong, and it took
+ * seeding a workspace with more than one person to see it.
+ *
+ * So the line is now selected by identity rather than by position. That is not
+ * a security filter and must not be mistaken for one — RLS is what refuses a
+ * colleague's payslip to somebody who may not read it.
  *
  * Every figure is the one frozen at compute time. A payslip that re-derived
  * itself would change behind the person it was issued to the next time their
@@ -24,6 +33,7 @@
 
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
+import { getCurrentUser } from "@/platform/auth";
 import { getPayDate, getPayrollSettings, getRunLines, listRuns } from "../handlers";
 import type { PayRunSummary, PayrollSettings, PayslipLine } from "../contracts";
 import { monthLabel } from "./usePayRunReport";
@@ -45,6 +55,7 @@ export default function MyPayslip() {
   const [payDate, setPayDate] = useState("");
   const [portal, setPortal] = useState<PayrollSettings["employeePortal"] | null>(null);
   const [slip, setSlip] = useState<PayrollSettings["payslip"] | null>(null);
+  const [me, setMe] = useState<string | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "error">("loading");
   const [error, setError] = useState("");
 
@@ -55,8 +66,13 @@ export default function MyPayslip() {
         // Only approved runs. A draft is still being worked on, and a payslip
         // somebody screenshots before the numbers are final is a conversation
         // nobody in payroll wants to have twice.
-        const [list, settings] = await Promise.all([listRuns(), getPayrollSettings()]);
+        const [list, settings, user] = await Promise.all([
+          listRuns(),
+          getPayrollSettings(),
+          getCurrentUser(),
+        ]);
         if (cancelled) return;
+        setMe(user?.id ?? null);
         const approved = list.filter((r) => r.status === "approved" || r.status === "paid");
         setRuns(approved);
         setPortal(settings.employeePortal);
@@ -81,7 +97,9 @@ export default function MyPayslip() {
       try {
         const lines = await getRunLines(runId);
         if (cancelled) return;
-        setLine(lines[0] ?? null);
+        // By identity, not by position. An administrator is handed every line
+        // in the run, and the first of them is somebody else's.
+        setLine(lines.find((l) => l.employeeId === me) ?? null);
         setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -92,7 +110,7 @@ export default function MyPayslip() {
     return () => {
       cancelled = true;
     };
-  }, [runId]);
+  }, [runId, me]);
 
   // The credit date, resolved against the organisation's own working calendar.
   // Allowed to fail quietly: a payslip without a date is still a payslip, and
@@ -234,9 +252,14 @@ export default function MyPayslip() {
           </p>
         )}
 
+        {/* The month's own length, from the run — NOT `daysPayable + ncpDays`.
+            Non-contributory days are ROUNDED for the PF return, so 29.5 days
+            worked in a 31-day month gives an NCP of 2 and a payslip that read
+            "29.5 of 31.5 days". A month with half a day extra in it is the kind
+            of detail that makes somebody stop trusting the rest of the page. */}
         <p className="mt-1 text-sm text-muted-foreground">
           {line.employeeCode ? `${line.employeeCode} · ` : ""}
-          {line.daysPayable} of {line.daysPayable + line.ncpDays} days payable
+          {line.daysPayable} of {runs.find((r) => r.id === runId)?.daysInMonth ?? "—"} days payable
           {line.departmentName ? ` · ${line.departmentName}` : ""}
         </p>
 

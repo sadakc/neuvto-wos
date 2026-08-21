@@ -217,6 +217,70 @@ begin
   else raise notice 'FAIL: recompute left % lines', n; failed := failed + 1; end if;
   perform pg_temp.as_postgres();
 
+  -- ══════════════ a standing deduction is part of the total, not beside it
+  --
+  -- 20260824140000, and the reason this assertion exists at all. When
+  -- `component_deductions` was added to the line, it was not added to
+  -- `pay_run_line_deductions_add_up` — so the engine computed a correct total
+  -- and the constraint refused it, and the FIRST pay run containing a canteen
+  -- recovery failed to compute with a 400 and nothing on screen.
+  --
+  -- It survived the suite because the engine tests exercised the figure where
+  -- there is no constraint, and the database tests exercised the constraint
+  -- with no such figure. Each half was covered; their meeting point was not.
+  -- This is the meeting point.
+
+  perform pg_temp.as_user(admin_a);
+  begin
+    perform public.payroll_replace_run_lines(run_a, jsonb_build_array(jsonb_build_object(
+      'employeeId', emp_a, 'employeeCode', 'TISR0009', 'departmentName', 'Engineering',
+      'earnedComponents', jsonb_build_array(jsonb_build_object('code','basic','amount',10000)),
+      'deductions', jsonb_build_array(jsonb_build_object('code','canteen','amount',300)),
+      'componentDeductions', 300,
+      'fixedGross', 10000, 'daysPayable', 31,
+      'arrears', 0, 'earnedGross', 10000, 'pfWages', 10000, 'pfEmployee', 1200,
+      'eps', 833, 'epsDifference', 367, 'edli', 50, 'pfAdmin', 50,
+      'esiEligible', true, 'esiEmployee', 75,
+      'esiEmployer', 325, 'professionalTax', 0, 'tds', 0, 'lwf', 0,
+      -- 1200 + 75 + 300 = 1575. The standing deduction is IN the total.
+      'otherDeduction', 0, 'totalDeduction', 1575, 'netPayable', 8425, 'ncpDays', 0)));
+    raise notice 'ok: a line carrying a standing deduction is accepted';
+  exception when others then
+    raise notice 'FAIL: a line with a standing deduction was refused: %', sqlerrm;
+    failed := failed + 1;
+  end;
+
+  -- And the constraint still bites. Same line, total left at what it would have
+  -- been without the canteen recovery — which is exactly the shape of a payslip
+  -- whose deductions do not explain the gap between gross and net.
+  begin
+    perform public.payroll_replace_run_lines(run_a, jsonb_build_array(jsonb_build_object(
+      'employeeId', emp_a, 'employeeCode', 'TISR0009', 'departmentName', 'Engineering',
+      'earnedComponents', jsonb_build_array(jsonb_build_object('code','basic','amount',10000)),
+      'deductions', jsonb_build_array(jsonb_build_object('code','canteen','amount',300)),
+      'componentDeductions', 300,
+      'fixedGross', 10000, 'daysPayable', 31,
+      'arrears', 0, 'earnedGross', 10000, 'pfWages', 10000, 'pfEmployee', 1200,
+      'eps', 833, 'epsDifference', 367, 'edli', 0, 'pfAdmin', 0,
+      'esiEligible', true, 'esiEmployee', 75,
+      'esiEmployer', 325, 'professionalTax', 0, 'tds', 0, 'lwf', 0,
+      'otherDeduction', 0, 'totalDeduction', 1275, 'netPayable', 8725, 'ncpDays', 0)));
+    raise notice 'FAIL: a total that ignores the standing deduction was stored';
+    failed := failed + 1;
+  exception when check_violation then
+    raise notice 'ok: a total that leaves the standing deduction out is refused';
+  end;
+
+  -- Put the run back the way the next assertions expect to find it.
+  perform public.payroll_replace_run_lines(run_a, jsonb_build_array(jsonb_build_object(
+    'employeeId', emp_a, 'employeeCode', 'TISR0009', 'departmentName', 'Engineering',
+    'earnedComponents', '[]'::jsonb, 'fixedGross', 10000, 'daysPayable', 20,
+    'arrears', 0, 'earnedGross', 6452, 'pfWages', 6452, 'pfEmployee', 774,
+    'eps', 537, 'epsDifference', 237, 'esiEligible', true, 'esiEmployee', 49,
+    'esiEmployer', 210, 'professionalTax', 0, 'tds', 0, 'lwf', 0,
+    'otherDeduction', 0, 'totalDeduction', 823, 'netPayable', 5629, 'ncpDays', 11)));
+  perform pg_temp.as_postgres();
+
   -- ══════════════════════════════════════════════ who can read whose payslip
 
   perform pg_temp.as_user(emp_a);
@@ -280,9 +344,49 @@ begin
   else raise notice 'FAIL: payslips did not come back after being switched on (% rows)', n; failed := failed + 1; end if;
   perform pg_temp.as_postgres();
 
+  -- ════════════ an employee can see the MONTH their payslip belongs to
+  --
+  -- 20260824150000, and the third time this module has found the same failure.
+  -- `pay_run_lines` let an employee read their own line from the beginning;
+  -- `pay_runs` never let them read the row it belongs to. The payslip screen —
+  -- the whole of this module for somebody who is not an administrator — asks
+  -- which months exist, got nothing, and told a person with a payslip one table
+  -- over that they had none.
+  --
+  -- It survived because the screen test mocks `listRuns` and hands it an
+  -- approved run: assertions right, fixture one the policy could not produce.
+  -- Caught by seeding a workspace, approving a real run, and signing in.
+  --
+  -- run_a is still in DRAFT at this point, which is half the assertion.
+
+  perform pg_temp.as_user(emp_a);
+  select count(*) into n from public.pay_runs;
+  if n = 0 then raise notice 'ok: an employee cannot see a pay run still being worked on';
+  else raise notice 'FAIL: an employee saw % draft pay run(s)', n; failed := failed + 1; end if;
+  perform pg_temp.as_postgres();
+
+  --
+  -- The other half — that they CAN see it once it is approved — is asserted
+  -- below, where the suite approves this run for its own reasons. Flipping it
+  -- here and back would need the run unlocked again, and an approved run that
+  -- can be unlocked is the thing the next section exists to refuse.
+
   -- ═══════════════════════════════════════════════════ an approved run is fixed
 
   update public.pay_runs set status = 'approved', locked_at = now() where id = run_a;
+
+  -- The other half of the run-visibility guard (20260824150000): approved, and
+  -- the person paid in it can now see the month it belongs to.
+  perform pg_temp.as_user(emp_a);
+  select count(*) into n from public.pay_runs;
+  if n = 1 then raise notice 'ok: and can see it once it is approved and they are in it';
+  else raise notice 'FAIL: an employee could not see the approved run they are paid in (% rows)', n; failed := failed + 1; end if;
+
+  perform pg_temp.as_user(mgr_a);
+  select count(*) into n from public.pay_runs;
+  if n = 0 then raise notice 'ok: somebody with no line in the run still sees nothing of it';
+  else raise notice 'FAIL: somebody with no line saw % pay run(s)', n; failed := failed + 1; end if;
+  perform pg_temp.as_postgres();
 
   begin
     update public.pay_run_lines set net_payable = 999999, total_deduction = earned_gross - 999999

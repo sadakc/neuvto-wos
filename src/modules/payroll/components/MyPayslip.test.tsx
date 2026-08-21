@@ -18,6 +18,10 @@ const getRunLines = vi.fn<() => Promise<PayslipLine[]>>();
 const getPayrollSettings = vi.fn<() => Promise<PayrollSettings>>();
 const getPayDate = vi.fn<() => Promise<string>>();
 
+const getCurrentUser = vi.fn();
+
+vi.mock("@/platform/auth", () => ({ getCurrentUser: () => getCurrentUser() }));
+
 vi.mock("../handlers", () => ({
   listRuns: () => listRuns(),
   getRunLines: () => getRunLines(),
@@ -91,6 +95,7 @@ beforeEach(() => {
   getRunLines.mockResolvedValue([line()]);
   getPayrollSettings.mockResolvedValue(portal());
   getPayDate.mockResolvedValue("2026-07-31");
+  getCurrentUser.mockResolvedValue({ id: "e1" });
 });
 
 describe("Payslip — exempt is not zero", () => {
@@ -284,5 +289,49 @@ describe("Payslip — an announcement that takes itself down", () => {
     );
     render(<MyPayslip />);
     expect(await screen.findByTestId("payslip-contact")).toHaveTextContent("hema@acme.test");
+  });
+});
+
+describe("Payslip — the month has the number of days the month has", () => {
+  it("takes the denominator from the run, not from the rounded NCP days", async () => {
+    // 29.5 days worked in a 31-day month gives an NCP of 2, because NCP is
+    // rounded for the PF return. Adding the two back together produced a
+    // payslip reading "29.5 of 31.5 days" — a month with half a day extra in
+    // it, which is the kind of detail that makes somebody stop trusting the
+    // rest of the page.
+    getRunLines.mockResolvedValue([line({ daysPayable: 29.5, ncpDays: 2 })]);
+    render(<MyPayslip />);
+
+    await screen.findByText("Net pay");
+    expect(screen.getByText(/29.5 of 31 days payable/)).toBeInTheDocument();
+    expect(screen.queryByText(/31.5 days/)).not.toBeInTheDocument();
+  });
+});
+
+describe("Payslip — whose payslip it is", () => {
+  it("shows the reader's own line, not the first one in the run", async () => {
+    // An administrator is also an employee, and the policy hands them EVERY
+    // line. Taking the first produced Hema's payslip with Alice's name and
+    // Alice's salary on it — found by seeding a workspace with more than one
+    // person in it, which is the only way it shows.
+    getRunLines.mockResolvedValue([
+      line({ employeeId: "someone-else", employeeName: "Alice Admin", netPayable: 99999 }),
+      line({ employeeId: "e1", employeeName: "Sam Christopher" }),
+    ]);
+
+    render(<MyPayslip />);
+    await screen.findByText("Net pay");
+
+    expect(screen.getByText("Sam Christopher")).toBeInTheDocument();
+    expect(screen.queryByText("Alice Admin")).not.toBeInTheDocument();
+    expect(screen.queryByText("₹99,999")).not.toBeInTheDocument();
+  });
+
+  it("says there is nothing rather than showing a stranger's, when the reader has no line", async () => {
+    getRunLines.mockResolvedValue([
+      line({ employeeId: "someone-else", employeeName: "Alice Admin" }),
+    ]);
+    render(<MyPayslip />);
+    expect(await screen.findByText(/You have no payslips yet/i)).toBeInTheDocument();
   });
 });
