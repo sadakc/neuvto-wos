@@ -1,6 +1,6 @@
 # Payroll
 
-**Version:** 1.3 · **Status:** Active · **Updated:** 21 Aug 2026
+**Version:** 1.4 · **Status:** Active · **Updated:** 21 Aug 2026
 
 The second module. It replaces an eleven-sheet Excel workbook that runs a real
 payroll every month, and its acceptance criterion is that workbook's own July
@@ -285,6 +285,66 @@ Enforced by a trigger (`COMPONENT_IN_USE`), not by the screen, because the
 screen is not what a stale browser tab, an import or a future handler goes
 through. `inUse` is derived on read from the structure lines themselves — a
 stored flag and the structures it describes drift, and it is the flag that lies.
+
+---
+
+## The statutory schemes
+
+Five, each a switch with an explainer, because none of them applies to
+everybody: an establishment under twenty people need not register for provident
+fund, professional tax and the labour welfare fund are levied by **states** that
+disagree with each other, and statutory bonus depends on what somebody earns.
+
+| Scheme              | Default | Computes                                      |
+| ------------------- | ------- | --------------------------------------------- |
+| Provident fund      | **On**  | Yes — EPF, EPS, and optionally EDLI and admin |
+| State insurance     | **On**  | Yes                                           |
+| Professional tax    | **On**  | Yes, from the state's own bands               |
+| Labour welfare fund | Off     | Yes, once switched on                         |
+| Statutory bonus     | Off     | No — recorded only                            |
+
+**The spec ships every scheme off; three of these default on.** That is a
+deliberate divergence and the reason is the same rule that governed the
+component backfill: provident fund, state insurance and professional tax have
+been computed on every pay run this module has ever produced, so defaulting them
+off would mean this release quietly stripping all three from the next payslip of
+every existing workspace. Switching one off is still one click, with an
+explainer either way.
+
+**Off is a state, not an empty form.** An administrator has to be able to tell
+"we do not run this" from "nobody has filled it in yet", and a blank form says
+the second when it means the first.
+
+### Professional tax is bands, not a threshold
+
+It is a state tax and the states do not agree on how many bands there are.
+Karnataka has two; Maharashtra has three and a different one in March. Encoding
+Karnataka's shape as _the_ shape would mean rewriting the engine to sell to
+somebody in Pune — so the policy carries a list, `upTo: null` is the top band,
+and an **empty list is a state that levies none**, which is a different thing
+from a band charging nought.
+
+The state is named on the screen, deliberately. The workbook this replaces files
+_Form 5A under the Andhra Pradesh_ Professions Tax Act for a Karnataka
+establishment while applying Karnataka's slab, and nobody noticed for years.
+
+### The labour welfare fund takes the figure over
+
+It is collected once a year in most states — Karnataka in December. While the
+scheme is on, the fund decides the amount **including the nothing it takes in
+the other eleven months**, and anything typed into a pay run for it is ignored.
+Leaving the typed figure standing in those months is how a yearly fund gets
+collected twelve times.
+
+While the scheme is off, the typed figure is the answer, which is what the
+workbook does.
+
+### What the employer pays, kept apart from what the employee pays
+
+EDLI and administration charges are employer-side, opt-in, computed on PF wages
+and **never deducted from anybody**. They are frozen on the line like every
+other figure, because a return filed in November for July must show July's
+rates, and rates change by notification.
 
 ---
 

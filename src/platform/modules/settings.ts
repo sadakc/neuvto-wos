@@ -25,6 +25,7 @@
  * here, because a check here would imply the policy is not trusted.
  */
 
+import { z } from "zod";
 import { supabase } from "@/integrations/supabase/client";
 import { AppError, toAppError } from "@/platform/errors";
 import { moduleByKey } from "./registry";
@@ -32,12 +33,22 @@ import { moduleByKey } from "./registry";
 /** One row per module. The table permits more; nothing needs more yet. */
 const SETTING_KEY = "settings";
 
-function schemaFor(moduleKey: string) {
+/**
+ * The schema to parse against.
+ *
+ * A module may hand over its own, and its own handlers should: looking a
+ * module's schema up through the registry means the module cannot be exercised
+ * unless the whole registry has been installed first, which is a runtime
+ * dependency on the platform that the module boundary exists to avoid. The
+ * registry lookup remains for a platform-side caller holding nothing but a key.
+ *
+ * A key this build does not have is a developer error, and a silent empty
+ * object would reach a screen as a mysteriously unconfigurable one.
+ */
+function schemaFor(moduleKey: string, schema?: z.ZodTypeAny) {
+  if (schema) return schema;
   const definition = moduleByKey(moduleKey);
   if (!definition) {
-    // A caller naming a module this build does not have is a developer error,
-    // and a silent empty object would let it reach a screen as a mysteriously
-    // unconfigurable one.
     throw new AppError("NOT_FOUND", "That module isn't installed.", 404);
   }
   return definition.settingsSchema;
@@ -54,8 +65,8 @@ function schemaFor(moduleKey: string) {
  * unreadable setting is recoverable; rendering a pay date from a string that
  * used to be a number is not.
  */
-export async function getModuleSettings<T>(moduleKey: string): Promise<T> {
-  const schema = schemaFor(moduleKey);
+export async function getModuleSettings<T>(moduleKey: string, schema?: z.ZodTypeAny): Promise<T> {
+  const parser = schemaFor(moduleKey, schema);
 
   const { data, error } = await supabase
     .from("module_settings")
@@ -69,10 +80,10 @@ export async function getModuleSettings<T>(moduleKey: string): Promise<T> {
   // code implies the policy cannot be trusted.
   if (error) throw toAppError(error, "getModuleSettings");
 
-  const stored = schema.safeParse(data?.value ?? {});
+  const stored = parser.safeParse(data?.value ?? {});
   if (stored.success) return stored.data as T;
 
-  return schema.parse({}) as T;
+  return parser.parse({}) as T;
 }
 
 /**
@@ -86,10 +97,9 @@ export async function saveModuleSettings<T>(
   organizationId: string,
   moduleKey: string,
   value: T,
+  schema?: z.ZodTypeAny,
 ): Promise<T> {
-  const schema = schemaFor(moduleKey);
-
-  const parsed = schema.safeParse(value);
+  const parsed = schemaFor(moduleKey, schema).safeParse(value);
   if (!parsed.success) {
     throw new AppError("VALIDATION_FAILED", "Those settings couldn't be saved.", 400);
   }

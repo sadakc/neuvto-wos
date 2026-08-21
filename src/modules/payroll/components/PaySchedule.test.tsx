@@ -16,7 +16,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { PayrollSettings } from "../contracts";
+import { StatutorySchemes, type PayrollSettings } from "../contracts";
 
 const getPayrollSettings = vi.fn<() => Promise<PayrollSettings>>();
 const savePayrollSettings = vi.fn();
@@ -50,6 +50,7 @@ const settings = (over: Partial<PayrollSettings["paySchedule"]> = {}): PayrollSe
   // `.default()`, saving a partial object does not fail — Zod refills it — so a
   // fixture that matches the defaults cannot tell "preserved" from "reset". The
   // first version of this file did exactly that and passed a sabotage.
+  statutory: StatutorySchemes.parse({}),
   employeePortal: { payslipsVisible: false, showStatutoryBreakdown: false, showPayDate: true },
 });
 

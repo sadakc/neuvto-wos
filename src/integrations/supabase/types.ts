@@ -1306,6 +1306,7 @@ export type Database = {
           department_name: string | null
           earned_components: Json
           earned_gross: number
+          edli: number
           employee_code: string | null
           employee_id: string
           eps: number
@@ -1321,6 +1322,7 @@ export type Database = {
           organization_id: string
           other_deduction: number
           pay_run_id: string
+          pf_admin: number
           pf_employee: number
           pf_wages: number
           professional_tax: number
@@ -1340,6 +1342,7 @@ export type Database = {
           department_name?: string | null
           earned_components?: Json
           earned_gross: number
+          edli?: number
           employee_code?: string | null
           employee_id: string
           eps?: number
@@ -1355,6 +1358,7 @@ export type Database = {
           organization_id: string
           other_deduction?: number
           pay_run_id: string
+          pf_admin?: number
           pf_employee?: number
           pf_wages?: number
           professional_tax?: number
@@ -1374,6 +1378,7 @@ export type Database = {
           department_name?: string | null
           earned_components?: Json
           earned_gross?: number
+          edli?: number
           employee_code?: string | null
           employee_id?: string
           eps?: number
@@ -1389,6 +1394,7 @@ export type Database = {
           organization_id?: string
           other_deduction?: number
           pay_run_id?: string
+          pf_admin?: number
           pf_employee?: number
           pf_wages?: number
           professional_tax?: number

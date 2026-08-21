@@ -87,9 +87,45 @@ export interface EmployeeInput {
  * Every rate is passed in rather than baked in. A rate written into the engine
  * is a rate that changes with a deployment, and these change by notification.
  */
+/**
+ * One band of professional tax. `upTo` is inclusive; `null` is "and above".
+ *
+ * A list rather than a threshold and an amount, because professional tax is a
+ * STATE tax and the states do not agree on how many bands there are. Karnataka
+ * has two; Maharashtra has three and a different one in March. Encoding
+ * Karnataka's shape as the shape would mean rewriting the engine to sell to
+ * somebody in Pune.
+ */
+export interface PtSlab {
+  readonly upTo: number | null;
+  readonly amount: number;
+}
+
+/** Labour welfare fund: a flat contribution, usually once a year. */
+export interface LwfScheme {
+  readonly enabled: boolean;
+  readonly employee: number;
+  readonly employer: number;
+  readonly cycle: "monthly" | "yearly";
+  /** 1–12. Only read when `cycle` is `yearly`. Karnataka collects in December. */
+  readonly deductInMonth: number;
+}
+
 export interface PayrollPolicy {
   /** Calendar days in the month. Proration is by calendar day, not a fixed 30. */
   readonly daysInMonth: number;
+  /**
+   * 1–12, the month being paid. Read only by the labour welfare fund, which is
+   * collected once a year and therefore has to know which month it is.
+   */
+  readonly periodMonth: number;
+  /**
+   * Whether this organisation runs EPF at all. Off means no provident fund line
+   * rather than a zero one — an establishment under twenty people is not
+   * required to register, and a payslip claiming ₹0 PF implies a scheme that
+   * happens to have deducted nothing.
+   */
+  readonly epfEnabled: boolean;
   readonly pfWageCeiling: number;
   /**
    * Whether PF wages are capped at the ceiling ("restricted PF wage") or
@@ -105,13 +141,17 @@ export interface PayrollPolicy {
   readonly restrictPfWagesToCeiling: boolean;
   readonly pfRate: number;
   readonly epsRate: number;
+  /** Employer-side, on PF wages. Both zero unless the organisation includes them. */
+  readonly edliRate: number;
+  readonly pfAdminRate: number;
+  readonly esiEnabled: boolean;
   /** Tested against FIXED gross, not earned — see `computeEmployee`. */
   readonly esiGrossCeiling: number;
   readonly esiEmployeeRate: number;
   readonly esiEmployerRate: number;
-  /** Professional tax applies above this earned gross, at `ptAmount`. */
-  readonly ptThreshold: number;
-  readonly ptAmount: number;
+  /** Bands, lowest first. An empty list means this state levies none. */
+  readonly ptSlabs: readonly PtSlab[];
+  readonly lwf: LwfScheme;
 }
 
 export interface EarnedComponent {
@@ -153,6 +193,12 @@ export interface PayrollLine {
   readonly esiEmployer: number;
 
   readonly professionalTax: number;
+  /**
+   * Employer-side contributions the PF return asks for separately. Zero unless
+   * the organisation has chosen to include them; never deducted from anybody.
+   */
+  readonly edli: number;
+  readonly pfAdmin: number;
   readonly tds: number;
   readonly lwf: number;
   readonly otherDeduction: number;

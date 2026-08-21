@@ -13,7 +13,7 @@
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import type { PayrollSettings } from "../contracts";
+import { StatutorySchemes, type PayrollSettings } from "../contracts";
 
 const getPayrollSettings = vi.fn<() => Promise<PayrollSettings>>();
 const savePayrollSettings = vi.fn();
@@ -35,6 +35,7 @@ const settings = (over: Partial<PayrollSettings["employeePortal"]> = {}): Payrol
     payDateRule: "day_of_next_month",
     payDay: 7,
   },
+  statutory: StatutorySchemes.parse({}),
   employeePortal: {
     payslipsVisible: true,
     showStatutoryBreakdown: true,

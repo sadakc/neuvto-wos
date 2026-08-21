@@ -21,9 +21,15 @@ import { AppError } from "@/platform/errors";
 import { getModuleSettings, saveModuleSettings } from "@/platform/modules";
 import { getExcludedDays } from "@/platform/calendar";
 import { computePayRun, DEFAULT_POLICY, payableDaysBasis, resolvePayDate } from "@/payroll-core";
-import type { ComponentDefinition, EmployeeInput, PayrollLine } from "@/payroll-core";
+import type {
+  ComponentDefinition,
+  EmployeeInput,
+  PayrollLine,
+  PayrollPolicy,
+} from "@/payroll-core";
 import {
   ComponentInput,
+  PayrollSettings,
   DaysInput,
   EmployeePayrollInput,
   StructureInput,
@@ -33,7 +39,6 @@ import {
   type EmployeePayrollRow,
   type PayRunStatus,
   type PayRunSummary,
-  type PayrollSettings,
   type PayslipLine,
   type SalaryComponent,
   type StructureRow,
@@ -140,10 +145,7 @@ export async function computeRun(runId: string): Promise<ComputeResult> {
     otherDeduction: e.otherDeduction,
   }));
 
-  const run = computePayRun(engineInput, components, {
-    ...DEFAULT_POLICY,
-    daysInMonth: inputs.daysInMonth,
-  });
+  const run = computePayRun(engineInput, components, await policyFor(inputs));
 
   // `employeeCode` carried the id through the engine, which has no concept of a
   // database key. Re-attach the real code and name for the frozen line.
@@ -185,6 +187,8 @@ function toStoredLine(line: PayrollLine, source: RunInputs["employees"][number] 
     pfWages: line.pfWages,
     pfEmployee: line.pfEmployee,
     eps: line.eps,
+    edli: line.edli,
+    pfAdmin: line.pfAdmin,
     epsDifference: line.epsDifference,
     esiEligible: line.esiEligible,
     esiEmployee: line.esiEmployee,
@@ -536,6 +540,8 @@ export async function getRunLines(runId: string): Promise<PayslipLine[]> {
     departmentName: r.department_name,
     earned: (r.earned_components as { code: string; amount: number }[]) ?? [],
     deductions: (r.deductions as { code: string; amount: number }[]) ?? [],
+    edli: Number(r.edli ?? 0),
+    pfAdmin: Number(r.pf_admin ?? 0),
     componentDeductions: Number(r.component_deductions ?? 0),
     fixedGross: Number(r.fixed_gross),
     daysPayable: Number(r.days_payable),
@@ -564,6 +570,60 @@ async function currentOrgId(): Promise<string> {
   return data as string;
 }
 
+// ═══════════════════════════════════════════════ configuration into arithmetic
+
+/**
+ * The organisation's statutory configuration, as the engine wants it.
+ *
+ * One place where percentages become fractions and a scheme's `enabled` flag
+ * becomes a zero. Doing this at the call site instead would mean every future
+ * caller of `computePayRun` reproducing the conversion, and one of them getting
+ * `12` where the engine expects `0.12` — a hundredfold provident fund deduction
+ * that every total would still reconcile against.
+ *
+ * A scheme that is off contributes ITS OWN defaults rather than the statutory
+ * ones. Reading a disabled scheme's rate would let a rate somebody typed while
+ * experimenting reach a pay run the moment they switched it on.
+ */
+export async function policyFor(inputs: {
+  daysInMonth: number;
+  periodMonth: string;
+}): Promise<PayrollPolicy> {
+  const { statutory, paySchedule } = await getPayrollSettings();
+  const pct = (n: number) => n / 100;
+
+  return {
+    ...DEFAULT_POLICY,
+    daysInMonth: payableDaysBasis(paySchedule, inputs.daysInMonth),
+    periodMonth: Number(inputs.periodMonth.slice(5, 7)),
+
+    epfEnabled: statutory.epf.enabled,
+    pfWageCeiling: statutory.epf.wageCeiling,
+    restrictPfWagesToCeiling: statutory.epf.restrictToCeiling,
+    pfRate: pct(statutory.epf.employeeRate),
+    epsRate: pct(statutory.epf.pensionRate),
+    edliRate: statutory.epf.includeEdli ? pct(statutory.epf.edliRate) : 0,
+    pfAdminRate: statutory.epf.includeAdminCharges ? pct(statutory.epf.adminChargeRate) : 0,
+
+    esiEnabled: statutory.esi.enabled,
+    esiGrossCeiling: statutory.esi.grossCeiling,
+    esiEmployeeRate: pct(statutory.esi.employeeRate),
+    esiEmployerRate: pct(statutory.esi.employerRate),
+
+    // An empty band list is a state that levies no professional tax, which is
+    // a different thing from a band charging nought — and reads more clearly.
+    ptSlabs: statutory.pt.enabled ? statutory.pt.slabs : [],
+
+    lwf: {
+      enabled: statutory.lwf.enabled,
+      employee: statutory.lwf.employee,
+      employer: statutory.lwf.employer,
+      cycle: statutory.lwf.cycle,
+      deductInMonth: statutory.lwf.deductInMonth,
+    },
+  };
+}
+
 // ═══════════════════════════════════════════════════ pay schedule and portal
 
 /**
@@ -574,7 +634,9 @@ async function currentOrgId(): Promise<string> {
  * here.
  */
 export async function getPayrollSettings(): Promise<PayrollSettings> {
-  return getModuleSettings<PayrollSettings>("payroll");
+  // Its own schema, not the registry's copy of it — this module must be
+  // exercisable without the platform registry having been installed.
+  return getModuleSettings<PayrollSettings>("payroll", PayrollSettings);
 }
 
 export async function savePayrollSettings(settings: PayrollSettings): Promise<PayrollSettings> {

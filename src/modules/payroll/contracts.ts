@@ -252,6 +252,137 @@ export const EmployeePortalInput = z.object({
 export type EmployeePortalInput = z.infer<typeof EmployeePortalInput>;
 
 /**
+ * The statutory schemes, each switched on or off deliberately.
+ *
+ * ── A deliberate divergence from the source spec ────────────────────────────
+ *
+ * The spec ships every scheme OFF behind an explainer and an "Enable" button,
+ * and that is right for a product onboarding a customer who may not be
+ * registered. It is wrong here, for one reason: **provident fund, employee
+ * state insurance and professional tax already run.** They have been computed
+ * on every pay run this module has ever produced, and a default of off would
+ * mean this release quietly stripping all three from the next payslip of every
+ * existing workspace — the same rule that governed the component backfill, a
+ * release must not restate a payslip.
+ *
+ * So the three that already run default ON at their statutory rates, and the
+ * two the workbook does not do — labour welfare fund and statutory bonus —
+ * default OFF. Every one of them is a visible switch with an explainer either
+ * way, so switching provident fund off for an establishment under twenty people
+ * is one deliberate click rather than an argument with the product.
+ *
+ * Rates carry their statutory defaults, so an organisation switching a scheme
+ * on gets the correct arithmetic without having to know it.
+ */
+export const EpfScheme = z.object({
+  enabled: z.boolean().default(true),
+  /**
+   * Restricted charges PF on wages capped at the ceiling; actual charges on
+   * what was earned. This is also the switch that makes a component's
+   * `under_threshold` treatment mean anything — capped, it is invisible.
+   */
+  restrictToCeiling: z.boolean().default(true),
+  wageCeiling: z.number().min(0).max(1_000_000).default(15_000),
+  employeeRate: z.number().min(0).max(100).default(12),
+  pensionRate: z.number().min(0).max(100).default(8.33),
+  /** Employer-side, and only charged when the organisation includes them. */
+  includeEdli: z.boolean().default(false),
+  edliRate: z.number().min(0).max(100).default(0.5),
+  includeAdminCharges: z.boolean().default(false),
+  adminChargeRate: z.number().min(0).max(100).default(0.5),
+});
+export type EpfScheme = z.infer<typeof EpfScheme>;
+
+export const EsiScheme = z.object({
+  enabled: z.boolean().default(true),
+  /** `00-00-000000-000-0000`. Optional, like every other identifier here. */
+  number: z
+    .string()
+    .trim()
+    .regex(
+      /^[0-9]{2}-[0-9]{2}-[0-9]{6}-[0-9]{3}-[0-9]{4}$/,
+      "An ESI number looks like 00-00-000000-000-0000",
+    )
+    .or(z.literal(""))
+    .default(""),
+  grossCeiling: z.number().min(0).max(1_000_000).default(21_000),
+  employeeRate: z.number().min(0).max(100).default(0.75),
+  employerRate: z.number().min(0).max(100).default(3.25),
+  includeEmployerInCtc: z.boolean().default(false),
+});
+export type EsiScheme = z.infer<typeof EsiScheme>;
+
+/**
+ * Professional tax, as bands rather than a threshold and an amount.
+ *
+ * It is a STATE tax and the states do not agree on how many bands there are.
+ * Karnataka has two; encoding that shape as the shape would mean rewriting the
+ * engine to sell to somebody in Pune. `upTo: null` is the top band.
+ *
+ * The workbook this replaces files *Form 5A under the Andhra Pradesh*
+ * Professions Tax Act while the establishment is in Karnataka and the slab it
+ * actually applies is Karnataka's. Naming the state here is how that stops
+ * being a thing nobody notices.
+ */
+export const PtSlabInput = z.object({
+  upTo: z.number().min(0).max(100_000_000).nullable(),
+  amount: z.number().min(0).max(100_000),
+});
+
+export const PtScheme = z.object({
+  enabled: z.boolean().default(true),
+  state: z.string().trim().max(60).default("Karnataka"),
+  registrationNumber: z.string().trim().max(40).default(""),
+  slabs: z.array(PtSlabInput).default([
+    { upTo: 24_999, amount: 0 },
+    { upTo: null, amount: 200 },
+  ]),
+});
+export type PtScheme = z.infer<typeof PtScheme>;
+
+export const LwfScheme = z.object({
+  enabled: z.boolean().default(false),
+  state: z.string().trim().max(60).default("Karnataka"),
+  employee: z.number().min(0).max(100_000).default(50),
+  employer: z.number().min(0).max(100_000).default(100),
+  cycle: z.enum(["monthly", "yearly"]).default("yearly"),
+  /** Karnataka collects in December. */
+  deductInMonth: z.number().int().min(1).max(12).default(12),
+});
+export type LwfScheme = z.infer<typeof LwfScheme>;
+
+/**
+ * Statutory bonus — CONFIGURED, and deliberately not computed.
+ *
+ * Bonus and off-cycle runs are out of scope for this MVP, and the arithmetic
+ * needs a per-state minimum wage table this product does not have. Recording
+ * the percentage an organisation has settled on is still worth doing; pretending
+ * it reaches a payslip would not be.
+ *
+ * The statutory range is 8.33% to 20% and the schema holds employers to it,
+ * because a number outside it is not a policy decision, it is a typo.
+ */
+export const BonusScheme = z.object({
+  enabled: z.boolean().default(false),
+  frequency: z.enum(["monthly", "yearly"]).default("yearly"),
+  percentage: z
+    .number()
+    .min(8.33, "Statutory bonus is at least 8.33%")
+    .max(20, "Statutory bonus is capped at 20%")
+    .default(8.33),
+});
+export type BonusScheme = z.infer<typeof BonusScheme>;
+
+export const StatutorySchemes = z.object({
+  epf: EpfScheme.default({}),
+  esi: EsiScheme.default({}),
+  pt: PtScheme.default({}),
+  lwf: LwfScheme.default({}),
+  bonus: BonusScheme.default({}),
+});
+export type StatutorySchemes = z.infer<typeof StatutorySchemes>;
+
+/**
  * Everything this module lets a customer configure, stored as one row in
  * `module_settings` (D7).
  *
@@ -261,6 +392,7 @@ export type EmployeePortalInput = z.infer<typeof EmployeePortalInput>;
  */
 export const PayrollSettings = z.object({
   paySchedule: PayScheduleInput.default({}),
+  statutory: StatutorySchemes.default({}),
   employeePortal: EmployeePortalInput.default({}),
 });
 export type PayrollSettings = z.infer<typeof PayrollSettings>;
@@ -390,6 +522,9 @@ export interface PayslipLine {
   pfEmployee: number;
   eps: number;
   epsDifference: number;
+  /** Employer-side, for the ECR return. Never deducted from anybody. */
+  edli: number;
+  pfAdmin: number;
   esiEligible: boolean;
   esiEmployee: number;
   esiEmployer: number;

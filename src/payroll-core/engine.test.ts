@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { computeEmployee, computePayRun, DEFAULT_POLICY } from "./engine";
+import { computeEmployee, computePayRun, professionalTaxFor, DEFAULT_POLICY } from "./engine";
+import { round0 } from "./money";
 import type { EmployeeInput, PayrollPolicy } from "./types";
 import { COMPONENTS, DAYS_IN_MONTH, EMPLOYEES, EXPECTED_TOTALS } from "./__fixtures__/july-2026";
 
-const POLICY: PayrollPolicy = { ...DEFAULT_POLICY, daysInMonth: DAYS_IN_MONTH };
+const POLICY: PayrollPolicy = { ...DEFAULT_POLICY, daysInMonth: DAYS_IN_MONTH, periodMonth: 7 };
 
 const employee = (over: Partial<EmployeeInput> = {}): EmployeeInput => ({
   employeeCode: "E1",
@@ -458,5 +459,132 @@ describe("Benefits and reimbursements are configured, not computed", () => {
     expect(line.earnedGross).toBe(20_000);
     expect(line.componentDeductions).toBe(0);
     expect(line.earned.find((c) => c.code === "vpf")).toBeUndefined();
+  });
+});
+
+describe("Provident fund as a scheme that can be off", () => {
+  const off: PayrollPolicy = { ...POLICY, epfEnabled: false };
+
+  it("produces no contribution rather than a zero one", () => {
+    // An establishment under twenty people is not required to register. A
+    // payslip showing ₹0 provident fund implies a scheme that happens to have
+    // deducted nothing, which is a different and misleading claim.
+    const line = computeEmployee(employee(), COMPONENTS, off);
+    expect(line.pfEmployee).toBe(0);
+    expect(line.eps).toBe(0);
+    expect(line.epsDifference).toBe(0);
+  });
+
+  it("takes the contribution out of the total deduction with it", () => {
+    const on = computeEmployee(employee(), COMPONENTS, POLICY);
+    const line = computeEmployee(employee(), COMPONENTS, off);
+    expect(on.pfEmployee).toBeGreaterThan(0);
+    expect(on.totalDeduction - line.totalDeduction).toBe(on.pfEmployee);
+    expect(line.netPayable - on.netPayable).toBe(on.pfEmployee);
+  });
+});
+
+describe("The employer-side contributions the PF return asks for", () => {
+  it("charges nothing unless the organisation includes them", () => {
+    const line = computeEmployee(employee(), COMPONENTS, POLICY);
+    expect(line.edli).toBe(0);
+    expect(line.pfAdmin).toBe(0);
+  });
+
+  it("charges them on PF wages, and never deducts them from anybody", () => {
+    const withEmployer: PayrollPolicy = { ...POLICY, edliRate: 0.005, pfAdminRate: 0.005 };
+    const plain = computeEmployee(employee(), COMPONENTS, POLICY);
+    const line = computeEmployee(employee(), COMPONENTS, withEmployer);
+
+    expect(line.edli).toBe(round0(line.pfWages * 0.005));
+    expect(line.pfAdmin).toBe(round0(line.pfWages * 0.005));
+    // The employee's side is untouched. These are the employer's cost.
+    expect(line.totalDeduction).toBe(plain.totalDeduction);
+    expect(line.netPayable).toBe(plain.netPayable);
+  });
+});
+
+describe("Professional tax as bands rather than a threshold", () => {
+  it("reproduces Karnataka's two", () => {
+    expect(professionalTaxFor(24_999, POLICY.ptSlabs)).toBe(0);
+    expect(professionalTaxFor(25_000, POLICY.ptSlabs)).toBe(200);
+  });
+
+  it("handles a state with three, which a threshold could not", () => {
+    // Maharashtra's shape. The whole reason this is a list: encoding
+    // Karnataka's two bands as THE shape means rewriting the engine to sell to
+    // somebody in Pune.
+    const maharashtra = [
+      { upTo: 7_500, amount: 0 },
+      { upTo: 10_000, amount: 175 },
+      { upTo: null, amount: 200 },
+    ];
+    expect(professionalTaxFor(7_500, maharashtra)).toBe(0);
+    expect(professionalTaxFor(7_501, maharashtra)).toBe(175);
+    expect(professionalTaxFor(10_000, maharashtra)).toBe(175);
+    expect(professionalTaxFor(10_001, maharashtra)).toBe(200);
+  });
+
+  it("charges nothing in a state that levies none", () => {
+    // An empty list, not a band of nought — a state without the tax is not a
+    // state with a zero rate, and the difference shows on the return.
+    expect(professionalTaxFor(100_000, [])).toBe(0);
+    const line = computeEmployee(employee(), COMPONENTS, { ...POLICY, ptSlabs: [] });
+    expect(line.professionalTax).toBe(0);
+  });
+});
+
+describe("Labour welfare fund, which is collected once a year", () => {
+  const yearly: PayrollPolicy = {
+    ...POLICY,
+    lwf: { enabled: true, employee: 50, employer: 100, cycle: "yearly", deductInMonth: 12 },
+  };
+
+  it("takes nothing in the eleven months it is not due", () => {
+    // periodMonth is July. The typed value is deliberately non-zero: a
+    // configured scheme GOVERNS, and leaving the typed figure standing in the
+    // other eleven months is how a yearly fund gets collected twelve times.
+    const line = computeEmployee(employee({ lwf: 50 }), COMPONENTS, yearly);
+    expect(line.lwf).toBe(0);
+  });
+
+  it("takes it in the month it is due", () => {
+    const line = computeEmployee(employee({ lwf: 0 }), COMPONENTS, { ...yearly, periodMonth: 12 });
+    expect(line.lwf).toBe(50);
+  });
+
+  it("takes it every month when the state collects monthly", () => {
+    const monthly: PayrollPolicy = { ...yearly, lwf: { ...yearly.lwf, cycle: "monthly" } };
+    expect(computeEmployee(employee({ lwf: 0 }), COMPONENTS, monthly).lwf).toBe(50);
+  });
+
+  it("leaves the typed figure alone while the scheme is off", () => {
+    // The workbook hand-enters this column, and switching the scheme on is what
+    // takes that job away. Until then the typed number is the answer.
+    const line = computeEmployee(employee({ lwf: 37 }), COMPONENTS, POLICY);
+    expect(line.lwf).toBe(37);
+  });
+});
+
+describe("Employee state insurance as a scheme that can be off", () => {
+  it("reports everybody as outside it, not as contributing nothing", () => {
+    const line = computeEmployee(
+      employee({ fixedComponents: [{ code: "basic", amount: 10_000 }] }),
+      COMPONENTS,
+      { ...POLICY, esiEnabled: false },
+    );
+    expect(line.esiEligible).toBe(false);
+    expect(line.esiEmployee).toBe(0);
+    expect(line.esiEmployer).toBe(0);
+  });
+
+  it("still covers a low earner while it is on", () => {
+    const line = computeEmployee(
+      employee({ fixedComponents: [{ code: "basic", amount: 10_000 }] }),
+      COMPONENTS,
+      POLICY,
+    );
+    expect(line.esiEligible).toBe(true);
+    expect(line.esiEmployee).toBeGreaterThan(0);
   });
 });

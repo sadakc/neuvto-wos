@@ -10,6 +10,7 @@
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
 import { render, screen, within } from "@testing-library/react";
+import { StatutorySchemes } from "../contracts";
 import type { PayRunSummary, PayrollSettings, PayslipLine } from "../contracts";
 
 const listRuns = vi.fn<() => Promise<PayRunSummary[]>>();
@@ -31,6 +32,7 @@ const portal = (over: Partial<PayrollSettings["employeePortal"]> = {}): PayrollS
     payDateRule: "last_working_day",
     payDay: 1,
   },
+  statutory: StatutorySchemes.parse({}),
   employeePortal: {
     payslipsVisible: true,
     showStatutoryBreakdown: true,
@@ -62,6 +64,8 @@ const line = (over: Partial<PayslipLine> = {}): PayslipLine => ({
   earned: [{ code: "basic", amount: 26613 }],
   deductions: [],
   componentDeductions: 0,
+  edli: 0,
+  pfAdmin: 0,
   fixedGross: 55000,
   daysPayable: 30,
   arrears: 0,

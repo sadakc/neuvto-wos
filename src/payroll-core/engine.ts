@@ -14,6 +14,7 @@ import { round0, roundUp0 } from "./money";
 import type {
   ComponentDefinition,
   EpfTreatment,
+  PtSlab,
   EmployeeInput,
   PayRunResult,
   PayrollLine,
@@ -22,20 +23,57 @@ import type {
   DepartmentTotals,
 } from "./types";
 
-/** The statutory position as at FY 2026-27, Karnataka. */
-export const DEFAULT_POLICY: Omit<PayrollPolicy, "daysInMonth"> = {
+/**
+ * The statutory position as at FY 2026-27, Karnataka.
+ *
+ * Every organisation gets this until it says otherwise, and the schemes it
+ * describes start ENABLED because the workbook this replaces runs all of them.
+ * The labour welfare fund is the exception: it is off, because the workbook
+ * hand-enters that figure and switching it on would restate a column somebody
+ * has already reconciled.
+ */
+export const DEFAULT_POLICY: Omit<PayrollPolicy, "daysInMonth" | "periodMonth"> = {
+  epfEnabled: true,
   pfWageCeiling: 15000,
   // The workbook's position, and the common one: PF is charged on wages
   // restricted to the ceiling.
   restrictPfWagesToCeiling: true,
   pfRate: 0.12,
   epsRate: 0.0833,
+  edliRate: 0,
+  pfAdminRate: 0,
+  esiEnabled: true,
   esiGrossCeiling: 21000,
   esiEmployeeRate: 0.0075,
   esiEmployerRate: 0.0325,
-  ptThreshold: 24999,
-  ptAmount: 200,
+  // Karnataka: nothing up to ₹24,999, ₹200 above it.
+  ptSlabs: [
+    { upTo: 24999, amount: 0 },
+    { upTo: null, amount: 200 },
+  ],
+  lwf: { enabled: false, employee: 0, employer: 0, cycle: "yearly", deductInMonth: 12 },
 };
+
+/**
+ * The band this earning falls in.
+ *
+ * First match on an ascending list, so the bands are read the way they are
+ * written on the state's own form. No band at all means no tax — an
+ * organisation in a state that levies none is not a zero-rate organisation, and
+ * an empty list says that more clearly than a rate of nought.
+ */
+export function professionalTaxFor(earnedGross: number, slabs: readonly PtSlab[]): number {
+  for (const slab of slabs) {
+    if (slab.upTo === null || earnedGross <= slab.upTo) return slab.amount;
+  }
+  return 0;
+}
+
+/** Whether the labour welfare fund falls due in the month being paid. */
+export function lwfDue(policy: PayrollPolicy): boolean {
+  if (!policy.lwf.enabled) return false;
+  return policy.lwf.cycle === "monthly" || policy.periodMonth === policy.lwf.deductInMonth;
+}
 
 export function computeEmployee(
   employee: EmployeeInput,
@@ -103,26 +141,38 @@ export function computeEmployee(
     .filter((d) => d.amount !== 0);
   const componentDeductions = deductions.reduce((sum, d) => sum + d.amount, 0);
 
-  const pfEmployee = round0(pfWages * policy.pfRate);
-  const eps = round0(pfWages * policy.epsRate);
+  // Off means no scheme, not a scheme that deducted nothing. An establishment
+  // under twenty people is not required to register, and a payslip showing ₹0
+  // provident fund implies one that is.
+  const pfEmployee = policy.epfEnabled ? round0(pfWages * policy.pfRate) : 0;
+  const eps = policy.epfEnabled ? round0(pfWages * policy.epsRate) : 0;
+  const edli = policy.epfEnabled ? round0(pfWages * policy.edliRate) : 0;
+  const pfAdmin = policy.epfEnabled ? round0(pfWages * policy.pfAdminRate) : 0;
 
   // THE ASYMMETRY IS DELIBERATE. Eligibility is tested against FIXED gross —
   // what the person is contracted to earn — while the contribution is charged
   // on what they actually earned. Testing eligibility on earned gross instead
   // would drop a well-paid employee into ESI in any month they took unpaid
   // leave, and enrol them for a period they cannot leave.
-  const esiEligible = fixedGross <= policy.esiGrossCeiling;
+  const esiEligible = policy.esiEnabled && fixedGross <= policy.esiGrossCeiling;
   const esiEmployee = esiEligible ? roundUp0(earnedGross * policy.esiEmployeeRate) : 0;
   const esiEmployer = esiEligible ? round0(earnedGross * policy.esiEmployerRate) : 0;
 
-  const professionalTax = earnedGross > policy.ptThreshold ? policy.ptAmount : 0;
+  const professionalTax = professionalTaxFor(earnedGross, policy.ptSlabs);
+
+  // A configured scheme GOVERNS. When labour welfare fund is switched on, the
+  // figure is the scheme's — including the zero it produces in the eleven
+  // months of the year it is not collected — and the number typed into the run
+  // is ignored. Leaving the typed value in place for those months is how a
+  // yearly fund gets collected twelve times.
+  const lwf = policy.lwf.enabled ? (lwfDue(policy) ? policy.lwf.employee : 0) : employee.lwf;
 
   const totalDeduction =
     pfEmployee +
     esiEmployee +
     professionalTax +
     employee.tds +
-    employee.lwf +
+    lwf +
     componentDeductions +
     employee.otherDeduction;
 
@@ -144,8 +194,10 @@ export function computeEmployee(
     esiEmployee,
     esiEmployer,
     professionalTax,
+    edli,
+    pfAdmin,
     tds: employee.tds,
-    lwf: employee.lwf,
+    lwf,
     otherDeduction: employee.otherDeduction,
     totalDeduction,
     netPayable: earnedGross - totalDeduction,

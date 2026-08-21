@@ -18,8 +18,24 @@ import { EMPLOYEES, COMPONENTS, EXPECTED_TOTALS } from "@/payroll-core/__fixture
 
 const rpc = vi.fn();
 
+/**
+ * `computeRun` now reads the organisation's statutory configuration before it
+ * computes anything, so the client needs a `from` as well as an `rpc`. It
+ * answers with no stored row — which is the case that matters: an organisation
+ * that has never opened the statutory screen must still be paid, and must be
+ * paid at the statutory rates the workbook uses.
+ */
 vi.mock("@/integrations/supabase/client", () => ({
-  supabase: { rpc: (name: string, args: unknown) => rpc(name, args) },
+  supabase: {
+    rpc: (name: string, args: unknown) => rpc(name, args),
+    from: () => ({
+      select: () => ({
+        eq: () => ({
+          eq: () => ({ maybeSingle: () => Promise.resolve({ data: null, error: null }) }),
+        }),
+      }),
+    }),
+  },
 }));
 
 import { computeRun } from "./handlers";

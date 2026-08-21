@@ -65,6 +65,14 @@ export const payroll: ModuleDefinition = {
       order: 5,
     },
     {
+      id: "statutory-components",
+      title: "Statutory components",
+      description:
+        "Provident fund, state insurance, professional tax, the labour welfare fund and statutory bonus. Each is a switch: none of them applies to every establishment, and two of them are levied by states that disagree with each other.",
+      component: lazy(() => import("./components/StatutoryComponents")),
+      order: 8,
+    },
+    {
       id: "salary-components",
       title: "Salary components",
       description:
