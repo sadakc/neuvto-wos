@@ -1,6 +1,6 @@
 # Publishing neuvto.com ourselves
 
-**Version:** 2.0 · **Status:** Active · **Updated:** 20 Aug 2026
+**Version:** 2.1 · **Status:** Active · **Updated:** 24 Aug 2026
 
 Written for somebody who is not a developer. Every step says where to click and
 what to copy. If a step does not match what you see, stop and ask — a screen
@@ -310,6 +310,26 @@ It fetches the live site, follows every piece of code it loads, and tells you
 which database that code talks to. It fails loudly if the answer is wrong, and
 also if it cannot find an answer at all — because "found nothing" is what a
 broken check looks like, and that mistake is why this file exists.
+
+### "Everybody says they are not registered"
+
+Signing in with an address Neuvto has never seen shows a modal reading **"Your
+email address has not been registered. Please contact your administrator."**
+That is correct and expected — workspaces are provisioned and people join by
+invitation, so a stranger genuinely has no account (D39, D67).
+
+**One person seeing it is a person problem. Everybody seeing it at once is a
+switch.** Supabase returns the same error code, `otp_disabled`, for two very
+different situations: "this address does not exist" and "email one-time codes
+are switched off on the server". The product cannot tell them apart, so a
+provider that gets disabled looks exactly like every customer being deleted, and
+the calls you get will all say "it says I'm not registered".
+
+If more than one person reports it in the same hour, check the switch before
+you check the people:
+
+**Supabase dashboard → Authentication → Sign In / Providers → Email →** confirm
+**Email OTP** is enabled.
 
 ### Undoing a bad release
 

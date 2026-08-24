@@ -16,16 +16,41 @@ import { EmailInput, VerifyOtpInput } from "./contracts";
 /**
  * Sends a 6-digit code to the address.
  *
- * `shouldCreateUser: true` is deliberate — the same flow serves sign-in and
- * sign-up, so a new person is not told "no account exists", which would also
- * turn this endpoint into an account-existence oracle.
+ * ── this used to mint an account for anybody who typed into the form
+ *
+ * The previous version passed `shouldCreateUser: true` unconditionally, under
+ * the comment "the same flow serves sign-in and sign-up, so a new person is not
+ * told 'no account exists', which would also turn this endpoint into an
+ * account-existence oracle."
+ *
+ * The first half of that stopped being true at D39. There IS no sign-up: a
+ * workspace is provisioned, and the only way into one is an invitation. So the
+ * flow served sign-in and account-minting-for-strangers, which is not a feature
+ * anybody asked for. Typing any address into the sign-in box on the landing
+ * page created a real row in `auth.users` and emailed a stranger a code.
+ * Verified against a live GoTrue, not inferred: `create_user: true` with an
+ * unknown address returns 200 and the row is there afterwards.
+ *
+ * The second half is a real cost and is now paid deliberately. This endpoint IS
+ * an account-existence oracle, because a product with no self-serve signup has
+ * nothing useful to say to an unregistered person except that they are not
+ * registered. Sada asked for exactly that, 24 Aug 2026.
+ *
+ * `redeemingInvitation` is the one case that still mints an account, and it has
+ * to: `profiles.id` references `auth.users`, so an invited person has no account
+ * until their first sign-in. Refusing here would weld shut the only door into a
+ * workspace. It defaults to false so that a call site which forgets the flag
+ * stops minting accounts rather than starting.
  */
-export async function requestOtp(input: unknown): Promise<void> {
+export async function requestOtp(
+  input: unknown,
+  { redeemingInvitation = false }: { redeemingInvitation?: boolean } = {},
+): Promise<void> {
   const { email } = EmailInput.parse(input);
 
   const { error } = await supabase.auth.signInWithOtp({
     email,
-    options: { shouldCreateUser: true },
+    options: { shouldCreateUser: redeemingInvitation },
   });
 
   if (!error) return;
@@ -37,7 +62,36 @@ export async function requestOtp(input: unknown): Promise<void> {
       429,
     );
   }
+
+  // What GoTrue returns for `create_user: false` against an address it has
+  // never seen — confirmed by calling it, because the published error table
+  // documents the code without saying which situations produce it:
+  //
+  //     HTTP 422 {"error_code":"otp_disabled","msg":"Signups not allowed for otp"}
+  //
+  // ── THE TRAP IN THIS BRANCH
+  //
+  // `otp_disabled` ALSO means "email OTP is switched off on the server". If
+  // that ever happens, every person signing in — including every existing
+  // customer — is told they are not registered, and every administrator gets
+  // calls about accounts that are demonstrably fine. The `msg` distinguishes
+  // the two but is prose and not part of any contract, so it is not branched
+  // on. The symptom is recorded in docs/operations/PRODUCTION_HOSTING.md
+  // instead: everyone at once means the provider, one person means the person.
+  if (isUnknownAddress(error)) {
+    throw new AppError(
+      "EMAIL_NOT_REGISTERED",
+      "Your email address has not been registered. Please contact your administrator.",
+      422,
+    );
+  }
+
   throw toAppError(error, "requestOtp");
+}
+
+/** `code` is the stable field; `status` alone would also catch a bad payload. */
+function isUnknownAddress(error: { status?: number; code?: string }): boolean {
+  return error.code === "otp_disabled" || error.status === 422;
 }
 
 /** Verifies the code and establishes the session. */
