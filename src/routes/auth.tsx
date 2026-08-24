@@ -16,6 +16,15 @@ import {
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { hardNavigate } from "@/platform/navigate";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/auth")({
   ssr: false,
@@ -134,6 +143,16 @@ function AuthPage() {
   /** Which words the "already signed in" screen uses, and where its button goes. */
   const [signedInVariant, setSignedInVariant] = useState<SignedInVariant>("invite");
   const [signedInDestination, setSignedInDestination] = useState("/app");
+  /**
+   * The address typed at the email step turned out to belong to nobody.
+   *
+   * A modal rather than a toast, by decision: a toast is gone in four seconds
+   * and this is the entire answer to what the person just tried to do. It is
+   * NOT a `Step`, because the email form has to stay mounted underneath — the
+   * next thing they do is try a different address, and a step would have thrown
+   * away what they typed and where they were.
+   */
+  const [notRegistered, setNotRegistered] = useState("");
 
   /**
    * Redeems the invitation if there is one, and routes onward.
@@ -354,10 +373,20 @@ function AuthPage() {
     e.preventDefault();
     setBusy(true);
     try {
-      await requestOtp({ email });
+      // An account is minted only for somebody redeeming an invitation. Every
+      // other caller must already exist — see requestOtp for why this endpoint
+      // used to create one for anybody who typed into the form, and why the
+      // invitation case genuinely cannot be refused.
+      await requestOtp({ email }, { redeemingInvitation: Boolean(invite) });
       setStep("code");
       toast.success(`We sent a 6-digit code to ${email.trim()}`);
     } catch (err) {
+      if (isAppError(err) && err.code === "EMAIL_NOT_REGISTERED") {
+        // Deliberately NOT setStep: the form stays as it was, so dismissing
+        // this returns them to the address they typed rather than a blank page.
+        setNotRegistered(err.message);
+        return;
+      }
       fail(err);
     } finally {
       setBusy(false);
@@ -650,6 +679,24 @@ function AuthPage() {
           </button>
         </>
       )}
+
+      {/*
+        Shown over whichever step is beneath it, and owned by no step. `email`
+        is the only one that can raise it today; keeping it outside the step
+        tree means it cannot be lost by a step change made later for some other
+        reason.
+      */}
+      <AlertDialog open={Boolean(notRegistered)} onOpenChange={() => setNotRegistered("")}>
+        <AlertDialogContent data-testid="not-registered">
+          <AlertDialogHeader>
+            <AlertDialogTitle>We can&apos;t find that address</AlertDialogTitle>
+            <AlertDialogDescription>{notRegistered}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogAction onClick={() => setNotRegistered("")}>OK</AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/*
         Signed in, and in no workspace. Previously a form that created one; now

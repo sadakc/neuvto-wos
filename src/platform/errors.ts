@@ -30,6 +30,13 @@ export const ERROR_CODES = [
   "ALREADY_IN_ORGANIZATION",
   "SLUG_TAKEN",
   "NO_ORGANIZATION",
+  // D39 again, from the other side of the door. The sign-in form used to mint
+  // an account for any address typed into it, so a stranger's first visit
+  // created a real `auth.users` row and mailed them a code. This is the refusal
+  // that replaces that. It is deliberately an account-existence oracle: the
+  // product has no self-serve signup, so "not registered" is the honest and
+  // only useful thing to say, and hiding it only wasted the person's time.
+  "EMAIL_NOT_REGISTERED",
   // joining a workspace (D39/D40)
   //
   // INVITATION_NOT_FOUND covers expired, revoked, already-used, addressed to

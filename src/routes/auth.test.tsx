@@ -430,3 +430,111 @@ describe("/auth — why the last session ended", () => {
     expect(document.body.textContent).not.toContain("You were signed out");
   });
 });
+
+describe("/auth — an address nobody invited", () => {
+  /**
+   * The bug: typing any address into the sign-in form emailed a code to it and
+   * created a real `auth.users` row for a stranger. There is no self-serve
+   * signup (D39), so there was never anything for that account to become — the
+   * person got a code, typed it, and landed on "you're not in a workspace yet"
+   * having been given an account nobody meant them to have.
+   *
+   * The rule being pinned: the refusal happens at the EMAIL step, before any
+   * code is sent, and it is a modal rather than a toast because a toast is
+   * gone in four seconds and this is the whole answer to what they tried to do.
+   */
+  const NOT_REGISTERED = new AppError(
+    "EMAIL_NOT_REGISTERED",
+    "Your email address has not been registered. Please contact your administrator.",
+    422,
+  );
+
+  async function typeEmailAndSubmit(address = "xyz@nowhere.test") {
+    const user = userEvent.setup();
+    render(<AuthPage />);
+    await user.type(await screen.findByLabelText(/work email/i), address);
+    await user.click(screen.getByRole("button", { name: "Email me a code" }));
+    return user;
+  }
+
+  it("says so in a modal, in the words that were asked for", async () => {
+    vi.mocked(requestOtp).mockRejectedValue(NOT_REGISTERED);
+    h.search = { next: "" };
+
+    await typeEmailAndSubmit();
+
+    const dialog = await screen.findByRole("alertdialog");
+    expect(dialog).toHaveTextContent(
+      "Your email address has not been registered. Please contact your administrator.",
+    );
+  });
+
+  it("does not advance to the code screen", async () => {
+    // The failure this guards against is the modal being shown OVER the code
+    // form: dismissing it would then reveal a six-digit input for a code that
+    // was never sent, and the person would sit there waiting for an email.
+    vi.mocked(requestOtp).mockRejectedValue(NOT_REGISTERED);
+    h.search = { next: "" };
+
+    await typeEmailAndSubmit();
+
+    await screen.findByRole("alertdialog");
+    expect(screen.queryByLabelText(/6-digit code/i)).toBeNull();
+    expect(screen.getByLabelText(/work email/i)).toBeInTheDocument();
+  });
+
+  it("lets them try a different address without a reload", async () => {
+    vi.mocked(requestOtp).mockRejectedValue(NOT_REGISTERED);
+    h.search = { next: "" };
+
+    const user = await typeEmailAndSubmit();
+    await screen.findByRole("alertdialog");
+    await user.click(screen.getByRole("button", { name: /^OK$/i }));
+
+    await waitFor(() => expect(screen.queryByRole("alertdialog")).toBeNull());
+    expect(screen.getByLabelText(/work email/i)).toBeInTheDocument();
+  });
+
+  it("does not mint an account for a plain sign-in", async () => {
+    vi.mocked(requestOtp).mockResolvedValue(undefined as never);
+    h.search = { next: "" };
+
+    await typeEmailAndSubmit("alice.admin@acme.test");
+
+    await waitFor(() => expect(requestOtp).toHaveBeenCalled());
+    expect(requestOtp).toHaveBeenCalledWith(
+      { email: "alice.admin@acme.test" },
+      { redeemingInvitation: false },
+    );
+  });
+
+  it("DOES mint one when an invitation is being redeemed", async () => {
+    // D39's only door, and the likeliest way this change breaks something it
+    // was not aimed at. An invited person has no `auth.users` row until this
+    // call creates one, so a `false` here means nobody can ever join.
+    vi.mocked(requestOtp).mockResolvedValue(undefined as never);
+    h.search = { next: "", invite: "tok" };
+
+    await typeEmailAndSubmit("newjoiner@acme.test");
+
+    await waitFor(() => expect(requestOtp).toHaveBeenCalled());
+    expect(requestOtp).toHaveBeenCalledWith(
+      { email: "newjoiner@acme.test" },
+      { redeemingInvitation: true },
+    );
+  });
+
+  it("still uses a toast for failures that are not about the address", async () => {
+    // A modal saying "contact your administrator" is the wrong answer to a rate
+    // limit or a network blip, and it is the answer somebody would act on.
+    vi.mocked(requestOtp).mockRejectedValue(
+      new AppError("RATE_LIMITED", "Too many codes requested. Wait a minute and try again.", 429),
+    );
+    h.search = { next: "" };
+
+    await typeEmailAndSubmit();
+
+    await waitFor(() => expect(requestOtp).toHaveBeenCalled());
+    expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+});
