@@ -5,6 +5,7 @@
 #   bash scripts/backup-staleness-check.sh                 alert if the newest backup is over 2 days old
 #   bash scripts/backup-staleness-check.sh --max-age 7     a different threshold
 #   bash scripts/backup-staleness-check.sh --max-partials 5  tolerate more failed runs before alarming
+#   bash scripts/backup-staleness-check.sh --partial-window 14  count failures over a longer window
 #   bash scripts/backup-staleness-check.sh --quiet         no GUI alert, exit code and stdout only
 #
 # WHY THIS EXISTS
@@ -55,6 +56,9 @@ set -euo pipefail
 
 MAX_AGE_DAYS=2
 MAX_PARTIALS=3
+# Partials older than this stop counting as evidence of a CURRENT problem.
+# They stay on disk — see the block above the count for why this window exists.
+PARTIAL_WINDOW_DAYS=7
 QUIET=false
 
 while [[ $# -gt 0 ]]; do
@@ -62,6 +66,9 @@ while [[ $# -gt 0 ]]; do
     --max-age)       MAX_AGE_DAYS="${2:-}"; shift ;;
     --max-age=*)     MAX_AGE_DAYS="${1#--max-age=}" ;;
     --max-partials)  MAX_PARTIALS="${2:-}"; shift ;;
+    --max-partials=*) MAX_PARTIALS="${1#--max-partials=}" ;;
+    --partial-window) PARTIAL_WINDOW_DAYS="${2:-}"; shift ;;
+    --partial-window=*) PARTIAL_WINDOW_DAYS="${1#--partial-window=}" ;;
     --quiet)     QUIET=true ;;
     -h|--help)   sed -n '2,8p' "$0" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *)           echo "Unknown argument: $1" >&2; exit 2 ;;
@@ -71,6 +78,7 @@ done
 
 [[ "$MAX_AGE_DAYS" =~ ^[0-9]+$ ]] || { echo "--max-age needs a number, got: $MAX_AGE_DAYS" >&2; exit 2; }
 [[ "$MAX_PARTIALS" =~ ^[0-9]+$ ]] || { echo "--max-partials needs a number, got: $MAX_PARTIALS" >&2; exit 2; }
+[[ "$PARTIAL_WINDOW_DAYS" =~ ^[0-9]+$ ]] || { echo "--partial-window needs a number of days, got: $PARTIAL_WINDOW_DAYS" >&2; exit 2; }
 
 DEST_ROOT="${NEUVTO_BACKUP_DIR:-$HOME/neuvto-backups}"
 PROD_DIR="$DEST_ROOT/prod"
@@ -143,17 +151,50 @@ fi
 # alone reports that as healthy, because the newest backup really is fresh.
 #
 # Counting partials is what tells those two situations apart.
-PARTIALS=$(find "$PROD_DIR" -mindepth 1 -maxdepth 1 -type d -name '*.partial' 2>/dev/null | wc -l | tr -d ' ')
+#
+# ── WHY THE COUNT HAS A WINDOW, AND DID NOT USE TO
+#
+# It counted every .partial in the directory, for all time. Retention never
+# prunes them, on purpose. Put those two together and the alarm is a LATCH:
+# after the third failure it ever has, it fires every single morning, forever,
+# no matter how healthy the schedule becomes afterwards. Deleting the
+# directories by hand was the only way to silence it.
+#
+# An alarm that always fires is not a strict improvement on no alarm. It is the
+# mirror of the failure this file was written against — a backup nobody checks
+# because they believe in it, versus an alarm nobody reads because it always
+# shouts. Both end with somebody discovering the truth on the worst day.
+#
+# So: old failures stay on disk as evidence, and stop being counted as evidence
+# of a problem happening NOW. The window comes from each directory's own UTC
+# stamp, not its mtime, for the same reason the age check does.
+PARTIALS_ALL=$(find "$PROD_DIR" -mindepth 1 -maxdepth 1 -type d -name '*.partial' 2>/dev/null | wc -l | tr -d ' ')
+CUTOFF=$(( NOW - PARTIAL_WINDOW_DAYS * 86400 ))
+PARTIALS=0
+while IFS= read -r d; do
+  [[ -n "$d" ]] || continue
+  pstamp="$(basename "$d" .partial)"
+  # A directory whose name is not a stamp cannot be dated. Count it rather than
+  # skip it: an uncountable failure is the thing this alarm exists to notice.
+  if pthen=$(TZ=UTC date -j -f "%Y-%m-%dT%H%M%SZ" "$pstamp" +%s 2>/dev/null); then
+    (( pthen >= CUTOFF )) && PARTIALS=$(( PARTIALS + 1 ))
+  else
+    PARTIALS=$(( PARTIALS + 1 ))
+  fi
+done < <(find "$PROD_DIR" -mindepth 1 -maxdepth 1 -type d -name '*.partial' 2>/dev/null)
+
+OLDER=$(( PARTIALS_ALL - PARTIALS ))
 
 if (( PARTIALS >= MAX_PARTIALS )); then
-  alarm "Backups are mostly failing" \
-        "Newest is only ${AGE_HOURS}h old, but there are $PARTIALS failed runs (.partial) in $PROD_DIR. Something fails most nights — check $DEST_ROOT/backup.log. Docker must be running at 03:00."
+  detail="Newest is only ${AGE_HOURS}h old, but $PARTIALS run(s) failed in the last ${PARTIAL_WINDOW_DAYS} days (.partial in $PROD_DIR). Something fails most nights — check $DEST_ROOT/backup.log. Docker must be running at 03:00, and the network must be up."
+  (( OLDER > 0 )) && detail="$detail ($OLDER older failure(s) on disk are not counted.)"
+  alarm "Backups are mostly failing" "$detail"
   exit 1
 fi
 
-if (( PARTIALS > 0 )); then
+if (( PARTIALS_ALL > 0 )); then
   echo "backup-staleness-check: ok — newest $STAMP, ${AGE_HOURS}h old, threshold ${MAX_AGE_DAYS}d"
-  echo "  note: $PARTIALS failed run(s) (.partial) in $PROD_DIR — alarm at $MAX_PARTIALS"
+  echo "  note: $PARTIALS failed run(s) in the last ${PARTIAL_WINDOW_DAYS}d — alarm at $MAX_PARTIALS ($PARTIALS_ALL on disk in total)"
   exit 0
 fi
 
