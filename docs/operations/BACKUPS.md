@@ -1,6 +1,6 @@
 # Backups
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 19 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 1 Sep 2026
 
 **Supabase's Free plan has no automatic backups.** Not short retention — none at
 all. Daily backups with 7-day retention begin on Pro (~$25/month). Until Neuvto
@@ -277,12 +277,81 @@ launchctl kickstart -k gui/$UID/com.neuvto.backup
 tail -f ~/neuvto-backups/backup.log
 ```
 
+### What the first eleven nights actually looked like
+
+The schedule went in on 20 Aug 2026. Between then and 31 Aug it ran eleven
+times and produced **three** backups. That is worth writing down precisely,
+because none of it was the failure everybody had prepared for.
+
+| what the log said | times | what it actually was |
+| --- | --- | --- |
+| `psql: could not translate host name … nodename nor servname provided` | 5 | DNS not up. Not a database problem at all |
+| `pg_dump: SSL SYSCALL error: EOF detected` | 3 | The connection dropped mid-dump |
+| `error running container: exit 1` | 1 | Docker not running yet |
+
+The first group is the interesting one. `launchd` runs a missed
+`StartCalendarInterval` job **once on wake** — so a lid opened at 09:00 fires
+the 03:00 job immediately, in the second or two before Wi-Fi has associated and
+DNS answers. The job was doing exactly what it was told. It just asked for a
+hostname before the machine had a network to ask on.
+
+Three changes came out of that:
+
+- **`--wait 600`** — the agent now retries the first connection every ten
+  seconds for up to ten minutes instead of treating "no Wi-Fi at 03:00" as a
+  lost night. A rejected password breaks out immediately; waiting is for a
+  network that has not arrived, not for an answer that was already no.
+- **Each dump is retried up to three times.** The `SSL SYSCALL` drops happened
+  with successful runs either side of them against the same host from the same
+  machine — a dropped connection, not a broken configuration. The output file is
+  deleted between attempts, so a failed retry can never leave the previous
+  attempt's wreckage looking like a finished dump.
+- **The working directory is created before the first connection**, not after.
+
+### The failures the alarm could not see
+
+That last change is the one that matters most, and it is a lesson rather than a
+tweak.
+
+A run that died at the connection never reached the code that creates a
+directory. So it left **nothing** — no `.partial`, no stamp, no trace except a
+few lines in a log file that carries no timestamps. Five of the eight failures
+were that shape. `backup-staleness-check.sh` counted three.
+
+It was not wrong. It was blind, and blind in the direction that matters most,
+because a laptop with no network at 03:00 is the single likeliest way this
+schedule fails. Every run now stamps a directory before it does anything else,
+so a failure leaves the same evidence whatever killed it — and, incidentally,
+the directory name is the timestamp the log never had.
+
+### The alarm was a latch, and had to stop being one
+
+Retention never prunes a `.partial`, deliberately: deleting the evidence of a
+failure is the wrong instinct. But the alarm counted **every** `.partial` in the
+directory, for all time. Put those two facts together and after the third
+failure it ever had, it fired every morning forever — no matter how healthy the
+schedule became afterwards. Deleting directories by hand was the only way to
+silence it.
+
+An alarm that always fires is not an improvement on no alarm. It is the mirror
+of the failure this whole file was written against: a backup nobody checks
+because they believe in it, and an alarm nobody reads because it always shouts.
+Both are discovered on the same bad day.
+
+Failures now count only inside a **7-day window** (`--partial-window`). Older
+ones stay on disk as evidence and are reported in the "on disk in total" note;
+they simply stop being treated as evidence of a problem happening *now*. A
+`.partial` whose name cannot be read as a date is counted rather than skipped —
+an uncountable failure is exactly what this alarm exists to notice.
+
 ### What this still does not fix
 
 - **The laptop has to be awake.** `launchd` runs a missed
   `StartCalendarInterval` job once on wake, so a closed lid means a late backup
   rather than no backup — but a laptop that is off all week produces nothing, and
-  the alarm can only fire once it is on again.
+  the alarm can only fire once it is on again. The ten-minute wait means that
+  catch-up run now survives the moments before Wi-Fi associates, which is what
+  used to kill it.
 - **The first Keychain read may prompt.** Click _Always Allow_ once.
 - **The alarm needs a GUI session.** Under launchd without one, `osascript`
   fails and the message survives only in the log and the exit code.

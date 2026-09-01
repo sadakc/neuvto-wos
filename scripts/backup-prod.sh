@@ -103,6 +103,14 @@ POOLER=false
 KEYCHAIN=false
 ASSUME_YES=false
 KEEP=14
+# Seconds to keep retrying the first connection before giving up. Zero for a
+# person at a keyboard — they want to be told now, not in ten minutes. The
+# launchd agent passes a real budget, because 03:00 on a laptop is the one time
+# the network is reliably NOT there yet.
+WAIT_SECS=0
+# Attempts per dump, not per run. A whole-run retry would re-dump the parts that
+# already succeeded and double the load on a free-tier database.
+DUMP_TRIES=3
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -114,6 +122,10 @@ while [[ $# -gt 0 ]]; do
     --yes|-y)       ASSUME_YES=true ;;
     --keep)         KEEP="${2:-}"; shift ;;
     --keep=*)       KEEP="${1#--keep=}" ;;
+    --wait)         WAIT_SECS="${2:-}"; shift ;;
+    --wait=*)       WAIT_SECS="${1#--wait=}" ;;
+    --tries)        DUMP_TRIES="${2:-}"; shift ;;
+    --tries=*)      DUMP_TRIES="${1#--tries=}" ;;
     -h|--help)      grep -m1 -n '^set -euo' "$0" | cut -d: -f1 | xargs -I{} sed -n "2,{}p" "$0" | sed 's/^#\{0,1\} \{0,1\}//' | sed '$d'; exit 0 ;;
     *) echo "unknown option: $1" >&2; exit 2 ;;
   esac
@@ -122,6 +134,9 @@ done
 
 [[ "$KEEP" =~ ^[0-9]+$ ]] || { echo "--keep needs a number, got: $KEEP" >&2; exit 2; }
 (( KEEP >= 1 )) || { echo "--keep must be at least 1 — 0 would delete the backup it just took." >&2; exit 2; }
+[[ "$WAIT_SECS" =~ ^[0-9]+$ ]] || { echo "--wait needs a number of seconds, got: $WAIT_SECS" >&2; exit 2; }
+[[ "$DUMP_TRIES" =~ ^[0-9]+$ ]] || { echo "--tries needs a number, got: $DUMP_TRIES" >&2; exit 2; }
+(( DUMP_TRIES >= 1 )) || { echo "--tries must be at least 1 — 0 would take no backup at all." >&2; exit 2; }
 
 PSQL="$(command -v psql || echo /opt/homebrew/opt/libpq/bin/psql)"
 [[ -x "$PSQL" ]] || { echo "psql not found. brew install libpq" >&2; exit 1; }
@@ -372,8 +387,111 @@ echo "  destination $DEST_ROOT/$SUB/"
 echo "  retention   last $KEEP run(s)"
 echo
 
+if [[ "$CHECK_ONLY" != true ]]; then
+  # ─────────────────────────────────────────────────────────────── destination
+  #
+  # ── WHY THIS RUNS BEFORE THE FIRST CONNECTION, AND NOT AFTER IT
+  #
+  # It used to run after. A run that could not resolve the database host died at
+  # the connection and never got here, so it created no directory — and a run that
+  # creates no directory leaves NOTHING for backup-staleness-check.sh to count.
+  #
+  # Of the eight scheduled failures in Aug 2026, five were exactly that shape, and
+  # the alarm's failed-run counter saw three. It was not wrong; it was blind, and
+  # it was blind in the direction that matters, because a laptop with no Wi-Fi at
+  # 03:00 is the single likeliest way this schedule fails.
+  #
+  # Creating the `.partial` first means every run that starts and does not finish
+  # leaves the same evidence, whatever killed it. The alarm keeps checking the
+  # artefact and never the exit code — there is simply now an artefact for the
+  # failure it could not previously see.
+  #
+  # --check still writes nothing. That is what --check means.
+  #
+  # A backup written inside the repository is a backup one `git add -f` away from
+  # being published, and this one is full of customer personal data. Refuse rather
+  # than trust a .gitignore.
+  #
+  # Test the nearest EXISTING ancestor, not $DEST_ROOT itself. `git -C` on a
+  # directory that does not exist yet cannot answer, fails, and reads as "not in a
+  # repo" — so the very first run created the folder inside the repo and wrote a
+  # full dump of production into it, exit 0, no warning. The second run then
+  # refused, the directory now existing. Caught by sabotage on 4 Aug 2026; the
+  # guard had been passing for exactly the run where it mattered.
+  PROBE="$DEST_ROOT"
+  while [[ ! -d "$PROBE" && "$PROBE" != "/" && "$PROBE" != "." ]]; do
+    PROBE="$(dirname "$PROBE")"
+  done
+  if git -C "$PROBE" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    echo "  REFUSING: $DEST_ROOT is inside the git work tree at $PROBE." >&2
+    echo "  These files hold customer personal data and git is permanent." >&2
+    echo "  Set NEUVTO_BACKUP_DIR to somewhere outside the repository." >&2
+    exit 1
+  fi
+
+  mkdir -p "$DEST_ROOT/$SUB"
+  chmod 700 "$DEST_ROOT" "$DEST_ROOT/$SUB" 2>/dev/null || true
+
+  # Build in `.partial` and rename only once everything is verified, so an
+  # interrupted run cannot leave something that looks like a usable backup — and
+  # so retention never counts one.
+  WORK="$DEST_ROOT/$SUB/${STAMP}.partial"
+  FINAL="$DEST_ROOT/$SUB/${STAMP}"
+  rm -rf "$WORK"; mkdir -p "$WORK"
+fi
+
+# ── waiting for a network that is not up yet
+#
+# WHAT THE LOG ACTUALLY SHOWED, before this existed
+#
+# Eleven scheduled runs between 20 and 31 Aug 2026: three produced a backup.
+# The failures came in two shapes, and only one of them was the shape anybody
+# had guessed at:
+#
+#   5 ×  psql: could not translate host name "db.….supabase.co" to address:
+#        nodename nor servname provided
+#   3 ×  pg_dump: SSL SYSCALL error: EOF detected     (mid-dump, connection lost)
+#   1 ×  error running container: exit 1              (Docker not up yet)
+#
+# The first group is not a database problem at all. It is DNS failing to
+# resolve, at 03:00, on a laptop that woke seconds earlier and has no Wi-Fi
+# yet. The job was running exactly as scheduled and dying before it reached the
+# network. Retrying for a few minutes is the entire fix.
+#
+# It is also the group that was INVISIBLE: those runs died before creating a
+# directory, so they left no `.partial`, so the alarm's failed-run counter could
+# not see five of the eight failures. That is fixed further down by creating the
+# working directory before the first connection rather than after it.
+connect_probe() {
+  OUT="$("$PSQL" -tAc 'select current_database() || $$ · $$ || substring(version() from $$PostgreSQL [0-9.]+$$)' 2>&1)"
+}
+
+# Fixed interval rather than exponential backoff: this is waiting for an
+# interface to come up, not backing off a service that is refusing us. Ten
+# seconds after the network arrives is the point of the whole exercise.
+#
+# One probe when WAIT_SECS is 0, so a person at a keyboard is told immediately.
 echo "  connecting …"
-if ! OUT="$("$PSQL" -tAc 'select current_database() || $$ · $$ || substring(version() from $$PostgreSQL [0-9.]+$$)' 2>&1)"; then
+CONNECTED=false
+WAITED=0
+while :; do
+  if connect_probe; then CONNECTED=true; break; fi
+  # Waiting is for a network that has not arrived. A rejected password means the
+  # network arrived and the answer was no — ten more minutes of asking will not
+  # change it, and would hammer the auth endpoint at 03:00 every night.
+  [[ "$OUT" == *"password authentication failed"* ]] && break
+  (( WAITED >= WAIT_SECS )) && break
+  sleep 10
+  WAITED=$(( WAITED + 10 ))
+  (( WAITED % 60 == 0 )) && echo "  still waiting for the network … ${WAITED}s"
+done
+if [[ "$CONNECTED" == true && $WAITED -gt 0 ]]; then
+  echo "  network arrived after ${WAITED}s"
+elif [[ "$CONNECTED" != true && $WAITED -gt 0 ]]; then
+  echo "  gave up after ${WAITED}s waiting for the network."
+fi
+
+if [[ "$CONNECTED" != true ]]; then
   echo
   echo "  ${OUT%%$'\n'*}"
   echo
@@ -407,38 +525,6 @@ if [[ "$CHECK_ONLY" == true ]]; then
   exit 0
 fi
 
-# ─────────────────────────────────────────────────────────────── destination
-#
-# A backup written inside the repository is a backup one `git add -f` away from
-# being published, and this one is full of customer personal data. Refuse rather
-# than trust a .gitignore.
-#
-# Test the nearest EXISTING ancestor, not $DEST_ROOT itself. `git -C` on a
-# directory that does not exist yet cannot answer, fails, and reads as "not in a
-# repo" — so the very first run created the folder inside the repo and wrote a
-# full dump of production into it, exit 0, no warning. The second run then
-# refused, the directory now existing. Caught by sabotage on 4 Aug 2026; the
-# guard had been passing for exactly the run where it mattered.
-PROBE="$DEST_ROOT"
-while [[ ! -d "$PROBE" && "$PROBE" != "/" && "$PROBE" != "." ]]; do
-  PROBE="$(dirname "$PROBE")"
-done
-if git -C "$PROBE" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
-  echo "  REFUSING: $DEST_ROOT is inside the git work tree at $PROBE." >&2
-  echo "  These files hold customer personal data and git is permanent." >&2
-  echo "  Set NEUVTO_BACKUP_DIR to somewhere outside the repository." >&2
-  exit 1
-fi
-
-mkdir -p "$DEST_ROOT/$SUB"
-chmod 700 "$DEST_ROOT" "$DEST_ROOT/$SUB" 2>/dev/null || true
-
-# Build in `.partial` and rename only once everything is verified, so an
-# interrupted run cannot leave something that looks like a usable backup — and
-# so retention never counts one.
-WORK="$DEST_ROOT/$SUB/${STAMP}.partial"
-FINAL="$DEST_ROOT/$SUB/${STAMP}"
-rm -rf "$WORK"; mkdir -p "$WORK"
 
 # `--linked` is the path that keeps the password out of argv: the CLI reads
 # SUPABASE_DB_PASSWORD from the environment and exports it as PGPASSWORD itself.
@@ -446,8 +532,8 @@ rm -rf "$WORK"; mkdir -p "$WORK"
 # that route falls back to a connection string, and the password IS visible in
 # `ps` for the seconds the dump runs. Single-user Mac, deliberate trade, said out
 # loud rather than left for someone to find.
-dump() {
-  local what="$1" out="$2"; shift 2
+dump_once() {
+  local out="$1"; shift
   if [[ "$SUB" == "local" ]]; then
     supabase db dump --db-url "$LOCAL_URL" "$@" -f "$out" >/dev/null
   elif [[ "$POOLER" == true ]]; then
@@ -456,7 +542,40 @@ dump() {
   else
     supabase db dump --linked "$@" -f "$out" >/dev/null
   fi
-  [[ -s "$out" ]] || { echo "  FAILED: $what produced an empty file." >&2; exit 1; }
+}
+
+# Retried, because the observed failure is transient and mid-flight.
+#
+#     pg_dump: error: query failed: SSL SYSCALL error: EOF detected
+#
+# Three of eleven scheduled runs died that way in Aug 2026, twice against the
+# direct host and once against the pooler, with runs either side succeeding
+# against the same host from the same machine. That is a dropped connection, not
+# a broken configuration, and the second attempt is free.
+#
+# ── WHY THE OUTPUT FILE IS DELETED BETWEEN ATTEMPTS
+#
+# A dump that dies partway leaves a partially written file behind. Re-running
+# `supabase db dump` over it would be fine, but a FAILED re-run would not: the
+# `-s` test below would then pass on the wreckage of the previous attempt, and a
+# truncated data.sql would be carried forward as though it were a dump. The
+# verification further down would very likely catch it — "very likely" is not
+# the standard for the only copy of the data.
+dump() {
+  local what="$1" out="$2"; shift 2
+  local try=1
+  while :; do
+    rm -f "$out"
+    if dump_once "$out" "$@" && [[ -s "$out" ]]; then break; fi
+    if (( try >= DUMP_TRIES )); then
+      rm -f "$out"
+      echo "  FAILED: $what did not complete after ${try} attempt(s)." >&2
+      exit 1
+    fi
+    echo "  retrying   $what (attempt $(( try + 1 )) of ${DUMP_TRIES})" >&2
+    try=$(( try + 1 ))
+    sleep 15
+  done
   printf '  %-10s %8s KB\n' "$what" "$(( ($(wc -c < "$out") + 1023) / 1024 ))"
 }
 

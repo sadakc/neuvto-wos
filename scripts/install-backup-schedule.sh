@@ -177,6 +177,11 @@ cat > "$AGENTS/$BACKUP_LABEL.plist" <<PLIST
     <string>/bin/bash</string>
     <string>$REPO/scripts/backup-prod.sh</string>
     <string>--keychain</string>
+    <!-- 03:00 on a laptop is the one moment the network is reliably not up
+         yet. Five of eight scheduled failures in Aug 2026 were DNS failing to
+         resolve, seconds after the machine woke. Wait up to ten minutes for an
+         interface rather than treating "no Wi-Fi at 3am" as a lost night. -->
+    <string>--wait</string><string>600</string>
   </array>
   <key>WorkingDirectory</key><string>$REPO</string>
   <key>StartCalendarInterval</key><dict>
