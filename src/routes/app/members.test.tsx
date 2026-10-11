@@ -146,6 +146,8 @@ vi.mock("@/platform/auth", async () => ({
     roles: ["org_admin"],
   }),
   isAdmin: () => true,
+  isSuperAdmin: (u: { roles?: string[] } | null) => !!u?.roles?.includes("super_admin"),
+  setMemberRoles: vi.fn(),
   listMembers: async () => MEMBERS,
   listInvitations: async () => [],
   deactivateMember: vi.fn(),

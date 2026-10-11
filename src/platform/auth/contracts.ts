@@ -17,11 +17,14 @@ import { z } from "zod";
  * enum value can be added but never removed, so it waits until it is wanted.
  */
 export const APP_ROLES = [
+  "super_admin",
   "org_admin",
   "hr_admin",
   "manager",
   "supervisor",
   "coordinator",
+  "payroll_officer",
+  "statutory_officer",
   "employee",
 ] as const;
 export type AppRole = (typeof APP_ROLES)[number];
@@ -40,12 +43,56 @@ export type AppRole = (typeof APP_ROLES)[number];
  * anywhere — the compiler names every screen that has to say something about it.
  */
 export const ROLE_LABELS: Record<AppRole, string> = {
+  super_admin: "Super Admin",
   org_admin: "Administrator",
   hr_admin: "HR administrator",
   manager: "Manager",
   supervisor: "Supervisor",
   coordinator: "Coordinator",
+  payroll_officer: "Payroll",
+  statutory_officer: "Statutory",
   employee: "Employee",
+};
+
+/**
+ * The roles only a Super Admin may grant or take away (D78). Mirrors
+ * `is_reserved_for_super_admin()` in the database, which is the copy that
+ * decides; this one only decides what a screen offers.
+ */
+export const SUPER_ADMIN_GRANTS: readonly AppRole[] = [
+  "super_admin",
+  "org_admin",
+  "hr_admin",
+  "payroll_officer",
+  "statutory_officer",
+];
+
+/**
+ * The roles that may hold an approval. Mirrors `is_approver_role()` (D57,
+ * D78). Payroll and Statutory are absent: they read data and approve nothing,
+ * and offering them in an approval rule would route somebody's leave to the
+ * person who looks after bank details.
+ */
+export const APPROVER_ROLES: readonly AppRole[] = [
+  "super_admin",
+  "org_admin",
+  "hr_admin",
+  "manager",
+  "supervisor",
+  "coordinator",
+];
+
+/** One line per role, shown where access is changed. */
+export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+  super_admin: "Runs access for the company. The only role that can make administrators.",
+  org_admin: "Runs the workspace: people, settings, reports, every module's configuration.",
+  hr_admin: "The same as an administrator, for the People Ops team.",
+  manager: "Approves leave for the people who report to them.",
+  supervisor: "Approves for their reports. Administers nothing.",
+  coordinator: "Approves for their reports. Administers nothing.",
+  payroll_officer: "Sees bank details and salaries. Separate from Administrator on purpose.",
+  statutory_officer: "Can reveal Aadhaar, PAN and the restricted block. Every reveal is logged.",
+  employee: "Their own record, leave and requests.",
 };
 
 export const EmailInput = z.object({

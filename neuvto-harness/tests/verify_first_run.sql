@@ -161,6 +161,20 @@ begin
   perform public.invitation_accept(v_token);
   raise notice 'ok: provisioning invites an administrator who accepts their way in';
 
+  -- D78. The administrator Neuvto names runs the company's access from then on,
+  -- which means they are its Super Admin. Nothing here grants it: provisioning
+  -- invites an org_admin, acceptance inserts that role, and the trigger must do
+  -- the rest. If this fails, a new customer has nobody who can make an admin.
+  perform pg_temp.as_postgres();
+  if not exists (select 1 from public.user_roles
+                  where user_id = v_founder and organization_id = v_org
+                    and role = 'super_admin' and deleted_at is null) then
+    perform pg_temp.fail(
+      'the provisioned administrator is not the Super Admin',
+      'D78: the first administrator of an organisation with no Super Admin must become one on acceptance');
+  end if;
+  raise notice 'ok: the administrator Neuvto names becomes the Super Admin (D78)';
+
   v_today := public.org_today(v_org);
   v_fy    := public.get_financial_year(v_org, v_today);
 

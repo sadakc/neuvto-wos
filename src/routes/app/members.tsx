@@ -5,13 +5,16 @@ import {
   deactivationImpact,
   getCurrentUser,
   isAdmin,
+  isSuperAdmin,
   listInvitations,
   listMembers,
   reactivateMember,
   revokeInvitation,
   ROLE_LABELS,
   setJoinedDate,
+  setMemberRoles,
   setReportingLine,
+  type AppRole,
   type CurrentUser,
   type DeactivationImpact,
   type Invitation,
@@ -19,6 +22,7 @@ import {
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { InviteTeam } from "@/platform/auth/InviteTeam";
+import { AccessEditor } from "@/platform/auth/AccessEditor";
 import { listDepartments, setDepartment, type Department } from "@/platform/organization";
 
 export const Route = createFileRoute("/app/members")({
@@ -58,6 +62,9 @@ export function MembersPage() {
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
+  // Whose access panel is open. One at a time: two open panels on a phone
+  // push the second person's Save below everything.
+  const [editingAccess, setEditingAccess] = useState<string | null>(null);
   /** D58. Empty is ordinary — a workspace that has configured none. */
   const [departments, setDepartments] = useState<Department[]>([]);
 
@@ -134,6 +141,17 @@ export function MembersPage() {
       // value the database refused.
       await load();
     }
+  }
+
+  // D78. The panel shows its own refusals inline, where the person is looking,
+  // so this throws rather than writing to the page-level error.
+  async function onSetRoles(member: Member, roles: AppRole[]) {
+    setError("");
+    setNotice("");
+    await setMemberRoles(member.id, roles);
+    setEditingAccess(null);
+    setNotice(`Access for ${member.fullName || member.email} updated.`);
+    await load();
   }
 
   async function onSetJoinedDate(employeeId: string, joinedDate: string) {
@@ -294,7 +312,7 @@ export function MembersPage() {
         </p>
 
         <div className="mt-4">
-          <InviteTeam onInvited={() => void load()} />
+          <InviteTeam onInvited={() => void load()} canGrantAdmin={isSuperAdmin(user)} />
         </div>
 
         <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
@@ -433,10 +451,33 @@ export function MembersPage() {
                       {m.phone ? ` · ${m.phone}` : ""}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {m.roles.map((r) => ROLE_LABELS[r]).join(", ") || "Employee"}
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      {m.roles.map((r) => ROLE_LABELS[r]).join(", ") || "Employee"}
+                    </span>
+                    {m.id !== user?.id && (
+                      <button
+                        type="button"
+                        data-testid="change-access"
+                        aria-expanded={editingAccess === m.id}
+                        onClick={() => setEditingAccess(editingAccess === m.id ? null : m.id)}
+                        className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        Change access
+                      </button>
+                    )}
                   </span>
                 </div>
+
+                {editingAccess === m.id && (
+                  <AccessEditor
+                    personName={m.fullName || m.email}
+                    roles={m.roles}
+                    callerIsSuperAdmin={isSuperAdmin(user)}
+                    onSave={(roles) => onSetRoles(m, roles)}
+                    onCancel={() => setEditingAccess(null)}
+                  />
+                )}
 
                 {/* The start date drives pro-rated entitlement (D3), so changing
                   it changes how much leave this person gets for the year. Kept

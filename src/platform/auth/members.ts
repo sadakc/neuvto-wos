@@ -93,6 +93,10 @@ export async function inviteMember(input: unknown): Promise<string> {
   });
 
   if (error) {
+    // D78. Inviting somebody as an administrator is granting them the role.
+    if (error.message.includes("ROLE_NOT_YOURS_TO_GRANT")) {
+      throw new AppError("FORBIDDEN", ROLE_NOT_YOURS, 403, { field: "role" });
+    }
     const code = (Object.keys(INVITE_ERRORS) as ErrorCode[]).find((k) => error.message.includes(k));
     if (code) {
       const e = INVITE_ERRORS[code]!;
@@ -348,6 +352,9 @@ export async function deactivateMember(
     if (raw.includes("SUCCESSOR_REQUIRED")) {
       throw new AppError("VALIDATION_FAILED", "Choose who takes over their work.", 400);
     }
+    if (raw.includes("LAST_SUPER_ADMIN")) {
+      throw new AppError("VALIDATION_FAILED", LAST_SUPER_ADMIN, 400);
+    }
     if (raw.includes("LAST_ADMIN")) {
       throw new AppError(
         "VALIDATION_FAILED",
@@ -399,4 +406,42 @@ export async function listDirectReports(): Promise<Pick<Member, "id" | "fullName
   if (failed) throw new AppError("INTERNAL_ERROR", "We couldn't load your team.", 500);
 
   return (reports ?? []).map((r) => ({ id: r.id, fullName: r.full_name, email: r.email }));
+}
+
+const ROLE_NOT_YOURS =
+  "Only a Super Admin can make somebody an administrator, or give the Payroll or Statutory role.";
+const LAST_SUPER_ADMIN =
+  "They're the only Super Admin. Make somebody else a Super Admin first, or nobody will be able to manage access for this company.";
+
+/**
+ * Sets the whole of somebody's roles (D78). The database decides what this
+ * caller may change, and refuses the set whole if any one change is not
+ * theirs to make; this maps each refusal to a sentence.
+ */
+export async function setMemberRoles(userId: string, roles: AppRole[]): Promise<AppRole[]> {
+  const { data, error } = await supabase.rpc("member_set_roles", {
+    _user_id: userId,
+    _roles: roles,
+  });
+  if (!error) return (data ?? []) as AppRole[];
+
+  const raw = error.message ?? "";
+  if (raw.includes("ROLE_NOT_YOURS_TO_GRANT")) throw new AppError("FORBIDDEN", ROLE_NOT_YOURS, 403);
+  if (raw.includes("CANNOT_CHANGE_OWN_ROLES")) {
+    throw new AppError(
+      "FORBIDDEN",
+      "You can't change your own access. Another Super Admin can.",
+      403,
+    );
+  }
+  if (raw.includes("LAST_SUPER_ADMIN"))
+    throw new AppError("VALIDATION_FAILED", LAST_SUPER_ADMIN, 400);
+  if (raw.includes("STILL_HAS_REPORTS")) {
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "People report to them, so they need a role that approves. Move their reports to somebody else first, or keep Manager, Supervisor or Coordinator.",
+      400,
+    );
+  }
+  throw toAppError(error, "setMemberRoles");
 }

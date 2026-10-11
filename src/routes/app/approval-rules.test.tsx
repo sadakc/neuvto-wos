@@ -40,9 +40,15 @@ vi.mock("@tanstack/react-router", () => ({
 const getCurrentUser = vi.fn<() => Promise<CurrentUser>>();
 
 vi.mock("@/platform/auth", async () => {
-  const { APP_ROLES, ROLE_LABELS } = await import("@/platform/auth/contracts");
+  const { APP_ROLES, APPROVER_ROLES, ROLE_LABELS } = await import("@/platform/auth/contracts");
   const { isAdmin } = await import("@/platform/auth/session");
-  return { APP_ROLES, ROLE_LABELS, isAdmin, getCurrentUser: () => getCurrentUser() };
+  return {
+    APP_ROLES,
+    APPROVER_ROLES,
+    ROLE_LABELS,
+    isAdmin,
+    getCurrentUser: () => getCurrentUser(),
+  };
 });
 
 const listApprovalLevels = vi.fn<() => Promise<ApprovalLevel[]>>();
@@ -132,12 +138,20 @@ describe("Approval rules — which roles may approve", () => {
     await renderRules();
 
     expect(roleOptions()).toEqual([
+      ["super_admin", "Super Admin"],
       ["org_admin", "Administrator"],
       ["hr_admin", "HR administrator"],
       ["manager", "Manager"],
       ["supervisor", "Supervisor"],
       ["coordinator", "Coordinator"],
     ]);
+  });
+
+  it("never offers Payroll or Statutory, which approve nothing (D78)", async () => {
+    await renderRules();
+    const values = roleOptions().map(([value]) => value);
+    expect(values).not.toContain("payroll_officer");
+    expect(values).not.toContain("statutory_officer");
   });
 
   it("never offers Employee", async () => {
@@ -186,6 +200,7 @@ describe("Approval rules — which roles may approve", () => {
       (o) => o.textContent,
     );
     expect(labels).toEqual([
+      "Super Admin",
       "Administrator",
       "HR administrator",
       "Manager",

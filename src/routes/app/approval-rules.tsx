@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   getCurrentUser,
   isAdmin,
-  APP_ROLES,
+  APPROVER_ROLES,
   ROLE_LABELS,
   type AppRole,
   type CurrentUser,
@@ -236,7 +236,7 @@ function ApprovalRulesPage() {
                         opinion on which. `chain_role_can_approve` now refuses it
                         in the database, so this list is presentation again
                         rather than the rule. */}
-                    {APP_ROLES.filter((r) => r !== "employee").map((r) => (
+                    {APPROVER_ROLES.map((r) => (
                       <option key={r} value={r}>
                         {ROLE_LABELS[r]}
                       </option>

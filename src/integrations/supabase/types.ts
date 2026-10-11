@@ -1486,6 +1486,10 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      active_super_admin_count: {
+        Args: { _except?: string; _org: string }
+        Returns: number
+      }
       admin_set_department: {
         Args: { _department_id: string; _employee_id: string }
         Returns: undefined
@@ -1633,6 +1637,11 @@ export type Database = {
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
+      is_reserved_for_super_admin: {
+        Args: { _role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
+      is_super_admin: { Args: never; Returns: boolean }
       leave_all_balances: {
         Args: never
         Returns: {
@@ -1791,6 +1800,13 @@ export type Database = {
       leave_year_open: {
         Args: { _org_id: string; _ref: string }
         Returns: boolean
+      }
+      member_set_roles: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: Database["public"]["Enums"]["app_role"][]
       }
       missing_system_notification_templates: { Args: never; Returns: string[] }
       module_enabled_for: {
@@ -2041,6 +2057,9 @@ export type Database = {
         | "employee"
         | "supervisor"
         | "coordinator"
+        | "super_admin"
+        | "payroll_officer"
+        | "statutory_officer"
       approval_decision: "pending" | "approved" | "rejected"
       approval_status: "pending" | "approved" | "rejected" | "cancelled"
       approver_rule: "reporting_manager" | "manager_of_manager" | "role"
@@ -2190,6 +2209,9 @@ export const Constants = {
         "employee",
         "supervisor",
         "coordinator",
+        "super_admin",
+        "payroll_officer",
+        "statutory_officer",
       ],
       approval_decision: ["pending", "approved", "rejected"],
       approval_status: ["pending", "approved", "rejected", "cancelled"],

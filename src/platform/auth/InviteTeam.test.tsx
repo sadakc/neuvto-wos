@@ -164,21 +164,35 @@ describe("InviteTeam — the Role dropdown", () => {
 
   const roleSelect = () => screen.getByLabelText("Role") as HTMLSelectElement;
 
-  it("offers all six roles, each with the word a person reads", () => {
-    render(<InviteTeam />);
+  it("offers a Super Admin every role, each with the word a person reads", () => {
+    render(<InviteTeam canGrantAdmin />);
 
     const options = within(roleSelect()).getAllByRole("option") as HTMLOptionElement[];
     // Value and label together. Either half alone passes against the bug: the
     // values come from APP_ROLES and were never wrong, and a label list alone
     // would not catch a label attached to the wrong role.
     expect(options.map((o) => [o.value, o.textContent])).toEqual([
+      ["super_admin", "Super Admin"],
       ["org_admin", "Administrator"],
       ["hr_admin", "HR administrator"],
       ["manager", "Manager"],
       ["supervisor", "Supervisor"],
       ["coordinator", "Coordinator"],
+      ["payroll_officer", "Payroll"],
+      ["statutory_officer", "Statutory"],
       ["employee", "Employee"],
     ]);
+  });
+
+  it("offers an Admin no administrator, Payroll or Statutory role to invite with (D78)", () => {
+    // An invitation is a role grant that arrives later. The database refuses
+    // it (ROLE_NOT_YOURS_TO_GRANT); this is the screen not offering it.
+    render(<InviteTeam />);
+
+    const values = (within(roleSelect()).getAllByRole("option") as HTMLOptionElement[]).map(
+      (o) => o.value,
+    );
+    expect(values).toEqual(["manager", "supervisor", "coordinator", "employee"]);
   });
 
   it("starts on Employee, and says so rather than showing a blank box", () => {

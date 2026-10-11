@@ -193,7 +193,16 @@ When Sada provisions a company, the administrator he names becomes that company'
   `user_roles`; the direct table write policies are dropped. A role on a table a user can
   write is a privilege-escalation hole (D4), and four policies saying "any admin" were
   exactly that once Admin and Super Admin differ.
-- Every grant and revoke is audited, and a role change revokes the person's sessions (D20).
+- Every grant and revoke is audited (the `user_roles` audit trigger), and a removed role is
+  soft-deleted, so who held what and when survives. A change takes effect on the person's
+  next request, because every policy reads `user_roles` at query time; no session has to be
+  revoked for it.
+- **How the first Super Admin happens:** a trigger. When an organisation with no Super Admin
+  gains its first Administrator, that person becomes Super Admin. So the administrator Sada
+  names at provisioning becomes one on **acceptance**, through the unchanged acceptance
+  path. Existing organisations were backfilled with the person who accepted their first
+  administrator invitation. Proved from a workspace that was never seeded, in
+  `verify_first_run.sql`, and rule by rule in `verify_company_access.sql`.
 - **Platform admins still never read tenant data (D42).** Sada names the first Super Admin
   at provisioning and does not see the company's people afterwards. If a company loses
   every Super Admin, re-naming one is a platform action that needs its own design (consent,

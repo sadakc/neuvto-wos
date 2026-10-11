@@ -122,9 +122,14 @@ export function hasRole(user: CurrentUser | null, role: AppRole): boolean {
   return user?.roles.includes(role) ?? false;
 }
 
-/** Mirrors the database `is_admin()` — org_admin or hr_admin. */
+/** Mirrors the database `is_admin()`: super_admin, org_admin or hr_admin. */
 export function isAdmin(user: CurrentUser | null): boolean {
-  return hasRole(user, "org_admin") || hasRole(user, "hr_admin");
+  return hasRole(user, "super_admin") || hasRole(user, "org_admin") || hasRole(user, "hr_admin");
+}
+
+/** Mirrors `is_super_admin()` (D78): the only tier that grants administrator roles. */
+export function isSuperAdmin(user: CurrentUser | null): boolean {
+  return hasRole(user, "super_admin");
 }
 
 /**

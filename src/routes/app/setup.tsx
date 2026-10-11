@@ -3,6 +3,7 @@ import { useCallback, useEffect, useState } from "react";
 import {
   getCurrentUser,
   isAdmin,
+  isSuperAdmin,
   listInvitations,
   listMembers,
   type CurrentUser,
@@ -277,7 +278,7 @@ function SetupWizard() {
           onBack={() => void go("modules")}
           onNext={() => void go("done")}
         >
-          <InviteTeam onInvited={() => void refresh()} />
+          <InviteTeam onInvited={() => void refresh()} canGrantAdmin={isSuperAdmin(user)} />
         </StepShell>
       )}
 

@@ -16,11 +16,23 @@
 
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
-import { APP_ROLES, ROLE_LABELS, type AppRole } from "./contracts";
+import { APP_ROLES, ROLE_LABELS, SUPER_ADMIN_GRANTS, type AppRole } from "./contracts";
 import { inviteMember } from "./members";
 import { listDepartments, type Department } from "@/platform/organization";
 
-export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
+export function InviteTeam({
+  onInvited,
+  canGrantAdmin = false,
+}: {
+  onInvited?: () => void;
+  /**
+   * D78. Only a Super Admin may invite somebody as an administrator, or with
+   * the Payroll or Statutory role, because an invitation is a role grant that
+   * arrives later. Off by default, so a caller that forgets to say gets the
+   * narrower list rather than a list the database will refuse.
+   */
+  canGrantAdmin?: boolean;
+}) {
   const [email, setEmail] = useState("");
   const [phone, setPhone] = useState("");
   const [fullName, setFullName] = useState("");
@@ -159,7 +171,7 @@ export function InviteTeam({ onInvited }: { onInvited?: () => void }) {
             }}
             className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
           >
-            {APP_ROLES.map((r) => (
+            {APP_ROLES.filter((r) => canGrantAdmin || !SUPER_ADMIN_GRANTS.includes(r)).map((r) => (
               <option key={r} value={r}>
                 {ROLE_LABELS[r]}
               </option>

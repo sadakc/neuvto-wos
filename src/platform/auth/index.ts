@@ -14,6 +14,7 @@ export {
   getSessionStartedAt,
   hasRole,
   isAdmin,
+  isSuperAdmin,
   canApprove,
 } from "./session";
 
@@ -45,6 +46,7 @@ export {
   listMembers,
   listDirectReports,
   setReportingLine,
+  setMemberRoles,
   setJoinedDate,
   accountStatus,
   reactivateMember,
@@ -58,6 +60,9 @@ export {
 export {
   APP_ROLES,
   ROLE_LABELS,
+  ROLE_DESCRIPTIONS,
+  APPROVER_ROLES,
+  SUPER_ADMIN_GRANTS,
   EmailInput,
   VerifyOtpInput,
   SignupInput,

@@ -2224,8 +2224,14 @@ begin
       raise notice 'ok: retroactive leave is refused in org-local time';
 
       begin
-        -- A Saturday and Sunday for Acme, whose weekend is Sat/Sun.
-        perform public.leave_submit(casual, date '2026-09-05', date '2026-09-06', 'weekend');
+        -- A Saturday and Sunday for Acme, whose weekend is Sat/Sun: the first
+        -- Saturday at least a week out. This was the literal 2026-09-05, which
+        -- turned into a past date on 5 Sep 2026 and from then on was refused
+        -- as PAST_DATE before the weekend rule was ever reached.
+        perform public.leave_submit(casual,
+          d0 + 7 + ((6 - extract(isodow from d0 + 7)::int + 7) % 7),
+          d0 + 8 + ((6 - extract(isodow from d0 + 7)::int + 7) % 7),
+          'weekend');
         raise exception 'RLS FAIL: leave was accepted for non-working days only';
       exception when raise_exception then
         if sqlerrm <> 'NO_WORKING_DAYS' then raise; end if;
@@ -2235,7 +2241,7 @@ begin
       -- Priya's balance covers 3 days; a fortnight cannot fit in it.
       perform pg_temp.as_user(priya);
       begin
-        perform public.leave_submit(casual, d0 + 100, d0 + 113, 'overdraw');
+        perform public.leave_submit(casual, d0 + 10, d0 + 23, 'overdraw');
         raise exception 'RLS FAIL: a request larger than the balance was accepted';
       exception when raise_exception then
         if sqlerrm not like 'INSUFFICIENT_BALANCE%' then raise; end if;
@@ -2379,7 +2385,7 @@ begin
           perform pg_temp.as_user(ravi);
           select available_days into v_avail0 from leave_balances
            where employee_id = ravi and leave_type_id = casual;
-          v_req2 := public.leave_submit(casual, d0 + 100, d0 + 102, 'to withdraw');
+          v_req2 := public.leave_submit(casual, d0 + 30, d0 + 32, 'to withdraw');
 
           perform pg_temp.as_postgres();
           select working_days into n from leave_requests where id = v_req2;
@@ -2423,8 +2429,12 @@ begin
           raise notice 'ok: cancelling twice pays out once';
 
           ------------------------------------------- somebody else's leave
+          -- Offsets kept within ~6 weeks of d0 (11 Oct 2026). They were +100
+          -- and +130, and d0 is already 40-100 days out, so by October they
+          -- landed in a leave year not yet open (D34) and raised
+          -- NEXT_YEAR_NOT_OPEN_YET instead of the refusal under test.
           perform pg_temp.as_user(ravi);
-          v_req2 := public.leave_submit(casual, d0 + 130, d0 + 132, 'not yours');
+          v_req2 := public.leave_submit(casual, d0 + 40, d0 + 42, 'not yours');
 
           perform pg_temp.as_user(priya);
           v_bad := false;
