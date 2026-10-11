@@ -1,0 +1,72 @@
+/**
+ * How the Employee Master writes dates, durations and counts. Pure, so the
+ * card, the history tables and the directory cannot disagree about any of them.
+ */
+
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+
+/** `2024-03-01` → `01 Mar 2024`. Read as a calendar date, never through a time zone. */
+export function formatDate(iso: string | null | undefined): string {
+  if (!iso) return "—";
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
+  if (!m) return "—";
+  return `${m[3]} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
+}
+
+/** 40 → `3 yr 4 mo`; 11 → `11 mo`; 24 → `2 yr`. */
+export function formatMonths(months: number | null | undefined): string {
+  if (months == null || months < 0) return "—";
+  const y = Math.floor(months / 12);
+  const m = months % 12;
+  if (y === 0) return `${m} mo`;
+  return m === 0 ? `${y} yr` : `${y} yr ${m} mo`;
+}
+
+/** Whole months from one calendar date to another (or to `today`). */
+export function monthsBetween(from: string, to: string | null, today: string): number {
+  const [fy, fm, fd] = from.slice(0, 10).split("-").map(Number);
+  const [ty, tm, td] = (to ?? today).slice(0, 10).split("-").map(Number);
+  let months = (ty - fy) * 12 + (tm - fm);
+  if (td < fd) months -= 1;
+  return Math.max(0, months);
+}
+
+const PLURAL: Record<string, string> = {
+  son: "sons",
+  daughter: "daughters",
+  wife: "wives",
+  husband: "husbands",
+  father: "fathers",
+  mother: "mothers",
+  brother: "brothers",
+  sister: "sisters",
+  "father-in-law": "fathers-in-law",
+  "mother-in-law": "mothers-in-law",
+};
+
+/**
+ * `['son','son','daughter']` → `2 sons, 1 daughter`. Ordered by first
+ * appearance, so the summary reads in the order the rows do.
+ */
+export function familySummary(relations: readonly string[]): string {
+  if (relations.length === 0) return "Nobody recorded";
+  const counts = new Map<string, number>();
+  for (const r of relations) counts.set(r, (counts.get(r) ?? 0) + 1);
+  return [...counts].map(([r, n]) => `${n} ${n === 1 ? r : (PLURAL[r] ?? `${r}s`)}`).join(", ");
+}
+
+/** `full_time` → `Full time`; any unknown key keeps its words. */
+export function humanise(value: string | null | undefined): string {
+  if (!value) return "—";
+  const s = value.replace(/_/g, " ");
+  return s.charAt(0).toUpperCase() + s.slice(1);
+}
+
+export function initials(name: string | null | undefined): string {
+  const parts = (name ?? "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  return ((parts[0][0] ?? "") + (parts.length > 1 ? parts[parts.length - 1][0] : "")).toUpperCase();
+}
+
+/** Today in the browser, as a calendar date. Durations only; nothing is decided on it. */
+export const todayIso = () => new Date().toISOString().slice(0, 10);

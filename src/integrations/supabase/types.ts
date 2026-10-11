@@ -476,6 +476,475 @@ export type Database = {
           },
         ]
       }
+      deployment_units: {
+        Row: {
+          attendance_capture_mode: string | null
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          is_billable: boolean
+          location: string | null
+          name: string
+          organization_id: string
+          requires_police_verification: boolean
+          state: string | null
+          status: string
+          unit_type: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          attendance_capture_mode?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          location?: string | null
+          name: string
+          organization_id: string
+          requires_police_verification?: boolean
+          state?: string | null
+          status?: string
+          unit_type: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          attendance_capture_mode?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          location?: string | null
+          name?: string
+          organization_id?: string
+          requires_police_verification?: boolean
+          state?: string | null
+          status?: string
+          unit_type?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployment_units_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      designations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          grade: string | null
+          id: string
+          name: string
+          organization_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          grade?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          grade?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "designations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_addresses: {
+        Row: {
+          address_type: string
+          city: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          district: string | null
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          line: string
+          nearest_police_station: string | null
+          organization_id: string
+          pincode: string
+          state: string
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          address_type: string
+          city: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          district?: string | null
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          line: string
+          nearest_police_station?: string | null
+          organization_id: string
+          pincode: string
+          state: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          address_type?: string
+          city?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          district?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          line?: string
+          nearest_police_station?: string | null
+          organization_id?: string
+          pincode?: string
+          state?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_addresses_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_addresses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_deployments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deployment_order_ref: string
+          deployment_unit_id: string
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          expected_duration: string | null
+          id: string
+          organization_id: string
+          reason: string | null
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deployment_order_ref: string
+          deployment_unit_id: string
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          expected_duration?: string | null
+          id?: string
+          organization_id: string
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deployment_order_ref?: string
+          deployment_unit_id?: string
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          expected_duration?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_deployments_deployment_unit_id_fkey"
+            columns: ["deployment_unit_id"]
+            isOneToOne: false
+            referencedRelation: "deployment_units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deployments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deployments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          alternate_mobile: string | null
+          blood_group: string | null
+          chest_cm: number | null
+          confirmed_on: string | null
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          deleted_at: string | null
+          designation_id: string | null
+          education_qualification: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relation: string | null
+          employee_code: string | null
+          employment_type: string | null
+          height_cm: number | null
+          id: string
+          invitation_id: string | null
+          marital_status: string | null
+          name_as_per_id: string | null
+          nationality: string | null
+          native_state: string | null
+          nearest_police_station: string | null
+          organization_id: string
+          personal_email: string | null
+          profile_id: string | null
+          re_joining_date: string | null
+          reason_for_leaving_last_org: string | null
+          sex: string | null
+          status: string
+          termination_date: string | null
+          termination_reason: string | null
+          updated_at: string
+          updated_by: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          alternate_mobile?: string | null
+          blood_group?: string | null
+          chest_cm?: number | null
+          confirmed_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          designation_id?: string | null
+          education_qualification?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
+          employee_code?: string | null
+          employment_type?: string | null
+          height_cm?: number | null
+          id?: string
+          invitation_id?: string | null
+          marital_status?: string | null
+          name_as_per_id?: string | null
+          nationality?: string | null
+          native_state?: string | null
+          nearest_police_station?: string | null
+          organization_id: string
+          personal_email?: string | null
+          profile_id?: string | null
+          re_joining_date?: string | null
+          reason_for_leaving_last_org?: string | null
+          sex?: string | null
+          status?: string
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          alternate_mobile?: string | null
+          blood_group?: string | null
+          chest_cm?: number | null
+          confirmed_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          designation_id?: string | null
+          education_qualification?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
+          employee_code?: string | null
+          employment_type?: string | null
+          height_cm?: number | null
+          id?: string
+          invitation_id?: string | null
+          marital_status?: string | null
+          name_as_per_id?: string | null
+          nationality?: string | null
+          native_state?: string | null
+          nearest_police_station?: string | null
+          organization_id?: string
+          personal_email?: string | null
+          profile_id?: string | null
+          re_joining_date?: string | null
+          reason_for_leaving_last_org?: string | null
+          sex?: string | null
+          status?: string
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "designations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "invitations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          employee_id: string
+          id: string
+          is_dependent: boolean
+          name: string
+          organization_id: string
+          relation: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          employee_id: string
+          id?: string
+          is_dependent?: boolean
+          name: string
+          organization_id: string
+          relation: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          employee_id?: string
+          id?: string
+          is_dependent?: boolean
+          name?: string
+          organization_id?: string
+          relation?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       holidays: {
         Row: {
           created_at: string
@@ -902,6 +1371,123 @@ export type Database = {
         }
         Relationships: []
       }
+      nomination_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          organization_id: string
+          scheme: string
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          organization_id: string
+          scheme?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          scheme?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nomination_versions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nomination_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nominees: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          id: string
+          name: string
+          organization_id: string
+          relation: string
+          share_percent: number
+          updated_at: string
+          updated_by: string | null
+          version_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          relation: string
+          share_percent: number
+          updated_at?: string
+          updated_by?: string | null
+          version_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          relation?: string
+          share_percent?: number
+          updated_at?: string
+          updated_by?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nominees_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nominees_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "nomination_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_templates: {
         Row: {
           body_template: string
@@ -1271,6 +1857,66 @@ export type Database = {
           },
         ]
       }
+      previous_organisations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          designation: string | null
+          employee_id: string
+          from_date: string
+          id: string
+          organisation_name: string
+          organization_id: string
+          reason_for_leaving: string | null
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          employee_id: string
+          from_date: string
+          id?: string
+          organisation_name: string
+          organization_id: string
+          reason_for_leaving?: string | null
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          employee_id?: string
+          from_date?: string
+          id?: string
+          organisation_name?: string
+          organization_id?: string
+          reason_for_leaving?: string | null
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "previous_organisations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "previous_organisations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1566,6 +2212,46 @@ export type Database = {
         Args: { _event_key: string; _payload: Json }
         Returns: undefined
       }
+      employee_age: { Args: { _dob: string; _org: string }; Returns: number }
+      employee_card: { Args: { _employee_id?: string }; Returns: Json }
+      employee_directory: {
+        Args: { _q?: string }
+        Returns: {
+          admin_role: string
+          date_of_joining: string
+          department: string
+          deployed_unit: string
+          designation: string
+          employee_code: string
+          full_name: string
+          has_signed_in: boolean
+          id: string
+          is_active: boolean
+          mobile: string
+          reports_to: string
+          status: string
+          work_email: string
+        }[]
+      }
+      employee_experience_months: {
+        Args: { _employee_id: string }
+        Returns: number
+      }
+      employee_org_chart: {
+        Args: never
+        Returns: {
+          designation: string
+          direct_reports: number
+          full_name: string
+          id: string
+          manager_profile_id: string
+          profile_id: string
+        }[]
+      }
+      employee_relationship: {
+        Args: { _employee_id: string }
+        Returns: string[]
+      }
       ensure_balance: {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
         Returns: {
@@ -1852,6 +2538,10 @@ export type Database = {
       }
       org_today: { Args: { _org_id: string }; Returns: string }
       organization_display_name: { Args: { _org_id: string }; Returns: string }
+      platform_add_super_admin: {
+        Args: { _email: string; _full_name?: string; _org_id: string }
+        Returns: string
+      }
       platform_client_errors: {
         Args: { p_days?: number }
         Returns: {
@@ -1893,6 +2583,19 @@ export type Database = {
           test_reason: string
         }[]
       }
+      platform_list_super_admins: {
+        Args: { _org_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          invitation_id: string
+          invite_url: string
+          is_active: boolean
+          kind: string
+          since: string
+          user_id: string
+        }[]
+      }
       platform_mail_health: {
         Args: never
         Returns: {
@@ -1909,6 +2612,10 @@ export type Database = {
         Args: { _org: string; _reason: string }
         Returns: undefined
       }
+      platform_remove_super_admin: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: undefined
+      }
       platform_secret: { Args: { _name: string }; Returns: string }
       platform_set_module: {
         Args: { _granted: boolean; _module_key: string; _org_id: string }
@@ -1916,6 +2623,10 @@ export type Database = {
       }
       platform_unmark_test_organization: {
         Args: { _org: string }
+        Returns: undefined
+      }
+      platform_withdraw_super_admin_invite: {
+        Args: { _invitation_id: string }
         Returns: undefined
       }
       provision_organization: {
