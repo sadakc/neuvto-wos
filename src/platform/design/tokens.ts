@@ -396,6 +396,10 @@ export const TYPE = {
     stat: { size: 27, lineHeight: 30, weight: 600, family: "sans", tracking: -0.03 },
     caption: { size: 11.5, lineHeight: 16, weight: 400, family: "sans", tracking: 0 },
     code: { size: 12, lineHeight: 17, weight: 400, family: "mono", tracking: 0 },
+    /** The module name in the top bar. */
+    barTitle: { size: 15, lineHeight: 20, weight: 600, family: "sans", tracking: -0.01 },
+    /** Tab, rail item, menu item. */
+    nav: { size: 13.5, lineHeight: 20, weight: 500, family: "sans", tracking: 0 },
   },
 } as const;
 

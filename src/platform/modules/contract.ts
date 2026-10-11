@@ -36,7 +36,19 @@ export interface ModuleNavItem {
   soon?: string;
   /** Omitted means everyone. Presence means at least one of these roles. */
   roles?: readonly AppRole[];
+  /**
+   * Where the tab sits in the Core HR tab bar (DESIGN_SYSTEM §7). `main` is the
+   * row an employee uses; `company` is behind the Company menu and should carry
+   * `roles` that administer. Defaults to `main`. "For your team" (Approvals) is
+   * the platform's to add, so a module cannot claim it.
+   */
+  group?: "main" | "company";
+  /** One line under the label in the Company menu and the section picker. */
+  description?: string;
 }
+
+/** The rail groups modules under these, once there are more than six. */
+export type ModuleSection = "Time" | "People" | "Money" | "Company";
 
 /**
  * A card a module contributes to the dashboard.
@@ -179,6 +191,17 @@ export interface ModuleDefinition {
   name: string;
   version: string;
 
+  /** The rail's label where space is short ("Leave" for "Leave Management"). */
+  shortName?: string;
+  /** Which rail section the module belongs to. Defaults to `Company`. */
+  section?: ModuleSection;
+  /** The rail icon. A component, so the platform imports no icon by name. */
+  icon?: ComponentType<{ className?: string }>;
+  /** The Company menu's line under this module's Reports tab. */
+  reportsDescription?: string;
+  /** The Company menu's line under this module's Configuration tab. */
+  configurationDescription?: string;
+
   /**
    * A function, not an array, because what a manager sees differs from what an
    * employee sees. Hiding a link is presentation; RLS is what actually refuses
@@ -254,6 +277,11 @@ export const ModuleDefinitionSchema = z.object({
     .regex(/^[a-z][a-z0-9_]*$/, "Module key must be lower snake_case, matching modules.key"),
   name: z.string().min(1),
   version: z.string().min(1),
+  shortName: z.string().min(1).max(14, "A short name is for a 2-up phone grid").optional(),
+  section: z.enum(["Time", "People", "Money", "Company"]).optional(),
+  icon: z.any().optional(),
+  reportsDescription: z.string().optional(),
+  configurationDescription: z.string().optional(),
   navigation: z.function(),
   routes: z.array(
     z.object({

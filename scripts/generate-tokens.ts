@@ -40,6 +40,22 @@ function block(): string {
   const vars = (theme: "light" | "dark") =>
     tokens.map((t) => `  --${cssName(t)}: ${oklchToCss(SEMANTIC[theme][t])};`).join("\n");
 
+  // Core HR's scale has steps Tailwind's does not (13.5, 11.5, 10.5px), so
+  // each role becomes a named utility: \`text-caption\`, \`text-eyebrow\`,
+  // \`tracking-eyebrow\`. A component writing text-[11.5px] instead is the
+  // arbitrary value DESIGN_SYSTEM §12 forbids.
+  const typeScale = Object.entries(TYPE.roles)
+    .map(([role, r]) => {
+      const name = cssName(role);
+      const lines = [
+        `  --text-${name}: ${r.size / 16}rem;`,
+        `  --text-${name}--line-height: ${r.lineHeight / 16}rem;`,
+      ];
+      if (r.tracking !== 0) lines.push(`  --tracking-${name}: ${r.tracking}em;`);
+      return lines.join("\n");
+    })
+    .join("\n");
+
   return `${START} — do not edit by hand.
 
    Generated from src/platform/design/tokens.ts by scripts/generate-tokens.ts.
@@ -57,6 +73,7 @@ function block(): string {
   --font-display: "${TYPE.fontSans}", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "${TYPE.fontSans}", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   --font-mono: "${TYPE.fontMono}", ui-monospace, "SF Mono", Menlo, monospace;
+${typeScale}
   --shadow-card: var(--shadow-card-value);
   --shadow-overlay: var(--shadow-overlay-value);
   /* Below \`text-xs\`, for the one place a label has to sit inside a tab. Named

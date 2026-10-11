@@ -11,6 +11,7 @@
  */
 
 import { lazy } from "react";
+import { CalendarDays } from "lucide-react";
 import type { ModuleDefinition } from "@/platform/modules";
 import { LeaveSettings } from "./contracts";
 
@@ -18,6 +19,11 @@ export const leave: ModuleDefinition = {
   key: "leave",
   name: "Leave Management",
   version: "1.0.0",
+  shortName: "Leave",
+  section: "Time",
+  icon: CalendarDays,
+  reportsDescription: "Balances, leave taken, what is waiting",
+  configurationDescription: "Leave types and opening balances",
 
   // "Approvals" used to be declared here, as `soon: "step 8"` — a module laying
   // claim to a platform screen. It now lives in the platform's own navigation,
@@ -30,8 +36,9 @@ export const leave: ModuleDefinition = {
   // reach the one screen they are needed on. Found by opening it at 280px wide;
   // the desktop sidebar showed all six and looked perfect.
   navigation: () => [
-    { label: "Apply", to: "/app/leave/apply" },
-    { label: "My leave", to: "/app/leave" },
+    // Core HR labels (D76). Apply first: it is what most people come for.
+    { label: "Apply Leave", to: "/app/leave/apply" },
+    { label: "My Leave", to: "/app/leave" },
     { label: "Calendar", to: "/app/leave/calendar" },
   ],
 

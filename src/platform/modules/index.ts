@@ -22,6 +22,7 @@ export {
   ModuleDefinitionSchema,
   type ModuleDefinition,
   type ModuleNavItem,
+  type ModuleSection,
   type ModuleRoute,
   type ModuleDashboardCard,
   type ModuleAdminSection,

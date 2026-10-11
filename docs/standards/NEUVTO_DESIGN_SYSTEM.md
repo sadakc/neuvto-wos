@@ -1,6 +1,6 @@
 # NEUVTO WOS — Design System
 
-**Version:** 2.0 · **Status:** Active · **Applies to:** every screen, web and native
+**Version:** 2.1 · **Status:** Active · **Applies to:** every screen, web and native
 **Audience:** designers, engineers, and AI build tools — all three work from this file
 
 The contract between design and code. A designer should be able to open this, look at a
@@ -288,12 +288,17 @@ footer saying how many are hidden for this role.
    (the `More` button may grow a red count).
 6. Walk tabs left to right accumulating widths. The first that does not fit is the cut;
    hide it and everything after.
-7. **If the active tab is in the hidden set, un-hide it and hide the last visible
-   non-active tab instead.** Nobody lands on a page whose tab they cannot see.
+7. **If the active tab is in the hidden set, un-hide it, then hide visible non-active tabs
+   from the right until the row fits again.** Nobody lands on a page whose tab they cannot
+   see. The prototype states this as a one-for-one swap, which overflows whenever the
+   active tab is wider than the one it displaces (16px at a 610px bar, found by the matrix
+   in `src/platform/shell/fit.test.ts`); demoting until it fits is what the swap was for.
 8. Set the `More` count, red if any hidden tab carries pending items.
 
-Re-measure on every render (`requestAnimationFrame`), on resize, and when the container
-changes. If the measured mode differs from the rendered mode, re-render before fitting.
+Re-measure on every render, on resize, and when the container changes. Neuvto measures an
+**invisible copy** of the row (`src/platform/shell/TabBar.tsx`), clipped inside a
+zero-overflow box so it can never widen the page, and observes the element with
+`ResizeObserver`, which also fires when a web font finishes loading. If the measured mode differs from the rendered mode, re-render before fitting.
 Rendering before layout settles and never re-checking is a real bug the prototype caught.
 
 ### Algorithm 2: module rail
@@ -368,7 +373,11 @@ skeletons matching the final layout, not a centred spinner.
   every pairing by `tokens.test.ts`; nobody's judgement.
 - **Never colour alone.** Every pill carries a word.
 - Focus ring on every interactive element: `2px solid` `--ring`, offset 2px.
-- Tabs are `role="tab"` in a `role="tablist"`, with arrow-key movement.
+- **The module tab bar is a `nav` of links** with `aria-current="page"` and arrow-key
+  movement, because each tab is a different screen. In-screen sub-tabs (the Employee
+  Card's Overview, Personal…) are a real `role="tablist"` of `role="tab"`. When the
+  current section is behind `Company`, that button carries the current state
+  ("Company, current: Reports").
 - Panels and modals close on `Escape` and on outside click, trap focus, and return it to
   their trigger.
 - Every control has a programmatically associated label. Placeholder text is not a label.
