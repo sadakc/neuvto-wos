@@ -8,7 +8,7 @@
  * and the section picker groups what it lists the way DESIGN_SYSTEM §7 says.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { z } from "zod";
@@ -165,5 +165,64 @@ describe("pick mode, below 540px", () => {
     const menu = screen.getByRole("menu");
     expect(within(menu).getAllByRole("group")).toHaveLength(1);
     expect(menu).toHaveTextContent("3 tabs hidden for this role");
+  });
+});
+
+describe("row mode, when the tabs do not all fit", () => {
+  // Six 150px tabs, `More` at 80px, a 600px bar: 570px available, 490px once
+  // `More` is reserved, so the natural cut is after the third tab. Widths are
+  // stubbed because happy-dom has no layout; the bar width comes from the
+  // component's own `forceWidth` seam.
+  const wide: ModuleDefinition = {
+    ...leave,
+    navigation: () =>
+      ["One", "Two", "Three", "Four", "Five", "Six"].map((label) => ({
+        label,
+        to: `/app/leave/${label.toLowerCase()}`,
+      })),
+  };
+  const module = buildShell(user(["employee"]), [wide]).find((m) => m.key === "leave")!;
+
+  let original: PropertyDescriptor | undefined;
+  beforeEach(() => {
+    original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "offsetWidth");
+    Object.defineProperty(HTMLElement.prototype, "offsetWidth", {
+      configurable: true,
+      get(this: HTMLElement) {
+        if (this.hasAttribute("data-tab")) return 150;
+        if (this.hasAttribute("data-more")) return 80;
+        if (this.hasAttribute("data-note")) return 200;
+        return 0;
+      },
+    });
+  });
+  afterEach(() => {
+    if (original) Object.defineProperty(HTMLElement.prototype, "offsetWidth", original);
+    else Reflect.deleteProperty(HTMLElement.prototype, "offsetWidth");
+  });
+
+  const shown = () =>
+    Array.from(
+      screen.getByRole("navigation").querySelectorAll("a[data-testid^=tab-]"),
+      (a) => a.textContent,
+    );
+
+  it("the natural cut leaves the first three and puts the rest behind More", async () => {
+    render(<TabBar module={module} activeTabId="/app/leave/one" forceWidth={600} />);
+    expect(shown()).toEqual(["One", "Two", "Three"]);
+    await userEvent.click(screen.getByTestId("tab-more"));
+    expect(
+      within(screen.getByRole("menu"))
+        .getAllByRole("menuitem")
+        .map((a) => a.textContent),
+    ).toEqual(["Four", "Five", "Six"]);
+  });
+
+  it.each(["four", "six"])("an active tab past the cut (%s) is still in the row", (label) => {
+    render(<TabBar module={module} activeTabId={`/app/leave/${label}`} forceWidth={600} />);
+    expect(screen.getByTestId(`tab-/app/leave/${label}`)).toHaveAttribute("aria-current", "page");
+    // It displaced a tab rather than overflowing the bar: still three in the row.
+    expect(shown()).toHaveLength(3);
+    expect(screen.getByTestId("tab-more")).toBeInTheDocument();
   });
 });
