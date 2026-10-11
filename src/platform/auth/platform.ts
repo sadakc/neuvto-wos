@@ -334,3 +334,99 @@ export async function getClientErrors(days = 7): Promise<ClientErrorGroup[] | nu
     stack: r.stack ?? null,
   }));
 }
+
+// ═══════════════════════════════════════════════ a company's Super Admins (D83)
+
+/** A company's Super Admin, or somebody invited to become one. */
+export interface CompanySuperAdmin {
+  kind: "member" | "invited";
+  /** Set for a member; what removing them takes. */
+  userId: string | null;
+  /** Set for an invitation; what withdrawing it takes. */
+  invitationId: string | null;
+  fullName: string | null;
+  email: string | null;
+  isActive: boolean;
+  since: string;
+  /** Present only for a pending invitation, for when the email never arrived. */
+  inviteUrl: string | null;
+}
+
+const SUPER_ADMIN_REFUSALS: Partial<Record<string, string>> = {
+  FORBIDDEN: "Only Neuvto staff can change a company's Super Admins.",
+  INVALID_EMAIL: "That doesn't look like an email address.",
+  EMAIL_IN_ANOTHER_WORKSPACE: "That person already belongs to another company on Neuvto.",
+  MEMBER_DEACTIVATED: "That person is deactivated. The company has to reactivate them first.",
+  LAST_SUPER_ADMIN:
+    "This is the company's only Super Admin. Add another, and wait for them to accept, before removing this one.",
+  NOT_FOUND: "That has already changed. Refresh to see the current list.",
+};
+
+function superAdminError(error: { message: string }, where: string): Error {
+  for (const [code, message] of Object.entries(SUPER_ADMIN_REFUSALS)) {
+    if (error.message.includes(code)) {
+      // Codes the shared list does not carry travel as VALIDATION_FAILED, as
+      // members.ts does for LAST_SUPER_ADMIN: the message is what the screen shows.
+      const known: ErrorCode =
+        code === "FORBIDDEN" ||
+        code === "INVALID_EMAIL" ||
+        code === "EMAIL_IN_ANOTHER_WORKSPACE" ||
+        code === "NOT_FOUND"
+          ? code
+          : "VALIDATION_FAILED";
+      return new AppError(known, message!, code === "FORBIDDEN" ? 403 : 400);
+    }
+  }
+  return toAppError(error, where);
+}
+
+export async function listSuperAdmins(organizationId: string): Promise<CompanySuperAdmin[]> {
+  const { data, error } = await supabase.rpc("platform_list_super_admins", {
+    _org_id: organizationId,
+  });
+  if (error) throw superAdminError(error, "listSuperAdmins");
+  return (data ?? []).map((r) => ({
+    kind: r.kind === "invited" ? "invited" : "member",
+    userId: r.user_id,
+    invitationId: r.invitation_id,
+    fullName: r.full_name,
+    email: r.email,
+    isActive: r.is_active,
+    since: r.since,
+    inviteUrl: r.invite_url,
+  }));
+}
+
+/**
+ * Makes somebody a company's Super Admin. A member is promoted at once; anybody
+ * else is invited and becomes one on accepting.
+ */
+export async function addSuperAdmin(
+  organizationId: string,
+  email: string,
+  fullName?: string,
+): Promise<"promoted" | "invited" | "already"> {
+  const { data, error } = await supabase.rpc("platform_add_super_admin", {
+    _org_id: organizationId,
+    _email: email,
+    _full_name: fullName?.trim() || undefined,
+  });
+  if (error) throw superAdminError(error, "addSuperAdmin");
+  return data === "promoted" || data === "already" ? data : "invited";
+}
+
+/** Takes the Super Admin role away. Their other roles stay. Never the last one. */
+export async function removeSuperAdmin(organizationId: string, userId: string): Promise<void> {
+  const { error } = await supabase.rpc("platform_remove_super_admin", {
+    _org_id: organizationId,
+    _user_id: userId,
+  });
+  if (error) throw superAdminError(error, "removeSuperAdmin");
+}
+
+export async function withdrawSuperAdminInvite(invitationId: string): Promise<void> {
+  const { error } = await supabase.rpc("platform_withdraw_super_admin_invite", {
+    _invitation_id: invitationId,
+  });
+  if (error) throw superAdminError(error, "withdrawSuperAdminInvite");
+}

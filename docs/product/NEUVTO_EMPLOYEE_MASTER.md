@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.0 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.1 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -203,10 +203,19 @@ When Sada provisions a company, the administrator he names becomes that company'
   path. Existing organisations were backfilled with the person who accepted their first
   administrator invitation. Proved from a workspace that was never seeded, in
   `verify_first_run.sql`, and rule by rule in `verify_company_access.sql`.
-- **Platform admins still never read tenant data (D42).** Sada names the first Super Admin
-  at provisioning and does not see the company's people afterwards. If a company loses
-  every Super Admin, re-naming one is a platform action that needs its own design (consent,
-  audit); it is in the build spec's known gaps rather than quietly possible.
+- **Neuvto can add or remove a company's Super Admins (D83).** In the console, each
+  customer row has a **Super Admins** panel: it lists the company's Super Admins and pending
+  Super Admin invitations, adds one by email (a member is promoted at once; anybody else is
+  invited and becomes one on accepting; a pending ordinary invitation is upgraded), removes
+  one (their other roles stay; somebody left with no role keeps Employee), and withdraws a
+  pending Super Admin invitation. It cannot grant any other role, and it cannot remove the
+  last Super Admin, because the trigger refuses Neuvto exactly as it refuses the company. To
+  replace the only one, add the new person, wait for them to accept, then remove. Every add
+  and remove is recorded in `analytics_events` and the `user_roles` audit trail. Proved in
+  `verify_platform_super_admins.sql`.
+- **Platform admins still never read tenant data (D42).** The Super Admins panel shows
+  names and email addresses of a company's Super Admins, the same kind of fact the console
+  already showed for the first administrator, and nothing about anybody else.
 
 Module access is unchanged and already built (D44): a module is **granted** by Neuvto from
 the console's Modules panel (Grant / Withdraw, per customer) and **switched on** by the
@@ -303,8 +312,8 @@ screen change has been through `screen-prover`.
 | E1    | Shell: module rail and adaptive tab bar, container queries, the shared components                                 | No horizontal scroll at 390/834/1112/1440 with 12 modules injected; the active tab is never hidden, for every role             |
 | E2    | Roles: `super_admin`, `payroll_officer`, `statutory_officer`, `member_set_roles`, the backfill, the People screen | An Admin cannot grant Admin, asserted from SQL **and** from the screen; the last Super Admin cannot be removed                 |
 | E3    | Passkeys: enrol and sign in with face or fingerprint (D79)                                                        | Sign-in by passkey reaches `/app`; a passkey on a deactivated account buys nothing (D52)                                       |
-| E4    | Schema: `employees`, managed lists, temporal and repeating tables, the backfill from `profiles`                   | Overlap refused by constraint; a closed row refuses UPDATE; three sons save; shares ≠ 100 refused; every guard watched failing |
-| E5    | My Card read tabs, Directory, Org chart                                                                           | Per-role render tests against §5; a restricted field is absent from the RPC response, not hidden                               |
+| E4 ✔  | Schema: `employees`, managed lists, temporal and repeating tables, the backfill from `profiles`                   | Overlap refused by constraint; a closed row refuses UPDATE; three sons save; shares ≠ 100 refused; every guard watched failing |
+| E5 ✔  | My Card read tabs, Directory, Org chart                                                                           | Per-role render tests against §5; a restricted field is absent from the RPC response, not hidden                               |
 | E6    | Restricted data: encryption, reveal, `restricted_reads`                                                           | Reveal writes its audit row in the same transaction; the value never enters the query cache                                    |
 | E7    | Writes: family, nominees, previous organisations, add an address, move to another unit                            | The bundle's acceptance criteria 1–5 and 10                                                                                    |
 | E8    | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
