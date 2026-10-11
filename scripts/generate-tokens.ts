@@ -15,7 +15,13 @@
 
 import { readFileSync, writeFileSync } from "node:fs";
 import { oklchToCss } from "../src/platform/design/color";
-import { RADIUS_BASE, SEMANTIC, type SemanticToken } from "../src/platform/design/tokens";
+import {
+  RADIUS_BASE,
+  SEMANTIC,
+  SHADOW,
+  TYPE,
+  type SemanticToken,
+} from "../src/platform/design/tokens";
 
 const CSS_PATH = new URL("../src/styles.css", import.meta.url).pathname;
 const START = "/* GENERATED:TOKENS:START";
@@ -46,8 +52,13 @@ function block(): string {
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
-  --font-display: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
-  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+  /* Core HR (D76) is one family. --font-display is kept, pointing at the same
+     face, so headings written against it before D76 still resolve. */
+  --font-display: "${TYPE.fontSans}", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "${TYPE.fontSans}", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+  --font-mono: "${TYPE.fontMono}", ui-monospace, "SF Mono", Menlo, monospace;
+  --shadow-card: var(--shadow-card-value);
+  --shadow-overlay: var(--shadow-overlay-value);
   /* Below \`text-xs\`, for the one place a label has to sit inside a tab. Named
      rather than written as text-[0.65rem] at the call site — an arbitrary
      value in a component is the thing the design system exists to prevent. */
@@ -59,10 +70,14 @@ ${themeInline}
 
 :root {
   --radius: ${RADIUS_BASE / 16}rem;
+  --shadow-card-value: ${SHADOW.light.card};
+  --shadow-overlay-value: ${SHADOW.light.overlay};
 ${vars("light")}
 }
 
 .dark {
+  --shadow-card-value: ${SHADOW.dark.card};
+  --shadow-overlay-value: ${SHADOW.dark.overlay};
 ${vars("dark")}
 }
 

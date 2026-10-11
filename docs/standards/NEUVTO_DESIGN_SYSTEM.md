@@ -1,11 +1,20 @@
 # NEUVTO WOS — Design System
 
-**Version:** 1.1 · **Status:** Active
+**Version:** 2.0 · **Status:** Active · **Applies to:** every screen, web and native
 **Audience:** designers, engineers, and AI build tools — all three work from this file
 
 The contract between design and code. A designer should be able to open this, look at a
 screen, and know which token every colour, size, and radius came from. An engineer should
 never need to invent a value.
+
+> **2.0 (11 Oct 2026): the Core HR design replaces Nocturne (D76, D77).** The reference
+> implementations are two prototypes Sada published on 11 Oct 2026: **Core HR Suite**
+> (88 web screens, four roles, a device preview) and **Core HR Mobile** (the native app,
+> drawn twice: Apple HIG and Material 3). Every new module, Leave's redesign included,
+> is built to them. Where this file and a prototype disagree, this file wins and the
+> conflict is raised, not guessed. The prototypes' written spec is the Core HR bundle,
+> recorded in [../product/NEUVTO_EMPLOYEE_MASTER.md](../product/NEUVTO_EMPLOYEE_MASTER.md)
+> §1 for what it changed here.
 
 ---
 
@@ -14,20 +23,24 @@ never need to invent a value.
 **No raw values in application code. Ever.**
 
 ```tsx
-❌ <div className="bg-[#0EA5E9] text-white rounded-[12px] p-[16px]">
+❌ <div className="bg-[#0f5f79] text-white rounded-[12px] p-[16px]">
 ❌ <div style={{ color: '#333' }}>
-✅ <div className="bg-primary text-primary-foreground rounded-lg p-4">
+✅ <div className="bg-primary text-primary-foreground rounded-xl p-4">
 ```
 
 A hex code in a component is a bug. It won't respond to dark mode, it can't be re-themed
-per tenant, and it will drift. Tenant white-labelling (`03` §Branding Service) is only
-possible because every colour resolves through a variable.
+per tenant, and it will drift.
 
 **Colours are authored in `src/platform/design/tokens.ts`, not in `src/styles.css`.**
-The stylesheet is generated — `bun run tokens` — and CI fails if the two disagree. Editing
+The stylesheet is generated (`bun run tokens`) and CI fails if the two disagree. Editing
 the generated block appears to work and is silently reverted the next time anyone
-regenerates. The TypeScript file is also what a React Native build imports, which is the
-reason it, rather than the CSS, is the source of truth.
+regenerates. The TypeScript file is also what the React Native build imports, which is
+the reason it, rather than the CSS, is the source of truth.
+
+The Core HR values are written in `tokens.ts` **as the prototype's own hex codes** and
+converted by `hexToOklch`, so a token is the designed colour rather than a hand-rounded
+copy of it. `tokens.test.ts` asserts the palette still matches the prototype, and lists the
+only three places it deliberately does not (§3).
 
 ---
 
@@ -35,342 +48,370 @@ reason it, rather than the CSS, is the source of truth.
 
 ```
 Tier 1  Primitive   Raw values. Never referenced by a component.
-                    --blue-500: oklch(0.71 0.15 231)
+                    teal: hex("#0f5f79")
 
 Tier 2  Semantic    Meaning, not appearance. What components use.
-                    --primary: var(--blue-500)
-                    --success: var(--green-500)
+                    primary: P.teal      successMuted: P.greenSoft
 
 Tier 3  Component   Only when a component needs to deviate systematically.
-                    --button-height-md: 2.5rem
 ```
 
-Components consume **Tier 2 only**. Naming a token for its meaning rather than its colour
-is what lets a tenant set their brand to green without every class in the codebase being
-named `blue`.
+Components consume **Tier 2 only**. Tier 2 keeps shadcn's names (`background`, `card`,
+`muted`, `accent`…) so every existing screen re-themed without being touched, and adds
+the Core HR roles shadcn has no word for. The prototype's variable names map like this:
 
-Tokens are authored in `src/platform/design/tokens.ts` in **OKLCH** and generated into
-`src/styles.css` as CSS custom properties, exposed to Tailwind through `@theme inline`.
-OKLCH is deliberate: it's perceptually uniform, so lightening a colour by 10% looks like
-10% to the eye across every hue.
+| Prototype                        | Token                                     | Tailwind                           |
+| -------------------------------- | ----------------------------------------- | ---------------------------------- |
+| `--ground`                       | `background`                              | `bg-background`                    |
+| `--surface`                      | `card`, `popover`                         | `bg-card`                          |
+| `--surface-2`                    | `secondary`, `muted`                      | `bg-muted`                         |
+| `--surface-3`                    | `surface3`                                | `bg-surface3`                      |
+| `--ink`                          | `foreground`                              | `text-foreground`                  |
+| `--ink-2`                        | `foregroundSecondary`                     | `text-foreground-secondary`        |
+| `--ink-3`                        | `mutedForeground`                         | `text-muted-foreground`            |
+| `--line`                         | `border`                                  | `border-border`                    |
+| `--line-2`                       | `borderStrong`                            | `border-border-strong`             |
+| (none)                           | `input` (field boundary, 3:1)             | `border-input`                     |
+| `--accent`                       | `primary`, `ring`                         | `bg-primary`, `text-primary`       |
+| `--accent-ink`                   | `primaryForeground`                       | `text-primary-foreground`          |
+| `--accent-soft`                  | `accent` (text on it: `accentForeground`) | `bg-accent text-accent-foreground` |
+| `--accent-line`                  | `accentLine`                              | `border-accent-line`               |
+| `--ok` `--warn` `--bad` `--info` | `success` `warning` `destructive` `info`  | `text-success`, `bg-success`       |
+| `--*-soft`                       | `successMuted` …                          | `bg-success-muted`                 |
+| `--*-line`                       | `successLine` …                           | `border-success-line`              |
+| `--shadow`, `--shadow-lg`        | `SHADOW.card`, `SHADOW.overlay`           | `shadow-card`, `shadow-overlay`    |
 
-`oklchToHex` in `design/color.ts` converts for consumers that cannot parse OKLCH — React
-Native, iOS colour sets, Android `colors.xml`. A token is therefore the same colour on
-every platform by construction rather than by transcription.
+> **Do not confuse shadcn's `accent` with the Core HR accent.** In shadcn `accent` is the
+> hover and selected surface. That is the prototype's `--accent-soft`, and that is what it
+> holds. The Core HR accent colour itself is `primary`.
+
+`brand` is **not** the product accent. It stays Neuvto's published sky blue `#0EA5E9`
+for the landing page, logo and social card. Repainting the brand is a marketing decision,
+not a theme one, and D76 did not make it.
 
 ---
 
 ## 3. Colour
 
-### Brand
+### The three deliberate differences from the prototype
 
-| Token                  | Value                                | Use                                                                                                                                                                                                                                                            |
-| ---------------------- | ------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `--primary`            | `#0EA5E9` sky blue                   | Primary actions, links, focus rings, active nav                                                                                                                                                                                                                |
-| `--primary-foreground` | white                                | Text on primary                                                                                                                                                                                                                                                |
-| `--brand`              | = primary                            | Logo lockup, marketing surfaces                                                                                                                                                                                                                                |
-| `--brand-strong`       | `#0574A6` (light) · = primary (dark) | **The brand hue as TEXT on a light ground** — section eyebrows, brand-coloured labels. `--primary` is 2.65:1 as text on paper and must not be used this way. On a dark ground use `--primary`: `--brand-strong` fails there (4.13:1) and `--primary` is 7.10:1 |
-| `--secondary`          | light grey `oklch(0.97 0.005 240)`   | **Secondary _button_ fill** — a surface role, not a brand colour                                                                                                                                                                                               |
-| `--brand-accent`       | `#0088AA` teal                       | Optional: icon accents, second chart series                                                                                                                                                                                                                    |
+Each failed `tokens.test.ts`, and each was fixed by the smallest same-hue step that passes:
 
-> **Resolved 28 Jul 2026: `#0EA5E9` sky blue is authoritative.** `05_LANDING_PAGE.md`
-> line 607 specifies `#0066CC`; that document is superseded on this point and should be
-> updated. The value is set here and nowhere else — one variable, one change.
+| Token                    | Prototype            | Neuvto    | Why                                                                                                    |
+| ------------------------ | -------------------- | --------- | ------------------------------------------------------------------------------------------------------ |
+| `mutedForeground`, light | `#6d8087`            | `#5a6c73` | Captions and hints are text. The prototype measures 3.80:1 on the page, 3.66:1 on a panel. AA is 4.5:1 |
+| `input`, light           | `--line-2` `#c5d1d5` | `#828d91` | A field border measuring 1.56:1 cannot be found on a phone in daylight. WCAG 1.4.11 asks 3:1           |
+| `input`, dark            | `--line-2` `#35474f` | `#5e717a` | Same rule, dark theme                                                                                  |
 
-> **Do not confuse `--secondary` with "the secondary brand colour."** In shadcn's token
-> vocabulary `--secondary` is a _surface_ role: the fill of a secondary button. It is a
-> near-white grey and must stay that way, or every secondary button on the platform turns
-> teal. Brand teal, if used, is `--brand-accent` and is reserved for accents and data
-> visualisation — never for a button fill or body text (it fails contrast at `text-sm`).
+`borderStrong` keeps the prototype's `--line-2` for decorative edges, where 3:1 does not
+apply. A future design revision that fails the suite is fixed in `tokens.ts` with its
+measurement, never in the generated CSS.
 
 ### Status
 
-Leave management is a status-driven product. Added 4 Aug 2026 — until then a status was
-drawn as grey text, so approved, declined and awaiting all looked identical.
+Status colour is separate from the accent and never counts as it. Each status has a strong
+colour, a `-muted` soft fill, and a `-line`.
 
-Each has a solid fill, a foreground, and a `-muted` tint for badges and calendar cells.
+| Status      | Light     | Dark      | Meaning                                   |
+| ----------- | --------- | --------- | ----------------------------------------- |
+| success     | `#2d7a48` | `#66c286` | Approved, current, sufficient, passed     |
+| warning     | `#94620a` | `#dca63f` | Pending, expiring, needs attention        |
+| destructive | `#a62a20` | `#e98a80` | Rejected, refused, failed, over the limit |
+| info        | `#3f548e` | `#8fa3dd` | Informational, holiday, upcoming          |
+| neutral     | `#5a6c73` | `#7b8f98` | Draft, cancelled, **archived**, inactive  |
 
-| Token           | Light fill      | Meaning                                 |
-| --------------- | --------------- | --------------------------------------- |
-| `--success`     | `#22C55E` green | Approved, sufficient balance, healthy   |
-| `--warning`     | `#F59E0B` amber | Pending approval, low balance, expiring |
-| `--destructive` | `#EF4444` red   | Rejected, error, over-balance           |
-| `--info`        | = `--primary`   | Informational, upcoming leave           |
-| `--neutral`     | grey            | Draft, cancelled, inactive              |
+**A pill is text in the status colour, on its `-muted` fill, with a 1px `-line` border.
+Never a solid block** (`<Pill tone="success">Current</Pill>`). Every status-on-soft pairing
+clears AA and is in the contrast suite, because a pill is the most common place a status
+word is read. The `Archived` pill on a closed history row is `neutral`.
 
-> **Every `-foreground` is near-black, including on red — and this replaced "white".**
-> White on `#0EA5E9` measures **2.77:1**; AA for body text is 4.5:1. The same held for
-> green (2.28:1) and amber (2.15:1). The published fills are preserved exactly and the
-> label on top changed instead, because darkening the fills until white passed would have
-> been a brand change made silently to satisfy a contrast rule.
->
-> None of this is anyone's judgement now: `src/platform/design/tokens.test.ts` computes
-> every pairing and fails the build under 4.5:1. Change a colour and watch it fail.
+Solid status fills (`bg-success text-success-foreground`) exist for the approve and reject
+buttons. White labels on light and near-black on dark, all at least 5.2:1.
 
-**Leave status → token. This mapping is fixed; do not improvise per screen.**
+### Dark mode
 
-| Status             | Token         | Badge                            | Calendar cell      |
-| ------------------ | ------------- | -------------------------------- | ------------------ |
-| `draft`            | `neutral`     | grey outline                     | —                  |
-| `pending_approval` | `warning`     | amber solid                      | amber fill         |
-| `approved`         | `success`     | green solid                      | blue fill (`info`) |
-| `rejected`         | `destructive` | red solid                        | —                  |
-| `cancelled`        | `neutral`     | grey outline, strikethrough date | —                  |
+Every token has a dark value, and a component that only works in light is incomplete.
+Which surface gets which theme is decided by `resolveTheme` in
+`src/platform/design/theme.ts`:
 
-> Deliberate inconsistency, taken from `06` §Leave Calendar: an approved leave shows a
-> **green badge** in lists but a **blue cell** in the calendar. Green-on-calendar reads as
-> "available to book"; blue reads as "booked". Keep it.
+| Surface                     | Theme                           | Why                                                                                     |
+| --------------------------- | ------------------------------- | --------------------------------------------------------------------------------------- |
+| `/neuvto-hq`, the console   | **light, always**               | A platform admin must never mistake the console for a tenant workspace (D42).           |
+| everywhere else, `/app` too | follows the device, toggle wins | D77. The person's own setting is the best signal; an explicit choice beats it both ways |
 
-### Surfaces
-
-| Token                | Light                   | Dark              | Use                                   |
-| -------------------- | ----------------------- | ----------------- | ------------------------------------- |
-| `--background`       | white                   | `oklch(0.12 0 0)` | Page                                  |
-| `--card`             | white                   | `oklch(0.16 0 0)` | Cards, panels, modals                 |
-| `--muted`            | `oklch(0.97 0.005 240)` | `oklch(0.22 0 0)` | Subtle fills, table stripes, disabled |
-| `--border`           | `oklch(0.92 0.005 240)` | `white / 12%`     | All borders and dividers              |
-| `--foreground`       | `oklch(0.15 0 0)`       | `oklch(0.98 0 0)` | Body text                             |
-| `--muted-foreground` | `oklch(0.45 0.02 240)`  | `oklch(0.7 0 0)`  | Secondary text, captions              |
-
-**Never** use `--border` for text or `--muted-foreground` for a border. Roles don't cross.
-
-### Dark mode — Nocturne
-
-Every token has a `.dark` value. Dark mode is not optional and not a later phase — a
-component that only works in light mode is incomplete. Test both before calling anything done.
-
-**Which surface gets which theme** is decided by `resolveTheme` in
-`src/platform/design/theme.ts`, not by the operating system alone:
-
-| Surface                     | Theme                 | Why                                                                           |
-| --------------------------- | --------------------- | ----------------------------------------------------------------------------- |
-| `/app/*` — the employee app | **dark**, overridable | Leave gets checked late at night, on a phone. A toggle in the header wins.    |
-| `/neuvto-hq` — the console  | **light, always**     | A platform admin must never mistake the console for a tenant workspace (D42). |
-| everything else             | follows the OS        | A stranger's system preference is the only signal available.                  |
-
-Nocturne, adopted 4 Aug 2026, is dark-_first_ rather than dark-mode-second. Four decisions
-follow from that premise:
-
-- **`--radius` is 8px**, down from 12. Dense status lists read better with less rounding.
-- **Status colours are desaturated on dark** (~20% less chroma). Full-chroma green glares
-  against near-black at night. Asserted by test, so it cannot drift back.
-- **Elevation is border-only on dark.** A shadow on a near-black surface is invisible, so
-  a shadow-only affordance does not exist for these users.
-- **Dark borders are opaque values, not `white / 12%`.** A translucent border composites
-  differently over the page than over a card — only one of the two was ever checked.
+Three states must all work: explicit light, explicit dark, and **unset**, where only
+`prefers-color-scheme` decides. Dark borders are opaque values, never `white / 12%`: a
+translucent border composites differently over the page than over a card, so only one of
+the two was ever checked. No dark status exceeds chroma 0.14, because a full-chroma green
+on near-black glares at night (asserted).
 
 ---
 
 ## 4. Typography
 
-| Token            | Family        | Use                        |
-| ---------------- | ------------- | -------------------------- |
-| `--font-display` | Space Grotesk | `h1`–`h6`, metric numerals |
-| `--font-sans`    | Inter         | Everything else            |
+**IBM Plex Sans for everything. IBM Plex Mono for employee codes, dates, reference numbers
+and numeric table columns.** Loaded from Google Fonts (free). `--font-display` still exists
+and points at Plex Sans, so headings written before D76 resolve.
 
-Headings carry `letter-spacing: -0.02em`. Applied globally in `@layer base` — never re-declare.
+| Role            | Size   | Weight | Tracking  | Notes                   |
+| --------------- | ------ | ------ | --------- | ----------------------- |
+| Page title      | 20px   | 600    | `-0.02em` |                         |
+| Card title      | 14px   | 600    | `-0.01em` |                         |
+| Body            | 14px   | 400    |           |                         |
+| Table cell      | 13px   | 400    |           |                         |
+| Table header    | 10.5px | 600    | `0.07em`  | uppercase               |
+| Eyebrow         | 10px   | 600    | `0.11em`  | uppercase               |
+| Stat number     | 27px   | 600    | `-0.03em` | `tabular-nums`          |
+| Caption, hint   | 11.5px | 400    |           | `text-muted-foreground` |
+| Code, date, ref | 12px   | 400    |           | `font-mono`             |
 
-| Role       | Class                                | Size / line height | Weight |
-| ---------- | ------------------------------------ | ------------------ | ------ |
-| Display    | `text-5xl`                           | 48 / 52            | 700    |
-| H1         | `text-4xl`                           | 36 / 40            | 700    |
-| H2         | `text-3xl`                           | 30 / 36            | 700    |
-| H3         | `text-2xl`                           | 24 / 32            | 600    |
-| H4         | `text-xl`                            | 20 / 28            | 600    |
-| Body       | `text-base`                          | 16 / 24            | 400    |
-| Body small | `text-sm`                            | 14 / 20            | 400    |
-| Caption    | `text-xs`                            | 12 / 16            | 400    |
-| Metric     | `text-3xl font-display tabular-nums` | 30 / 36            | 700    |
+Values live in `TYPE.roles` in `tokens.ts`; native multiplies each size by the OS font
+scale rather than treating it as final (Dynamic Type, Android font scaling).
 
-**`tabular-nums` is mandatory on every number that changes** — balances, day counts,
-countdowns. Without it digits have different widths and the number visibly jitters as it
-updates. This is the single most common polish failure in a dashboard.
+**`tabular-nums` is mandatory on every number that changes**: balances, day counts,
+shares, money. Without it digits jitter as they update.
 
-**16px minimum for any input on mobile.** Below that, iOS Safari zooms the viewport on focus.
+**16px minimum for any input on a touch device, and this outranks the prototype's 13.5px
+fields.** Below 16px iOS Safari zooms the viewport on focus and throws the form sideways
+mid-typing. Fields are 16px at phone width and the prototype's size above it.
 
 ---
 
 ## 5. Spacing, radius, elevation
 
-**Spacing:** 4px base scale — `1`=4 · `2`=8 · `3`=12 · `4`=16 · `6`=24 · `8`=32 · `12`=48 · `16`=64.
-Nothing off-scale. No `p-[13px]`.
+**Spacing:** 4px base scale (`1`=4, `2`=8, `3`=12, `4`=16, `6`=24, `8`=32). Nothing off-scale.
+Screen padding is 20px, 16px under the `app` container's 640px. Gap between cards 14px
+(the prototype's value; use `gap-3.5`).
 
-- Inside a card: `p-6` desktop, `p-4` mobile
-- Between form fields: `space-y-4`
-- Between page sections: `space-y-8`
-- Related elements (label → input): `space-y-2`
+**Radius**, from `RADIUS_BASE = 8`: `rounded-sm` 4 (tags) · `rounded-md` 6 (buttons,
+inputs, the prototype's `--r-sm`) · `rounded-lg` 8 (panels, `--r`) · `rounded-xl` 12
+(cards, stat tiles, modals, `--r-lg`) · `rounded-full` (pills, avatars).
 
-**Radius** — from `RADIUS_BASE = 8` in `design/tokens.ts` (`--radius: 0.5rem`). Nocturne
-tightened this from 12px; everything else derives, so it is one number to change.
-
-| Token          | Value | Use                         |
-| -------------- | ----- | --------------------------- |
-| `rounded-sm`   | 4px   | Badges, chips, small inputs |
-| `rounded-md`   | 6px   | Buttons, inputs             |
-| `rounded-lg`   | 8px   | Cards, panels               |
-| `rounded-xl`   | 12px  | Modals, sheets              |
-| `rounded-full` | —     | Avatars, icon-only buttons  |
-
-**Elevation:** borders first, shadows sparingly. `shadow-sm` for resting cards,
-`shadow-md` on hover for interactive cards, `shadow-lg` for modals and popovers only.
-Dark mode uses border contrast rather than shadow — shadows are nearly invisible on dark
-surfaces, so a shadow-only affordance disappears.
+**Elevation:** a card has a 1px `border` **and** `shadow-card`. Overlays (modal, nav panel)
+use `shadow-overlay`. In dark the border carries the edge and the shadow only adds depth,
+so nothing depends on a shadow being seen.
 
 ---
 
-## 6. Components
+## 6. Layout: container queries, not media queries
 
-Built on shadcn/ui in `components/ui/`. **Those files are not hand-edited** — variants are
-added through the component's own variant API so future shadcn updates don't clobber them.
+**This is the rule that makes everything else work.** Layout responds to the width of its
+container, not the browser window. It is what lets one component render correctly in a
+narrow pane, beside a sidebar, or in a device preview frame.
 
-### Button
+Two named containers, set by the shell:
 
-| Variant       | Appearance          | Use                             |
-| ------------- | ------------------- | ------------------------------- |
-| `default`     | primary fill        | The one primary action per view |
-| `secondary`   | muted fill          | Secondary actions               |
-| `outline`     | border, transparent | Tertiary, cancel                |
-| `ghost`       | no border           | Toolbar, icon actions           |
-| `destructive` | red fill            | Reject, delete, cancel leave    |
-| `success`     | green fill          | **Approve** — add this variant  |
-
-| Size      | Height   | Padding | Use                          |
-| --------- | -------- | ------- | ---------------------------- |
-| `sm`      | 32px     | `px-3`  | Dense tables                 |
-| `default` | 40px     | `px-4`  | Desktop                      |
-| `lg`      | **48px** | `px-6`  | **All mobile touch targets** |
-
-Required states: default · hover · active · focus-visible (2px `--ring` offset 2px) ·
-disabled (50% opacity, `cursor-not-allowed`) · loading (spinner replaces leading icon,
-label persists, button disabled).
-
-**Never** disable a submit button without telling the user why. The apply-leave form shows
-_"You requested 5 days but have only 3 available"_ — it does not silently grey out.
-
-### Status badge
-
-`rounded-sm px-2 py-0.5 text-xs font-medium`. Colour strictly from the §3 status mapping.
-Text always accompanies colour — never colour alone (§8).
-
-### Card
-
-`bg-card border border-border rounded-lg p-6 shadow-sm`. Header `text-lg font-semibold`,
-optional `text-sm text-muted-foreground` description, `space-y-4` body.
-
-### Input
-
-Height 40px desktop / 48px mobile, `rounded-md border border-input bg-background px-3`,
-`text-base` on mobile. Focus: `ring-2 ring-ring ring-offset-2`. Error: `border-destructive`
-plus a message in `text-sm text-destructive` below — **colour alone is never the error signal.**
-Labels are always visible. Placeholder is not a label.
-
-### Table (admin only)
-
-Header `bg-muted text-sm font-medium`, rows `border-b border-border`, hover `bg-muted/50`,
-numeric columns right-aligned with `tabular-nums`. Below `md`, tables become stacked cards —
-never a horizontal scroll on mobile.
-
-### Empty, loading, error states
-
-Every async view needs all three. Empty states state what's missing and offer the action
-("No leave requests yet" + _Apply for leave_). Loading uses skeletons matching final layout,
-not a centred spinner — spinners cause layout shift when content arrives.
-
----
-
-## 7. Layout and responsive
-
-Breakpoints: `sm` 640 · `md` 768 · `lg` 1024 · `xl` 1280.
-
-**Employee views are mobile-first.** Design at 375px, enhance upward.
-**Admin views are desktop-first**, degrading to tablet. Below `md`, admin tables stack.
-
-|                | Employee                 | Admin                    |
-| -------------- | ------------------------ | ------------------------ |
-| Navigation     | Bottom tab bar, ≤5 items | Collapsible left sidebar |
-| Primary action | Full-width or FAB        | Top-right of content     |
-| Content width  | Full bleed, `px-4`       | `max-w-7xl mx-auto px-6` |
-
-**Mobile requirements, from `06` AC3:**
-
-- Touch targets ≥ **48×48px**, with ≥ 8px between adjacent targets
-- Dashboard balance and primary CTA **above the fold at 375×667**
-- Apply-leave completable in ≤ 5 taps
-
----
-
-## 8. Accessibility — non-negotiable
-
-- **Contrast ≥ 4.5:1** for body text, ≥ 3:1 for large text and UI boundaries (`05` line 680).
-  Amber `--warning` fails against white — it uses dark foreground. Verify in both themes.
-- **Never colour alone.** Every status badge pairs colour with text. Roughly 1 in 12 men has
-  a colour vision deficiency; a red/green approve-reject distinction is invisible to them.
-- Visible `focus-visible` ring on every interactive element. Never `outline: none` without
-  a replacement.
-- Full keyboard operability. Modals trap focus and restore it on close. `Esc` closes.
-- Every input has a `<label>`. Icon-only buttons carry `aria-label`.
-- Live regions (`aria-live="polite"`) announce balance changes and approval outcomes.
-- Respect `prefers-reduced-motion` — transitions drop to 0ms.
-
----
-
-## 9. Motion
-
-Fast and few. `150ms ease-out` for hover and focus, `200ms ease-out` for dropdowns and
-popovers, `300ms ease-in-out` for sheets and modals. Nothing over 300ms. Animate only
-`transform` and `opacity` — animating layout properties causes jank on mid-range Android,
-which is what your employee users will be holding.
-
----
-
-## 10. Designer handoff
-
-**Figma variables mirror these token names exactly.** `--primary` in code is `primary` in
-Figma. If a designer sends a spec saying `color/primary/default`, the engineer knows without
-asking. Mismatched naming is where design systems die.
-
-Suggested Figma collections:
-
-```
-Color / Brand / primary, secondary, brand
-Color / Status / success, warning, destructive, info, neutral
-Color / Surface / background, card, muted, border
-Color / Text / foreground, muted-foreground
-Spacing / 1, 2, 3, 4, 6, 8, 12, 16
-Radius / sm, md, lg, xl, full
-Type / display, h1…h4, body, body-sm, caption, metric
+```css
+.app-stage {
+  container: app / inline-size;
+} /* the whole shell */
+.app-screen {
+  container: screen / inline-size;
+} /* the content area, inside the rail */
 ```
 
-Each collection needs **Light and Dark modes** — a design delivered in one theme is half a design.
+In Tailwind: `@container/app` and `@container/screen`, queried with
+`@max-[1000px]/app:` and `@max-[820px]/screen:` and so on.
 
-### When a designer proposes something new
+`app` drives the shell (rail, top bar, tab bar). `screen` drives content (grids, two-pane
+layouts, card rows). The breakpoints are the prototype's:
 
-1. Can an existing token express it? Use that.
-2. Is it a genuinely new _meaning_ (not a new shade)? Add a Tier 2 token here first, then in code.
-3. Is it a one-off? Push back. One-offs are how systems rot.
+| Container | Max width | What changes                                              |
+| --------- | --------- | --------------------------------------------------------- |
+| app       | 1000px    | Module rail becomes a horizontal row, top bar unsticks    |
+| app       | 640px     | Screen padding 16px, top bar wraps, search on its own row |
+| app       | 560px     | Module rail becomes a 2-up grid with short labels         |
+| app       | 641–1240  | Global search hides                                       |
+| screen    | 1040px    | 3-up stat grid → 2-up                                     |
+| screen    | 860px     | 3-up card grid → 2-up                                     |
+| screen    | 820px     | `.split` two-pane → one column                            |
+| screen    | 740px     | 4-up stat strip → 2-up                                    |
+| screen    | 700px     | Config two-pane collapses, section nav goes horizontal    |
+| screen    | 640px     | Approval chain steps stack                                |
+| screen    | 600px     | Balance tiles single column                               |
+| screen    | 520px     | Card grid single column                                   |
+| screen    | 460px     | Stat strip single column                                  |
 
-**A new hex code is a change to this document, not to a component.**
+Two things that bite:
 
-### Deliverable checklist for any new screen
+- `1fr` is `minmax(auto, 1fr)` and will not shrink below its content. **Always write
+  `minmax(0,1fr)`**, and `minmax(min(240px,100%),1fr)` inside `repeat(auto-fit, …)`.
+  Getting this wrong is what makes a card overflow its column at phone width.
+- A grid whose item count is fixed uses an **explicit column count** stepping down (3 → 2 →
+  1), not `auto-fit`. Six tiles at `auto-fit` give five columns and an orphan.
 
-- [ ] Light and dark
-- [ ] 375px and 1280px
-- [ ] Every interactive element's states: default, hover, focus, active, disabled, loading
-- [ ] Empty, loading, and error states
-- [ ] Colours named by token, not hex
-- [ ] Touch targets ≥ 48px on mobile
-- [ ] Contrast verified in both themes
+**Short viewport.** Phone landscape is ~390px tall. The shell sets `data-short` on the
+stage when its usable height is under 600px; the rail loses its label, breadcrumb and
+search hide, tabs and stat tiles shrink. Do not use a height media query: the stage height
+is not the window height.
+
+**Nothing scrolls sideways, ever,** except a table inside its own wrapper and the org chart
+inside its own container. `document.documentElement.scrollWidth === clientWidth` on every
+route at 390, 640, 834, 1112 and 1440px is a test, not a hope.
 
 ---
 
-## 11. Build-tool rules
+## 7. Navigation
+
+The shell is a **module rail** plus, per module, a **tab bar**. Each module owns its tabs,
+split into two groups (this is how a module stays at five or six visible tabs):
+
+- **Main tabs**, in the row: what an employee or approver uses.
+- **Company tabs**, behind one `Company` menu at the end of the row, for Admin and above,
+  each with a one-line description.
+
+A tab the role cannot use is **not rendered**, not disabled. When tabs are hidden for the
+role, a muted `2 tabs hidden for this role` note sits at the end of the row; it is the
+first thing dropped when space is tight. `Approvals` appears when the person can approve
+(§7 of [NEUVTO_EMPLOYEE_MASTER.md](../product/NEUVTO_EMPLOYEE_MASTER.md) on how that is
+derived).
+
+### Algorithm 1: adaptive tab bar
+
+```
+PICK_WIDTH = 540
+mode = navWidth() < PICK_WIDTH ? 'pick' : 'row'
+```
+
+**Pick mode.** The whole row collapses to one button, `Section / <current>`, with
+`N sections [badge] ›` on the right. It opens a panel grouped as: the module's own
+sections, then `For your team` (Approvals), then `Company` (with descriptions), then a
+footer saying how many are hidden for this role.
+
+**Row mode,** priority plus overflow:
+
+1. Render every main tab, a hidden `More`, the `Company` button and the role note.
+2. Measure. `W = bar.clientWidth - 30`. `Company` plus its separator is fixed width.
+3. If everything including the role note fits, stop.
+4. Hide the role note. If it now fits, stop.
+5. Show `More`. Budget is `W - fixed - moreWidth`, less 28px if any tab carries a badge
+   (the `More` button may grow a red count).
+6. Walk tabs left to right accumulating widths. The first that does not fit is the cut;
+   hide it and everything after.
+7. **If the active tab is in the hidden set, un-hide it and hide the last visible
+   non-active tab instead.** Nobody lands on a page whose tab they cannot see.
+8. Set the `More` count, red if any hidden tab carries pending items.
+
+Re-measure on every render (`requestAnimationFrame`), on resize, and when the container
+changes. If the measured mode differs from the rendered mode, re-render before fitting.
+Rendering before layout settles and never re-checking is a real bug the prototype caught.
+
+### Algorithm 2: module rail
+
+| Mode     | Width      | Behaviour                                                                                   |
+| -------- | ---------- | ------------------------------------------------------------------------------------------- |
+| `column` | > 1000px   | Vertical rail, 246px. Section headings once the suite passes 6 modules                      |
+| `row`    | 540–1000px | Horizontal row with priority plus overflow into a `Modules` chip                            |
+| `grid`   | < 540px    | 2-up grid with short labels, capped at 4, rest behind `All N modules` with a combined badge |
+
+Modules carry a `section` (`Time`, `People`, `Money`, `Company`). Group by section
+properly, collecting unique sections in first-appearance order; never emit a heading
+whenever the value changes (a module appended out of order then duplicates a heading).
+
+The rail lists only the modules **granted and switched on** for this organisation
+(D44). Adding a module is a manifest change only (D32). With 12 modules nothing scrolls
+sideways at any width.
+
+### Native (Core HR Mobile)
+
+Five bottom tabs: **Home, Leave, Attendance, Approvals, Me** (`MAX_VISIBLE_TABS = 5`, the
+`UITabBar` limit). iOS uses large titles, inset grouped lists and sheets; Android uses a
+top app bar, cards, an extended FAB and a navigation bar. Not one layout squeezed onto two
+phones: each platform gets its own controls. Administration, reports and configuration are
+**absent** from mobile. See `NEUVTO_NATIVE_TRANSLATION.md`.
+
+---
+
+## 8. Components
+
+Shared primitives live in `src/components/shared/`. The shadcn files in
+`src/components/ui/` are not hand-edited; Core HR components wrap them.
+
+| Component          | Notes                                                                                                                                 |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------- |
+| `Card`             | title, sub, actions, body, footer (footer on `bg-muted`). `tight` for a flush table                                                   |
+| `DataTable`        | Column defs with `key`, `label`, `align`. Own `overflow-x:auto` wrapper, `min-width:560px` table. Sticky header. Empty state required |
+| `Pill`             | tones `success warning destructive info neutral accent`. Text, 1px line, soft fill; never solid                                       |
+| `Tag`              | mono 11px chip for codes and dates (`NW-0412`, `Joined 02 Aug 2021`)                                                                  |
+| `StatTile`         | name, number, unit, optional meter, legs. A 3px left stripe carries the tone                                                          |
+| `Field`            | label, control, hint, required marker. Every control has a stable `id` and a real `<label>`                                           |
+| `SegmentedControl` | Sub-tab switching inside a screen. Wraps, never scrolls                                                                               |
+| `Chain`            | Approval levels, `done` `current` `upcoming`. Stacks under 640px                                                                      |
+| `Modal`            | Centred, scrollable body, sticky header and footer. `wide` at 900px                                                                   |
+| `Drawer`           | Side panel for edit forms                                                                                                             |
+| `Toast`            | Bottom centre, at most 3 stacked, auto-dismiss 2.4s                                                                                   |
+| `NavPanel`         | The dropdown behind `More`, `Company`, the section picker and the module picker                                                       |
+| `Note`             | Inline explanation strip, tones info / warning / success / destructive                                                                |
+| `TemporalTable`    | Address and deployment history. Closed rows muted with an `Archived` pill and **no edit or delete control rendered**                  |
+| `RepeatRows`       | Family, nominees, previous organisations. Add and remove, no cap, relation from a select                                              |
+| `Forbidden`        | The 403 state: what was refused, which role is needed, who to ask. **Never an empty table**                                           |
+
+**Buttons:** primary (`bg-primary`, one per view), default (surface, `border-border-strong`),
+ghost, danger (`destructive` on its soft fill), approve (`success` on its soft fill). A
+button says what happens (`Send invite`, `Save and archive the old one`), and the toast
+says it happened (`Invite sent`). On touch, every control is at least 48px
+(`MIN_TOUCH_TARGET`). Never disable a submit without saying why on screen.
+
+**Tables:** numeric columns right-aligned in mono with tabular numerals. Codes, refs and
+dates in mono at 12px. Row hover changes background only, never size. At most two controls
+in an action cell; a third goes in an overflow menu. Horizontal scroll belongs to the
+table's wrapper, never the page.
+
+**Every async view ships loading, empty, error and forbidden states.** Loading uses
+skeletons matching the final layout, not a centred spinner.
+
+---
+
+## 9. Accessibility — non-negotiable
+
+- **Contrast ≥ 4.5:1** for text, ≥ 3:1 for UI boundaries, in both themes. Computed for
+  every pairing by `tokens.test.ts`; nobody's judgement.
+- **Never colour alone.** Every pill carries a word.
+- Focus ring on every interactive element: `2px solid` `--ring`, offset 2px.
+- Tabs are `role="tab"` in a `role="tablist"`, with arrow-key movement.
+- Panels and modals close on `Escape` and on outside click, trap focus, and return it to
+  their trigger.
+- Every control has a programmatically associated label. Placeholder text is not a label.
+- `aria-live="polite"` announces toasts and running totals (a nominee share sum).
+- Respect `prefers-reduced-motion`.
+
+## 10. Motion
+
+Fast and few. 150ms for hover and toggles, 200ms for panels, 300ms for sheets and modals.
+Nothing longer. Animate only `transform` and `opacity`.
+
+## 11. Copy
+
+- Sentence case everywhere except the uppercase eyebrow and table headers.
+- Errors say what went wrong and what to do. No apologies.
+- **Explain a rule where the user meets it,** not in a help page: the archive note sits on
+  the History tab; the share-total rule sits on the nominee table header.
+- New on-screen copy uses no em dash characters (commas, colons, parentheses). This is a
+  Core HR rule for what a user reads; it is not applied retroactively to code comments.
+
+---
+
+## 12. Build-tool rules
 
 For Lovable's agent and any AI writing UI:
 
-1. Never emit a hex, rgb, or arbitrary Tailwind value (`bg-[#...]`, `p-[13px]`) in `src/modules` or `src/components/shared`
-2. Never hand-edit `src/components/ui/*` — extend through variants
-3. Every new colour need is raised as a token here first
-4. Dark mode in the same change, never a follow-up
-5. Every async view ships loading, empty, and error states
-6. Mobile touch targets `size="lg"` (48px)
-7. Numbers that change get `tabular-nums`
+1. Never emit a hex, rgb, or arbitrary Tailwind colour (`bg-[#...]`) in `src/modules`,
+   `src/platform` or `src/components/shared`.
+2. Never hand-edit `src/components/ui/*`. Wrap it.
+3. A new colour need is raised as a token in `tokens.ts` first, and must pass the contrast
+   suite before it exists.
+4. Container queries for layout, never viewport breakpoints inside a screen.
+5. Dark mode in the same change, never a follow-up.
+6. Every async view ships loading, empty, error and forbidden states.
+7. Numbers that change get `tabular-nums`; codes and dates get `font-mono`.
+8. A hidden tab or a refused field is **absent**, not disabled and not masked client-side.
+
+### Deliverable checklist for any new screen
+
+- [ ] Light, dark, and unset (device) theme
+- [ ] 390, 834 and 1440px with no horizontal page scroll
+- [ ] Every interactive state: default, hover, focus, active, disabled, loading
+- [ ] Empty, loading, error and forbidden states
+- [ ] Colours named by token, not hex
+- [ ] Touch targets ≥ 48px, inputs ≥ 16px on touch
+- [ ] A render test per role, watched failing first (CLAUDE.md)

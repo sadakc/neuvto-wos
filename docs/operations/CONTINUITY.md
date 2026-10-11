@@ -95,7 +95,7 @@ This repository is more handoff-ready than most funded startups. A competent
 engineer has, on day one:
 
 - **23 documents** covering standards, operations and architecture
-- the **D1–D66 decision table**, every deviation recorded with its reasoning —
+- the **D1–D82 decision table**, every deviation recorded with its reasoning —
   read it before concluding something is a bug, because several things that look
   wrong are decisions
 - a **SQL harness** that proves tenant isolation rather than asserting it
