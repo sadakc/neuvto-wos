@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCurrentUser, signOut, type CurrentUser } from "@/platform/auth";
 import {
@@ -197,13 +197,14 @@ function AppShell() {
           >
             Sign out
           </button>
-          <span
-            title={user?.email}
-            aria-label={`Signed in as ${user?.email ?? ""}`}
-            className="grid size-[30px] shrink-0 place-items-center rounded-full border border-info-line bg-info-muted text-caption font-semibold text-info"
+          <Link
+            to="/app/security"
+            title={`${user?.email ?? ""} · Sign-in and security`}
+            aria-label={`Signed in as ${user?.email ?? ""}. Sign-in and security`}
+            className="grid size-[30px] shrink-0 place-items-center rounded-full border border-info-line bg-info-muted text-caption font-semibold text-info hover:border-info"
           >
             {initials}
-          </span>
+          </Link>
         </>
       }
     >

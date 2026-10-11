@@ -80,6 +80,8 @@ export function buildShell(
     icon: icons.home,
     tabs: [
       { id: "dashboard", label: "Dashboard", to: "/app", group: "main" },
+      // D79. Everybody's own: how they sign in, including face or fingerprint.
+      { id: "security", label: "Sign-in and security", to: "/app/security", group: "main" },
       ...(approver
         ? [
             {

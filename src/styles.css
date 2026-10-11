@@ -226,4 +226,29 @@
     font-family: var(--font-display);
     letter-spacing: -0.02em;
   }
+  /* DESIGN_SYSTEM §9: every interactive element shows the same focus ring.
+     Without this a plain <input> fell back to the browser's own ring, which
+     is amber in some browsers and invisible in others. Components that draw
+     their own (shadcn's ring utilities) still win: utilities beat base. */
+  :focus-visible {
+    outline: 2px solid var(--color-ring);
+    outline-offset: 2px;
+  }
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline-offset: 0;
+  }
+  /* Codes, dates and figures that change keep their width (DESIGN_SYSTEM §4). */
+  .font-mono {
+    font-variant-numeric: tabular-nums;
+  }
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
 }

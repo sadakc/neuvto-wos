@@ -18,6 +18,7 @@ import { Route as NeuvtoHqIndexRouteImport } from './routes/neuvto-hq/index'
 import { Route as AppIndexRouteImport } from './routes/app/index'
 import { Route as AppSetupRouteImport } from './routes/app/setup'
 import { Route as AppSettingsRouteImport } from './routes/app/settings'
+import { Route as AppSecurityRouteImport } from './routes/app/security'
 import { Route as AppReportsRouteImport } from './routes/app/reports'
 import { Route as AppMembersRouteImport } from './routes/app/members'
 import { Route as AppImportRouteImport } from './routes/app/import'
@@ -72,6 +73,11 @@ const AppSetupRoute = AppSetupRouteImport.update({
 const AppSettingsRoute = AppSettingsRouteImport.update({
   id: '/settings',
   path: '/settings',
+  getParentRoute: () => AppRouteRoute,
+} as any)
+const AppSecurityRoute = AppSecurityRouteImport.update({
+  id: '/security',
+  path: '/security',
   getParentRoute: () => AppRouteRoute,
 } as any)
 const AppReportsRoute = AppReportsRouteImport.update({
@@ -142,6 +148,7 @@ export interface FileRoutesByFullPath {
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/security': typeof AppSecurityRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
   '/app/': typeof AppIndexRoute
@@ -162,6 +169,7 @@ export interface FileRoutesByTo {
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/security': typeof AppSecurityRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
   '/app': typeof AppIndexRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
+  '/app/security': typeof AppSecurityRoute
   '/app/settings': typeof AppSettingsRoute
   '/app/setup': typeof AppSetupRoute
   '/app/': typeof AppIndexRoute
@@ -207,6 +216,7 @@ export interface FileRouteTypes {
     | '/app/import'
     | '/app/members'
     | '/app/reports'
+    | '/app/security'
     | '/app/settings'
     | '/app/setup'
     | '/app/'
@@ -227,6 +237,7 @@ export interface FileRouteTypes {
     | '/app/import'
     | '/app/members'
     | '/app/reports'
+    | '/app/security'
     | '/app/settings'
     | '/app/setup'
     | '/app'
@@ -248,6 +259,7 @@ export interface FileRouteTypes {
     | '/app/import'
     | '/app/members'
     | '/app/reports'
+    | '/app/security'
     | '/app/settings'
     | '/app/setup'
     | '/app/'
@@ -334,6 +346,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppSettingsRouteImport
       parentRoute: typeof AppRouteRoute
     }
+    '/app/security': {
+      id: '/app/security'
+      path: '/security'
+      fullPath: '/app/security'
+      preLoaderRoute: typeof AppSecurityRouteImport
+      parentRoute: typeof AppRouteRoute
+    }
     '/app/reports': {
       id: '/app/reports'
       path: '/reports'
@@ -414,6 +433,7 @@ interface AppRouteRouteChildren {
   AppImportRoute: typeof AppImportRoute
   AppMembersRoute: typeof AppMembersRoute
   AppReportsRoute: typeof AppReportsRoute
+  AppSecurityRoute: typeof AppSecurityRoute
   AppSettingsRoute: typeof AppSettingsRoute
   AppSetupRoute: typeof AppSetupRoute
   AppIndexRoute: typeof AppIndexRoute
@@ -426,6 +446,7 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppImportRoute: AppImportRoute,
   AppMembersRoute: AppMembersRoute,
   AppReportsRoute: AppReportsRoute,
+  AppSecurityRoute: AppSecurityRoute,
   AppSettingsRoute: AppSettingsRoute,
   AppSetupRoute: AppSetupRoute,
   AppIndexRoute: AppIndexRoute,

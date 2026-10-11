@@ -165,6 +165,12 @@ PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_concurrency.
 printf '\n──  %s\n' "verifying scheduled work"
 PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_scheduled_work.sh"
 
+# D79. Face and fingerprint sign-in, against the real local auth server, with
+# a software authenticator standing in for the phone. Skips itself when the
+# auth server has passkeys off. Needs Mailpit, which the local stack runs.
+printf '\n──  %s\n' "verifying face and fingerprint sign-in"
+PSQL="$PSQL" DATABASE_URL="$DB_URL" bun "$HARNESS_DIR/tests/verify_passkeys.ts"
+
 # ── the suite must leave the database as consistent as it found it
 #
 # verify_invariants.sql already ran, above, before the steps that mutate the

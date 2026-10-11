@@ -95,6 +95,7 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 | [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives                            |
 | [FIRST_CUSTOMER_RUNBOOK.md](operations/FIRST_CUSTOMER_RUNBOOK.md)       | what a real customer must do to go live — and every gap that stops them                                                |
 | [BACKUPS.md](operations/BACKUPS.md)                                     | the Free plan has none — how to take one, how to prove it restores, and what it leaves out                             |
+| [PASSKEYS.md](operations/PASSKEYS.md)                                   | face and fingerprint sign-in: what people do, and the one dashboard setting per environment that can never change      |
 | [TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                     | production is the test environment — how that data gets hard-deleted later without guesswork                           |
 | [ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                           | the QA/UAT stacks, the second Supabase org, and the in-progress Cloudflare hosting migration                           |
 | [AUTOSAVE.md](operations/AUTOSAVE.md)                                   | why work reaches git on its own, and the credential guard that stops it doing harm                                     |

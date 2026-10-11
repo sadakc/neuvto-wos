@@ -47,6 +47,19 @@ additional_redirect_urls = ["http://localhost:8080"]
 # sends the WHOLE [auth] block, including the localhost site_url. Adding a value
 # here creates a reason to push a file that must not be pushed.
 
+# D79 — face and fingerprint sign-in, through Supabase Auth's own passkeys.
+# LOCAL ONLY: this file configures the local stack. Production is set in the
+# Supabase dashboard (Authentication -> Passkeys) with relying party ID
+# `neuvto.com`, and that ID must never change afterwards, because every passkey
+# is bound to it. See docs/operations/PASSKEYS.md.
+[auth.passkey]
+enabled = true
+
+[auth.webauthn]
+rp_display_name = "Neuvto"
+rp_id = "localhost"
+rp_origins = ["http://localhost:8080"]
+
 [auth.email]
 enable_signup = true
 # D8 — no passwords anywhere. Nothing to phish, forget, reuse, or leak.
