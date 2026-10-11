@@ -192,7 +192,7 @@ async function signInWithEmailCode(email: string): Promise<{ token: string; user
   const before = Date.now();
   let sent = await auth("/otp", { email, create_user: false });
   // GoTrue allows one code per address every couple of seconds.
-  for (let i = 0; sent.status === 429 && i < 10; i++) {
+  for (let i = 0; (sent.status === 429 || sent.status >= 500) && i < 10; i++) {
     await Bun.sleep(1000);
     sent = await auth("/otp", { email, create_user: false });
   }
@@ -241,6 +241,16 @@ async function passkeySignIn(device: Authenticator, userHandle: string, key?: Ke
 }
 
 /* ── the proof ────────────────────────────────────────────────────────────── */
+
+// After `supabase db reset` the auth container restarts, and for a few seconds
+// the gateway answers "invalid response from the upstream server". Wait for it
+// rather than reporting a cold start as a passkey failure.
+for (let i = 0; ; i++) {
+  const health = await fetch(`${API}/auth/v1/health`, { headers: { apikey: KEY } }).catch(() => null);
+  if (health?.ok) break;
+  if (i >= 60) fail("the local auth server never became healthy");
+  await Bun.sleep(500);
+}
 
 const probe = await auth("/passkeys/authentication/options", {});
 if (probe.json.error_code === "passkey_disabled" || probe.status === 404) {

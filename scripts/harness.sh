@@ -144,6 +144,7 @@ run "verifying data integrity"   "$HARNESS_DIR/tests/verify_invariants.sql"
 run "verifying the error store"  "$HARNESS_DIR/tests/verify_error_reporting.sql"
 run "verifying session policy"   "$HARNESS_DIR/tests/verify_session_policy.sql"
 run "verifying company access"   "$HARNESS_DIR/tests/verify_company_access.sql"
+run "verifying the employee record" "$HARNESS_DIR/tests/verify_employee_master.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

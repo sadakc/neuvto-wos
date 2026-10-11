@@ -1109,6 +1109,15 @@ begin
 
     -- ─────────────────────────────────────── cleanup
     perform pg_temp.as_postgres();
+    -- Removing a whole workspace is a purge, and a purge says so: employee
+    -- history refuses deletion otherwise (D82). First, so the audit rows its
+    -- deletion writes are swept by the audit_logs delete below.
+    if to_regclass('public.employees') is not null then
+      perform set_config('neuvto.purge', 'on', true);
+      delete from public.employees where organization_id in
+        (select id from organizations where slug = 'provisioned-co');
+      perform set_config('neuvto.purge', '', true);
+    end if;
     delete from public.leave_requests where employee_id = ravi;
     delete from public.notifications  where organization_id in
       (select id from organizations where slug = 'provisioned-co');
