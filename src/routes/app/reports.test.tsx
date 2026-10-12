@@ -47,8 +47,8 @@ const getCurrentUser = vi.fn<() => Promise<CurrentUser | null>>();
 vi.mock("@/platform/auth", async () => {
   // The real role helper. `session` imports the Supabase client, which is a lazy
   // Proxy that constructs nothing until a query runs.
-  const { isAdmin } = await import("@/platform/auth/session");
-  return { isAdmin, getCurrentUser: () => getCurrentUser() };
+  const { isAdmin, isModuleAdmin, administersAnyModule } = await import("@/platform/auth/session");
+  return { isAdmin, isModuleAdmin, administersAnyModule, getCurrentUser: () => getCurrentUser() };
 });
 
 const getModuleReports = vi.fn<() => Promise<(ModuleReport & { moduleKey: string })[]>>();

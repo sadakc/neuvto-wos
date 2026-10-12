@@ -24,7 +24,7 @@
 
 import type { ComponentType } from "react";
 import type { CurrentUser } from "@/platform/auth";
-import { canApprove, isAdmin } from "@/platform/auth";
+import { canApprove, isAdmin, isModuleAdmin } from "@/platform/auth";
 import type { ModuleDefinition, ModuleSection } from "@/platform/modules";
 
 export type TabGroup = "main" | "team" | "company";
@@ -102,7 +102,11 @@ export function buildShell(
     let hidden = 0;
 
     for (const item of m.navigation(user)) {
-      const allowed = !item.roles?.length || item.roles.some((r) => user?.roles.includes(r));
+      const byRole = !!item.roles?.length && item.roles.some((r) => user?.roles.includes(r));
+      const allowed =
+        (!item.roles?.length && !item.moduleAdmin) ||
+        byRole ||
+        (!!item.moduleAdmin && isModuleAdmin(user, m.key));
       if (!allowed) {
         hidden++;
         continue;
@@ -151,7 +155,7 @@ export function buildShell(
         description: m.configurationDescription ?? `How ${m.name} works in this workspace`,
       });
     }
-    if (admin) tabs.push(...companyTabs);
+    if (isModuleAdmin(user, m.key)) tabs.push(...companyTabs);
     else hidden += companyTabs.length;
 
     return {

@@ -282,6 +282,13 @@ export interface CurrentUser {
   organizationId: string;
   organizationName: string;
   roles: AppRole[];
+  /**
+   * D84. Modules this person administers by a grant from a Super Admin. A
+   * company-wide Admin administers every module without one, so ask
+   * `isModuleAdmin`, never this list directly. Optional so a user built in a
+   * test without it administers no module.
+   */
+  moduleAdmin?: readonly string[];
 }
 
 /** Derives a slug suggestion from a company name. Advisory only — the user can edit it. */

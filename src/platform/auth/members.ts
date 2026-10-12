@@ -30,6 +30,8 @@ export interface Member {
   /** D58. Null is ordinary: a workspace with no departments configured has nobody in one. */
   departmentId: string | null;
   roles: AppRole[];
+  /** D84. Modules a Super Admin made them admin of. Empty for most people. */
+  moduleAdmin: string[];
 }
 
 /** What deactivating somebody would move. Counts, so the confirmation states facts. */
@@ -152,15 +154,16 @@ export async function listMembers(): Promise<Member[]> {
   // therefore has no relationship to traverse, and asking for one fails at
   // compile time rather than returning an empty array at runtime, which is the
   // better half of that trade.
-  const [people, roles] = await Promise.all([
+  const [people, roles, modules] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, email, phone, joined_date, is_active, manager_id, department_id")
       .order("full_name"),
     supabase.from("user_roles").select("user_id, role"),
+    supabase.from("module_admins").select("user_id, module_key"),
   ]);
 
-  if (people.error || roles.error) {
+  if (people.error || roles.error || modules.error) {
     throw new AppError("INTERNAL_ERROR", "We couldn't load the people in this workspace.", 500);
   }
 
@@ -169,6 +172,10 @@ export async function listMembers(): Promise<Member[]> {
     const list = byUser.get(r.user_id) ?? [];
     list.push(r.role as AppRole);
     byUser.set(r.user_id, list);
+  }
+  const adminOf = new Map<string, string[]>();
+  for (const r of modules.data ?? []) {
+    adminOf.set(r.user_id, [...(adminOf.get(r.user_id) ?? []), r.module_key]);
   }
 
   return (people.data ?? []).map((r) => ({
@@ -181,6 +188,7 @@ export async function listMembers(): Promise<Member[]> {
     managerId: r.manager_id,
     departmentId: r.department_id,
     roles: byUser.get(r.id) ?? [],
+    moduleAdmin: (adminOf.get(r.id) ?? []).sort(),
   }));
 }
 
@@ -444,4 +452,34 @@ export async function setMemberRoles(userId: string, roles: AppRole[]): Promise<
     );
   }
   throw toAppError(error, "setMemberRoles");
+}
+
+/**
+ * D84. Sets which modules somebody administers, the whole set. A Super Admin
+ * only, never for themselves; the database refuses anything else.
+ */
+export async function setMemberModuleAdmins(userId: string, modules: string[]): Promise<string[]> {
+  const { data, error } = await supabase.rpc("member_set_module_admins", {
+    _user_id: userId,
+    _modules: modules,
+  });
+  if (!error) return data ?? [];
+
+  const raw = error.message ?? "";
+  if (raw.includes("ROLE_NOT_YOURS_TO_GRANT")) throw new AppError("FORBIDDEN", ROLE_NOT_YOURS, 403);
+  if (raw.includes("CANNOT_CHANGE_OWN_ROLES")) {
+    throw new AppError(
+      "FORBIDDEN",
+      "You can't change your own access. Another Super Admin can.",
+      403,
+    );
+  }
+  if (raw.includes("UNKNOWN_MODULE")) {
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "That module isn't switched on for this company, so nobody can administer it yet.",
+      400,
+    );
+  }
+  throw toAppError(error, "setMemberModuleAdmins");
 }

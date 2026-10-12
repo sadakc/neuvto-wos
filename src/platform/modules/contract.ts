@@ -37,6 +37,11 @@ export interface ModuleNavItem {
   /** Omitted means everyone. Presence means at least one of these roles. */
   roles?: readonly AppRole[];
   /**
+   * D84. Only this module's admins: a company-wide Admin, or somebody a Super
+   * Admin made admin of this module. With `roles` as well, either one opens it.
+   */
+  moduleAdmin?: boolean;
+  /**
    * Where the tab sits in the Core HR tab bar (DESIGN_SYSTEM §7). `main` is the
    * row an employee uses; `company` is behind the Company menu and should carry
    * `roles` that administer. Defaults to `main`. "For your team" (Approvals) is

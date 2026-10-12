@@ -12,6 +12,7 @@ import {
   revokeInvitation,
   ROLE_LABELS,
   setJoinedDate,
+  setMemberModuleAdmins,
   setMemberRoles,
   setReportingLine,
   type AppRole,
@@ -22,7 +23,8 @@ import {
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { InviteTeam } from "@/platform/auth/InviteTeam";
-import { AccessEditor } from "@/platform/auth/AccessEditor";
+import { AccessEditor, type AdministrableModule } from "@/platform/auth/AccessEditor";
+import { getEnabledModules } from "@/platform/modules";
 import { listDepartments, setDepartment, type Department } from "@/platform/organization";
 
 export const Route = createFileRoute("/app/members")({
@@ -67,6 +69,8 @@ export function MembersPage() {
   const [editingAccess, setEditingAccess] = useState<string | null>(null);
   /** D58. Empty is ordinary — a workspace that has configured none. */
   const [departments, setDepartments] = useState<Department[]>([]);
+  /** D84. What a Super Admin can make somebody admin of. */
+  const [modules, setModules] = useState<AdministrableModule[]>([]);
 
   const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
 
@@ -79,6 +83,10 @@ export function MembersPage() {
     // department", which is what an unconfigured workspace shows anyway.
     await listDepartments()
       .then(setDepartments)
+      .catch(() => {});
+    // Forgiving for the same reason: without it the panel shows roles only.
+    await getEnabledModules()
+      .then((ms) => setModules(ms.map((m) => ({ key: m.key, name: m.name }))))
       .catch(() => {});
   }
 
@@ -145,10 +153,16 @@ export function MembersPage() {
 
   // D78. The panel shows its own refusals inline, where the person is looking,
   // so this throws rather than writing to the page-level error.
-  async function onSetRoles(member: Member, roles: AppRole[]) {
+  async function onSetRoles(member: Member, roles: AppRole[], adminOf: string[]) {
     setError("");
     setNotice("");
-    await setMemberRoles(member.id, roles);
+    const rolesChanged =
+      roles.length !== member.roles.length || roles.some((r) => !member.roles.includes(r));
+    if (rolesChanged) await setMemberRoles(member.id, roles);
+    const modulesChanged =
+      adminOf.length !== member.moduleAdmin.length ||
+      adminOf.some((m) => !member.moduleAdmin.includes(m));
+    if (modulesChanged) await setMemberModuleAdmins(member.id, adminOf);
     setEditingAccess(null);
     setNotice(`Access for ${member.fullName || member.email} updated.`);
     await load();
@@ -453,7 +467,12 @@ export function MembersPage() {
                   </span>
                   <span className="flex shrink-0 flex-col items-end gap-1">
                     <span className="text-xs text-muted-foreground">
-                      {m.roles.map((r) => ROLE_LABELS[r]).join(", ") || "Employee"}
+                      {[
+                        ...m.roles.map((r) => ROLE_LABELS[r]),
+                        ...m.moduleAdmin.map(
+                          (k) => `${modules.find((x) => x.key === k)?.name ?? k} Admin`,
+                        ),
+                      ].join(", ") || "Employee"}
                     </span>
                     {m.id !== user?.id && (
                       <button
@@ -474,7 +493,9 @@ export function MembersPage() {
                     personName={m.fullName || m.email}
                     roles={m.roles}
                     callerIsSuperAdmin={isSuperAdmin(user)}
-                    onSave={(roles) => onSetRoles(m, roles)}
+                    modules={modules}
+                    moduleAdmin={m.moduleAdmin}
+                    onSave={(roles, adminOf) => onSetRoles(m, roles, adminOf)}
                     onCancel={() => setEditingAccess(null)}
                   />
                 )}

@@ -1,15 +1,18 @@
 // @vitest-environment happy-dom
 
 /**
- * Statutory and bank (E6, D80), rendered from real employee_card() output per
- * role (__fixtures__/cards.json). What it pins:
+ * Statutory and bank (E6, D80, D85), rendered from real employee_card() output
+ * per role (__fixtures__/cards.json). What it pins:
  *
- * - the tab and each panel exist only for the roles §5 gives them to; Admin
- *   gets no bank panel and no Reveal on Aadhaar;
- * - a reveal asks for a reason first, sends it, and shows the value with
- *   "Shown, logged";
- * - the revealed value is gone two minutes later, and on "Hide everything";
- * - a refused reveal shows why, and shows no value;
+ * - the tab and each panel exist only for the roles the database gives them
+ *   to; the Admin and an Employee Admin get every number as its last four,
+ *   with an eye on each, and the bank panel;
+ * - the person themselves gets last fours and no eye anywhere, restricted
+ *   data included;
+ * - the eye asks for nothing: one click shows the number, marked "Shown,
+ *   logged", and a second click locks it again;
+ * - the shown value is gone two minutes later, and on "Hide everything";
+ * - a refused look shows why, and shows no value;
  * - the value never lands in the URL or browser storage;
  * - an editor sends only what changed, and an empty number field means "keep".
  */
@@ -57,49 +60,79 @@ describe("Statutory and bank, per role", () => {
     expect(tabNames()).not.toContain("Statutory and bank");
   });
 
-  it("gives an Admin last fours and verification, no bank and no reveal", () => {
-    render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
+  it.each(["admin", "employeeAdmin"] as const)(
+    "gives the %s every number locked to its last four, each with an eye, and the bank",
+    (role) => {
+      render(<StatutoryTab card={as(role)} onChanged={() => {}} />);
+      expect(screen.getByTestId("aadhaar-masked")).toHaveTextContent("•••• 0124");
+      expect(screen.getByTestId("uan-masked")).toHaveTextContent("•••• 7890");
+      expect(screen.queryByText("101234567890")).toBeNull();
+      for (const label of [
+        "UAN",
+        "EPF number",
+        "ESIC number",
+        "Aadhaar",
+        "PAN",
+        "account number",
+      ]) {
+        expect(screen.getByRole("button", { name: `Show ${label}` })).toBeInTheDocument();
+      }
+      expect(screen.getByTestId("panel-bank")).toBeInTheDocument();
+      expect(screen.getByTestId("reveal-restricted")).toBeInTheDocument();
+      expect(screen.getByTestId("edit-statutory")).toBeInTheDocument();
+      expect(screen.getByTestId("edit-bank")).toBeInTheDocument();
+      expect(screen.getByTestId("edit-restricted")).toBeInTheDocument();
+    },
+  );
+
+  it("gives the person their last fours and no eye anywhere", () => {
+    render(<StatutoryTab card={as("self")} onChanged={() => {}} />);
     expect(screen.getByTestId("aadhaar-masked")).toHaveTextContent("•••• 0124");
-    expect(screen.queryByTestId("reveal-aadhaar")).toBeNull();
-    expect(screen.queryByTestId("panel-bank")).toBeNull();
-    expect(screen.getByTestId("panel-verification")).toBeInTheDocument();
-    expect(within(screen.getByTestId("panel-pf")).getByText("•••• 7890")).toBeInTheDocument();
-    expect(screen.getByTestId("edit-statutory")).toBeInTheDocument();
-    expect(screen.queryByTestId("edit-bank")).toBeNull();
+    expect(screen.getByTestId("bank-account-masked")).toHaveTextContent("•••• 5678");
+    expect(screen.queryAllByRole("button", { name: /^Show / })).toHaveLength(0);
+    expect(screen.getByTestId("restricted-held")).toHaveTextContent("Recorded");
+    expect(screen.queryByTestId("reveal-restricted")).toBeNull();
+    expect(screen.queryByTestId("edit-restricted")).toBeNull();
   });
 
-  it("gives Payroll the full UAN and the bank, with a reveal for the account only", () => {
+  it("gives Payroll the full UAN and the bank, with an eye on the account only", () => {
     render(<StatutoryTab card={as("payroll")} onChanged={() => {}} />);
     expect(within(screen.getByTestId("panel-pf")).getByText("101234567890")).toBeInTheDocument();
-    expect(screen.getByTestId("reveal-bank-account")).toBeInTheDocument();
-    expect(screen.queryByTestId("reveal-aadhaar")).toBeNull();
+    expect(screen.getByRole("button", { name: "Show account number" })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: "Show Aadhaar" })).toBeNull();
     expect(screen.queryByTestId("panel-verification")).toBeNull();
   });
 });
 
-describe("revealing", () => {
-  it("asks why, sends the reason, and marks the value as shown and logged", async () => {
+describe("the eye", () => {
+  it("shows the number at once, asks for nothing, and locks it again on a second click", async () => {
     const user = userEvent.setup();
-    api.revealRestricted.mockResolvedValue({ aadhaar: AADHAAR });
-    render(<StatutoryTab card={as("statutory")} onChanged={() => {}} />);
+    api.revealRestricted.mockResolvedValue({ uan: "101234567890" });
+    render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
 
-    await user.click(screen.getByTestId("reveal-aadhaar"));
-    const confirm = screen.getByTestId("reveal-confirm");
-    expect(confirm).toBeDisabled();
-    expect(api.revealRestricted).not.toHaveBeenCalled();
-
-    await user.type(screen.getByTestId("reveal-reason"), "ECR filing");
-    await user.click(confirm);
-
-    expect(api.revealRestricted).toHaveBeenCalledWith(
-      as("statutory").id,
-      ["aadhaar"],
-      "ECR filing",
-    );
-    const shown = await screen.findByTestId("aadhaar-value");
-    expect(shown).toHaveTextContent(AADHAAR);
-    expect(shown).toHaveTextContent("Shown, logged");
+    await user.click(screen.getByRole("button", { name: "Show UAN" }));
+    expect(api.revealRestricted).toHaveBeenCalledWith(as("admin").id, ["uan"]);
     expect(screen.queryByTestId("reveal-prompt")).toBeNull();
+    const shown = await screen.findByTestId("uan-value");
+    expect(shown).toHaveTextContent("101234567890");
+    expect(shown).toHaveTextContent("Shown, logged");
+
+    await user.click(screen.getByRole("button", { name: "Hide UAN" }));
+    expect(screen.queryByTestId("uan-value")).toBeNull();
+    expect(screen.getByTestId("uan-masked")).toHaveTextContent("•••• 7890");
+  });
+
+  it("opens restricted data the same way", async () => {
+    const user = userEvent.setup();
+    api.revealRestricted.mockResolvedValue({ religion: "Hindu", casteCategory: "obc" });
+    render(<StatutoryTab card={as("employeeAdmin")} onChanged={() => {}} />);
+    await user.click(screen.getByTestId("reveal-restricted"));
+    expect(api.revealRestricted).toHaveBeenCalledWith(as("employeeAdmin").id, [
+      "religion",
+      "caste_category",
+      "disability",
+    ]);
+    expect(await screen.findByTestId("restricted-revealed")).toHaveTextContent("Hindu");
   });
 
   it("forgets the value two minutes later", async () => {
@@ -108,9 +141,7 @@ describe("revealing", () => {
     api.revealRestricted.mockResolvedValue({ aadhaar: AADHAAR });
     render(<StatutoryTab card={as("statutory")} onChanged={() => {}} />);
 
-    await user.click(screen.getByTestId("reveal-aadhaar"));
-    await user.type(screen.getByTestId("reveal-reason"), "ECR filing");
-    await user.click(screen.getByTestId("reveal-confirm"));
+    await user.click(screen.getByRole("button", { name: "Show Aadhaar" }));
     await screen.findByTestId("aadhaar-value");
 
     await act(() => vi.advanceTimersByTimeAsync(REVEAL_LIFETIME_MS - 1000));
@@ -124,11 +155,9 @@ describe("revealing", () => {
     const user = userEvent.setup();
     const before = window.location.href;
     api.revealRestricted.mockResolvedValue({ aadhaar: AADHAAR });
-    render(<StatutoryTab card={as("statutory")} onChanged={() => {}} />);
+    render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
 
-    await user.click(screen.getByTestId("reveal-aadhaar"));
-    await user.type(screen.getByTestId("reveal-reason"), "ECR filing");
-    await user.click(screen.getByTestId("reveal-confirm"));
+    await user.click(screen.getByRole("button", { name: "Show Aadhaar" }));
     await screen.findByTestId("aadhaar-value");
 
     expect(window.location.href).toBe(before);
@@ -142,14 +171,22 @@ describe("revealing", () => {
   it("shows a refusal and no value", async () => {
     const user = userEvent.setup();
     api.revealRestricted.mockRejectedValue(
-      new AppError("VALIDATION_FAILED", "Say why you need to see it.", 400),
+      new AppError("FORBIDDEN", "You can't see that number.", 403),
     );
-    render(<StatutoryTab card={as("statutory")} onChanged={() => {}} />);
-    await user.click(screen.getByTestId("reveal-aadhaar"));
-    await user.type(screen.getByTestId("reveal-reason"), "abc");
-    await user.click(screen.getByTestId("reveal-confirm"));
-    expect(await screen.findByTestId("reveal-error")).toHaveTextContent("Say why");
+    render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
+    await user.click(screen.getByRole("button", { name: "Show Aadhaar" }));
+    expect(await screen.findByTestId("reveal-error")).toHaveTextContent("can't see");
     expect(screen.queryByTestId("aadhaar-value")).toBeNull();
+  });
+
+  it("lists a look that gave no reason without inventing one", async () => {
+    api.getRestrictedReads.mockResolvedValue([
+      { readAt: "2026-10-12T10:00:00Z", readerName: "Hema HR", fields: ["uan"], reason: null },
+    ]);
+    render(<StatutoryTab card={as("self")} onChanged={() => {}} />);
+    const list = await screen.findByTestId("reads-list");
+    expect(list).toHaveTextContent("Hema HR saw uan");
+    expect(list).not.toHaveTextContent("null");
   });
 });
 

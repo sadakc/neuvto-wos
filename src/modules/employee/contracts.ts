@@ -245,6 +245,11 @@ export interface BankBlock {
 
 /** What a reveal may ask for (employee_reveal_restricted). */
 export type RevealField =
+  | "uan"
+  | "epf_number"
+  | "esic_number"
+  | "old_uan"
+  | "old_esic_number"
   | "aadhaar"
   | "pan"
   | "bank_account"
@@ -253,6 +258,11 @@ export type RevealField =
   | "disability";
 
 export interface Revealed {
+  uan?: string | null;
+  epfNumber?: string | null;
+  esicNumber?: string | null;
+  oldUan?: string | null;
+  oldEsicNumber?: string | null;
   aadhaar?: string | null;
   pan?: string | null;
   bankAccount?: string | null;
@@ -266,7 +276,8 @@ export interface RestrictedRead {
   readAt: string;
   readerName: string | null;
   fields: string[];
-  reason: string;
+  /** D85: the eye asks for none, so most looks have no reason. */
+  reason: string | null;
 }
 
 export const RELATIONS = [

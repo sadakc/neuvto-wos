@@ -32,6 +32,7 @@ const RAVI = "ravi-id";
 const h = vi.hoisted(() => ({
   callerRoles: ["org_admin"] as string[],
   setMemberRoles: vi.fn<(id: string, roles: string[]) => Promise<void>>(),
+  setMemberModuleAdmins: vi.fn<(id: string, modules: string[]) => Promise<void>>(),
 }));
 
 /**
@@ -50,6 +51,7 @@ const MEMBERS = [
     managerId: null,
     departmentId: null,
     roles: ["org_admin"],
+    moduleAdmin: [],
   },
   {
     id: MARK,
@@ -61,6 +63,7 @@ const MEMBERS = [
     managerId: null,
     departmentId: null,
     roles: ["manager"],
+    moduleAdmin: [],
   },
   {
     id: RAVI,
@@ -72,6 +75,7 @@ const MEMBERS = [
     managerId: MARK,
     departmentId: null,
     roles: ["employee"],
+    moduleAdmin: [],
   },
 ];
 
@@ -93,6 +97,7 @@ vi.mock("@/platform/auth", async () => {
       roles: h.callerRoles,
     }),
     setMemberRoles: (id: string, roles: string[]) => h.setMemberRoles(id, roles),
+    setMemberModuleAdmins: (id: string, modules: string[]) => h.setMemberModuleAdmins(id, modules),
     listMembers: async () => MEMBERS,
     listInvitations: async () => [],
     deactivateMember: vi.fn(),
@@ -106,6 +111,10 @@ vi.mock("@/platform/auth", async () => {
 
 // InviteTeam renders for real; only its network is replaced.
 vi.mock("@/platform/auth/members", () => ({ inviteMember: vi.fn() }));
+// D84: the module list the access panel offers. None here; members.access proves it.
+vi.mock("@/platform/modules", () => ({
+  getEnabledModules: async () => [{ key: "leave", name: "Leave Management" }],
+}));
 vi.mock("@/platform/organization", () => ({
   listDepartments: async () => [],
   setDepartment: vi.fn(),
@@ -142,6 +151,8 @@ function inviteRoleValues(): string[] {
 beforeEach(() => {
   h.setMemberRoles.mockReset();
   h.setMemberRoles.mockResolvedValue(undefined);
+  h.setMemberModuleAdmins.mockReset();
+  h.setMemberModuleAdmins.mockResolvedValue(undefined);
 });
 
 describe("People — whose access can be changed", () => {
@@ -174,6 +185,18 @@ describe("People — whose access can be changed", () => {
     // And the panel closes on success, with the page saying whose access moved.
     await waitFor(() => expect(screen.queryByTestId("access-editor")).toBeNull());
     expect(screen.getByText("Access for Ravi Employee updated.")).toBeInTheDocument();
+  });
+
+  it("D84: a Super Admin makes somebody Leave Admin, and their roles are not re-sent", async () => {
+    const user = userEvent.setup();
+    await renderPeople(["super_admin"]);
+    await user.click(within(rowFor("Ravi Employee")).getByTestId("change-access"));
+    const panel = within(rowFor("Ravi Employee")).getByTestId("access-editor");
+    await user.click(within(panel).getByTestId("module-admin-leave"));
+    await user.click(within(panel).getByTestId("access-save"));
+
+    await waitFor(() => expect(h.setMemberModuleAdmins).toHaveBeenCalledWith(RAVI, ["leave"]));
+    expect(h.setMemberRoles).not.toHaveBeenCalled();
   });
 
   it("shows a refusal inside the panel, and leaves the panel open", async () => {

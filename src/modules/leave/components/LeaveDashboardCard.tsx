@@ -13,7 +13,7 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ModuleLink } from "@/platform/modules";
-import { getCurrentUser, isAdmin } from "@/platform/auth";
+import { getCurrentUser, isModuleAdmin } from "@/platform/auth";
 import { getFinancialYear } from "@/platform/calendar";
 import { getMyBalances, getMyRequests } from "../handlers";
 import { BalanceCard } from "./BalanceCard";
@@ -31,7 +31,7 @@ export default function LeaveDashboardCard() {
     let cancelled = false;
     getCurrentUser()
       .then((u) => {
-        if (!cancelled) setAdmin(isAdmin(u));
+        if (!cancelled) setAdmin(isModuleAdmin(u, "leave"));
         return u ? getFinancialYear(u.organizationId) : null;
       })
       .then((fy) => !cancelled && setFyLabel(fy))

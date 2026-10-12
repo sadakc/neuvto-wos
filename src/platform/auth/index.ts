@@ -15,6 +15,8 @@ export {
   hasRole,
   isAdmin,
   isSuperAdmin,
+  isModuleAdmin,
+  administersAnyModule,
   canApprove,
 } from "./session";
 
@@ -52,6 +54,7 @@ export {
   listDirectReports,
   setReportingLine,
   setMemberRoles,
+  setMemberModuleAdmins,
   setJoinedDate,
   accountStatus,
   reactivateMember,

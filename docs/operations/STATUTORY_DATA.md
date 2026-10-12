@@ -1,6 +1,6 @@
 # Statutory and bank data: the encryption key, and going live
 
-**Version:** 1.1 · **Status:** Active · **Applies to:** every environment's Vault, before any Aadhaar, PAN or bank account is entered there
+**Version:** 1.2 · **Status:** Active · **Applies to:** every environment's Vault, before any Aadhaar, PAN or bank account is entered there
 
 D80. Neuvto stores Aadhaar, PAN, UAN, EPF and ESIC numbers, the bank account, and
 religion, caste category and disability status. Every one of those values is
@@ -14,22 +14,24 @@ in Supabase Vault. The design is in `product/NEUVTO_EMPLOYEE_MASTER.md`, under
 
 ## What protects what
 
-| Layer                | What it does                                                                                                             |
-| -------------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Encryption at rest   | The tables hold ciphertext and a last four. A database dump, a backup or a stray `select` shows no number.               |
-| Keyed index          | Aadhaar and PAN are unique per company through an HMAC under the same key, so a number cannot be looked up by hash.      |
-| No table access      | RLS on, no policy, no grant. Only the functions below reach these tables.                                                |
-| Role-shaped card     | `employee_card()` sends each role exactly what §5 of the Employee Master allows. Admin never receives the bank block.    |
-| Reveal               | `employee_reveal_restricted()` needs the right role and a stated reason, and writes `restricted_reads` before answering. |
-| Audit without values | Writes to these tables are audited by which fields changed, never the value. Admins read `audit_logs`; it holds none.    |
-| The browser          | A revealed value lives in one component's state, never a cache, URL or log, and is dropped after two minutes.            |
+| Layer                | What it does                                                                                                              |
+| -------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| Encryption at rest   | The tables hold ciphertext and a last four. A database dump, a backup or a stray `select` shows no number.                |
+| Keyed index          | Aadhaar and PAN are unique per company through an HMAC under the same key, so a number cannot be looked up by hash.       |
+| No table access      | RLS on, no policy, no grant. Only the functions below reach these tables.                                                 |
+| Role-shaped card     | `employee_card()` sends each role exactly what §5 of the Employee Master allows. The person never gets a full value.      |
+| Reveal               | `employee_reveal_restricted()` needs the right role (no reason since D85) and writes `restricted_reads` before answering. |
+| Audit without values | Writes to these tables are audited by which fields changed, never the value. Admins read `audit_logs`; it holds none.     |
+| The browser          | A revealed value lives in one component's state, never a cache, URL or log, and is dropped after two minutes.             |
 
-Who may reveal: Aadhaar and PAN, the Statutory role; the bank account, the Payroll role;
-religion, caste and disability, the Statutory role or the person themselves. Who has
-looked is shown to the person, a Super Admin and the Statutory role.
+Who may reveal (D85, 12 Oct 2026): the Employee Admin, everything; the Statutory role,
+every number and the restricted data; the Payroll role, the bank account. The person
+themselves sees last four digits and reveals nothing. On screen it is an eye beside each
+locked number, with no reason asked. Who has looked is shown to the person, a Super Admin
+and the Statutory role.
 
-All of this is proved by `neuvto-harness/tests/verify_statutory.sql` (44 cases, ten
-guards sabotaged) and the render tests in `src/modules/employee/components/`.
+All of this is proved by `neuvto-harness/tests/verify_statutory.sql` (now including the Employee Admin's eye; every
+guard sabotaged) and the render tests in `src/modules/employee/components/`.
 
 ---
 
@@ -114,6 +116,6 @@ D80 says this data does not reach production until all of these hold. Tick each 
 - [ ] The purge order in `TEST_DATA_PURGE.md` includes the restricted tables (it does,
       from version 1.3).
 - [ ] The reveal log's three-year retention job is registered: `select active from cron.job
-    where jobname = 'neuvto-employee-reveal-retention'` returns `true`.
+  where jobname = 'neuvto-employee-reveal-retention'` returns `true`.
 - [ ] The legal position on collecting Aadhaar (D59's original concern) is settled. The
       software is ready; whether to collect is not a software question.

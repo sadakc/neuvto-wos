@@ -1,6 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
-import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
+import {
+  administersAnyModule,
+  getCurrentUser,
+  isModuleAdmin,
+  type CurrentUser,
+} from "@/platform/auth";
 import { getModuleReports, type ModuleReport } from "@/platform/modules";
 import { ScheduledReports } from "@/platform/reports";
 
@@ -39,14 +44,15 @@ function ReportsPage() {
         // for a non-admin itself — a screen that is merely not linked is not a
         // permission, and this check exists so the page says so rather than
         // rendering empty tables.
-        if (!isAdmin(u)) {
+        // D84: each module's admin sees that module's reports.
+        if (!administersAnyModule(u)) {
           setState("denied");
           return;
         }
 
         const list = await getModuleReports(u);
         if (cancelled) return;
-        setReports(list);
+        setReports(list.filter((r) => isModuleAdmin(u, r.moduleKey)));
         setActiveId(list[0]?.id ?? "");
         setState("ready");
       } catch (e) {

@@ -50,6 +50,11 @@ begin
   insert into public.user_roles (user_id, organization_id, role)
   values ('00000000-0000-0000-0000-00000000a008', acme, 'payroll_officer'),
          ('00000000-0000-0000-0000-00000000a007', acme, 'statutory_officer');
+  -- D84: Dan, a manager, administers the Employee module and nothing else.
+  if to_regclass('public.module_admins') is not null then
+    insert into public.module_admins (organization_id, user_id, module_key)
+    values (acme, '00000000-0000-0000-0000-00000000a003', 'employee');
+  end if;
 
   select id into e from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006';
   insert into public.designations (organization_id, name, grade)
@@ -136,6 +141,8 @@ select jsonb_pretty(jsonb_build_object(
   'draft',     (select pg_temp.card_as('00000000-0000-0000-0000-00000000a002', e.id)
                   from public.employees e where e.draft_email = 'nisha.rao@acme.test'),
   'admin',     pg_temp.card_as('00000000-0000-0000-0000-00000000a001',
+                 (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006')),
+  'employeeAdmin', pg_temp.card_as('00000000-0000-0000-0000-00000000a003',
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006'))
 ));
 

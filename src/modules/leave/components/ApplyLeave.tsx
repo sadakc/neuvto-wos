@@ -18,7 +18,7 @@ import {
   describeExcludedDays,
   type ExcludedDay,
 } from "@/platform/calendar";
-import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
+import { getCurrentUser, isModuleAdmin, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
 import { getLeaveTypes, getMyBalances, submitLeave } from "../handlers";
 import type { LeaveBalance } from "../contracts";
@@ -217,11 +217,11 @@ export default function ApplyLeave() {
       <div className="max-w-lg">
         <h1 className="text-page-title font-semibold tracking-page-title">Apply for leave</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {isAdmin(user)
+          {isModuleAdmin(user, "leave")
             ? "No leave types are set up yet, so there's nothing to apply for."
             : "No leave types have been set up yet. Ask your administrator to add them."}
         </p>
-        {isAdmin(user) && (
+        {isModuleAdmin(user, "leave") && (
           <Link
             to="/app/settings"
             className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"

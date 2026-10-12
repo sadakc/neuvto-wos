@@ -1,20 +1,26 @@
 /**
- * Statutory and bank (bundle §7.1, D80).
+ * Statutory and bank (bundle §7.1, D80, D85).
  *
  * What arrives decides what renders, as everywhere on the card: a block the
- * database did not send is not drawn. Numbers arrive as their last four unless
- * §5 grants them in full (UAN, EPF and ESIC to Payroll and Statutory).
+ * database did not send is not drawn. Numbers arrive as their last four, shown
+ * behind a lock; UAN, EPF and ESIC arrive in full only for Payroll and
+ * Statutory.
  *
- * A full Aadhaar, PAN, account or restricted value exists in this browser only
- * after a reveal, and only here:
+ * The eye (D85). Whoever the database lets open a number (the Employee Admin,
+ * Statutory for numbers, Payroll for the account) clicks the eye and sees it.
+ * Nothing is asked first; the database writes who looked, at what and when
+ * before it answers. The person themselves sees their last four and no eye.
+ *
+ * A full value exists in this browser only after a look, and only here:
  *
  *   - in this component's state, never a cache, a URL or a log line;
  *   - gone when the component unmounts, so on leaving the tab or the page;
- *   - gone two minutes after the last reveal, whatever the person is doing;
- *   - asked for with a stated reason, which the database keeps with the look.
+ *   - gone on a second click of the eye, or on "Hide everything shown";
+ *   - gone two minutes after the last look, whatever the person is doing.
  */
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Eye, EyeOff, Lock } from "lucide-react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { isAppError } from "@/platform/errors";
 import {
@@ -39,7 +45,22 @@ import { Fields, Panel } from "./parts";
 
 export const REVEAL_LIFETIME_MS = 2 * 60 * 1000;
 
-const lastFour = (v: string | null | undefined) => (v ? `•••• ${v}` : null);
+/** Which key of `Revealed` each field comes back as. */
+const REVEALED_AS: Record<RevealField, keyof Revealed> = {
+  uan: "uan",
+  epf_number: "epfNumber",
+  esic_number: "esicNumber",
+  old_uan: "oldUan",
+  old_esic_number: "oldEsicNumber",
+  aadhaar: "aadhaar",
+  pan: "pan",
+  bank_account: "bankAccount",
+  religion: "religion",
+  caste_category: "casteCategory",
+  disability: "disabilityStatus",
+};
+
+const RESTRICTED: RevealField[] = ["religion", "caste_category", "disability"];
 
 export function StatutoryTab({
   card,
@@ -50,7 +71,8 @@ export function StatutoryTab({
 }) {
   const caps = card.capabilities;
   const [revealed, setRevealed] = useState<Revealed>({});
-  const [asking, setAsking] = useState<RevealField[] | null>(null);
+  const [opening, setOpening] = useState<RevealField | null>(null);
+  const [error, setError] = useState("");
   const [reads, setReads] = useState<RestrictedRead[] | null>(null);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -74,12 +96,29 @@ export function StatutoryTab({
     [],
   );
 
-  function onRevealed(values: Revealed) {
-    setRevealed((current) => ({ ...current, ...values }));
-    setAsking(null);
-    if (timer.current) clearTimeout(timer.current);
-    timer.current = setTimeout(() => setRevealed({}), REVEAL_LIFETIME_MS);
-    loadReads();
+  async function open(fields: RevealField[]) {
+    setError("");
+    setOpening(fields[0]);
+    try {
+      const values = await revealRestricted(card.id, fields);
+      setRevealed((current) => ({ ...current, ...values }));
+      if (timer.current) clearTimeout(timer.current);
+      timer.current = setTimeout(() => setRevealed({}), REVEAL_LIFETIME_MS);
+      loadReads();
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That couldn't be shown.");
+    } finally {
+      setOpening(null);
+    }
+  }
+
+  function lock(fields: RevealField[]) {
+    setRevealed((current) => {
+      const next = { ...current };
+      for (const f of fields) delete next[REVEALED_AS[f]];
+      if (fields.includes("disability")) delete next.disabilityPercent;
+      return next;
+    });
   }
 
   function hideAll() {
@@ -90,6 +129,34 @@ export function StatutoryTab({
   const anyRevealed = Object.keys(revealed).length > 0;
   const st = card.statutory;
 
+  /** A number behind its lock, with the eye for whoever may open it. */
+  const secret = (
+    field: RevealField,
+    label: string,
+    testId: string,
+    last4: string | null | undefined,
+    full: string | null | undefined,
+    canReveal: boolean,
+  ) => (
+    <Secret
+      testId={testId}
+      label={label}
+      last4={last4 ?? null}
+      // A value the card already carries in full (Payroll's UAN) needs no eye.
+      value={full ?? (revealed[REVEALED_AS[field]] as string | null | undefined)}
+      alwaysShown={!!full}
+      canReveal={canReveal}
+      busy={opening === field}
+      onShow={() => void open([field])}
+      onHide={() => lock([field])}
+    />
+  );
+
+  const restrictedShown =
+    revealed.religion !== undefined ||
+    revealed.casteCategory !== undefined ||
+    revealed.disabilityStatus !== undefined;
+
   return (
     <div className="flex flex-col gap-4">
       <p
@@ -97,8 +164,9 @@ export function StatutoryTab({
         className="flex flex-wrap items-center gap-2 rounded-lg border border-warning-line bg-warning-muted px-3.5 py-2.5 text-sm"
       >
         <span className="min-w-0 flex-1">
-          Numbers show their last four. Revealing one is logged against your account with the reason
-          you give, and the log is kept for three years.
+          {caps.canRevealStatutory || caps.canRevealBank || caps.canRevealRestricted
+            ? "Numbers are locked to their last four. The eye shows one; every look is logged with your name and kept for three years."
+            : "Numbers show their last four. Your administrator can see them in full, and every look is logged where you can see it."}
         </span>
         {anyRevealed && (
           <button
@@ -112,6 +180,12 @@ export function StatutoryTab({
         )}
       </p>
 
+      {error && (
+        <p role="alert" data-testid="reveal-error" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+
       <div className="grid gap-4 @min-[800px]/app:grid-cols-2">
         {st && (
           <Panel
@@ -121,18 +195,60 @@ export function StatutoryTab({
           >
             <Fields
               items={[
-                { label: "UAN", value: st.uan ?? lastFour(st.uanLast4), mono: true },
-                { label: "EPF number", value: st.epfNumber ?? lastFour(st.epfLast4), mono: true },
+                {
+                  label: "UAN",
+                  value: secret(
+                    "uan",
+                    "UAN",
+                    "uan",
+                    st.uanLast4,
+                    st.uan,
+                    !!caps.canRevealStatutory,
+                  ),
+                },
+                {
+                  label: "EPF number",
+                  value: secret(
+                    "epf_number",
+                    "EPF number",
+                    "epf",
+                    st.epfLast4,
+                    st.epfNumber,
+                    !!caps.canRevealStatutory,
+                  ),
+                },
                 {
                   label: "ESIC number",
-                  value: st.esicNumber ?? lastFour(st.esicLast4),
-                  mono: true,
+                  value: secret(
+                    "esic_number",
+                    "ESIC number",
+                    "esic",
+                    st.esicLast4,
+                    st.esicNumber,
+                    !!caps.canRevealStatutory,
+                  ),
                 },
-                { label: "Old UAN", value: st.oldUan ?? lastFour(st.oldUanLast4), mono: true },
+                {
+                  label: "Old UAN",
+                  value: secret(
+                    "old_uan",
+                    "old UAN",
+                    "old-uan",
+                    st.oldUanLast4,
+                    st.oldUan,
+                    !!caps.canRevealStatutory,
+                  ),
+                },
                 {
                   label: "Old ESIC number",
-                  value: st.oldEsicNumber ?? lastFour(st.oldEsicLast4),
-                  mono: true,
+                  value: secret(
+                    "old_esic_number",
+                    "old ESIC number",
+                    "old-esic",
+                    st.oldEsicLast4,
+                    st.oldEsicNumber,
+                    !!caps.canRevealStatutory,
+                  ),
                 },
               ]}
             />
@@ -146,27 +262,18 @@ export function StatutoryTab({
                 { label: "Document given", value: humanise(st.identityDocumentType) },
                 {
                   label: "Aadhaar",
-                  value: (
-                    <Secret
-                      testId="aadhaar"
-                      last4={st.aadhaarLast4}
-                      value={revealed.aadhaar}
-                      canReveal={!!caps.canRevealStatutory}
-                      onAsk={() => setAsking(["aadhaar"])}
-                    />
+                  value: secret(
+                    "aadhaar",
+                    "Aadhaar",
+                    "aadhaar",
+                    st.aadhaarLast4,
+                    null,
+                    !!caps.canRevealStatutory,
                   ),
                 },
                 {
                   label: "PAN",
-                  value: (
-                    <Secret
-                      testId="pan"
-                      last4={st.panLast4}
-                      value={revealed.pan}
-                      canReveal={!!caps.canRevealStatutory}
-                      onAsk={() => setAsking(["pan"])}
-                    />
-                  ),
+                  value: secret("pan", "PAN", "pan", st.panLast4, null, !!caps.canRevealStatutory),
                 },
                 { label: "Verified on", value: formatDate(st.verifiedOn) },
               ]}
@@ -182,14 +289,13 @@ export function StatutoryTab({
                 ...("branch" in card.bank ? [{ label: "Branch", value: card.bank.branch }] : []),
                 {
                   label: "Account",
-                  value: (
-                    <Secret
-                      testId="bank-account"
-                      last4={card.bank.accountLast4}
-                      value={revealed.bankAccount}
-                      canReveal={!!caps.canRevealBank}
-                      onAsk={() => setAsking(["bank_account"])}
-                    />
+                  value: secret(
+                    "bank_account",
+                    "account number",
+                    "bank-account",
+                    card.bank.accountLast4,
+                    null,
+                    !!caps.canRevealBank,
                   ),
                 },
                 { label: "IFSC", value: card.bank.ifsc, mono: true },
@@ -231,14 +337,12 @@ export function StatutoryTab({
         {card.restricted && (
           <Panel title="Restricted" testId="panel-restricted-values">
             <p className="text-sm text-foreground-secondary">
-              Religion, caste category and disability status. Only the Statutory role and the person
-              themselves can see them, and every look is logged.
+              Religion, caste category and disability status. Optional, entered by an administrator,
+              and every look is logged.
             </p>
             {!card.restricted.recorded ? (
               <p className="mt-2 text-sm text-muted-foreground">Nothing recorded.</p>
-            ) : revealed.religion !== undefined ||
-              revealed.casteCategory !== undefined ||
-              revealed.disabilityStatus !== undefined ? (
+            ) : restrictedShown ? (
               <div className="mt-3" data-testid="restricted-revealed">
                 <Fields
                   items={[
@@ -254,32 +358,39 @@ export function StatutoryTab({
                     },
                   ]}
                 />
-                <StatusBadge tone="warning" className="mt-2">
-                  Shown, logged
-                </StatusBadge>
+                <span className="mt-2 inline-flex items-center gap-2">
+                  <StatusBadge tone="warning">Shown, logged</StatusBadge>
+                  <button
+                    type="button"
+                    onClick={() => lock(RESTRICTED)}
+                    aria-label="Hide restricted data"
+                    className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                  >
+                    <EyeOff className="size-4" aria-hidden />
+                  </button>
+                </span>
               </div>
-            ) : caps.canRevealRestricted ? (
-              <button
-                type="button"
-                data-testid="reveal-restricted"
-                onClick={() => setAsking(["religion", "caste_category", "disability"])}
-                className="mt-3 h-10 rounded-md border border-border px-3 text-sm font-medium"
-              >
-                Reveal
-              </button>
-            ) : null}
+            ) : (
+              <p className="mt-3 flex items-center gap-2 text-sm">
+                <Lock className="size-4 text-muted-foreground" aria-hidden />
+                <span data-testid="restricted-held">Recorded</span>
+                {caps.canRevealRestricted && (
+                  <button
+                    type="button"
+                    data-testid="reveal-restricted"
+                    aria-label="Show restricted data"
+                    disabled={opening === "religion"}
+                    onClick={() => void open(RESTRICTED)}
+                    className="inline-flex size-9 items-center justify-center rounded-md text-primary hover:bg-muted disabled:opacity-45"
+                  >
+                    <Eye className="size-4" aria-hidden />
+                  </button>
+                )}
+              </p>
+            )}
           </Panel>
         )}
       </div>
-
-      {asking && (
-        <RevealPrompt
-          employeeId={card.id}
-          fields={asking}
-          onCancel={() => setAsking(null)}
-          onRevealed={onRevealed}
-        />
-      )}
 
       <Editors card={card} onChanged={onChanged} />
 
@@ -289,15 +400,19 @@ export function StatutoryTab({
             <div className="h-8 animate-pulse rounded bg-muted" />
           ) : reads.length === 0 ? (
             <p className="text-sm text-muted-foreground">
-              Nobody has revealed anything on this record.
+              Nobody has looked at anything locked on this record.
             </p>
           ) : (
             <ul className="space-y-2 text-sm" data-testid="reads-list">
               {reads.map((r, i) => (
                 <li key={`${r.readAt}-${i}`}>
                   <span className="font-medium">{r.readerName ?? "Somebody"}</span> saw{" "}
-                  {r.fields.map(humanise).join(", ").toLowerCase()} on {formatDate(r.readAt)}:{" "}
-                  <span className="text-foreground-secondary">{r.reason}</span>
+                  {r.fields.map(humanise).join(", ").toLowerCase()} on {formatDate(r.readAt)}
+                  {r.reason && (
+                    <>
+                      : <span className="text-foreground-secondary">{r.reason}</span>
+                    </>
+                  )}
                 </li>
               ))}
             </ul>
@@ -308,133 +423,65 @@ export function StatutoryTab({
   );
 }
 
-/** A restricted number: its last four, or the value once revealed. */
+/** A number: locked to its last four, or shown, with the eye between the two. */
 function Secret({
   last4,
   value,
+  alwaysShown,
   canReveal,
-  onAsk,
+  busy,
+  onShow,
+  onHide,
+  label,
   testId,
 }: {
   last4: string | null;
   value: string | null | undefined;
+  /** Sent in full on the card (Payroll's UAN): no lock and no eye. */
+  alwaysShown: boolean;
   canReveal: boolean;
-  onAsk: () => void;
+  busy: boolean;
+  onShow: () => void;
+  onHide: () => void;
+  label: string;
   testId: string;
 }) {
+  if (alwaysShown && value) return <span className="font-mono">{value}</span>;
   if (!last4) return <span>—</span>;
   if (value) {
     return (
       <span className="inline-flex flex-wrap items-center gap-2" data-testid={`${testId}-value`}>
         <span className="font-mono">{value}</span>
         <StatusBadge tone="warning">Shown, logged</StatusBadge>
+        <button
+          type="button"
+          onClick={onHide}
+          aria-label={`Hide ${label}`}
+          className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <EyeOff className="size-4" aria-hidden />
+        </button>
       </span>
     );
   }
   return (
     <span className="inline-flex flex-wrap items-center gap-2">
+      <Lock className="size-3.5 text-muted-foreground" aria-hidden />
       <span className="font-mono" data-testid={`${testId}-masked`}>
         •••• {last4}
       </span>
       {canReveal && (
         <button
           type="button"
-          onClick={onAsk}
-          data-testid={`reveal-${testId}`}
-          className="text-sm font-medium text-primary hover:underline"
+          onClick={onShow}
+          disabled={busy}
+          aria-label={`Show ${label}`}
+          className="inline-flex size-9 items-center justify-center rounded-md text-primary hover:bg-muted disabled:opacity-45"
         >
-          Reveal
+          <Eye className="size-4" aria-hidden />
         </button>
       )}
     </span>
-  );
-}
-
-const FIELD_NAMES: Record<RevealField, string> = {
-  aadhaar: "the Aadhaar number",
-  pan: "the PAN",
-  bank_account: "the bank account number",
-  religion: "the restricted data",
-  caste_category: "the restricted data",
-  disability: "the restricted data",
-};
-
-function RevealPrompt({
-  employeeId,
-  fields,
-  onCancel,
-  onRevealed,
-}: {
-  employeeId: string;
-  fields: RevealField[];
-  onCancel: () => void;
-  onRevealed: (v: Revealed) => void;
-}) {
-  const [reason, setReason] = useState("");
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    setBusy(true);
-    try {
-      onRevealed(await revealRestricted(employeeId, fields, reason));
-    } catch (err) {
-      setError(isAppError(err) ? err.message : "That couldn't be shown.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  return (
-    <form
-      onSubmit={submit}
-      data-testid="reveal-prompt"
-      className="rounded-xl border border-warning-line bg-card p-4 shadow-card"
-    >
-      <label htmlFor="reveal-reason" className="block text-sm font-medium">
-        Why do you need to see {FIELD_NAMES[fields[0]]}?
-      </label>
-      <p className="mt-0.5 text-caption text-muted-foreground">
-        Kept with the record of this look, with your name and the time.
-      </p>
-      <input
-        id="reveal-reason"
-        value={reason}
-        onChange={(e) => {
-          setReason(e.target.value);
-          setError("");
-        }}
-        autoFocus
-        autoComplete="off"
-        placeholder="ECR filing for September"
-        data-testid="reveal-reason"
-        className="mt-2 h-12 w-full rounded-md border border-input bg-background px-3 text-sm"
-      />
-      {error && (
-        <p role="alert" data-testid="reveal-error" className="mt-2 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy || reason.trim().length < 3}
-          data-testid="reveal-confirm"
-          className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
-        >
-          {busy ? "Revealing…" : "Reveal and log"}
-        </button>
-        <button
-          type="button"
-          onClick={onCancel}
-          className="h-11 rounded-md border border-border px-4 text-sm"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
   );
 }
 

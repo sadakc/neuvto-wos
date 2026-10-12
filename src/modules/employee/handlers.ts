@@ -119,7 +119,8 @@ export async function setRestricted(employeeId: string, values: Values): Promise
 }
 
 /**
- * The full values, once. The database logs the look before it answers.
+ * The full values, once. The database logs the look before it answers. No
+ * reason is asked for since D85; one is sent only if a caller has it.
  *
  * The result is returned to the caller and kept NOWHERE here: no cache, no
  * module state, no log line. The component that asked holds it in its own
@@ -128,12 +129,12 @@ export async function setRestricted(employeeId: string, values: Values): Promise
 export async function revealRestricted(
   employeeId: string,
   fields: RevealField[],
-  reason: string,
+  reason?: string,
 ): Promise<Revealed> {
   const { data, error } = await supabase.rpc("employee_reveal_restricted", {
     _employee_id: employeeId,
     _fields: fields,
-    _reason: reason,
+    ...(reason ? { _reason: reason } : {}),
   });
   if (error) throw toEmployeeError(error.message);
   return (data ?? {}) as Revealed;

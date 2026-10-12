@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.7 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.8 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -176,6 +176,18 @@ statutory returns this product exists to produce ask for it, so the full design 
   the person, a Super Admin and the Statutory role. Operator steps:
   `operations/STATUTORY_DATA.md`.
 
+- **Changed by Sada, 12 Oct 2026 (D85).** The Employee Admin (§4) enters every statutory
+  number, the bank details, and religion, caste category and disability. After saving they
+  see each number locked to its last four, with an **eye**: one click shows the full number,
+  a second click locks it again. The eye asks for **no reason**; the look is still written
+  to `restricted_reads` before the number is returned, so the person and a Super Admin see
+  who looked, at what and when. The person themselves sees their own last four digits and
+  that restricted data is recorded, and has **no eye**, restricted data included. Storage
+  does not change: every number stays encrypted in the database (Sada's choice, the same
+  day). Aadhaar is optional: "Aadhaar or PAN" is no longer a mandatory onboarding item by
+  default, though a company can make it one. Payroll keeps the bank, Statutory keeps the
+  numbers and restricted data; both are additions to the Employee Admin, not instead of it.
+
 This is the most sensitive data Neuvto will hold. It does not go to production until the
 encryption key, the reveal audit and the purge story (`operations/TEST_DATA_PURGE.md`) are
 in place, and each is in the harness.
@@ -192,6 +204,7 @@ When Sada provisions a company, the administrator he names becomes that company'
 | Super Admin                      | a Super Admin            |
 | Admin (`org_admin`, `hr_admin`)  | a Super Admin            |
 | Payroll role, Statutory role     | a Super Admin            |
+| Admin of one module (D84)        | a Super Admin            |
 | Manager, Supervisor, Coordinator | any Admin or Super Admin |
 | Employee                         | everybody holds it       |
 
@@ -229,6 +242,18 @@ When Sada provisions a company, the administrator he names becomes that company'
   names and email addresses of a company's Super Admins, the same kind of fact the console
   already showed for the first administrator, and nothing about anybody else.
 
+- **An admin for each module (D84, 12 Oct 2026).** A Super Admin can make somebody the
+  admin of one module: **Employee Admin** (adds people and manages every employee card,
+  statutory numbers and bank included) or **Leave Admin** (leave types, opening balances,
+  Leave's reports and every leave request). A person can administer several modules and a
+  module can have several admins. A company-wide Admin (`org_admin`, `hr_admin`) stays the
+  admin of every module without a grant. A module admin reaches nothing outside their
+  module: not People, departments, holidays, approval rules or another module's records.
+  The grants are rows in `module_admins`, written only by `member_set_module_admins` (Super
+  Admin only, never your own), and every module check asks `is_module_admin(module)`. On
+  screen it is the **Administers a module** section of the People access panel. Proved in
+  `verify_module_admins.sql`.
+
 Module access is unchanged and already built (D44): a module is **granted** by Neuvto from
 the console's Modules panel (Grant / Withdraw, per customer) and **switched on** by the
 customer. Only the console's look changes with D76.
@@ -245,7 +270,8 @@ being an Admin.
 | Employee         | `employee`                             | by existing                                                               |
 | Approver         | `manager`, `supervisor`, `coordinator` | by an Admin (D57). The Approvals tab appears when someone reports to them |
 | Unit coordinator | `coordinator` + a unit assignment      | by an Admin, per deployment unit                                          |
-| Admin            | `org_admin`, `hr_admin`                | by a Super Admin                                                          |
+| Admin            | `org_admin`, `hr_admin`                | by a Super Admin. Administers every module                                |
+| Module admin     | a `module_admins` row (D84)            | by a Super Admin. "Admin" in the table below means Employee Admin         |
 | Payroll role     | `payroll_officer`                      | by a Super Admin                                                          |
 | Statutory role   | `statutory_officer`                    | by a Super Admin                                                          |
 | Super Admin      | `super_admin`                          | provisioning, then by another Super Admin                                 |
@@ -259,22 +285,24 @@ permission from a job title.
 **Field visibility** (the API omits what a role may not see; the frontend renders what it
 gets):
 
-| Field group                         | Self                 | Their approver | Unit coord.     | Admin        | Payroll             | Statutory           |
-| ----------------------------------- | -------------------- | -------------- | --------------- | ------------ | ------------------- | ------------------- |
-| Name, code, designation, department | read                 | read           | read            | read, write  | read                | read                |
-| Mobile, alternate mobile            | read, request change | read           | read            | read, write  | read                | read                |
-| Personal email, emergency contact   | read, request change | read           | hidden          | read, write  | hidden              | hidden              |
-| Addresses, current and archived     | read, request change | hidden         | hidden          | read, append | hidden              | read                |
-| Family, nominees                    | read, request change | hidden         | hidden          | read, write  | read                | read                |
-| Deployment, current and history     | read                 | read current   | their unit only | read, append | read                | read                |
-| Height, chest, weight               | read                 | hidden         | read            | read, write  | hidden              | hidden              |
-| Police station, verification        | read                 | hidden         | status only     | read, write  | hidden              | read                |
-| UAN, EPF, ESIC                      | last 4               | hidden         | hidden          | last 4       | **full**            | **full**            |
-| Aadhaar, PAN                        | last 4               | hidden         | hidden          | last 4       | last 4              | **full, on reveal** |
-| Bank account, IFSC                  | last 4, own only     | hidden         | hidden          | hidden       | **full, on reveal** | hidden              |
-| Religion, caste, disability         | own only             | hidden         | hidden          | **hidden**   | hidden              | **full, on reveal** |
+| Field group                         | Self                 | Their approver | Unit coord.     | Admin        | Payroll     | Statutory   |
+| ----------------------------------- | -------------------- | -------------- | --------------- | ------------ | ----------- | ----------- |
+| Name, code, designation, department | read                 | read           | read            | read, write  | read        | read        |
+| Mobile, alternate mobile            | read, request change | read           | read            | read, write  | read        | read        |
+| Personal email, emergency contact   | read, request change | read           | hidden          | read, write  | hidden      | hidden      |
+| Addresses, current and archived     | read, request change | hidden         | hidden          | read, append | hidden      | read        |
+| Family, nominees                    | read, request change | hidden         | hidden          | read, write  | read        | read        |
+| Deployment, current and history     | read                 | read current   | their unit only | read, append | read        | read        |
+| Height, chest, weight               | read                 | hidden         | read            | read, write  | hidden      | hidden      |
+| Police station, verification        | read                 | hidden         | status only     | read, write  | hidden      | read        |
+| UAN, EPF, ESIC                      | last 4               | hidden         | hidden          | last 4, eye  | **full**    | **full**    |
+| Aadhaar, PAN                        | last 4               | hidden         | hidden          | last 4, eye  | last 4      | last 4, eye |
+| Bank account, IFSC                  | last 4, own only     | hidden         | hidden          | last 4, eye  | last 4, eye | hidden      |
+| Religion, caste, disability         | "recorded" only      | hidden         | hidden          | eye, write   | hidden      | eye, write  |
 
-Two rows where Admin sees less than expected are deliberate.
+"Eye" (D85): locked to the last four, opened with one click and no reason, every look
+logged. Until D85 the Admin saw no bank and no restricted data and could open nothing;
+Sada changed that on 12 Oct 2026.
 
 A `403` is a **forbidden state**, never an empty screen: what was refused, which role would
 be needed, who to ask. An empty table is how people conclude the data is missing.

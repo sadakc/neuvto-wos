@@ -158,6 +158,45 @@ describe("what each role is offered", () => {
   });
 });
 
+describe("an admin for each module (D84)", () => {
+  const employeeLike: ModuleDefinition = {
+    ...leaveLike,
+    key: "employee",
+    name: "Employee Master",
+    section: "People",
+    navigation: () => [
+      { label: "My Card", to: "/app/employee" },
+      { label: "Add Employee", to: "/app/employee/add", group: "company", moduleAdmin: true },
+    ],
+    approvalEntityTypes: [],
+    reports: undefined,
+    adminSections: undefined,
+  };
+  const granted = (moduleAdmin: string[]): CurrentUser => ({
+    ...user(["employee"]),
+    moduleAdmin,
+  });
+
+  it("gives a Leave Admin Leave's company tabs and nothing of another module's or the company's", () => {
+    const shell = buildShell(granted(["leave"]), [leaveLike, employeeLike]);
+    expect(labels(shell, "leave")).toEqual(expect.arrayContaining(["Reports", "Configuration"]));
+    expect(labels(shell, "employee")).toEqual(["My Card"]);
+    expect(shell.find((m) => m.key === "organisation")).toBeUndefined();
+  });
+
+  it("gives an Employee Admin the employee module's admin tabs and not Leave's", () => {
+    const shell = buildShell(granted(["employee"]), [leaveLike, employeeLike]);
+    expect(labels(shell, "employee")).toEqual(["My Card", "Add Employee"]);
+    expect(labels(shell, "leave")).not.toContain("Configuration");
+  });
+
+  it("gives a company-wide Admin both, with no grant", () => {
+    const shell = buildShell(user(["employee", "hr_admin"]), [leaveLike, employeeLike]);
+    expect(labels(shell, "employee")).toContain("Add Employee");
+    expect(labels(shell, "leave")).toContain("Configuration");
+  });
+});
+
 describe("locate", () => {
   const shell = buildShell(user(["employee", "org_admin"]), [leaveLike]);
 

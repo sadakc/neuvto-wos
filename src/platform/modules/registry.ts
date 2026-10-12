@@ -12,7 +12,7 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import type { CurrentUser } from "@/platform/auth";
+import { isModuleAdmin, type CurrentUser } from "@/platform/auth";
 import {
   ModuleDefinitionSchema,
   type ModuleApprovalView,
@@ -123,8 +123,9 @@ export async function getModuleNavigation(user: CurrentUser | null): Promise<Mod
 
   return enabled.flatMap((m) =>
     m.navigation(user).filter((item) => {
-      if (!item.roles || item.roles.length === 0) return true;
-      return item.roles.some((r) => user?.roles.includes(r));
+      const byRole = !!item.roles?.length && item.roles.some((r) => user?.roles.includes(r));
+      if (!item.roles?.length && !item.moduleAdmin) return true;
+      return byRole || (!!item.moduleAdmin && isModuleAdmin(user, m.key));
     }),
   );
 }

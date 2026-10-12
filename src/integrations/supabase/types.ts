@@ -1661,6 +1661,57 @@ export type Database = {
           },
         ]
       }
+      module_admins: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          module_key: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          module_key: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          module_key?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_admins_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "module_admins_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       module_settings: {
         Row: {
           created_at: string
@@ -2450,7 +2501,7 @@ export type Database = {
           read_at: string
           reader_id: string
           reader_name: string | null
-          reason: string
+          reason: string | null
         }
         Insert: {
           employee_id: string
@@ -2460,7 +2511,7 @@ export type Database = {
           read_at?: string
           reader_id: string
           reader_name?: string | null
-          reason: string
+          reason?: string | null
         }
         Update: {
           employee_id?: string
@@ -2470,7 +2521,7 @@ export type Database = {
           read_at?: string
           reader_id?: string
           reader_name?: string | null
-          reason?: string
+          reason?: string | null
         }
         Relationships: [
           {
@@ -2760,7 +2811,7 @@ export type Database = {
         }[]
       }
       employee_reveal_restricted: {
-        Args: { _employee_id: string; _fields: string[]; _reason: string }
+        Args: { _employee_id: string; _fields: string[]; _reason?: string }
         Returns: Json
       }
       employee_save_designation: {
@@ -2912,6 +2963,7 @@ export type Database = {
         Returns: boolean
       }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
+      is_module_admin: { Args: { _module: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
       is_reserved_for_super_admin: {
@@ -3077,6 +3129,10 @@ export type Database = {
       leave_year_open: {
         Args: { _org_id: string; _ref: string }
         Returns: boolean
+      }
+      member_set_module_admins: {
+        Args: { _modules: string[]; _user_id: string }
+        Returns: string[]
       }
       member_set_roles: {
         Args: {
@@ -3338,6 +3394,7 @@ export type Database = {
         Args: { _known: string[]; _values: Json }
         Returns: undefined
       }
+      restricted_reads_prune: { Args: never; Returns: number }
       restricted_target: { Args: { _employee_id: string }; Returns: string[] }
       scrub_client_text: {
         Args: { _limit: number; _text: string }
@@ -3352,6 +3409,7 @@ export type Database = {
       }
       statutory_key: { Args: never; Returns: string }
       statutory_normalise: { Args: { _v: string }; Returns: string }
+      statutory_rotate_key: { Args: never; Returns: Json }
       working_days_excluded: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: {

@@ -12,6 +12,10 @@
  *     sent back unchanged, so an Admin editing approvers cannot strip an
  *     administrator by omission.
  *   · Nobody sees a panel for themselves.
+ *   · D84: below the roles, the company's switched-on modules. A Super Admin
+ *     ticks who administers which; anybody else sees the grants read-only.
+ *     A company-wide Admin already administers every module, so for them the
+ *     section says so instead of offering boxes that would change nothing.
  *
  * None of that is the enforcement. The database refuses the set whole if any
  * change is not the caller's to make; what this screen hides, it hides so
@@ -39,26 +43,48 @@ const GROUPS: Array<{ heading: string; roles: AppRole[]; reserved: boolean }> = 
   },
 ];
 
+/** A switched-on module, as the access panel offers it. */
+export interface AdministrableModule {
+  key: string;
+  name: string;
+}
+
+const ADMINISTERS_EVERYTHING: readonly AppRole[] = ["super_admin", "org_admin", "hr_admin"];
+
 export function AccessEditor({
   personName,
   roles,
   callerIsSuperAdmin,
+  modules = [],
+  moduleAdmin = [],
   onSave,
   onCancel,
 }: {
   personName: string;
   roles: readonly AppRole[];
   callerIsSuperAdmin: boolean;
-  onSave: (roles: AppRole[]) => Promise<void>;
+  /** D84. The company's switched-on modules. */
+  modules?: readonly AdministrableModule[];
+  /** D84. The modules this person administers by grant. */
+  moduleAdmin?: readonly string[];
+  onSave: (roles: AppRole[], modules: string[]) => Promise<void>;
   onCancel: () => void;
 }) {
   const id = useId();
   const [chosen, setChosen] = useState<Set<AppRole>>(new Set(roles));
+  const [chosenModules, setChosenModules] = useState<Set<string>>(new Set(moduleAdmin));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
 
   const editable = (r: AppRole) => callerIsSuperAdmin || !SUPER_ADMIN_GRANTS.includes(r);
-  const changed = chosen.size !== roles.length || roles.some((r) => !chosen.has(r));
+  const modulesChanged =
+    chosenModules.size !== moduleAdmin.length || moduleAdmin.some((m) => !chosenModules.has(m));
+  const changed =
+    chosen.size !== roles.length || roles.some((r) => !chosen.has(r)) || modulesChanged;
+  // Read from what is ticked now, so ticking Org Admin says at once that the
+  // module boxes stop mattering.
+  const everyModule = ADMINISTERS_EVERYTHING.some((r) => chosen.has(r));
+  const shownModules = modules.filter((m) => callerIsSuperAdmin || moduleAdmin.includes(m.key));
 
   const toggle = (r: AppRole) =>
     setChosen((prev) => {
@@ -74,7 +100,10 @@ export function AccessEditor({
     try {
       // Employee is implied; the database adds it when nothing else is held.
       const next = APP_ROLES.filter((r) => r !== "employee" && chosen.has(r));
-      await onSave(next.length ? next : ["employee"]);
+      await onSave(
+        next.length ? next : ["employee"],
+        modules.map((m) => m.key).filter((k) => chosenModules.has(k)),
+      );
     } catch (e) {
       setError(isAppError(e) ? e.message : "That access change couldn't be saved.");
     } finally {
@@ -139,6 +168,60 @@ export function AccessEditor({
         );
       })}
 
+      {shownModules.length > 0 && (
+        <fieldset className="mt-4" data-testid="module-admin">
+          <legend className="text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
+            Administers a module
+          </legend>
+          {everyModule ? (
+            <p className="mt-2 text-caption text-muted-foreground" data-testid="module-admin-all">
+              An administrator role above already runs every module.
+            </p>
+          ) : (
+            <div className="mt-2 grid gap-2">
+              {shownModules.map((m) => {
+                const inputId = `${id}-module-${m.key}`;
+                return (
+                  <label
+                    key={m.key}
+                    htmlFor={inputId}
+                    className={cn(
+                      "flex min-h-12 items-start gap-2.5 rounded-md border border-border px-3 py-2.5",
+                      callerIsSuperAdmin ? "cursor-pointer hover:bg-muted" : "bg-muted",
+                    )}
+                  >
+                    <input
+                      id={inputId}
+                      type="checkbox"
+                      data-testid={`module-admin-${m.key}`}
+                      checked={chosenModules.has(m.key)}
+                      disabled={!callerIsSuperAdmin}
+                      onChange={() =>
+                        setChosenModules((prev) => {
+                          const next = new Set(prev);
+                          if (next.has(m.key)) next.delete(m.key);
+                          else next.add(m.key);
+                          return next;
+                        })
+                      }
+                      className="mt-0.5 size-4 shrink-0 accent-primary"
+                    />
+                    <span className="min-w-0">
+                      <span className="block text-sm font-semibold">{m.name} Admin</span>
+                      <span className="block text-caption text-muted-foreground">
+                        {callerIsSuperAdmin
+                          ? moduleAdminDescription(m)
+                          : "Granted by a Super Admin. Only a Super Admin can remove it."}
+                      </span>
+                    </span>
+                  </label>
+                );
+              })}
+            </div>
+          )}
+        </fieldset>
+      )}
+
       {error && (
         <p role="alert" data-testid="access-error" className="mt-3 text-sm text-destructive">
           {error}
@@ -170,4 +253,11 @@ export function AccessEditor({
       )}
     </div>
   );
+}
+
+function moduleAdminDescription(m: AdministrableModule): string {
+  if (m.key === "employee") {
+    return "Adds people and manages every employee card, including statutory numbers and bank details. Nothing in other modules.";
+  }
+  return `Runs ${m.name}: its configuration, reports and everybody's records in it. Nothing in other modules.`;
 }

@@ -15,16 +15,24 @@ import { AppError } from "@/platform/errors";
 import { AccessEditor } from "./AccessEditor";
 import type { AppRole } from "./contracts";
 
+const MODULES = [
+  { key: "leave", name: "Leave Management" },
+  { key: "employee", name: "Employee Master" },
+];
+
 function renderEditor(
   roles: AppRole[],
   callerIsSuperAdmin: boolean,
   onSave = vi.fn(async () => {}),
+  moduleAdmin: string[] = [],
 ) {
   render(
     <AccessEditor
       personName="Dan Director"
       roles={roles}
       callerIsSuperAdmin={callerIsSuperAdmin}
+      modules={MODULES}
+      moduleAdmin={moduleAdmin}
       onSave={onSave}
       onCancel={() => {}}
     />,
@@ -63,7 +71,7 @@ describe("an Admin who is not a Super Admin", () => {
     const onSave = renderEditor(["org_admin", "manager"], false);
     await userEvent.click(screen.getByTestId("role-supervisor"));
     await userEvent.click(screen.getByTestId("access-save"));
-    expect(onSave).toHaveBeenCalledWith(["org_admin", "manager", "supervisor"]);
+    expect(onSave).toHaveBeenCalledWith(["org_admin", "manager", "supervisor"], []);
   });
 });
 
@@ -88,14 +96,14 @@ describe("a Super Admin", () => {
     const onSave = renderEditor(["employee"], true);
     await userEvent.click(screen.getByTestId("role-super_admin"));
     await userEvent.click(screen.getByTestId("access-save"));
-    expect(onSave).toHaveBeenCalledWith(["super_admin"]);
+    expect(onSave).toHaveBeenCalledWith(["super_admin"], []);
   });
 
   it("removing every role sends Employee, never an empty set", async () => {
     const onSave = renderEditor(["manager"], true);
     await userEvent.click(screen.getByTestId("role-manager"));
     await userEvent.click(screen.getByTestId("access-save"));
-    expect(onSave).toHaveBeenCalledWith(["employee"]);
+    expect(onSave).toHaveBeenCalledWith(["employee"], []);
   });
 });
 
@@ -116,5 +124,41 @@ describe("saving", () => {
     expect(await screen.findByTestId("access-error")).toHaveTextContent(
       "They're the only Super Admin.",
     );
+  });
+});
+
+describe("an admin for each module (D84)", () => {
+  it("lets a Super Admin make somebody admin of one module, and sends their roles unchanged", async () => {
+    const onSave = renderEditor(["manager"], true);
+    await userEvent.click(screen.getByTestId("module-admin-leave"));
+    await userEvent.click(screen.getByTestId("access-save"));
+    expect(onSave).toHaveBeenCalledWith(["manager"], ["leave"]);
+  });
+
+  it("takes a module away, and holds several at once", async () => {
+    const onSave = renderEditor(["manager"], true, undefined, ["leave", "employee"]);
+    expect(screen.getByTestId("module-admin-leave")).toBeChecked();
+    await userEvent.click(screen.getByTestId("module-admin-leave"));
+    await userEvent.click(screen.getByTestId("access-save"));
+    expect(onSave).toHaveBeenCalledWith(["manager"], ["employee"]);
+  });
+
+  it("shows an Admin the grants a person holds, read-only, and offers none", () => {
+    renderEditor(["manager"], false, undefined, ["employee"]);
+    expect(screen.getByTestId("module-admin-employee")).toBeDisabled();
+    expect(screen.queryByTestId("module-admin-leave")).toBeNull();
+  });
+
+  it("offers an Admin nothing at all for somebody with no grant", () => {
+    renderEditor(["manager"], false);
+    expect(screen.queryByTestId("module-admin")).toBeNull();
+  });
+
+  it("says a company-wide administrator already runs every module", async () => {
+    renderEditor(["manager"], true);
+    expect(screen.getByTestId("module-admin-leave")).toBeInTheDocument();
+    await userEvent.click(screen.getByTestId("role-hr_admin"));
+    expect(screen.getByTestId("module-admin-all")).toBeInTheDocument();
+    expect(screen.queryByTestId("module-admin-leave")).toBeNull();
   });
 });
