@@ -45,6 +45,7 @@ const item: ApprovalQueueItem = {
   levelSince: "2026-10-10T09:00:00Z",
   daysAtLevel: 2,
   targetDays: 2,
+  escalatedFrom: null,
 };
 
 beforeEach(() => {
@@ -115,5 +116,34 @@ describe("deciding a leave request", () => {
     render(<LeaveApprovalCard item={item} onDecided={() => {}} />);
     await user.click(await screen.findByText("Approval history"));
     expect(await screen.findByText(/Not enough notice/)).toBeInTheDocument();
+  });
+
+  it("says in the history when a level moved up, and from whom", async () => {
+    const user = userEvent.setup();
+    h.getApprovalTimeline.mockResolvedValue([
+      {
+        level: 1,
+        approverName: "Dan Director",
+        decision: "pending",
+        comments: null,
+        decidedAt: null,
+        reasonCode: null,
+        escalatedFrom: "Mark Manager",
+        escalatedAt: "2026-10-11T09:00:00Z",
+      },
+      {
+        level: 2,
+        approverName: "Hema HR",
+        decision: "pending",
+        comments: null,
+        decidedAt: null,
+        reasonCode: null,
+        escalatedFrom: null,
+        escalatedAt: null,
+      },
+    ]);
+    render(<LeaveApprovalCard item={item} onDecided={() => {}} />);
+    await user.click(await screen.findByText("Approval history"));
+    expect(await screen.findAllByText(/moved up from Mark Manager/)).toHaveLength(1);
   });
 });

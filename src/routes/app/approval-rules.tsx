@@ -278,13 +278,13 @@ function ApprovalRulesPage() {
 
             <div className="mt-4">
               <label htmlFor={`esc-${l.id}`} className="block text-sm font-medium">
-                Chase after
+                Move up after
               </label>
               <div className="mt-2 flex items-center gap-2">
                 <input
                   id={`esc-${l.id}`}
                   type="number"
-                  min={0}
+                  min={1}
                   max={30}
                   value={l.escalateAfterDays ?? ""}
                   onChange={(e) =>
@@ -296,6 +296,11 @@ function ApprovalRulesPage() {
                 />
                 <span className="text-sm text-muted-foreground">days without a decision</span>
               </div>
+              <p data-testid="move-up-hint" className="mt-1 text-xs text-muted-foreground">
+                A request still waiting then goes to the approver&apos;s manager, else the
+                module&apos;s admin, else a company admin. Nothing is approved by waiting. Leave it
+                empty and it never moves.
+              </p>
             </div>
 
             <button

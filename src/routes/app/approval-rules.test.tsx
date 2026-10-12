@@ -211,3 +211,14 @@ describe("Approval rules — which roles may approve", () => {
     expect(box.selectedOptions[0].textContent).toBe("HR administrator");
   });
 });
+
+describe("Approval rules — moving up (D87)", () => {
+  it("names the target as the point a request moves up, and says to whom", async () => {
+    await renderRules();
+    const levelOne = screen.getAllByTestId("approval-level")[0];
+    expect(within(levelOne).getByLabelText("Move up after")).toBeInTheDocument();
+    expect(within(levelOne).getByTestId("move-up-hint")).toHaveTextContent(
+      "A request still waiting then goes to the approver's manager, else the module's admin, else a company admin. Nothing is approved by waiting. Leave it empty and it never moves.",
+    );
+  });
+});

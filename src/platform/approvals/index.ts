@@ -37,10 +37,12 @@ export interface ApprovalQueueItem {
   /** Whole days at this level. */
   daysAtLevel: number;
   /**
-   * The level's `escalate_after_days`, or null. A target, nothing more:
-   * nothing escalates automatically, so the screen must never say it will.
+   * The level's `escalate_after_days`, or null. Past it, the request moves to
+   * somebody above the approver (D87); with no target it never moves.
    */
   targetDays: number | null;
+  /** Who it moved up from, when it came to the caller that way (D87). */
+  escalatedFrom: string | null;
 }
 
 /**
@@ -93,6 +95,7 @@ export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
     levelSince: r.level_since,
     daysAtLevel: days(r.level_since),
     targetDays: r.target_days,
+    escalatedFrom: r.escalated_from ?? null,
   }));
 }
 

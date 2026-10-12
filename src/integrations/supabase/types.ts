@@ -163,6 +163,81 @@ export type Database = {
           },
         ]
       }
+      approval_escalations: {
+        Row: {
+          approval_request_id: string
+          approval_step_id: string
+          created_at: string
+          escalated_at: string
+          from_approver_id: string
+          id: string
+          level: number
+          organization_id: string
+          to_approver_id: string | null
+          waited_days: number
+        }
+        Insert: {
+          approval_request_id: string
+          approval_step_id: string
+          created_at?: string
+          escalated_at?: string
+          from_approver_id: string
+          id?: string
+          level: number
+          organization_id: string
+          to_approver_id?: string | null
+          waited_days: number
+        }
+        Update: {
+          approval_request_id?: string
+          approval_step_id?: string
+          created_at?: string
+          escalated_at?: string
+          from_approver_id?: string
+          id?: string
+          level?: number
+          organization_id?: string
+          to_approver_id?: string | null
+          waited_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_escalations_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_approval_step_id_fkey"
+            columns: ["approval_step_id"]
+            isOneToOne: false
+            referencedRelation: "approval_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_from_approver_id_fkey"
+            columns: ["from_approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_to_approver_id_fkey"
+            columns: ["to_approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_requests: {
         Row: {
           completed_at: string | null
@@ -2682,6 +2757,11 @@ export type Database = {
         }[]
       }
       approval_entity_label: { Args: { _entity_type: string }; Returns: string }
+      approval_escalate_due: { Args: never; Returns: number }
+      approval_escalation_target: {
+        Args: { _step_id: string }
+        Returns: string
+      }
       approval_queue: {
         Args: never
         Returns: {
@@ -2690,6 +2770,7 @@ export type Database = {
           created_at: string
           entity_id: string
           entity_type: string
+          escalated_from: string
           level: number
           level_since: string
           requester_id: string
@@ -2699,6 +2780,10 @@ export type Database = {
         }[]
       }
       approval_reject_reasons: { Args: never; Returns: string[] }
+      approval_step_waiting_since: {
+        Args: { _step_id: string }
+        Returns: string
+      }
       approval_submit: {
         Args: { _context?: Json; _entity_id: string; _entity_type: string }
         Returns: string
@@ -2710,6 +2795,8 @@ export type Database = {
           comments: string
           decided_at: string
           decision: Database["public"]["Enums"]["approval_decision"]
+          escalated_at: string
+          escalated_from: string
           level: number
           reason_code: string
         }[]

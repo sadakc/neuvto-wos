@@ -155,6 +155,7 @@ run "verifying employee configuration" "$HARNESS_DIR/tests/verify_employee_confi
 run "verifying Neuvto names Super Admins" "$HARNESS_DIR/tests/verify_platform_super_admins.sql"
 run "verifying an admin for each module" "$HARNESS_DIR/tests/verify_module_admins.sql"
 run "verifying leave phase 2" "$HARNESS_DIR/tests/verify_leave_phase2.sql"
+run "verifying waiting approvals move up" "$HARNESS_DIR/tests/verify_escalation.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

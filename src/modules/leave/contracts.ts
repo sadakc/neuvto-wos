@@ -157,6 +157,9 @@ export interface ApprovalStep {
   decidedAt: string | null;
   /** Leave phase 2: why it was rejected, as a code. */
   reasonCode?: string | null;
+  /** D87: who this level moved up from, and when, if it did. */
+  escalatedFrom?: string | null;
+  escalatedAt?: string | null;
 }
 
 export interface LeaveRequest {

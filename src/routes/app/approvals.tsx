@@ -211,6 +211,11 @@ function ApprovalsPage() {
                     {waitingLine(item)}
                   </span>
                 </div>
+                {item.escalatedFrom && (
+                  <p data-testid="escalated-from" className="mt-1 text-xs text-muted-foreground">
+                    Moved to you from {item.escalatedFrom}, who had it longer than the target.
+                  </p>
+                )}
 
                 <div className="mt-3">
                   {Renderer ? (
@@ -249,9 +254,9 @@ function overTarget(item: ApprovalQueueItem): boolean {
 }
 
 /**
- * How long it has waited where it is now, against that level's target. Never
- * "escalates in": nothing escalates automatically, and a promise nothing keeps
- * is worse than none.
+ * How long it has waited where it is now, against that level's target. Past
+ * the target it moves to somebody above the approver (D87); the sweep runs
+ * every fifteen minutes, so "moving up" is what is about to happen.
  */
 function waitingLine(item: ApprovalQueueItem): string {
   const where = item.requiredLevels > 1 ? ` at level ${item.level} of ${item.requiredLevels}` : "";
@@ -263,6 +268,6 @@ function waitingLine(item: ApprovalQueueItem): string {
   const waited = `waiting ${item.daysAtLevel} day${item.daysAtLevel === 1 ? "" : "s"}${where}`;
   if (item.targetDays === null) return waited;
   return overTarget(item)
-    ? `${waited} · over the ${item.targetDays}-day target`
-    : `${waited} · target ${item.targetDays} day${item.targetDays === 1 ? "" : "s"}`;
+    ? `${waited} · over the ${item.targetDays}-day target, moving up`
+    : `${waited} · moves up after ${item.targetDays} day${item.targetDays === 1 ? "" : "s"}`;
 }
