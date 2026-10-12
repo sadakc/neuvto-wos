@@ -127,8 +127,11 @@ begin
   if jsonb_array_length(j -> 'lines') <> 2 or j ->> 'status' <> 'draft' or j ->> 'toFy' <> fy then
     raise exception 'CARRY FAIL: the review reads %', j;
   end if;
-  select (x ->> 'id')::uuid into l_ravi from jsonb_array_elements(j -> 'lines') x
-   where x ->> 'employeeName' = 'Ravi Employee';
+  -- By id, not by name: another suite renames people.
+  select id into l_ravi from public.leave_carry_lines where review_id = review and employee_id = ravi;
+  if not exists (select 1 from jsonb_array_elements(j -> 'lines') x where (x ->> 'id')::uuid = l_ravi) then
+    raise exception 'CARRY FAIL: the review does not list Ravi''s line';
+  end if;
   if (select proposed_days from public.leave_carry_lines where id = l_ravi) <> 5
      or (select proposed_days from public.leave_carry_lines where employee_id = priya and review_id = review) <> 2 then
     raise exception 'CARRY FAIL: proposals are not the smaller of what is left and the maximum';
@@ -187,7 +190,7 @@ begin
     raise exception 'CARRY FAIL: locking applied the wrong days';
   end if;
   j := pg_temp.cf_do(mark, format('select public.leave_carry_review(%L)', prev));
-  if j ->> 'status' <> 'locked' or j ->> 'lockedBy' <> 'Mark Manager' then
+  if j ->> 'status' <> 'locked' or j ->> 'lockedBy' is distinct from (select full_name from public.profiles where id = mark) then
     raise exception 'CARRY FAIL: the locked review reads %', j;
   end if;
   perform pg_temp.cf_ok('locking applies every line to next year at once, the Admin''s numbers where changed');
