@@ -34,8 +34,8 @@ export const employee: ModuleDefinition = {
       label: "Import records",
       to: "/app/employee/import",
       group: "company",
-      roles: ["super_admin"],
-      description: "Bring a workforce in from a spreadsheet, as drafts",
+      moduleAdmin: true,
+      description: "Bring a workforce in from the master template, as drafts",
     },
     {
       label: "Configuration",

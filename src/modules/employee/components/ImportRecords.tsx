@@ -1,61 +1,126 @@
 /**
- * Bulk import of employee records (E8, bundle §7.7). Super Admin only.
+ * Bringing a workforce in from the master template (D86). The Employee Admin.
  *
- * Dry run first, always: choosing a file reads it and asks the database what
- * is wrong, column by column, and writes nothing. Then one of two commits:
- * the clean rows now (the rest are listed to fix), or, when nothing needs
- * attention, everything. The database re-checks either way.
+ * The template is Neuvto's own: one Excel workbook, People, Family, Nominees
+ * and Previous employment, linked by Employee code, every field the record
+ * keeps, Aadhaar, PAN and bank included. Downloaded here with the company's
+ * own designations, departments and units as drop-downs.
  *
- * Rows come in as DRAFTS. Inviting is a separate step on Add Employee, so a
- * file with a wrong email column cannot send two hundred invitations.
+ * Dry run first, always: choosing a file reads it and asks the database, which
+ * runs every person through the card's own writers and keeps nothing. Then the
+ * whole file, or, if some people need attention, only the clean ones. The
+ * database checks again either way.
  *
- * Statutory columns are dropped here and named as dropped. A spreadsheet of
- * Aadhaar numbers is the file that leaks (D80).
+ * People come in as DRAFTS. Inviting is a separate step on Add Employee, so a
+ * wrong email column cannot send two hundred invitations.
  */
 
 import { useState } from "react";
 import { isAppError } from "@/platform/errors";
-import { checkImport, commitImport, type ImportCheck } from "../handlers";
-import { readFile, TEMPLATE, type Parsed } from "../importFile";
+import { listDepartments } from "@/platform/organization";
 import { ModuleLink } from "@/platform/modules";
+import { employeeErrorMessage } from "../contracts";
+import {
+  importMaster,
+  listAllDesignations,
+  listUnits,
+  type ImportProblem,
+  type ImportResult,
+} from "../handlers";
+import {
+  forDatabase,
+  headerFor,
+  readGrids,
+  tabName,
+  type ReadProblem,
+  type Workbook,
+} from "../masterTemplate";
+import { buildTemplate, readWorkbook } from "../masterWorkbook";
+
+/** A problem, however it was found, as one line for the list. */
+interface Line {
+  where: string;
+  column: string;
+  message: string;
+}
 
 export default function ImportRecords() {
-  const [parsed, setParsed] = useState<Parsed | null>(null);
-  const [checks, setChecks] = useState<ImportCheck[] | null>(null);
-  const [busy, setBusy] = useState<"check" | "commit" | null>(null);
+  const [fileName, setFileName] = useState("");
+  const [workbook, setWorkbook] = useState<Workbook | null>(null);
+  const [check, setCheck] = useState<ImportResult | null>(null);
+  const [readProblems, setReadProblems] = useState<ReadProblem[]>([]);
+  const [busy, setBusy] = useState<"template" | "check" | "commit" | null>(null);
   const [error, setError] = useState("");
-  const [done, setDone] = useState<{ created: number; skipped: number } | null>(null);
+  const [done, setDone] = useState<ImportResult | null>(null);
+
+  async function downloadTemplate() {
+    setError("");
+    setBusy("template");
+    try {
+      const [designations, units, departments] = await Promise.all([
+        listAllDesignations(),
+        listUnits(),
+        listDepartments().catch(() => []),
+      ]);
+      const data = await buildTemplate({
+        designations: designations.filter((d) => d.status === "active").map((d) => d.name),
+        departments: departments.map((d) => d.name),
+        units: units.filter((u) => u.status === "active").map((u) => u.name),
+      });
+      const url = URL.createObjectURL(
+        new Blob([data], {
+          type: "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        }),
+      );
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "neuvto-master-template.xlsx";
+      a.click();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "The template couldn't be made.");
+    } finally {
+      setBusy(null);
+    }
+  }
 
   async function choose(file: File) {
     setError("");
     setDone(null);
-    setChecks(null);
-    const p = readFile(file.name, await file.text());
-    setParsed(p);
-    if (!p.headers.some((h) => h.column === "full_name")) {
-      setError("The file needs a full_name column. Download the template to see the columns.");
-      return;
-    }
-    if (p.rows.length === 0) {
-      setError("The file has no rows under its header.");
-      return;
-    }
+    setCheck(null);
+    setReadProblems([]);
+    setWorkbook(null);
+    setFileName(file.name);
     setBusy("check");
     try {
-      setChecks(await checkImport(p.rows));
+      const { workbook: wb, problems } = readGrids(await readWorkbook(await file.arrayBuffer()));
+      setWorkbook(wb);
+      if (problems.length > 0) {
+        setReadProblems(problems);
+        return;
+      }
+      if (wb.people.length === 0) {
+        setError("The People tab has nobody on it.");
+        return;
+      }
+      setCheck(await importMaster(forDatabase(wb), false, false));
     } catch (err) {
-      setError(isAppError(err) ? err.message : "The file couldn't be checked.");
+      setError(
+        isAppError(err)
+          ? err.message
+          : "That file couldn't be read. Save it as an Excel workbook (.xlsx) and try again.",
+      );
     } finally {
       setBusy(null);
     }
   }
 
   async function commit(onlyClean: boolean) {
-    if (!parsed) return;
+    if (!workbook) return;
     setError("");
     setBusy("commit");
     try {
-      setDone(await commitImport(parsed.rows, onlyClean));
+      setDone(await importMaster(forDatabase(workbook), true, onlyClean));
     } catch (err) {
       setError(isAppError(err) ? err.message : "Nothing was imported.");
     } finally {
@@ -63,9 +128,22 @@ export default function ImportRecords() {
     }
   }
 
-  const bad = (checks ?? []).filter((c) => Object.keys(c.problems).length > 0);
-  const clean = (checks?.length ?? 0) - bad.length;
-  const perColumn = (column: string) => bad.filter((c) => column in c.problems).length;
+  /** The row in Excel: the database counts rows sent, Excel counts from its header. */
+  const sheetRow = (p: ImportProblem) =>
+    workbook?.[p.tab]?.[p.row - 1]?.__sheetRow ?? String(p.row + 1);
+
+  const lines: Line[] = [
+    ...readProblems.map((p) => ({
+      where: `${p.tab}${p.row ? `, row ${p.row}` : ""}`,
+      column: p.column,
+      message: p.message,
+    })),
+    ...(check?.problems ?? []).map((p) => ({
+      where: `${tabName(p.tab)}, row ${sheetRow(p)}${p.employeeCode ? ` (${p.employeeCode})` : ""}`,
+      column: headerFor(p.tab, p.column) || sectionName(p.section),
+      message: employeeErrorMessage(p.code),
+    })),
+  ];
 
   return (
     <div className="flex min-w-0 flex-col gap-4">
@@ -74,26 +152,29 @@ export default function ImportRecords() {
           Import employee records
         </h1>
         <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
-          Bring a workforce in from a spreadsheet saved as CSV. Everybody comes in as a draft:
-          nobody is invited until you send invitations from Add Employee. Nothing is written until
-          you have seen what the file holds.
+          Fill in Neuvto&apos;s master template: one row a person on People, and their family,
+          nominees and earlier employers as rows on their own tabs, as many as there are. Everybody
+          comes in as a draft, nobody is invited until you send invitations, and nothing is written
+          until you have seen what the file holds. Aadhaar, PAN and bank numbers are encrypted the
+          moment they arrive.
         </p>
       </div>
 
       <div className="flex flex-wrap items-center gap-2">
-        <a
-          href={`data:text/csv;charset=utf-8,${encodeURIComponent(TEMPLATE)}`}
-          download="neuvto-employee-records.csv"
+        <button
+          type="button"
+          onClick={() => void downloadTemplate()}
+          disabled={busy !== null}
           data-testid="import-template"
-          className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium"
+          className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-45"
         >
-          Download the template
-        </a>
+          {busy === "template" ? "Making the template…" : "Download the template"}
+        </button>
         <label className="inline-flex h-11 cursor-pointer items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground">
-          {parsed ? "Choose another file" : "Choose a file"}
+          {fileName ? "Choose another file" : "Choose a file"}
           <input
             type="file"
-            accept=".csv,text/csv"
+            accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             data-testid="import-file"
             className="sr-only"
             onChange={(e) => {
@@ -103,7 +184,7 @@ export default function ImportRecords() {
             }}
           />
         </label>
-        {parsed && <span className="text-sm text-muted-foreground">{parsed.fileName}</span>}
+        {fileName && <span className="text-sm text-muted-foreground">{fileName}</span>}
       </div>
 
       {error && (
@@ -116,114 +197,82 @@ export default function ImportRecords() {
         </p>
       )}
 
-      {parsed && (
-        <section className="min-w-0 rounded-xl border border-border bg-card shadow-card">
-          <h2 className="border-b border-border px-4 py-3 text-card-title font-semibold tracking-card-title">
-            Columns
-          </h2>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[32rem] text-table-cell" data-testid="import-columns">
-              <thead>
-                <tr className="border-b border-border text-left">
-                  {["In your file", "Becomes", "Result"].map((h) => (
-                    <th
-                      key={h}
-                      className="px-4 py-2 text-table-header font-semibold tracking-table-header text-muted-foreground uppercase"
-                    >
-                      {h}
-                    </th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {parsed.headers.map((h) => (
-                  <tr
-                    key={h.raw}
-                    className="border-b border-border last:border-0"
-                    data-testid="import-column-row"
-                  >
-                    <td className="px-4 py-2 font-mono">{h.raw}</td>
-                    <td className="px-4 py-2">{h.fate === "imported" ? h.column : "—"}</td>
-                    <td className="px-4 py-2">
-                      {h.fate === "never"
-                        ? "Not imported. Statutory and restricted data go in on each person's card, one at a time."
-                        : h.fate === "unknown"
-                          ? "Not a column we import; ignored."
-                          : checks === null
-                            ? "…"
-                            : perColumn(h.column) === 0
-                              ? "Every row is fine"
-                              : `${perColumn(h.column)} ${perColumn(h.column) === 1 ? "row needs" : "rows need"} attention`}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      )}
+      {busy === "check" && <p className="text-sm text-muted-foreground">Checking every person…</p>}
 
-      {busy === "check" && <p className="text-sm text-muted-foreground">Checking every row…</p>}
-
-      {checks && !done && (
+      {(check || readProblems.length > 0) && !done && (
         <section
           className="rounded-xl border border-border bg-card p-4 shadow-card"
           data-testid="import-summary"
         >
-          <p className="text-sm">
-            <strong>{clean}</strong> of {checks.length}{" "}
-            {checks.length === 1 ? "row is" : "rows are"} ready.
-            {bad.length > 0 && <> {bad.length} need attention.</>}
-          </p>
-          {bad.length > 0 && (
+          {check ? (
+            <p className="text-sm">
+              <strong>{check.ready}</strong> of {check.people}{" "}
+              {check.people === 1 ? "person is" : "people are"} ready.
+              {check.skipped > 0 && <> {check.skipped} need attention.</>}
+              {workbook && (
+                <span className="text-muted-foreground">
+                  {" "}
+                  With {workbook.family.length} family{" "}
+                  {workbook.family.length === 1 ? "member" : "members"}, {workbook.nominees.length}{" "}
+                  {workbook.nominees.length === 1 ? "nominee" : "nominees"} and{" "}
+                  {workbook.previous.length} earlier{" "}
+                  {workbook.previous.length === 1 ? "employer" : "employers"}.
+                </span>
+              )}
+            </p>
+          ) : (
+            <p className="text-sm">
+              The file couldn&apos;t be read as it is. Fix these and choose it again; nothing was
+              sent.
+            </p>
+          )}
+
+          {lines.length > 0 && (
             <ul
-              className="mt-3 max-h-72 space-y-1 overflow-y-auto text-sm"
+              className="mt-3 max-h-80 space-y-1 overflow-y-auto text-sm"
               data-testid="import-problems"
             >
-              {bad.map((c) => (
-                <li key={c.index}>
-                  <span className="font-mono">Line {c.index + 1}</span>
-                  {parsed?.rows[c.index - 1]?.full_name
-                    ? ` (${parsed.rows[c.index - 1].full_name})`
-                    : ""}
-                  :{" "}
-                  {Object.entries(c.problems)
-                    .map(([col, msg]) => `${col}: ${msg}`)
-                    .join("; ")}
+              {lines.map((l, i) => (
+                <li key={i}>
+                  <span className="font-medium">{l.where}</span>
+                  {l.column ? `: ${l.column}` : ""}: {l.message}
                 </li>
               ))}
             </ul>
           )}
-          <div className="mt-4 flex flex-wrap gap-2">
-            {bad.length === 0 ? (
-              <button
-                type="button"
-                disabled={busy !== null}
-                onClick={() => void commit(false)}
-                data-testid="import-all"
-                className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
-              >
-                {busy === "commit" ? "Importing…" : `Import all ${checks.length}`}
-              </button>
-            ) : (
-              <>
+
+          {check && (
+            <div className="mt-4 flex flex-wrap gap-2">
+              {check.problems.length === 0 ? (
                 <button
                   type="button"
-                  disabled={busy !== null || clean === 0}
-                  onClick={() => void commit(true)}
-                  data-testid="import-clean"
+                  disabled={busy !== null}
+                  onClick={() => void commit(false)}
+                  data-testid="import-all"
                   className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
                 >
-                  {busy === "commit"
-                    ? "Importing…"
-                    : `Import the ${clean} clean ${clean === 1 ? "row" : "rows"} now`}
+                  {busy === "commit" ? "Importing…" : `Import all ${check.people}`}
                 </button>
-                <p className="self-center text-sm text-muted-foreground">
-                  Or fix the {bad.length} in your file and choose it again.
-                </p>
-              </>
-            )}
-          </div>
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    disabled={busy !== null || check.ready === 0}
+                    onClick={() => void commit(true)}
+                    data-testid="import-clean"
+                    className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
+                  >
+                    {busy === "commit"
+                      ? "Importing…"
+                      : `Import the ${check.ready} ready ${check.ready === 1 ? "person" : "people"} now`}
+                  </button>
+                  <p className="self-center text-sm text-muted-foreground">
+                    Or fix the file and choose it again.
+                  </p>
+                </>
+              )}
+            </div>
+          )}
         </section>
       )}
 
@@ -233,7 +282,7 @@ export default function ImportRecords() {
           data-testid="import-done"
           className="rounded-lg border border-success-line bg-success-muted px-3.5 py-2.5 text-sm"
         >
-          {done.created} {done.created === 1 ? "record" : "records"} imported as drafts
+          {done.created} {done.created === 1 ? "person" : "people"} imported as drafts
           {done.skipped > 0 ? `, ${done.skipped} skipped` : ""}.{" "}
           <ModuleLink path="employee/add" className="font-medium underline">
             Send their invitations from Add Employee
@@ -243,4 +292,21 @@ export default function ImportRecords() {
       )}
     </div>
   );
+}
+
+function sectionName(section: string | undefined): string {
+  const names: Record<string, string> = {
+    person: "The person",
+    record: "The record",
+    presentAddress: "Present address",
+    permanentAddress: "Permanent address",
+    posting: "Deployment",
+    statutory: "Statutory numbers",
+    bank: "Bank",
+    restricted: "Religion, caste or disability",
+    family: "Family",
+    nominees: "Nominees",
+    previous: "Previous employment",
+  };
+  return section ? (names[section] ?? "") : "";
 }

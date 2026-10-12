@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.10 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.11 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -436,6 +436,39 @@ and `verify_employee_import.sql`, and on screen by `Lifecycle.test.tsx` and
   - _Deactivate_ does not cancel the person's own pending leave requests or hand final
     settlement to Payroll: the first belongs to Leave and the second to the parked Payroll
     module (D81). Both are listed in the build spec's known gaps.
+
+### The master template (D86, 12 Oct 2026)
+
+Sada: the old master sheet is **not** imported as it is; it is replaced by Neuvto's own
+template. Import records now downloads and reads one Excel workbook:
+
+| Tab                 | One row is          | Notes                                                                                                                       |
+| ------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------- |
+| Instructions        | a column            | every column, whether it is required, and what to put                                                                       |
+| People              | a person            | identity, contact, employment, both addresses, posting, physical, statutory, bank, religion/caste/disability (all optional) |
+| Family              | a family member     | any number of sons, daughters and others: no numbered slots                                                                 |
+| Nominees            | a nominee           | per scheme, shares totalling 100                                                                                            |
+| Previous employment | an earlier employer |                                                                                                                             |
+
+- Rows are linked by **Employee code**, required and unique. **New people only**: a code or
+  email already in the company is a problem on that row, never an update.
+- **Who:** the Employee Admin, so every company-wide Admin too (was Super Admin only).
+- **One set of rules.** `employee_import_master` runs every person through the card's own
+  writers, each section in its own subtransaction, and keeps nothing on a dry run or for a
+  person with any problem. Aadhaar, PAN, bank and restricted values are encrypted on
+  arrival by those writers; the audit trail holds no value. All or nothing by default, or
+  only the clean people when asked.
+- **The workbook.** Text columns are formatted as Text, so a 12-digit Aadhaar or an 18-digit
+  account is not turned into a rounded number; a number Excel has already rounded is
+  refused, never stored. Choices are drop-downs; designations, departments and units are
+  the company's own, so a name cannot be misspelt. Dates are date cells or YYYY-MM-DD.
+- **Not in it: leave opening balances.** Leave keeps balances only for people who have signed
+  in, and an imported person is a draft until they accept their invitation. Opening
+  balances are set from Leave's own screen once they have joined.
+- Defined once in `src/modules/employee/masterTemplate.ts`; written and read with ExcelJS
+  (MIT, free), loaded only on this screen. Proved by `verify_employee_import.sql` and
+  `masterTemplate.test.ts`, which also fails if the template's columns and the database's
+  accepted keys ever differ. Replaces the 17-column CSV import, which is dropped.
 
 ### E9 as built (16 Oct 2026)
 

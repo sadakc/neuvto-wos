@@ -398,32 +398,60 @@ export async function deactivateEmployee(
   return data as unknown as DeactivationResult;
 }
 
-// ═══════════════════════════════════════════════════════════ bulk import (E8)
+// ═══════════════════════════════════════════════════════════ the master template (D86)
 
-export interface ImportCheck {
-  index: number;
-  /** Column → what is wrong with it. Empty for a clean row. */
-  problems: Record<string, string>;
+/** One thing the database found, where it found it. */
+export interface ImportProblem {
+  tab: "people" | "family" | "nominees" | "previous";
+  /** 1-based, among the tab's non-blank rows as sent. */
+  row: number;
+  employeeCode?: string | null;
+  column?: string | null;
+  section?: string;
+  code: string;
 }
 
-/** The dry run. Writes nothing. */
-export async function checkImport(rows: Record<string, string>[]): Promise<ImportCheck[]> {
-  const { data, error } = await supabase.rpc("employee_import_check", { _rows: rows });
-  if (error) throw toEmployeeError(error.message);
-  return data as unknown as ImportCheck[];
+export interface ImportResult {
+  people: number;
+  ready: number;
+  created: number;
+  skipped: number;
+  problems: ImportProblem[];
 }
 
-/** Brings rows in as drafts, after the database re-checks every one. */
-export async function commitImport(
-  rows: Record<string, string>[],
+/**
+ * The whole workbook, through the card's own writers. `commit` false is the
+ * dry run and keeps nothing. With `onlyClean`, the clean people are kept and
+ * the rest skipped; without it, any problem keeps nothing.
+ */
+export async function importMaster(
+  workbook: Record<string, Record<string, string>[]>,
+  commit: boolean,
   onlyClean: boolean,
-): Promise<{ created: number; skipped: number }> {
-  const { data, error } = await supabase.rpc("employee_import_commit", {
-    _rows: rows,
+): Promise<ImportResult> {
+  const { data, error } = await supabase.rpc("employee_import_master", {
+    _workbook: workbook,
+    _commit: commit,
     _only_clean: onlyClean,
   });
-  if (error) throw toEmployeeError(error.message);
-  return data as unknown as { created: number; skipped: number };
+  if (error) {
+    if (error.message.includes("UNKNOWN_COLUMN")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "The file has a column this template doesn't. Download the template again.",
+        400,
+      );
+    }
+    if (error.message.includes("ROWS_NEED_ATTENTION")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "Something changed since the check. Choose the file again.",
+        409,
+      );
+    }
+    throw toEmployeeError(error.message);
+  }
+  return data as unknown as ImportResult;
 }
 
 // ═══════════════════════════════════════════════════════════ configuration (E9)

@@ -2812,16 +2812,12 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: number
       }
-      employee_import_check: { Args: { _rows: Json }; Returns: Json }
-      employee_import_columns: { Args: never; Returns: string[] }
-      employee_import_commit: {
-        Args: { _only_clean: boolean; _rows: Json }
+      employee_import_keys: { Args: { _tab: string }; Returns: string[] }
+      employee_import_master: {
+        Args: { _commit: boolean; _only_clean?: boolean; _workbook: Json }
         Returns: Json
       }
-      employee_import_row_problems: {
-        Args: { _org: string; _r: Json; _seen: string[] }
-        Returns: Json
-      }
+      employee_import_pick: { Args: { _map: Json; _r: Json }; Returns: Json }
       employee_move_unit: {
         Args: { _employee_id: string; _values: Json }
         Returns: Json

@@ -399,6 +399,31 @@ export function employeeErrorMessage(code: string): string {
     ["ALREADY_DEPLOYED_THERE", "They're already deployed there."],
     ["NOMINEE_SHARES_NOT_100", "Nominee shares must add up to exactly 100%."],
     ["NOMINEES_REQUIRED", "Add at least one nominee."],
+    ["NOT_ON_PEOPLE", "Not on the People tab. Check the employee code."],
+    ["TWICE_IN_FILE", "Appears twice in this file."],
+    ["CODE_TAKEN", "Somebody in your company already has this employee code."],
+    [
+      "UNKNOWN_DESIGNATION",
+      "Not a designation in Configuration. Add it there first, or fix the spelling.",
+    ],
+    [
+      "UNKNOWN_DEPARTMENT",
+      "Not a department in Settings. Add it there first, or fix the spelling.",
+    ],
+    [
+      "UNKNOWN_UNIT",
+      "Not a deployment unit in Configuration. Add it there first, or fix the spelling.",
+    ],
+    [
+      "MANAGER_NOT_FOUND",
+      "Nobody in Neuvto has that email yet. They must be a member to be reported to.",
+    ],
+    ["MANAGER_CANNOT_APPROVE", "That person can't approve. Give them an approver role first."],
+    ["NAME_REQUIRED", "A name is required."],
+    ["REQUIRED", "Required."],
+    ["ALREADY_A_DRAFT", "This email already belongs to a draft."],
+    ["ALREADY_A_MEMBER", "This email already belongs to a member."],
+    ["INVALID_EMAIL", "Not an email address."],
     [
       "DESIGNATION_NOT_AVAILABLE",
       "That designation isn't available any more. Choose an active one.",
@@ -444,46 +469,3 @@ export interface DeactivationResult {
   status: string;
   lastWorkingDay: string;
 }
-
-/**
- * The columns an import reads, in template order, with what each one means.
- * The database holds the same list (employee_import_columns) and refuses any
- * other; this one is for the template and the mapping table.
- */
-export const IMPORT_COLUMNS: readonly [string, string][] = [
-  ["full_name", "Required"],
-  ["email", "Where the invitation goes; can come later"],
-  ["mobile", ""],
-  ["joined_date", "YYYY-MM-DD"],
-  ["employee_code", ""],
-  ["designation", "Must match the designation list"],
-  ["department", "Must match a department"],
-  ["reports_to_email", "An active manager here"],
-  ["employment_type", "Full time, contract, apprentice, part time, intern, consultant"],
-  ["date_of_birth", "YYYY-MM-DD"],
-  ["sex", "Male, female, other or undisclosed"],
-  ["blood_group", "A+ … O-"],
-  ["emergency_contact_name", ""],
-  ["emergency_contact_phone", ""],
-  ["deployed_unit", "Must match an active unit"],
-  ["deployed_from", "YYYY-MM-DD; the joined date if blank"],
-  ["deployment_order_ref", "Required with a deployed unit"],
-];
-
-/** Columns a spreadsheet often carries that are deliberately never imported. */
-export const NEVER_IMPORTED: readonly string[] = [
-  "aadhaar",
-  "pan",
-  "uan",
-  "epf",
-  "epf_number",
-  "esic",
-  "esic_number",
-  "bank_account",
-  "account_number",
-  "ifsc",
-  "religion",
-  "caste",
-  "caste_category",
-  "disability",
-];

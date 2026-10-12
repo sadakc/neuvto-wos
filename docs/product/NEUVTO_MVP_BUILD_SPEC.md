@@ -1,6 +1,6 @@
 # NEUVTO WOS — Build Spec
 
-**Version:** 1.15 · **Status:** Active · **Updated:** 12 Oct 2026
+**Version:** 1.16 · **Status:** Active · **Updated:** 12 Oct 2026
 
 ## The platform is the product
 
@@ -156,6 +156,7 @@ These override the source docs where they conflict. Deviations are deliberate an
 | D83 | **Neuvto can add and remove a company's Super Admins from the console.** Four platform-only functions list them, add one (a member is promoted, anybody else is invited as `super_admin`, a pending invitation is upgraded), remove one (other roles stay) and withdraw a pending Super Admin invitation. They grant no other role, and the last Super Admin still stays: the trigger refuses Neuvto too. The console learns names and emails of Super Admins only (D42 holds). | Leaving it to the company alone (no way back when the only Super Admin leaves), and letting the console edit any role (that is reading and running the company's access, which D42 declines). |
 | D84 | **A Super Admin can make somebody the admin of one module.** Employee Admin, Leave Admin, and so on: several per module, several per person, as `module_admins` rows written only by `member_set_module_admins` (Super Admin only, never your own, module switched on). Every module check asks `is_module_admin(module)`, which a company-wide Admin always passes. A module admin reaches only their module: not People, departments, holidays, approval rules or another module. They get the administrator's short idle timeout. | A role per module in `app_role` (an enum value can never be removed, so every retired module would leave one behind), and keeping one company-wide Admin (Sada asked for admins per module). |
 | D85 | **The Employee Admin enters statutory numbers, bank details and restricted data, and opens any of them with an eye, without giving a reason.** Numbers show their last four behind a lock; one click shows the full value, a second locks it. Every look is still logged before the value is returned. The person sees their own last four and nothing more. Storage stays encrypted. Aadhaar is no longer a default mandatory onboarding item. Revises D80's who-may-reveal. | Stopping encryption of UAN, EPF, ESIC and PAN (Sada chose to keep it: the lock on screen and encryption at rest protect against different things), and keeping the reason prompt (Sada: one click). |
+| D86 | **The customer's master sheet is replaced by Neuvto's own master template, not imported as it is.** One Excel workbook (People, Family, Nominees, Previous employment, Instructions), every field Neuvto keeps including Aadhaar, PAN, bank and the optional restricted values, repeating things as rows (any number of children), linked by employee code. New people only; the Employee Admin imports; every person runs through the card's own writers, dry run first. | Importing the old sheet as it is (numbered child slots, repeated columns, Excel-rounded numbers), and a flat CSV (cannot hold repeating rows). |
 
 **D15 is unchanged and still deferred.** Company identity (D45) is not theming.
 A name and a logo are _facts about the customer_, stored as columns and rendered
