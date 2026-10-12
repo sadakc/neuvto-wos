@@ -199,6 +199,8 @@ export interface ApprovalStep {
   /** D87: who this level moved up from, and when, if it did. */
   escalatedFrom?: string | null;
   escalatedAt?: string | null;
+  /** D92: who decided it, when it was somebody acting for the approver. */
+  decidedBy?: string | null;
 }
 
 export interface LeaveRequest {

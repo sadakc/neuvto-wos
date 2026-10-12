@@ -46,6 +46,7 @@ const item: ApprovalQueueItem = {
   daysAtLevel: 2,
   targetDays: 2,
   escalatedFrom: null,
+  onBehalfOf: null,
 };
 
 beforeEach(() => {
@@ -145,5 +146,23 @@ describe("deciding a leave request", () => {
     render(<LeaveApprovalCard item={item} onDecided={() => {}} />);
     await user.click(await screen.findByText("Approval history"));
     expect(await screen.findAllByText(/moved up from Mark Manager/)).toHaveLength(1);
+  });
+
+  it("says in the history who decided a level on the approver's behalf", async () => {
+    const user = userEvent.setup();
+    h.getApprovalTimeline.mockResolvedValue([
+      {
+        level: 1,
+        approverName: "Mark Manager",
+        decision: "approved",
+        comments: null,
+        decidedAt: "2026-10-04T09:00:00Z",
+        reasonCode: null,
+        decidedBy: "Hema HR",
+      },
+    ]);
+    render(<LeaveApprovalCard item={item} onDecided={() => {}} />);
+    await user.click(await screen.findByText("Approval history"));
+    expect(await screen.findByText(/decided by Hema HR on their behalf/)).toBeInTheDocument();
   });
 });

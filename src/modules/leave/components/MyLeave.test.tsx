@@ -120,3 +120,30 @@ describe("monthly crediting (D90)", () => {
     expect(card).toHaveTextContent("Earned leave");
   });
 });
+
+describe("decided on somebody's behalf (D92)", () => {
+  it("says who decided, when it was not the approver", async () => {
+    const user = userEvent.setup();
+    h.getApprovalTimeline.mockResolvedValue([
+      {
+        level: 1,
+        approverName: "Mark Manager",
+        decision: "approved",
+        comments: null,
+        decidedAt: "2026-10-04T09:00:00Z",
+        decidedBy: "Hema HR",
+      },
+      {
+        level: 2,
+        approverName: "Dan Director",
+        decision: "approved",
+        comments: null,
+        decidedAt: "2026-10-05T09:00:00Z",
+        decidedBy: null,
+      },
+    ]);
+    render(<MyLeave />);
+    await user.click(await screen.findByTestId("request-row"));
+    expect(await screen.findAllByText(/Decided by Hema HR on their behalf/)).toHaveLength(1);
+  });
+});

@@ -1,6 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
-import { getCurrentUser, type CurrentUser } from "@/platform/auth";
+import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
+import { Delegations } from "@/platform/approvals/Delegations";
 import { isAppError } from "@/platform/errors";
 import {
   approveMany,
@@ -8,7 +9,7 @@ import {
   type ApprovalQueueItem,
   type BulkOutcome,
 } from "@/platform/approvals";
-import { getApprovalViews, type ModuleApprovalView } from "@/platform/modules";
+import { getApprovalViews, moduleByKey, type ModuleApprovalView } from "@/platform/modules";
 
 export const Route = createFileRoute("/app/approvals")({
   ssr: false,
@@ -211,6 +212,11 @@ function ApprovalsPage() {
                     {waitingLine(item)}
                   </span>
                 </div>
+                {item.onBehalfOf && (
+                  <p data-testid="on-behalf-of" className="mt-1 text-xs text-muted-foreground">
+                    {item.onBehalfOf}&apos;s approval, handed to you while they are away.
+                  </p>
+                )}
                 {item.escalatedFrom && (
                   <p data-testid="escalated-from" className="mt-1 text-xs text-muted-foreground">
                     Moved to you from {item.escalatedFrom}, who had it longer than the target.
@@ -245,6 +251,14 @@ function ApprovalsPage() {
           })}
         </ul>
       )}
+
+      {/* D92. The modules this workspace has approvals for, named. */}
+      <Delegations
+        isAdmin={isAdmin(user)}
+        modules={[...new Set([...views.values()].map((v) => v.moduleKey))]
+          .map((key) => ({ key, name: moduleByKey(key)?.name ?? key }))
+          .sort((a, b) => a.name.localeCompare(b.name))}
+      />
     </div>
   );
 }

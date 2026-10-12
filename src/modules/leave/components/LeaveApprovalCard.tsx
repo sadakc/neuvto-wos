@@ -128,6 +128,11 @@ export default function LeaveApprovalCard({ item, onDecided }: ModuleApprovalVie
                     ? "waiting"
                     : `${s.decision}${s.decidedAt ? ` ${new Date(s.decidedAt).toLocaleDateString()}` : ""}`}
                 </span>
+                {s.decidedBy && (
+                  <span className="mt-0.5 block text-muted-foreground">
+                    decided by {s.decidedBy} on their behalf
+                  </span>
+                )}
                 {s.escalatedFrom && (
                   <span className="mt-0.5 block text-muted-foreground">
                     moved up from {s.escalatedFrom}

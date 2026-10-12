@@ -202,6 +202,7 @@ export async function getApprovalTimeline(approvalRequestId: string): Promise<Ap
     reasonCode: r.reason_code,
     escalatedFrom: r.escalated_from,
     escalatedAt: r.escalated_at,
+    decidedBy: r.decided_by,
   }));
 }
 

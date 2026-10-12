@@ -43,6 +43,8 @@ export interface ApprovalQueueItem {
   targetDays: number | null;
   /** Who it moved up from, when it came to the caller that way (D87). */
   escalatedFrom: string | null;
+  /** Whose approval this is, when it is the caller's by delegation (D92). */
+  onBehalfOf: string | null;
 }
 
 /**
@@ -96,6 +98,7 @@ export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
     daysAtLevel: days(r.level_since),
     targetDays: r.target_days,
     escalatedFrom: r.escalated_from ?? null,
+    onBehalfOf: r.on_behalf_of ?? null,
   }));
 }
 
@@ -160,6 +163,13 @@ function decideError(error: { message?: string }): AppError {
       "VALIDATION_FAILED",
       "Add a short note for the person. They'll read it with the reason.",
       400,
+    );
+  }
+  if (raw.includes("ALREADY_SIGNING")) {
+    return new AppError(
+      "FORBIDDEN",
+      "You already sign another level of this request, so you can't sign this one for somebody else too.",
+      403,
     );
   }
   if (raw.includes("SELF_APPROVAL_FORBIDDEN")) {
@@ -303,4 +313,91 @@ export async function removeApprovalLevel(id: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw toAppError(error, "removeApprovalLevel");
+}
+
+// ═══════════════════════════════════════════════ handing approvals over (D92)
+
+/** One hand-over: given by the caller, received by them, or (for an admin) between others. */
+export interface Delegation {
+  id: string;
+  direction: "given" | "received" | "others";
+  delegatorName: string;
+  delegateName: string;
+  fromDate: string;
+  toDate: string;
+  /** Null: every module's approvals. */
+  moduleKey: string | null;
+  moduleName: string | null;
+  reason: string | null;
+  inForce: boolean;
+}
+
+const DELEGATION_MESSAGES: Record<string, string> = {
+  DELEGATE_TO_SELF: "Choose somebody other than the person whose approvals these are.",
+  DELEGATE_CANNOT_APPROVE:
+    "They can't approve anything: they need a role that approves, in this company.",
+  PAST_DATE: "A hand-over can't start in the past.",
+  INVALID_DATE_RANGE: "The last day can't be before the first.",
+  DELEGATION_TOO_LONG: "Hand approvals over for at most six months at a time.",
+  DELEGATION_OVERLAPS: "Your approvals are already handed over for some of those dates.",
+  MODULE_NOT_ENABLED: "That isn't switched on for this workspace.",
+  FORBIDDEN: "Only a company admin can hand over somebody else's approvals.",
+  NOT_FOUND: "That hand-over isn't yours to change.",
+};
+
+function delegationError(error: { message?: string }, where: string): AppError {
+  const code = Object.keys(DELEGATION_MESSAGES).find((k) => (error.message ?? "").includes(k));
+  return code
+    ? new AppError("VALIDATION_FAILED", DELEGATION_MESSAGES[code], 400, { code })
+    : toAppError(error, where);
+}
+
+export async function listMyDelegations(): Promise<Delegation[]> {
+  const { data, error } = await supabase.rpc("approval_my_delegations");
+  if (error) throw toAppError(error, "listMyDelegations");
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    direction: r.direction as Delegation["direction"],
+    delegatorName: r.delegator_name,
+    delegateName: r.delegate_name,
+    fromDate: r.from_date,
+    toDate: r.to_date,
+    moduleKey: r.module_key,
+    moduleName: r.module_name,
+    reason: r.reason,
+    inForce: r.in_force,
+  }));
+}
+
+/** Colleagues who can be handed approvals: active, able to approve, not the caller. */
+export async function listDelegateCandidates(): Promise<{ id: string; fullName: string }[]> {
+  const { data, error } = await supabase.rpc("approval_delegate_candidates");
+  if (error) throw toAppError(error, "listDelegateCandidates");
+  return (data ?? []).map((r) => ({ id: r.id, fullName: r.full_name }));
+}
+
+export async function delegateApprovals(input: {
+  delegateId: string;
+  fromDate: string;
+  toDate: string;
+  moduleKey: string | null;
+  reason: string;
+  /** A company admin handing over somebody else's; null for the caller's own. */
+  delegatorId: string | null;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("approval_delegate", {
+    _delegate_id: input.delegateId,
+    _from_date: input.fromDate,
+    _to_date: input.toDate,
+    _module_key: input.moduleKey ?? undefined,
+    _reason: input.reason || undefined,
+    _delegator_id: input.delegatorId ?? undefined,
+  });
+  if (error) throw delegationError(error, "delegateApprovals");
+  return data as string;
+}
+
+export async function cancelDelegation(id: string): Promise<void> {
+  const { error } = await supabase.rpc("approval_delegation_cancel", { _id: id });
+  if (error) throw delegationError(error, "cancelDelegation");
 }

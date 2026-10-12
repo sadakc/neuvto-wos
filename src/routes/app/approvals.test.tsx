@@ -34,12 +34,27 @@ vi.mock("@/platform/auth", () => ({
     organizationName: "Acme",
     roles: ["manager"],
   }),
+  isAdmin: (u: { roles: string[] } | null) =>
+    !!u?.roles.some((r) => ["super_admin", "org_admin", "hr_admin"].includes(r)),
 }));
 vi.mock("@/platform/approvals", () => ({
   listApprovalQueue: h.listApprovalQueue,
   approveMany: h.approveMany,
 }));
-vi.mock("@/platform/modules", () => ({ getApprovalViews: async () => new Map() }));
+vi.mock("@/platform/modules", () => ({
+  getApprovalViews: async () =>
+    new Map([
+      ["leave_request", { entityType: "leave_request", moduleKey: "leave", component: null }],
+    ]),
+  moduleByKey: (key: string) => (key === "leave" ? { key, name: "Leave Management" } : undefined),
+}));
+vi.mock("@/platform/approvals/Delegations", () => ({
+  Delegations: ({ modules, isAdmin }: { modules: { name: string }[]; isAdmin: boolean }) => (
+    <p data-testid="delegations">
+      {modules.map((m) => m.name).join(",")}|{String(isAdmin)}
+    </p>
+  ),
+}));
 
 const { Route } = await import("./approvals");
 const Page = (Route as unknown as { component: ComponentType }).component;
@@ -50,6 +65,7 @@ const row = (
   daysAtLevel: number,
   targetDays: number | null,
   escalatedFrom: string | null = null,
+  onBehalfOf: string | null = null,
 ) =>
   ({
     approvalRequestId: id,
@@ -66,6 +82,7 @@ const row = (
     daysAtLevel,
     targetDays,
     escalatedFrom,
+    onBehalfOf,
   }) satisfies ApprovalQueueItem;
 
 beforeEach(() => {
@@ -75,6 +92,7 @@ beforeEach(() => {
     row("b", "Priya Employee", 1, 2),
     row("c", "New Joiner", 0, null),
     row("d", "Dev Escalated", 0, 2, "Mark Manager"),
+    row("e", "Esha Delegated", 0, 2, null, "Dan Director"),
   ]);
 });
 
@@ -129,5 +147,20 @@ describe("approve selected", () => {
     expect(result).toHaveTextContent("1 approved.");
     expect(result).toHaveTextContent("New Joiner: This has already been decided.");
     expect(h.listApprovalQueue).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe("handing approvals over (D92)", () => {
+  it("says whose approval a delegated request is", async () => {
+    render(<Page />);
+    expect(within(await itemFor("Esha Delegated")).getByTestId("on-behalf-of")).toHaveTextContent(
+      "Dan Director's approval, handed to you while they are away",
+    );
+    expect(within(await itemFor("Ravi Employee")).queryByTestId("on-behalf-of")).toBeNull();
+  });
+
+  it("offers an approver the hand-over, with the workspace's modules that have approvals", async () => {
+    render(<Page />);
+    expect(await screen.findByTestId("delegations")).toHaveTextContent("Leave Management|false");
   });
 });

@@ -131,6 +131,83 @@ export type Database = {
           },
         ]
       }
+      approval_delegations: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          delegate_id: string
+          delegator_id: string
+          from_date: string
+          id: string
+          module_key: string | null
+          organization_id: string
+          reason: string | null
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delegate_id: string
+          delegator_id: string
+          from_date: string
+          id?: string
+          module_key?: string | null
+          organization_id: string
+          reason?: string | null
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delegate_id?: string
+          delegator_id?: string
+          from_date?: string
+          id?: string
+          module_key?: string | null
+          organization_id?: string
+          reason?: string | null
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_delegations_delegate_id_fkey"
+            columns: ["delegate_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_delegations_delegator_id_fkey"
+            columns: ["delegator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_delegations_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "approval_delegations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_entity_labels: {
         Row: {
           created_at: string
@@ -315,6 +392,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           decided_at: string | null
+          decided_by: string | null
           decision: Database["public"]["Enums"]["approval_decision"]
           deleted_at: string | null
           id: string
@@ -331,6 +409,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           decided_at?: string | null
+          decided_by?: string | null
           decision?: Database["public"]["Enums"]["approval_decision"]
           deleted_at?: string | null
           id?: string
@@ -347,6 +426,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           decided_at?: string | null
+          decided_by?: string | null
           decision?: Database["public"]["Enums"]["approval_decision"]
           deleted_at?: string | null
           id?: string
@@ -367,6 +447,13 @@ export type Database = {
           {
             foreignKeyName: "approval_steps_approver_id_fkey"
             columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_decided_by_fkey"
+            columns: ["decided_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -3122,11 +3209,54 @@ export type Database = {
           status: string
         }[]
       }
+      approval_delegate: {
+        Args: {
+          _delegate_id: string
+          _delegator_id?: string
+          _from_date: string
+          _module_key?: string
+          _reason?: string
+          _to_date: string
+        }
+        Returns: string
+      }
+      approval_delegate_candidates: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
+      approval_delegation_active: {
+        Args: {
+          _approver: string
+          _delegate: string
+          _entity_type: string
+          _org: string
+        }
+        Returns: boolean
+      }
+      approval_delegation_cancel: { Args: { _id: string }; Returns: undefined }
       approval_entity_label: { Args: { _entity_type: string }; Returns: string }
       approval_escalate_due: { Args: never; Returns: number }
       approval_escalation_target: {
         Args: { _step_id: string }
         Returns: string
+      }
+      approval_my_delegations: {
+        Args: never
+        Returns: {
+          delegate_name: string
+          delegator_name: string
+          direction: string
+          from_date: string
+          id: string
+          in_force: boolean
+          module_key: string
+          module_name: string
+          reason: string
+          to_date: string
+        }[]
       }
       approval_queue: {
         Args: never
@@ -3139,6 +3269,7 @@ export type Database = {
           escalated_from: string
           level: number
           level_since: string
+          on_behalf_of: string
           requester_id: string
           requester_name: string
           required_levels: number
@@ -3160,6 +3291,7 @@ export type Database = {
           approver_name: string
           comments: string
           decided_at: string
+          decided_by: string
           decision: Database["public"]["Enums"]["approval_decision"]
           escalated_at: string
           escalated_from: string

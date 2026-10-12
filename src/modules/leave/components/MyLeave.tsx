@@ -251,6 +251,11 @@ export default function MyLeave() {
                               <span className="text-sm">
                                 <span className="text-muted-foreground">Level {s.level}</span>{" "}
                                 {s.approverName}
+                                {s.decidedBy && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    Decided by {s.decidedBy} on their behalf
+                                  </span>
+                                )}
                                 {s.escalatedFrom && (
                                   <span className="block text-xs text-muted-foreground">
                                     Moved up from {s.escalatedFrom}, who had it longer than the

@@ -48,6 +48,7 @@ const item: ApprovalQueueItem = {
   daysAtLevel: 1,
   targetDays: 2,
   escalatedFrom: null,
+  onBehalfOf: null,
 };
 
 beforeEach(() => {
