@@ -108,6 +108,14 @@ begin
     perform pg_temp.root_();
   end if;
 
+  -- E8: a draft, started by an Admin, nobody invited yet.
+  if to_regprocedure('public.employee_create_draft(jsonb)') is not null then
+    perform pg_temp.as_('00000000-0000-0000-0000-00000000a002');
+    perform public.employee_create_draft(jsonb_build_object(
+      'fullName', 'Nisha Rao', 'email', 'nisha.rao@acme.test', 'joinedDate', '2026-11-01'));
+    perform pg_temp.root_();
+  end if;
+
   insert into public.previous_organisations
     (organization_id, employee_id, organisation_name, designation, from_date, to_date, reason_for_leaving)
   values (acme, e, 'SIS Security', 'Guard', '2019-01-01', '2024-03-15', 'Better role');
@@ -125,6 +133,8 @@ select jsonb_pretty(jsonb_build_object(
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006')),
   'statutory', pg_temp.card_as('00000000-0000-0000-0000-00000000a007',
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006')),
+  'draft',     (select pg_temp.card_as('00000000-0000-0000-0000-00000000a002', e.id)
+                  from public.employees e where e.draft_email = 'nisha.rao@acme.test'),
   'admin',     pg_temp.card_as('00000000-0000-0000-0000-00000000a001',
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006'))
 ));

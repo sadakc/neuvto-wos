@@ -134,14 +134,14 @@ begin
 
   -- ── self: everything on the card
   c := pg_temp.ec_card(priya, null);
-  if (c->>'id')::uuid <> e then
+  if (c->>'id')::uuid is distinct from e then
     raise exception 'EMPLOYEE-CARD FAIL: no argument did not return your own card';
   end if;
   perform pg_temp.ec_shape('you see your whole card', c,
     personal || array['emergencyContact','addresses','familyMembers','nominations','deployments'],
     array[]::text[]);
-  if not (c->'capabilities'->>'canRequestChange')::boolean
-     or (c->'capabilities'->>'canEdit')::boolean then
+  if (c->'capabilities'->>'canRequestChange')::boolean is not true
+     or (c->'capabilities'->>'canEdit')::boolean is not false then
     raise exception 'EMPLOYEE-CARD FAIL: self should request changes, not edit';
   end if;
 
@@ -171,7 +171,7 @@ begin
   perform pg_temp.ec_shape('statutory sees addresses and the police station', c,
     array['addresses','nearestPoliceStation','familyMembers','nominations'],
     personal || array['emergencyContact']);
-  if not (c->'capabilities'->>'canRevealStatutory')::boolean then
+  if (c->'capabilities'->>'canRevealStatutory')::boolean is not true then
     raise exception 'EMPLOYEE-CARD FAIL: statutory is not offered the reveal';
   end if;
 
@@ -180,7 +180,7 @@ begin
   perform pg_temp.ec_shape('an admin sees everything', c,
     personal || array['emergencyContact','addresses','familyMembers','nominations','deployments'],
     array[]::text[]);
-  if not (c->'capabilities'->>'canEdit')::boolean then
+  if (c->'capabilities'->>'canEdit')::boolean is not true then
     raise exception 'EMPLOYEE-CARD FAIL: an admin is not offered edit';
   end if;
 

@@ -82,3 +82,7 @@ export {
 export { installIdleWatcher } from "./idle";
 export { getSessionPolicy, type SessionPolicy } from "./session-policy";
 export { decide as decideIdle, type IdleVerdict } from "./idle-policy";
+
+// The CSV reader, shared so a module importing its own records reads a file
+// exactly as the People import does: quotes, commas and line endings alike.
+export { parseCsv } from "./import";

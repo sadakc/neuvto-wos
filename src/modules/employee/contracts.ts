@@ -9,6 +9,17 @@
  * to drift from the database's.
  */
 
+/** `removed`: the person's account was deleted; the record is history. */
+export type Stage = "draft" | "invited" | "active" | "deactivated" | "removed";
+
+export const STAGE_LABEL: Record<Stage, string> = {
+  draft: "Draft",
+  invited: "Invited",
+  active: "Active",
+  deactivated: "Deactivated",
+  removed: "Removed",
+};
+
 export type Relationship = "colleague" | "self" | "admin" | "payroll" | "statutory" | "approver";
 
 export const EMPLOYEE_STATUSES = ["working", "probation", "notice", "suspended", "left"] as const;
@@ -109,6 +120,8 @@ export interface EmployeeCard {
   status: EmployeeStatus;
   isActive: boolean;
   hasSignedIn: boolean;
+  /** E8. Where the person is in joining: started by an Admin, invited, here, or gone. */
+  stage?: Stage;
   dateOfJoining: string | null;
   designation: { id: string; name: string; grade: string | null } | null;
   department: { id: string; name: string } | null;
@@ -179,6 +192,9 @@ export interface EmployeeCard {
     canEditBank?: boolean;
     canEditRestricted?: boolean;
     canSeeReveals?: boolean;
+    canSendInvite?: boolean;
+    canDeactivate?: boolean;
+    canEditDraft?: boolean;
   };
 }
 
@@ -322,6 +338,7 @@ export interface DirectoryRow {
   hasSignedIn: boolean;
   /** "Super Admin", "Admin" or null. */
   adminRole: string | null;
+  stage: Stage;
 }
 
 export interface OrgChartNode {
@@ -382,3 +399,80 @@ export function employeeErrorMessage(code: string): string {
   }
   return "That didn't load. Please try again.";
 }
+
+export interface AdminOverview {
+  managers: { profileId: string; fullName: string }[];
+  departments: { id: string; name: string }[];
+  active: number;
+  invitedNotSignedIn: number;
+  drafts: number;
+  deployedToClientUnits: number;
+  missingStatutory: number;
+  recent: {
+    id: string;
+    fullName: string | null;
+    email: string | null;
+    stage: Stage;
+    createdAt: string;
+    gaps: string[];
+  }[];
+}
+
+export interface DeactivationPreview {
+  directReports: number;
+  pendingApprovals: number;
+  openPosting: { unitName: string; since: string } | null;
+  successors: { profileId: string; fullName: string }[];
+}
+
+export interface DeactivationResult {
+  reports_moved: number;
+  approvals_moved: number;
+  levels_collapsed: number;
+  postingClosed: { unitName: string; lastDay: string } | null;
+  status: string;
+  lastWorkingDay: string;
+}
+
+/**
+ * The columns an import reads, in template order, with what each one means.
+ * The database holds the same list (employee_import_columns) and refuses any
+ * other; this one is for the template and the mapping table.
+ */
+export const IMPORT_COLUMNS: readonly [string, string][] = [
+  ["full_name", "Required"],
+  ["email", "Where the invitation goes; can come later"],
+  ["mobile", ""],
+  ["joined_date", "YYYY-MM-DD"],
+  ["employee_code", ""],
+  ["designation", "Must match the designation list"],
+  ["department", "Must match a department"],
+  ["reports_to_email", "An active manager here"],
+  ["employment_type", "Full time, contract, apprentice, part time, intern, consultant"],
+  ["date_of_birth", "YYYY-MM-DD"],
+  ["sex", "Male, female, other or undisclosed"],
+  ["blood_group", "A+ … O-"],
+  ["emergency_contact_name", ""],
+  ["emergency_contact_phone", ""],
+  ["deployed_unit", "Must match an active unit"],
+  ["deployed_from", "YYYY-MM-DD; the joined date if blank"],
+  ["deployment_order_ref", "Required with a deployed unit"],
+];
+
+/** Columns a spreadsheet often carries that are deliberately never imported. */
+export const NEVER_IMPORTED: readonly string[] = [
+  "aadhaar",
+  "pan",
+  "uan",
+  "epf",
+  "epf_number",
+  "esic",
+  "esic_number",
+  "bank_account",
+  "account_number",
+  "ifsc",
+  "religion",
+  "caste",
+  "caste_category",
+  "disability",
+];

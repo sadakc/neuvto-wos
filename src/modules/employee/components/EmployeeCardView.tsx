@@ -17,6 +17,7 @@ import { cn } from "@/lib/utils";
 import {
   EMPLOYEE_STATUS_LABEL,
   EMPLOYMENT_TYPE_LABEL,
+  STAGE_LABEL,
   UNIT_TYPE_LABEL,
   type EmployeeCard,
   type EmployeeStatus,
@@ -35,6 +36,8 @@ import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
 import { StatutoryTab } from "./StatutoryTab";
 import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
+import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
+import { STAGE_TONE } from "../status";
 import {
   AddAddressDialog,
   ContactEditors,
@@ -158,7 +161,11 @@ export function EmployeeCardView({
                 {EMPLOYEE_STATUS_LABEL[card.status]}
               </StatusBadge>
               {card.confirmedOn && <StatusBadge tone="info">Confirmed</StatusBadge>}
-              {!card.isActive && <StatusBadge tone="neutral">Cannot sign in</StatusBadge>}
+              {card.stage && card.stage !== "active" ? (
+                <StatusBadge tone={STAGE_TONE[card.stage]}>{STAGE_LABEL[card.stage]}</StatusBadge>
+              ) : (
+                !card.isActive && <StatusBadge tone="neutral">Cannot sign in</StatusBadge>
+              )}
             </div>
             {where && <p className="mt-1 text-sm text-foreground-secondary">{where}</p>}
             <ul className="mt-2 flex flex-wrap gap-1.5" aria-label="Key facts">
@@ -170,6 +177,22 @@ export function EmployeeCardView({
               )}
             </ul>
           </div>
+          {(card.capabilities.canSendInvite ||
+            card.capabilities.canDeactivate ||
+            card.capabilities.canEditDraft) && (
+            <div
+              className="flex w-full flex-wrap items-start gap-2 @min-[640px]/app:w-auto @min-[640px]/app:justify-end"
+              data-testid="lifecycle-actions"
+            >
+              {card.capabilities.canEditDraft && <DraftEditor card={card} onChanged={onChanged} />}
+              {card.capabilities.canSendInvite && (
+                <SendInviteButton card={card} onChanged={onChanged} />
+              )}
+              {card.capabilities.canDeactivate && (
+                <DeactivateDialog card={card} onChanged={onChanged} />
+              )}
+            </div>
+          )}
           {card.capabilities.canRequestChange && (
             <div className="flex w-full flex-col items-start gap-1 @min-[640px]/app:w-auto @min-[640px]/app:items-end">
               <RequestChangeButton card={card} onSent={() => setRequestsSent((n) => n + 1)} />

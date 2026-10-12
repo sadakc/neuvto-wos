@@ -24,6 +24,20 @@ export const employee: ModuleDefinition = {
     { label: "Directory", to: "/app/employee/directory" },
     { label: "Org Chart", to: "/app/employee/org-chart" },
     {
+      label: "Add Employee",
+      to: "/app/employee/add",
+      group: "company",
+      roles: ["super_admin", "org_admin", "hr_admin"],
+      description: "Start a record and invite them, complete or not",
+    },
+    {
+      label: "Import records",
+      to: "/app/employee/import",
+      group: "company",
+      roles: ["super_admin"],
+      description: "Bring a workforce in from a spreadsheet, as drafts",
+    },
+    {
       label: "Change requests",
       to: "/app/employee/change-requests",
       group: "company",
@@ -38,6 +52,8 @@ export const employee: ModuleDefinition = {
     // Under Directory, so the tab bar keeps Directory lit while you read somebody.
     { path: "employee/directory/person", component: lazy(() => import("./components/PersonCard")) },
     { path: "employee/org-chart", component: lazy(() => import("./components/OrgChart")) },
+    { path: "employee/add", component: lazy(() => import("./components/Lifecycle")) },
+    { path: "employee/import", component: lazy(() => import("./components/ImportRecords")) },
     {
       path: "employee/change-requests",
       component: lazy(() => import("./components/ChangeRequests")),

@@ -246,7 +246,7 @@ begin
       if (c -> 'statutory' ? 'uan') <> (role_ in ('payroll','statutory')) then
         raise exception 'STATUTORY FAIL: full UAN wrong for %', role_;
       end if;
-      if c -> 'statutory' ->> 'aadhaarLast4' <> right(aadhaar, 4) then
+      if c -> 'statutory' ->> 'aadhaarLast4' is distinct from right(aadhaar, 4) then
         raise exception 'STATUTORY FAIL: % does not get the Aadhaar last four', role_;
       end if;
     end if;
@@ -255,7 +255,7 @@ begin
     end if;
   end loop;
   c := pg_temp.st_card(pay, e);
-  if c -> 'statutory' ->> 'uan' <> '101234567890' or c -> 'statutory' ->> 'epfNumber' <> 'MHBAN00000640000000125' then
+  if c -> 'statutory' ->> 'uan' is distinct from '101234567890' or c -> 'statutory' ->> 'epfNumber' is distinct from 'MHBAN00000640000000125' then
     raise exception 'STATUTORY FAIL: Payroll''s full UAN/EPF are wrong: %', c -> 'statutory';
   end if;
   perform pg_temp.st_ok('the card gives each role exactly its §5 blocks, and no full Aadhaar, PAN or account to anybody');
@@ -263,7 +263,7 @@ begin
   -- ── 4 · the reveal
   select count(*) into n from public.restricted_reads where employee_id = e;
   r := pg_temp.st_reveal(stat, e, array['aadhaar','pan'], 'ECR filing for September');
-  if r ->> 'aadhaar' <> aadhaar or r ->> 'pan' <> 'ABCDE1234F' then
+  if r ->> 'aadhaar' is distinct from aadhaar or r ->> 'pan' is distinct from 'ABCDE1234F' then
     raise exception 'STATUTORY FAIL: the reveal returned %', r;
   end if;
   select count(*) into n2 from public.restricted_reads
@@ -294,9 +294,9 @@ begin
   perform pg_temp.st_ok('a refused reveal logs nothing and shows nothing');
 
   r := pg_temp.st_reveal(pay, e, array['bank_account'], 'salary bounced');
-  if r ->> 'bankAccount' <> account then raise exception 'STATUTORY FAIL: Payroll got %', r; end if;
+  if r ->> 'bankAccount' is distinct from account then raise exception 'STATUTORY FAIL: Payroll got %', r; end if;
   r := pg_temp.st_reveal(priya, e, array['religion','caste_category'], 'checking my record');
-  if r ->> 'religion' <> 'Hindu' or r ->> 'casteCategory' <> 'obc' then
+  if r ->> 'religion' is distinct from 'Hindu' or r ->> 'casteCategory' is distinct from 'obc' then
     raise exception 'STATUTORY FAIL: the person''s own restricted data came back as %', r;
   end if;
   perform pg_temp.st_ok('Payroll reveals the account; a person reveals their own restricted data');

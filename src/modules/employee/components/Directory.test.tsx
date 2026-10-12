@@ -46,6 +46,7 @@ function row(
     isActive: true,
     hasSignedIn: true,
     adminRole: null,
+    stage: "active",
   };
 }
 

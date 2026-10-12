@@ -195,7 +195,7 @@ begin
   r := pg_temp.ew_run(hema, format($q$select public.employee_add_address(%L, jsonb_build_object(
     'addressType','present','effectiveFrom','2025-06-01','line','9 Lake View','city','Hosur',
     'state','Tamil Nadu','pincode','635109'))$q$, e));
-  if r -> 'closed' -> 0 ->> 'lastDay' <> '2025-05-31' then
+  if r -> 'closed' -> 0 ->> 'lastDay' is distinct from '2025-05-31' then
     raise exception 'EMPLOYEE-WRITES FAIL: the old address should end 31 May, got %', r;
   end if;
   select count(*) into n from public.employee_addresses where employee_id = e and address_type = 'present';
@@ -218,7 +218,7 @@ begin
     'unitId',%L,'effectiveFrom','2024-04-01','orderRef','DO-2024-0001'))$q$, e, hq));
   r := pg_temp.ew_run(hema, format($q$select public.employee_move_unit(%L, jsonb_build_object(
     'unitId',%L,'effectiveFrom','2025-06-01','orderRef','DO-2025-0042','reason','Client asked'))$q$, e, site));
-  if r -> 'closed' ->> 'lastDay' <> '2025-05-31' then
+  if r -> 'closed' ->> 'lastDay' is distinct from '2025-05-31' then
     raise exception 'EMPLOYEE-WRITES FAIL: the old posting should end 31 May, got %', r;
   end if;
   select count(*) into n from public.employee_deployments where employee_id = e;
@@ -266,7 +266,7 @@ begin
   perform pg_temp.ew_do(hema, format($q$select public.employee_save_previous_orgs(%L,
     '[{"organisationName":"SIS Security","designation":"Guard","fromDate":"2019-01-01","toDate":"2020-12-31"}]')$q$, e));
   if (pg_temp.ew_run(hema, format('select public.employee_card(%L)', e)) ->> 'totalExperienceMonths')::int
-     <> months + 23 then
+     is distinct from months + 23 then
     raise exception 'EMPLOYEE-WRITES FAIL: two years at SIS did not add 23 whole months';
   end if;
   perform pg_temp.ew_refused('a previous job ending before it starts is refused', hema,

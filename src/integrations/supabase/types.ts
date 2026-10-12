@@ -1038,6 +1038,12 @@ export type Database = {
           date_of_birth: string | null
           deleted_at: string | null
           designation_id: string | null
+          draft_department_id: string | null
+          draft_email: string | null
+          draft_full_name: string | null
+          draft_joined_date: string | null
+          draft_manager_id: string | null
+          draft_phone: string | null
           education_qualification: string | null
           emergency_contact_name: string | null
           emergency_contact_phone: string | null
@@ -1075,6 +1081,12 @@ export type Database = {
           date_of_birth?: string | null
           deleted_at?: string | null
           designation_id?: string | null
+          draft_department_id?: string | null
+          draft_email?: string | null
+          draft_full_name?: string | null
+          draft_joined_date?: string | null
+          draft_manager_id?: string | null
+          draft_phone?: string | null
           education_qualification?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -1112,6 +1124,12 @@ export type Database = {
           date_of_birth?: string | null
           deleted_at?: string | null
           designation_id?: string | null
+          draft_department_id?: string | null
+          draft_email?: string | null
+          draft_full_name?: string | null
+          draft_joined_date?: string | null
+          draft_manager_id?: string | null
+          draft_phone?: string | null
           education_qualification?: string | null
           emergency_contact_name?: string | null
           emergency_contact_phone?: string | null
@@ -1145,6 +1163,20 @@ export type Database = {
             columns: ["designation_id"]
             isOneToOne: false
             referencedRelation: "designations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_draft_department_id_fkey"
+            columns: ["draft_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_draft_manager_id_fkey"
+            columns: ["draft_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
             referencedColumns: ["id"]
           },
           {
@@ -2543,7 +2575,12 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: Json
       }
+      employee_admin_overview: { Args: never; Returns: Json }
       employee_age: { Args: { _dob: string; _org: string }; Returns: number }
+      employee_apply_draft: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
       employee_card: { Args: { _employee_id?: string }; Returns: Json }
       employee_change_requests: {
         Args: { _status?: string }
@@ -2560,6 +2597,24 @@ export type Database = {
           status: string
         }[]
       }
+      employee_close_posting: {
+        Args: { _employee_id: string; _last_day: string }
+        Returns: Json
+      }
+      employee_create_draft: { Args: { _values: Json }; Returns: string }
+      employee_deactivate: {
+        Args: {
+          _employee_id: string
+          _last_working_day: string
+          _reason: string
+          _successor_id: string
+        }
+        Returns: Json
+      }
+      employee_deactivation_preview: {
+        Args: { _employee_id: string }
+        Returns: Json
+      }
       employee_directory: {
         Args: { _q?: string }
         Returns: {
@@ -2575,13 +2630,28 @@ export type Database = {
           is_active: boolean
           mobile: string
           reports_to: string
+          stage: string
           status: string
           work_email: string
         }[]
       }
+      employee_email_is_free: {
+        Args: { _email: string; _except?: string; _org: string }
+        Returns: undefined
+      }
       employee_experience_months: {
         Args: { _employee_id: string }
         Returns: number
+      }
+      employee_import_check: { Args: { _rows: Json }; Returns: Json }
+      employee_import_columns: { Args: never; Returns: string[] }
+      employee_import_commit: {
+        Args: { _only_clean: boolean; _rows: Json }
+        Returns: Json
+      }
+      employee_import_row_problems: {
+        Args: { _org: string; _r: Json; _seen: string[] }
+        Returns: Json
       }
       employee_move_unit: {
         Args: { _employee_id: string; _values: Json }
@@ -2639,6 +2709,13 @@ export type Database = {
         Args: { _employee_id: string; _rows: Json }
         Returns: undefined
       }
+      employee_send_invite: {
+        Args: {
+          _employee_id: string
+          _role?: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
       employee_set_bank: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
@@ -2652,6 +2729,10 @@ export type Database = {
         Returns: undefined
       }
       employee_update: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_update_draft: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
       }

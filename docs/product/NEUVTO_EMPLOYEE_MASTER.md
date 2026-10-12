@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.4 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.5 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -328,7 +328,7 @@ screen change has been through `screen-prover`.
 | E5 ✔  | My Card read tabs, Directory, Org chart                                                                           | Per-role render tests against §5; a restricted field is absent from the RPC response, not hidden                               |
 | E6 ✔  | Restricted data: encryption, reveal, `restricted_reads`                                                           | Reveal writes its audit row in the same transaction; the value never enters the query cache                                    |
 | E7 ✔  | Writes: family, nominees, previous organisations, add an address, move to another unit                            | The bundle's acceptance criteria 1–5 and 10                                                                                    |
-| E8    | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
+| E8 ✔  | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
 | E9    | Configuration, and the responsive and role sweeps                                                                 | Every one of the 62 source columns has a home; `scrollWidth === clientWidth` on every route at every width                     |
 
 Leave Management's redesign follows E9, to the same design, reusing E1's shell.
@@ -364,6 +364,45 @@ Every writer is an Admin's (§5) and lives in `20261014100000_the_record_is_writ
     the receiving coordinator, notify the employee) are not offered. There is no shift model
     or unit coordinator assignment yet, and a checkbox that does nothing is worse than none.
   - Proof uploads on an address.
+
+### E8 as built (15 Oct 2026)
+
+`20261015100000_adding_people_and_letting_them_go.sql` and
+`20261015110000_records_from_a_spreadsheet.sql`; proved by `verify_employee_lifecycle.sql`
+and `verify_employee_import.sql`, and on screen by `Lifecycle.test.tsx` and
+`ImportRecords.test.tsx`.
+
+- **Drafts.** An Admin starts a record with only a name (`employee_create_draft`). Until the
+  invitation exists, the name, email, phone, joining date, department and manager sit in
+  `draft_*` columns; sending the invitation moves them onto it through `invitation_create`,
+  so every invitation rule (D78's role rule, duplicates) applies unchanged. Accepting claims
+  the drafted record: one record from draft to arrival, postings and all. A draft is visible
+  to Admins only. An incomplete record can be invited (E8's criterion); what it lacks is
+  listed against it on Add Employee.
+- **Stages.** `draft`, `invited`, `active`, `deactivated`, and `removed` for a record whose
+  person's account was deleted. That last one was found by the harness: such a record had
+  been counting, nameless, as a draft.
+- **Deactivate** (`employee_deactivate`) wraps the platform's deactivation (sign-in blocked,
+  reports and approvals moved to a named successor) and adds what the record owes: the open
+  posting closed on the last working day, status Left with the date and reason. It returns
+  what it did, and the dialog says so (criterion 10). A trigger closes an open posting on
+  every other deactivation path too, so the People screen's deactivation cannot leave one
+  open.
+- **Bulk import** is the Employee module's own, for a Super Admin: rows come in as drafts,
+  dry run first, the commit re-checks every row, and either the clean rows only or nothing.
+  Designation, department and unit must match the managed lists; dates must be YYYY-MM-DD,
+  because Postgres read `01/11/2026` as 11 January (found by the harness). **Statutory and
+  restricted columns are never imported** and are named as dropped: a spreadsheet of Aadhaar
+  numbers is the file that leaks.
+- **Deliberate differences from the bundle:**
+  - _Add Employee_ starts the record (sections 01 and 02) and opens it on the card, where the
+    card's own editors fill 03 to 08. One set of editors means one set of rules; a second
+    address form would be the one that forgot to close the old row.
+  - _Manage_ has no separate modal: account access is changed on People (Change access),
+    which already enforces D78; deactivation is on the card.
+  - _Deactivate_ does not cancel the person's own pending leave requests or hand final
+    settlement to Payroll: the first belongs to Leave and the second to the parked Payroll
+    module (D81). Both are listed in the build spec's known gaps.
 
 ## 8. Acceptance criteria, module level
 

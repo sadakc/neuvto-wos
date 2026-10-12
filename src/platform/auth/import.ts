@@ -60,7 +60,7 @@ export const OPTIONAL_COLUMNS = ["manager_email", "department", "role", "phone"]
  * Excel will contain `"Patel, Priya"` and splitting on commas turns one person
  * into two columns and a silent mess.
  */
-function parseCsv(text: string): string[][] {
+export function parseCsv(text: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [];
   let field = "";

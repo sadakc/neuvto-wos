@@ -10,6 +10,10 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppError } from "@/platform/errors";
 import {
   employeeErrorMessage,
+  type AdminOverview,
+  type DeactivationPreview,
+  type DeactivationResult,
+  type Stage,
   type ChangeRequest,
   type ChangeRequestStatus,
   type RestrictedRead,
@@ -67,6 +71,7 @@ export async function getDirectory(query?: string): Promise<DirectoryRow[]> {
     isActive: r.is_active,
     hasSignedIn: r.has_signed_in,
     adminRole: r.admin_role,
+    stage: r.stage as Stage,
   }));
 }
 
@@ -326,4 +331,96 @@ export async function resolveChange(
     _note: note?.trim() || undefined,
   });
   if (error) throw toEmployeeError(error.message);
+}
+
+// ═══════════════════════════════════════════════════════════ adding and letting go (E8)
+
+export interface DraftInput {
+  fullName?: string;
+  email?: string | null;
+  phone?: string | null;
+  joinedDate?: string | null;
+  departmentId?: string | null;
+  managerId?: string | null;
+}
+
+/** Starts a record before anybody is invited. Needs only a name. */
+export async function createDraft(values: DraftInput): Promise<string> {
+  const { data, error } = await supabase.rpc("employee_create_draft", {
+    _values: values as Values,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+export async function updateDraft(employeeId: string, values: DraftInput): Promise<void> {
+  const { error } = await supabase.rpc("employee_update_draft", {
+    _employee_id: employeeId,
+    _values: values as Values,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+/** Invites a draft. An incomplete record can be invited; its gaps stay on the list. */
+export async function sendInvite(employeeId: string): Promise<void> {
+  const { error } = await supabase.rpc("employee_send_invite", { _employee_id: employeeId });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export async function getAdminOverview(): Promise<AdminOverview> {
+  const { data, error } = await supabase.rpc("employee_admin_overview");
+  if (error) throw toEmployeeError(error.message);
+  return data as unknown as AdminOverview;
+}
+
+export async function getDeactivationPreview(employeeId: string): Promise<DeactivationPreview> {
+  const { data, error } = await supabase.rpc("employee_deactivation_preview", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as unknown as DeactivationPreview;
+}
+
+export async function deactivateEmployee(
+  employeeId: string,
+  successorProfileId: string,
+  lastWorkingDay: string,
+  reason: string,
+): Promise<DeactivationResult> {
+  const { data, error } = await supabase.rpc("employee_deactivate", {
+    _employee_id: employeeId,
+    _successor_id: successorProfileId,
+    _last_working_day: lastWorkingDay,
+    _reason: reason,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as unknown as DeactivationResult;
+}
+
+// ═══════════════════════════════════════════════════════════ bulk import (E8)
+
+export interface ImportCheck {
+  index: number;
+  /** Column → what is wrong with it. Empty for a clean row. */
+  problems: Record<string, string>;
+}
+
+/** The dry run. Writes nothing. */
+export async function checkImport(rows: Record<string, string>[]): Promise<ImportCheck[]> {
+  const { data, error } = await supabase.rpc("employee_import_check", { _rows: rows });
+  if (error) throw toEmployeeError(error.message);
+  return data as unknown as ImportCheck[];
+}
+
+/** Brings rows in as drafts, after the database re-checks every one. */
+export async function commitImport(
+  rows: Record<string, string>[],
+  onlyClean: boolean,
+): Promise<{ created: number; skipped: number }> {
+  const { data, error } = await supabase.rpc("employee_import_commit", {
+    _rows: rows,
+    _only_clean: onlyClean,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as unknown as { created: number; skipped: number };
 }

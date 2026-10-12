@@ -16,7 +16,13 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import { isAppError } from "@/platform/errors";
-import { EMPLOYEE_STATUS_LABEL, type DirectoryRow, type EmployeeStatus } from "../contracts";
+import {
+  EMPLOYEE_STATUS_LABEL,
+  STAGE_LABEL,
+  type DirectoryRow,
+  type EmployeeStatus,
+} from "../contracts";
+import { STAGE_TONE } from "../status";
 import { getDirectory } from "../handlers";
 import { formatDate } from "../format";
 import { PersonLink } from "./PersonLink";
@@ -208,9 +214,10 @@ export default function Directory() {
                         <StatusBadge tone={TONE[r.status]}>
                           {EMPLOYEE_STATUS_LABEL[r.status]}
                         </StatusBadge>
-                        {!r.hasSignedIn && <StatusBadge tone="neutral">Invited</StatusBadge>}
-                        {r.hasSignedIn && !r.isActive && (
-                          <StatusBadge tone="neutral">Deactivated</StatusBadge>
+                        {r.stage !== "active" && (
+                          <StatusBadge tone={STAGE_TONE[r.stage]}>
+                            {STAGE_LABEL[r.stage]}
+                          </StatusBadge>
                         )}
                         {r.adminRole && <StatusBadge tone="info">{r.adminRole}</StatusBadge>}
                       </span>
