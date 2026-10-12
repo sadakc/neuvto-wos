@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.11 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.12 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -500,6 +500,19 @@ template. Import records now downloads and reads one Excel workbook:
   Reminders and escalation need scheduled notifications for this module and are not built.
 - **05 Access and admin roles**: the role table and the rules that are always on. Roles are
   changed on People (Change access). Logging every card view, not only reveals, is not built.
+
+### Documents and Export record (D95, D96, 12 Oct 2026)
+
+- **Documents** is the card's seventh sub-tab, for the person and the Employee Admin only.
+  The twelve documents are listed with uploaded date, expiry and status (Uploaded, Verified,
+  Expired, Not submitted); each earlier employer's relieving letter is its own row. Uploading
+  a document already on file replaces it and keeps the old one. The Employee Admin verifies
+  (never on their own record) and removes with a reason; nothing is deleted. Every opening is
+  logged, and storage will not hand out the file without that log entry, so the footer's "every
+  opening is logged" is enforced, not promised. The Employee Admin can see who opened what.
+  Proved by `verify_employee_documents.sql`.
+- **Export record** in the card header writes a PDF of the card as its viewer received it.
+  Numbers to their last four, always; the physical record and the restricted fields never.
 
 ## 8. Acceptance criteria, module level
 

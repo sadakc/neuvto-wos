@@ -22,6 +22,8 @@ import cards from "./__fixtures__/cards.json";
 vi.mock("../handlers", () => ({
   listChangeRequests: vi.fn().mockResolvedValue([]),
   getRestrictedReads: vi.fn().mockResolvedValue([]),
+  listDocuments: vi.fn().mockResolvedValue([]),
+  listDocumentViews: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children?: React.ReactNode }) => <a>{children}</a>,

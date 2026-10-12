@@ -23,6 +23,9 @@ import {
   type EmployeeCard,
   type EmployeeStatus,
   type OrgChartNode,
+  type DocumentType,
+  type DocumentView,
+  type EmployeeDocument,
 } from "./contracts";
 
 function toEmployeeError(message: string): AppError {
@@ -579,4 +582,109 @@ export async function saveOnboardingItem(
     _mandatory: mandatory,
   });
   if (error) throw toEmployeeError(error.message);
+}
+
+// ═══════════════════════════════════════════════ documents (D95)
+
+const DOCUMENT_BUCKET = "employee-documents";
+const DOCUMENT_MIME = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+const DOCUMENT_MAX_BYTES = 10 * 1024 * 1024;
+
+export async function listDocuments(employeeId: string): Promise<EmployeeDocument[]> {
+  const { data, error } = await supabase.rpc("employee_documents_list", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    docType: r.doc_type as DocumentType,
+    title: r.title,
+    fileName: r.file_name,
+    sizeBytes: r.size_bytes,
+    uploadedAt: r.uploaded_at,
+    uploadedBy: r.uploaded_by,
+    expiresOn: r.expires_on,
+    verifiedAt: r.verified_at,
+    verifiedBy: r.verified_by,
+    status: r.status as EmployeeDocument["status"],
+  }));
+}
+
+/**
+ * Uploads a file into the record's own folder, then files it. Storage refuses
+ * any other folder, and the database refuses a path outside the record.
+ */
+export async function uploadDocument(input: {
+  employeeId: string;
+  docType: DocumentType;
+  title: string;
+  expiresOn: string | null;
+  file: File;
+}): Promise<string> {
+  if (!DOCUMENT_MIME.includes(input.file.type) || input.file.size > DOCUMENT_MAX_BYTES) {
+    throw new AppError("VALIDATION_FAILED", employeeErrorMessage("INVALID_DOCUMENT"), 400);
+  }
+  const { data: org, error: orgErr } = await supabase.rpc("current_org_id");
+  if (orgErr || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
+  const safe = input.file.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
+  const path = `${org}/${input.employeeId}/${crypto.randomUUID()}-${safe}`;
+  const { error: upErr } = await supabase.storage
+    .from(DOCUMENT_BUCKET)
+    .upload(path, input.file, { contentType: input.file.type, upsert: false });
+  if (upErr) throw new AppError("INTERNAL_ERROR", "The file didn't upload. Try again.", 500);
+  const { data, error } = await supabase.rpc("employee_document_add", {
+    _employee_id: input.employeeId,
+    _doc_type: input.docType,
+    _title: input.title,
+    _file_path: path,
+    _file_name: input.file.name,
+    _mime_type: input.file.type,
+    _size_bytes: input.file.size,
+    _expires_on: input.expiresOn ?? undefined,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+export async function verifyDocument(documentId: string): Promise<void> {
+  const { error } = await supabase.rpc("employee_document_verify", { _document_id: documentId });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export async function removeDocument(documentId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc("employee_document_remove", {
+    _document_id: documentId,
+    _reason: reason,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+/**
+ * Logs the opening first, then asks storage for a five-minute link: storage
+ * signs only against a logged view (D95), so there is no unlogged way in.
+ */
+export async function openDocument(documentId: string): Promise<string> {
+  const { data: path, error } = await supabase.rpc("employee_document_open", {
+    _document_id: documentId,
+  });
+  if (error) throw toEmployeeError(error.message);
+  const { data, error: signErr } = await supabase.storage
+    .from(DOCUMENT_BUCKET)
+    .createSignedUrl(path as string, 300);
+  if (signErr || !data) throw new AppError("FORBIDDEN", "That document can't be opened.", 403);
+  return data.signedUrl;
+}
+
+export async function listDocumentViews(employeeId: string): Promise<DocumentView[]> {
+  const { data, error } = await supabase.rpc("employee_document_views_list", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((r) => ({
+    documentId: r.document_id,
+    docType: r.doc_type as DocumentType,
+    title: r.title,
+    viewerName: r.viewer_name,
+    viewedAt: r.viewed_at,
+  }));
 }

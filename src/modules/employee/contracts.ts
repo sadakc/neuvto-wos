@@ -370,6 +370,17 @@ export function employeeErrorMessage(code: string): string {
     return "There's nobody with that record in your company.";
   }
   const write: [string, string][] = [
+    // D95, documents.
+    ["FILE_NOT_IN_RECORD", "That file couldn't be attached. Upload it again."],
+    ["FILE_NOT_UPLOADED", "The file didn't finish uploading. Try again."],
+    ["FILE_ALREADY_FILED", "That file is already on the record."],
+    [
+      "TITLE_REQUIRED",
+      "Say which one it is: the employer a relieving letter is from, or what the document is.",
+    ],
+    ["ALREADY_EXPIRED", "That expiry date has passed. Upload a document that's still valid."],
+    ["INVALID_DOCUMENT", "Upload a PDF or a photo (PNG, JPEG or WebP) of 10 MB or less."],
+    ["NOT_YOUR_OWN", "Somebody else has to verify your own documents."],
     [
       "STATUTORY_KEY_NOT_SET",
       "Statutory data can't be stored yet: this environment's encryption key isn't set. Tell Neuvto support.",
@@ -468,4 +479,51 @@ export interface DeactivationResult {
   postingClosed: { unitName: string; lastDay: string } | null;
   status: string;
   lastWorkingDay: string;
+}
+
+// ═══════════════════════════════════════════════ documents (D95)
+
+/** The twelve documents a record holds, in the prototype's order and words. */
+export const DOCUMENT_TYPES = [
+  { key: "offer_letter", label: "Offer letter", category: "Onboarding" },
+  { key: "appointment_letter", label: "Appointment letter", category: "Onboarding" },
+  { key: "aadhaar", label: "Aadhaar card", category: "Statutory" },
+  { key: "pan", label: "PAN card", category: "Statutory" },
+  { key: "pf_nomination", label: "Form 2, PF nomination", category: "Statutory" },
+  { key: "bank_proof", label: "Bank passbook first page or cancelled cheque", category: "Payroll" },
+  { key: "education", label: "Degree or qualification certificate", category: "Education" },
+  { key: "relieving_letter", label: "Relieving letter", category: "Background", named: true },
+  {
+    key: "police_verification",
+    label: "Police verification report",
+    category: "Background",
+    expires: true,
+  },
+  { key: "passport", label: "Passport", category: "Travel", expires: true },
+  { key: "insurance_nomination", label: "Medical insurance nomination", category: "Benefits" },
+  { key: "other", label: "Other document", category: "Other", named: true },
+] as const;
+export type DocumentType = (typeof DOCUMENT_TYPES)[number]["key"];
+
+export interface EmployeeDocument {
+  id: string;
+  docType: DocumentType;
+  /** The employer of a relieving letter; what an "other" is. */
+  title: string | null;
+  fileName: string;
+  sizeBytes: number;
+  uploadedAt: string;
+  uploadedBy: string | null;
+  expiresOn: string | null;
+  verifiedAt: string | null;
+  verifiedBy: string | null;
+  status: "uploaded" | "verified" | "expired";
+}
+
+export interface DocumentView {
+  documentId: string;
+  docType: DocumentType;
+  title: string | null;
+  viewerName: string;
+  viewedAt: string;
 }

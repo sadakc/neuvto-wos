@@ -7,8 +7,10 @@
  * allows. A colleague's browser never receives a date of birth, so there is
  * nothing here that could show one by mistake.
  *
- * Statutory and bank (E6) and Documents arrive in later stages; until then
- * their tabs do not exist rather than standing empty.
+ * Documents (D95) are the person's and the Employee Admin's only: the tab
+ * appears for those two relationships, and the database refuses anybody else.
+ * Export record (D96) writes what this card was sent, for anybody who can see
+ * it.
  */
 
 import { useRef, useState, type KeyboardEvent } from "react";
@@ -35,6 +37,8 @@ import {
 import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
 import { StatutoryTab } from "./StatutoryTab";
+import { DocumentsTab } from "./DocumentsTab";
+import { downloadRecordPdf } from "../recordExport";
 import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
 import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
 import { STAGE_TONE } from "../status";
@@ -59,7 +63,14 @@ const STATUS_TONE: Record<EmployeeStatus, StatusTone> = {
 
 type Changed = () => Promise<void> | void;
 
-type TabKey = "overview" | "personal" | "family" | "employment" | "statutory" | "history";
+type TabKey =
+  | "overview"
+  | "personal"
+  | "family"
+  | "employment"
+  | "statutory"
+  | "history"
+  | "documents";
 
 /** Which sub-tabs this card can fill, from what the database actually sent. */
 function cardTabs(card: EmployeeCard): { key: TabKey; label: string }[] {
@@ -72,6 +83,9 @@ function cardTabs(card: EmployeeCard): { key: TabKey; label: string }[] {
   }
   if ("addresses" in card || "deployments" in card || "previousOrganisations" in card) {
     tabs.push({ key: "history", label: "History" });
+  }
+  if (card.relationship.includes("self") || card.relationship.includes("admin")) {
+    tabs.push({ key: "documents", label: "Documents" });
   }
   return tabs;
 }
@@ -177,6 +191,13 @@ export function EmployeeCardView({
               )}
             </ul>
           </div>
+          <button
+            type="button"
+            onClick={() => void downloadRecordPdf(card)}
+            className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium"
+          >
+            Export record
+          </button>
           {(card.capabilities.canSendInvite ||
             card.capabilities.canDeactivate ||
             card.capabilities.canEditDraft) && (
@@ -279,6 +300,13 @@ export function EmployeeCardView({
         )}
         {active === "statutory" && <StatutoryTab card={card} onChanged={onChanged} />}
         {active === "history" && <History card={card} onChanged={onChanged} />}
+        {active === "documents" && (
+          <DocumentsTab
+            employeeId={card.id}
+            isAdmin={card.relationship.includes("admin")}
+            isSelf={card.relationship.includes("self")}
+          />
+        )}
       </div>
     </div>
   );

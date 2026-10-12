@@ -27,7 +27,11 @@ import cards from "./__fixtures__/cards.json";
 vi.mock("../handlers", () => ({
   listChangeRequests: vi.fn().mockResolvedValue([]),
   getRestrictedReads: vi.fn().mockResolvedValue([]),
+  listDocuments: vi.fn().mockResolvedValue([]),
+  listDocumentViews: vi.fn().mockResolvedValue([]),
 }));
+const exportRecord = vi.hoisted(() => vi.fn());
+vi.mock("../recordExport", () => ({ downloadRecordPdf: exportRecord }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
     <a className={className}>{children}</a>
@@ -66,6 +70,7 @@ describe("EmployeeCardView", () => {
       "Employment",
       "Statutory and bank",
       "History",
+      "Documents",
     ]);
     expect(within(screen.getByTestId("card-strip")).getByText("Yelahanka")).toBeInTheDocument();
 
@@ -132,7 +137,23 @@ describe("EmployeeCardView", () => {
     expect(personal).toHaveAttribute("aria-selected", "true");
     expect(personal).toHaveFocus();
     expect(overview).toHaveAttribute("tabindex", "-1");
+    // Back past the first tab wraps round to the last.
     await user.keyboard("{ArrowLeft}{ArrowLeft}");
-    expect(screen.getByRole("tab", { name: "History" })).toHaveAttribute("aria-selected", "true");
+    expect(screen.getByRole("tab", { name: "Documents" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("gives the Employee Admin the Documents tab, and nobody else but the person (D95)", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={as("employeeAdmin")} />);
+    expect(tabNames()).toContain("Documents");
+    await user.click(screen.getByRole("tab", { name: "Documents" }));
+    expect(await screen.findByRole("button", { name: "Upload a document" })).toBeInTheDocument();
+  });
+
+  it("offers everybody the record as a PDF, of what they were sent (D96)", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={as("colleague")} />);
+    await user.click(screen.getByRole("button", { name: "Export record" }));
+    expect(exportRecord).toHaveBeenCalledWith(as("colleague"));
   });
 });

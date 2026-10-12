@@ -1203,6 +1203,156 @@ export type Database = {
           },
         ]
       }
+      employee_document_views: {
+        Row: {
+          document_id: string
+          file_path: string
+          id: string
+          viewed_at: string
+          viewer_id: string
+        }
+        Insert: {
+          document_id: string
+          file_path: string
+          id?: string
+          viewed_at?: string
+          viewer_id: string
+        }
+        Update: {
+          document_id?: string
+          file_path?: string
+          id?: string
+          viewed_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_document_views_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "employee_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_documents: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          doc_type: string
+          employee_id: string
+          expires_on: string | null
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string
+          organization_id: string
+          removed_at: string | null
+          removed_by: string | null
+          removed_reason: string | null
+          replaced_at: string | null
+          size_bytes: number
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+          uploaded_at: string
+          uploaded_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          doc_type: string
+          employee_id: string
+          expires_on?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type: string
+          organization_id: string
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
+          replaced_at?: string | null
+          size_bytes: number
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          doc_type?: string
+          employee_id?: string
+          expires_on?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string
+          organization_id?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
+          replaced_at?: string | null
+          size_bytes?: number
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_onboarding_items: {
         Row: {
           created_at: string
@@ -3555,6 +3705,66 @@ export type Database = {
           stage: string
           status: string
           work_email: string
+        }[]
+      }
+      employee_document_add: {
+        Args: {
+          _doc_type: string
+          _employee_id: string
+          _expires_on?: string
+          _file_name: string
+          _file_path: string
+          _mime_type: string
+          _size_bytes: number
+          _title: string
+        }
+        Returns: string
+      }
+      employee_document_may_read: { Args: { _name: string }; Returns: boolean }
+      employee_document_may_upload: {
+        Args: { _name: string }
+        Returns: boolean
+      }
+      employee_document_open: {
+        Args: { _document_id: string }
+        Returns: string
+      }
+      employee_document_remove: {
+        Args: { _document_id: string; _reason: string }
+        Returns: undefined
+      }
+      employee_document_verify: {
+        Args: { _document_id: string }
+        Returns: undefined
+      }
+      employee_document_views_list: {
+        Args: { _employee_id: string }
+        Returns: {
+          doc_type: string
+          document_id: string
+          title: string
+          viewed_at: string
+          viewer_name: string
+        }[]
+      }
+      employee_documents_allowed: {
+        Args: { _employee_id: string }
+        Returns: boolean
+      }
+      employee_documents_list: {
+        Args: { _employee_id: string }
+        Returns: {
+          doc_type: string
+          expires_on: string
+          file_name: string
+          id: string
+          size_bytes: number
+          status: string
+          title: string
+          uploaded_at: string
+          uploaded_by: string
+          verified_at: string
+          verified_by: string
         }[]
       }
       employee_email_is_free: {

@@ -22,6 +22,8 @@ import type { EmployeeCard } from "../contracts";
 import cards from "./__fixtures__/cards.json";
 
 const api = vi.hoisted(() => ({
+  listDocuments: vi.fn(async () => []),
+  listDocumentViews: vi.fn(async () => []),
   addAddress: vi.fn(),
   listActiveUnits: vi.fn(),
   listDesignations: vi.fn(),
