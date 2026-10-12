@@ -3454,6 +3454,24 @@ export type Database = {
           total_days: number
         }[]
       }
+      comp_off_register: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          claim_id: string
+          days_worked: string
+          decided_on: string
+          department_name: string
+          employee_name: string
+          expired_days: number
+          expires_on: string
+          has_proof: boolean
+          leave_type_name: string
+          reason: string
+          status: string
+          submitted_on: string
+          total_days: number
+        }[]
+      }
       comp_off_submit: {
         Args: {
           _days: Json
@@ -3783,6 +3801,18 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      leave_absenteeism_report: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          bradford_factor: number
+          days: number
+          department_name: string
+          employee_id: string
+          employee_name: string
+          spells: number
+          unpaid_days: number
+        }[]
+      }
       leave_accrue_due: { Args: never; Returns: number }
       leave_all_balances: {
         Args: never
@@ -3820,6 +3850,22 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_approval_turnaround: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          approver_name: string
+          days_taken: number
+          decided_at: string
+          decided_by_name: string
+          decision: string
+          employee_name: string
+          level: number
+          moved_up: boolean
+          reached_at: string
+          step_id: string
+          what: string
+        }[]
+      }
       leave_blackout_remove: { Args: { _id: string }; Returns: undefined }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
       leave_carry_adjust: {
@@ -3830,6 +3876,20 @@ export type Database = {
       leave_carry_prepare: { Args: { _from_fy: string }; Returns: string }
       leave_carry_review: { Args: { _from_fy: string }; Returns: Json }
       leave_carry_years: { Args: never; Returns: Json }
+      leave_liability_report: {
+        Args: never
+        Returns: {
+          booked_days: number
+          department_name: string
+          employee_id: string
+          employee_name: string
+          free_days: number
+          fy_label: string
+          kind: string
+          leave_type_name: string
+          not_taken_days: number
+        }[]
+      }
       leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_all_balances: { Args: never; Returns: number }
       leave_mature_balances: { Args: { _org_id: string }; Returns: number }
@@ -3894,6 +3954,10 @@ export type Database = {
       }
       leave_proof_readable: { Args: { _name: string }; Returns: boolean }
       leave_report_schedule_run: { Args: never; Returns: number }
+      leave_report_window: {
+        Args: { _from: string; _to: string }
+        Returns: undefined
+      }
       leave_set_opening_balance: {
         Args: {
           _carryforward: number

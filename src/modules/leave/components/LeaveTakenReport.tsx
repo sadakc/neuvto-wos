@@ -111,6 +111,7 @@ export default function LeaveTakenReport() {
   return (
     <ReportView
       slug="leave-taken"
+      title="Leave taken"
       columns={cols}
       rows={invalid ? [] : rows}
       rowKey={(r) => r.leaveRequestId}

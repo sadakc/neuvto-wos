@@ -369,6 +369,8 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   REVIEW_LOCKED: "This review is locked. Nothing in it can change.",
   REVIEW_STALE:
     "Somebody's balance has moved since this review was prepared. Prepare it again, check it, then lock it.",
+  // D94, the reports.
+  RANGE_TOO_LONG: "Choose a window of a year or less.",
   CARRY_WOULD_OVERDRAW:
     "Somebody has already booked next year's leave against more carried-over days than this gives them. Raise their line, then lock.",
   // D88. Staging is for somebody not yet joined; once they have, their own
@@ -515,4 +517,61 @@ export interface CarryReview {
   /** Whether the year being carried into is open yet (D34): lockable only then. */
   nextYearOpen: boolean;
   lines: CarryLine[];
+}
+
+/** D94 — leave still owed this year, in days. */
+export interface LeaveLiabilityRow {
+  employeeId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeName: string;
+  kind: LeaveKind;
+  fyLabel: string;
+  notTakenDays: number;
+  bookedDays: number;
+  freeDays: number;
+}
+
+/** D94 — one compensatory off claim in the register. */
+export interface CompOffRegisterRow {
+  claimId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeName: string;
+  daysWorked: string;
+  totalDays: number;
+  reason: string;
+  status: CompOffClaim["status"];
+  submittedOn: string;
+  decidedOn: string | null;
+  expiresOn: string | null;
+  expiredDays: number;
+  hasProof: boolean;
+}
+
+/** D94 — one Leave approval decision and how long it took. */
+export interface ApprovalTurnaroundRow {
+  stepId: string;
+  what: string;
+  employeeName: string;
+  level: number;
+  approverName: string;
+  /** Who decided, when it was somebody acting for the approver (D92). */
+  decidedByName: string | null;
+  decision: "approved" | "rejected";
+  reachedAt: string;
+  decidedAt: string;
+  daysTaken: number;
+  movedUp: boolean;
+}
+
+/** D94 — approved leave in a window, per person. */
+export interface AbsenteeismRow {
+  employeeId: string;
+  employeeName: string;
+  departmentName: string | null;
+  spells: number;
+  days: number;
+  unpaidDays: number;
+  bradfordFactor: number;
 }

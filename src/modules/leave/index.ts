@@ -142,6 +142,37 @@ export const leave: ModuleDefinition = {
       component: lazy(() => import("./components/LeavePendingReport")),
       order: 30,
     },
+    // D94.
+    {
+      id: "leave-liability",
+      title: "Leave liability",
+      description:
+        "What is still owed this year, in days: not yet taken, already booked, free to book.",
+      component: lazy(() => import("./components/LeaveLiabilityReport")),
+      order: 40,
+    },
+    {
+      id: "comp-off-register",
+      title: "Compensatory off register",
+      description:
+        "Every claim in the dates you choose: the days worked, what became of it, what expired.",
+      component: lazy(() => import("./components/CompOffRegisterReport")),
+      order: 50,
+    },
+    {
+      id: "approval-turnaround",
+      title: "Approval turnaround",
+      description: "How long each decision took, who made it, and what had to move up.",
+      component: lazy(() => import("./components/ApprovalTurnaroundReport")),
+      order: 60,
+    },
+    {
+      id: "absenteeism",
+      title: "Absenteeism",
+      description: "Approved leave in the dates you choose, per person, with the Bradford factor.",
+      component: lazy(() => import("./components/AbsenteeismReport")),
+      order: 70,
+    },
   ],
 
   // Registered with the Approval Engine, which knows nothing about leave and

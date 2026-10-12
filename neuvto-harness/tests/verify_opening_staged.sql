@@ -145,6 +145,7 @@ begin
   select * into rec from public.leave_staged_opening_balances() where employee_record_id = d1 and leave_type_id = casual;
   select count(*) into n from public.leave_staged_opening_balances() where employee_record_id in (e_ravi, e_other);
   perform pg_temp.os_root();
+  if rec.employee_record_id is null then raise exception 'STAGED FAIL: Nisha is not listed'; end if;
   if rec.entitled_days <> 5 or rec.used_days <> 5 or rec.carryforward_days <> 1 or not rec.staged or rec.stage <> 'draft'
      or rec.employee_name <> 'Nisha Staged' then
     raise exception 'STAGED FAIL: the list reads %', to_jsonb(rec);
@@ -205,6 +206,7 @@ begin
   perform pg_temp.os_as(mark);
   select * into rec from public.leave_staged_opening_problems() where employee_id = kiran;
   perform pg_temp.os_root();
+  if rec.employee_id is null then raise exception 'STAGED FAIL: Kiran''s problem is not listed'; end if;
   if rec.problem is distinct from 'OPENING_BALANCE_OVERDRAWN' or rec.used_days <> 12 then
     raise exception 'STAGED FAIL: the problem reads %', to_jsonb(rec);
   end if;

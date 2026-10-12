@@ -1,6 +1,6 @@
 # Leave Management, phase 2: what the Core HR bundle asks for, and what needs deciding
 
-**Version:** 1.1 · **Status:** Contained items built; the rest for decision · **Applies to:** the `leave` module after the Employee Master (E0–E9)
+**Version:** 1.2 · **Status:** Built: the contained items and all six substantial ones · **Applies to:** the `leave` module after the Employee Master (E0–E9)
 
 The Core HR bundle's chapter 08 describes a second phase of Leave Management. The visual
 redesign is done: every Leave screen now uses the Core HR tokens, type scale, cards and
@@ -33,7 +33,7 @@ where it conflicts, so the scope can be decided rather than guessed.
 - Removing a leave type or holiday behind a modal that states the consequence (criterion 6).
 - Blackout periods with add, edit and remove (criterion 7).
 
-**Substantial (a stage each):**
+**Substantial (a stage each). Built 12 Oct 2026, when Sada asked for phase 2 to be completed:**
 
 - **Compensatory off** as an earned kind: a claim with a required eligibility reason, a
   repeating work log, proof upload, approver credit, expiry, and a register (criteria 2–4).
@@ -99,12 +99,48 @@ each watched failing first.
 
 ## Cost
 
-Nothing paid. Everything above runs on the current Supabase and Cloudflare free tiers.
+Nothing paid. Everything above runs on the current Supabase and Cloudflare free tiers; the two
+new libraries (jsPDF, jspdf-autotable) are MIT-licensed.
 
-## What is needed from Sada
+### Substantial items, as built
 
-The contained items are built. Next: which of the "substantial" items to build, and in
-what order, and what automatic escalation should do (above). A suggested order, smallest
-dependency first: unpaid leave and the reject reason (contained), then compensatory off,
-then accrual and carry-forward review, then delegation and notifications configuration, then
-the extra reports.
+Each is a numbered decision in `NEUVTO_MVP_BUILD_SPEC.md`, chosen by Claude when Sada asked
+for the rest to be completed, and each can be changed.
+
+- **Automatic escalation (D87).** Past its level's target a waiting approval moves to the
+  approver's manager, else the module's admin, else a company admin (active, able to approve,
+  not the requester, not already signing). Both approvers are told; the history and the queue
+  say where it came from. Nobody qualifying: it stays and the admins are told. Never decided
+  by waiting. Swept every 15 minutes. The approval rules field is now "Move up after".
+- **Opening balances for imported people (D88).** Staged against the employee record on
+  Opening balances ("Not joined yet"), applied when they accept; a number that no longer fits
+  is listed and never fails the acceptance.
+- **Compensatory off (D89).** An "earned" leave type: claim days worked (any date, full or
+  half, as many as needed), a reason, optional or required proof; the manager approves; the
+  days are credited with the type's expiry; expiry takes only unused days, first in first out.
+  Claimed at Leave › My Leave › Claim compensatory off.
+- **Accrual (D90).** A paid type is credited all at once or a twelfth each month, rounded down
+  to the half day; only what is credited can be booked.
+- **Carry-forward review (D91).** Each paid type may carry up to so many days. Leave
+  configuration › Carry-forward review: prepare, adjust within what is left, lock. Nothing
+  changes before the lock; locking needs next year open and no balance moved since.
+- **Delegation (D92).** Approvals › "Away? Hand your approvals over": a colleague who can
+  approve, a date range, all modules or one; a company admin can do it for somebody. The
+  history says who decided on whose behalf.
+- **Notifications configuration (D93).** Leave configuration › Notifications: the matrix of
+  events against audiences, the engine's own rules locked on, the rest switchable, plus named
+  people for one department or all. Copies are worded "for your information".
+- **Reports (D94).** Leave liability (in days; money waits for Payroll), compensatory off
+  register, approval turnaround and absenteeism with the Bradford factor. Every report now
+  exports Excel and PDF beside CSV (ExcelJS and jsPDF, both MIT, loaded on demand).
+
+Each proved in its own harness suite (`verify_escalation`, `verify_opening_staged`,
+`verify_comp_off`, `verify_accrual`, `verify_carry_forward`, `verify_delegation`,
+`verify_notification_rules`, `verify_leave_reports_more`), every guard sabotaged, and in
+render tests watched failing first.
+
+## Still open
+
+The conflicts above (1–5) are unchanged: platform settings stay the platform's, payroll
+cut-off waits for Payroll, and the sandwich rule, optional holidays and location calendars
+wait for Attendance.

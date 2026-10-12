@@ -36,6 +36,10 @@ import {
   type CompOffDay,
   type EarnedTypeRules,
   type CarryReview,
+  type LeaveLiabilityRow,
+  type CompOffRegisterRow,
+  type ApprovalTurnaroundRow,
+  type AbsenteeismRow,
 } from "./contracts";
 
 /**
@@ -742,4 +746,77 @@ export async function lockCarry(reviewId: string): Promise<number> {
   const { data, error } = await supabase.rpc("leave_carry_lock", { _review_id: reviewId });
   if (error) throw toCarryError(error.message);
   return data as number;
+}
+
+// ═══════════════════════════════════════════════ four more reports (D94)
+
+export async function getLeaveLiability(): Promise<LeaveLiabilityRow[]> {
+  const { data, error } = await supabase.rpc("leave_liability_report");
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeName: r.leave_type_name,
+    kind: r.kind as LeaveKind,
+    fyLabel: r.fy_label,
+    notTakenDays: Number(r.not_taken_days),
+    bookedDays: Number(r.booked_days),
+    freeDays: Number(r.free_days),
+  }));
+}
+
+export async function getCompOffRegister(from: string, to: string): Promise<CompOffRegisterRow[]> {
+  const { data, error } = await supabase.rpc("comp_off_register", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    claimId: r.claim_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeName: r.leave_type_name,
+    daysWorked: r.days_worked ?? "",
+    totalDays: Number(r.total_days),
+    reason: r.reason,
+    status: r.status as CompOffRegisterRow["status"],
+    submittedOn: r.submitted_on,
+    decidedOn: r.decided_on ?? null,
+    expiresOn: r.expires_on ?? null,
+    expiredDays: Number(r.expired_days),
+    hasProof: r.has_proof,
+  }));
+}
+
+export async function getApprovalTurnaround(
+  from: string,
+  to: string,
+): Promise<ApprovalTurnaroundRow[]> {
+  const { data, error } = await supabase.rpc("leave_approval_turnaround", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    stepId: r.step_id,
+    what: r.what,
+    employeeName: r.employee_name,
+    level: r.level,
+    approverName: r.approver_name,
+    decidedByName: r.decided_by_name ?? null,
+    decision: r.decision as ApprovalTurnaroundRow["decision"],
+    reachedAt: r.reached_at,
+    decidedAt: r.decided_at,
+    daysTaken: Number(r.days_taken),
+    movedUp: r.moved_up,
+  }));
+}
+
+export async function getAbsenteeism(from: string, to: string): Promise<AbsenteeismRow[]> {
+  const { data, error } = await supabase.rpc("leave_absenteeism_report", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    spells: r.spells,
+    days: Number(r.days),
+    unpaidDays: Number(r.unpaid_days),
+    bradfordFactor: Number(r.bradford_factor),
+  }));
 }
