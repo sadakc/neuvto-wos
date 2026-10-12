@@ -17,8 +17,9 @@ import { useEffect, useState } from "react";
 import { getCurrentUser, type CurrentUser } from "@/platform/auth";
 import { getOrgSettings } from "@/platform/calendar";
 import { isAppError } from "@/platform/errors";
-import { listLeaveTypes, saveLeaveType, setLeaveTypeStatus } from "../handlers";
-import { LeaveTypeInput, type LeaveType } from "../contracts";
+import { leaveTypeImpact, listLeaveTypes, saveLeaveType, setLeaveTypeStatus } from "../handlers";
+import { LeaveTypeInput, type LeaveKind, type LeaveType, type LeaveTypeImpact } from "../contracts";
+import { ConfirmRemoval } from "./ConfirmRemoval";
 
 /** The form's own shape: numbers are strings until they parse. */
 type Draft = {
@@ -29,6 +30,7 @@ type Draft = {
   minNoticeDays: string;
   maxPerRequest: string;
   approvalRequired: boolean;
+  kind: LeaveKind;
 };
 
 /**
@@ -56,6 +58,7 @@ const EMPTY: Draft = {
   minNoticeDays: "",
   approvalRequired: true,
   maxPerRequest: "",
+  kind: "paid",
 };
 
 const toDraft = (t: LeaveType): Draft => ({
@@ -66,6 +69,7 @@ const toDraft = (t: LeaveType): Draft => ({
   minNoticeDays: t.minNoticeDays === null ? "" : String(t.minNoticeDays),
   maxPerRequest: t.maxPerRequest === null ? "" : String(t.maxPerRequest),
   approvalRequired: t.approvalRequired,
+  kind: t.kind,
 });
 
 /** Blank means "no limit", which is not the same as zero — hence null, not 0. */
@@ -85,6 +89,11 @@ export default function LeaveTypes() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  /** Leave phase 2: the type about to be archived, and what that leaves behind. */
+  const [archiving, setArchiving] = useState<{
+    type: LeaveType;
+    impact: LeaveTypeImpact | null;
+  } | null>(null);
 
   async function load() {
     setTypes(await listLeaveTypes());
@@ -123,10 +132,11 @@ export default function LeaveTypes() {
         id: draft.id,
         name: draft.name,
         description: draft.description || undefined,
-        maxDaysPerYear: Number(draft.maxDaysPerYear),
+        maxDaysPerYear: draft.kind === "unpaid" ? 0 : Number(draft.maxDaysPerYear),
         minNoticeDays: optionalNumber(draft.minNoticeDays),
         maxPerRequest: optionalNumber(draft.maxPerRequest),
         approvalRequired: draft.approvalRequired,
+        kind: draft.kind,
       });
       await saveLeaveType(parsed, user.organizationId);
       await load();
@@ -148,6 +158,19 @@ export default function LeaveTypes() {
 
   async function onToggleStatus(t: LeaveType) {
     setError("");
+    // Archiving says what it leaves behind first. Restoring loses nothing.
+    if (t.status === "active") {
+      setArchiving({ type: t, impact: null });
+      leaveTypeImpact(t.id)
+        .then((impact) => setArchiving((a) => (a?.type.id === t.id ? { type: t, impact } : a)))
+        .catch(() => {});
+      return;
+    }
+    await setStatus(t);
+  }
+
+  async function setStatus(t: LeaveType) {
+    setArchiving(null);
     try {
       await setLeaveTypeStatus(t.id, t.status === "active" ? "archived" : "active");
       await load();
@@ -202,7 +225,9 @@ export default function LeaveTypes() {
                     neither said which. That is the display half of the same
                     confusion the blank default fixes. */}
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t.maxDaysPerYear} {t.maxDaysPerYear === 1 ? "day" : "days"} a year
+                  {t.kind === "unpaid"
+                    ? "Unpaid · no allowance"
+                    : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year`}
                   {t.minNoticeDays === null
                     ? defaultNotice === null
                       ? " · notice: the workspace default"
@@ -288,28 +313,69 @@ export default function LeaveTypes() {
             />
           </div>
 
+          {/* Chosen once: the database refuses switching a saved type between
+              paid and unpaid, because balances would be stranded. */}
+          {!draft.id && (
+            <fieldset>
+              <legend className="block text-sm font-medium">Paid or unpaid</legend>
+              <div className="mt-2 grid gap-2 @min-[640px]/app:grid-cols-2">
+                {(
+                  [
+                    ["paid", "Paid", "Has a yearly allowance and a balance"],
+                    [
+                      "unpaid",
+                      "Unpaid (loss of pay)",
+                      "No allowance and no balance. Days taken are counted, not paid",
+                    ],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <label
+                    key={value}
+                    className="flex min-h-12 cursor-pointer items-start gap-2.5 rounded-md border border-border px-3 py-2.5 hover:bg-muted"
+                  >
+                    <input
+                      type="radio"
+                      name="lt-kind"
+                      value={value}
+                      checked={draft.kind === value}
+                      onChange={() => setDraft({ ...draft, kind: value })}
+                      aria-label={label}
+                      className="mt-0.5 size-4 shrink-0 accent-primary"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
           <div className="grid gap-4 @min-[640px]/app:grid-cols-3">
-            <div>
-              <label htmlFor="lt-days" className="block text-sm font-medium">
-                Days a year
-              </label>
-              <input
-                id="lt-days"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={365}
-                // Whole days or halves. Entitlement is pro-rated onto the same
-                // grid, so a type set to 12.4 could never be honoured exactly.
-                step={0.5}
-                value={draft.maxDaysPerYear}
-                onChange={(e) => setDraft({ ...draft, maxDaysPerYear: e.target.value })}
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Whole days or halves. Pro-rated for anyone who joins part-way through the year
-              </p>
-            </div>
+            {draft.kind === "paid" && (
+              <div>
+                <label htmlFor="lt-days" className="block text-sm font-medium">
+                  Days a year
+                </label>
+                <input
+                  id="lt-days"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={365}
+                  // Whole days or halves. Entitlement is pro-rated onto the same
+                  // grid, so a type set to 12.4 could never be honoured exactly.
+                  step={0.5}
+                  value={draft.maxDaysPerYear}
+                  onChange={(e) => setDraft({ ...draft, maxDaysPerYear: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Whole days or halves. Pro-rated for anyone who joins part-way through the year
+                </p>
+              </div>
+            )}
 
             <div>
               <label htmlFor="lt-notice" className="block text-sm font-medium">
@@ -407,6 +473,36 @@ export default function LeaveTypes() {
           </div>
         </form>
       )}
+
+      <ConfirmRemoval
+        open={archiving !== null}
+        title={`Archive ${archiving?.type.name ?? "this leave type"}?`}
+        action={`Archive ${archiving?.type.name ?? ""}`.trim()}
+        onCancel={() => setArchiving(null)}
+        onConfirm={() => archiving && void setStatus(archiving.type)}
+      >
+        <p>Nobody will be able to apply for it from now on. Its history stays.</p>
+        {archiving?.impact ? (
+          <ul className="list-disc space-y-1 pl-5" data-testid="archive-impact">
+            <li>
+              {archiving.impact.pendingRequests}{" "}
+              {archiving.impact.pendingRequests === 1 ? "request" : "requests"} waiting for a
+              decision stay waiting, and can still be approved.
+            </li>
+            <li>
+              {archiving.impact.upcomingApproved} approved leave still to come stays approved.
+            </li>
+            <li>
+              {archiving.impact.peopleWithDaysLeft}{" "}
+              {archiving.impact.peopleWithDaysLeft === 1 ? "person still has" : "people still have"}{" "}
+              days of it this year, and can no longer use them.
+            </li>
+          </ul>
+        ) : (
+          <p className="text-xs">Counting what it affects…</p>
+        )}
+        <p>You can restore it later.</p>
+      </ConfirmRemoval>
     </div>
   );
 }

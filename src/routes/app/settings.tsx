@@ -13,6 +13,16 @@ import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platfor
 import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
 import { Departments } from "@/platform/organization/Departments";
 import { WorkingCalendar } from "@/platform/calendar/WorkingCalendar";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 export const Route = createFileRoute("/app/settings")({
   ssr: false,
@@ -39,6 +49,8 @@ function SettingsPage() {
   const [error, setError] = useState("");
 
   const [holidayName, setHolidayName] = useState("");
+  /** The holiday about to be removed: removing changes future counts, so it asks. */
+  const [removing, setRemoving] = useState<Holiday | null>(null);
   const [holidayDate, setHolidayDate] = useState("");
 
   useEffect(() => {
@@ -99,6 +111,7 @@ function SettingsPage() {
   }
 
   async function onRemoveHoliday(id: string) {
+    setRemoving(null);
     setError("");
     try {
       await removeHoliday(id);
@@ -277,7 +290,7 @@ function SettingsPage() {
                       </span>
                     </span>
                     <button
-                      onClick={() => onRemoveHoliday(h.id)}
+                      onClick={() => setRemoving(h)}
                       className="inline-flex h-12 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
                     >
                       Remove
@@ -286,6 +299,28 @@ function SettingsPage() {
                 ))}
               </ul>
             )}
+            <AlertDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)}>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove {removing?.name ?? "this holiday"}?</AlertDialogTitle>
+                  <AlertDialogDescription asChild>
+                    <div className="space-y-2 text-sm text-muted-foreground">
+                      <p>
+                        From now on that date is counted as a working day, so leave applied for over
+                        it uses one more day.
+                      </p>
+                      <p>Leave already applied for is not recounted.</p>
+                    </div>
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel onClick={() => setRemoving(null)}>Keep it</AlertDialogCancel>
+                  <AlertDialogAction onClick={() => removing && void onRemoveHoliday(removing.id)}>
+                    Remove {removing?.name ?? ""}
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           </section>
 
           {/* ─────────────────────────────────────────────── modules */}

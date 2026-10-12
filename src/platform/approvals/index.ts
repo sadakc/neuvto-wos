@@ -32,6 +32,32 @@ export interface ApprovalQueueItem {
   createdAt: string;
   /** Whole days since it was raised. What a queue is really sorted by in a manager's head. */
   daysWaiting: number;
+  /** When it reached the level it is at now. */
+  levelSince: string;
+  /** Whole days at this level. */
+  daysAtLevel: number;
+  /**
+   * The level's `escalate_after_days`, or null. A target, nothing more:
+   * nothing escalates automatically, so the screen must never say it will.
+   */
+  targetDays: number | null;
+}
+
+/**
+ * Why a request was rejected. The codes are the database's
+ * (`approval_reject_reasons()`); the words are the screen's.
+ */
+export const REJECT_REASONS = [
+  { code: "business_need", label: "Needed at work on those dates" },
+  { code: "insufficient_notice", label: "Not enough notice" },
+  { code: "policy", label: "Against company policy" },
+  { code: "documents_missing", label: "Documents missing" },
+  { code: "other", label: "Other" },
+] as const;
+export type RejectReason = (typeof REJECT_REASONS)[number]["code"];
+
+export function rejectReasonLabel(code: string | null | undefined): string | null {
+  return REJECT_REASONS.find((r) => r.code === code)?.label ?? null;
 }
 
 /**
@@ -51,6 +77,8 @@ export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (error) throw toAppError(error, "listApprovalQueue");
 
   const now = Date.now();
+  const days = (iso: string) =>
+    Math.max(0, Math.floor((now - new Date(iso).getTime()) / (1000 * 60 * 60 * 24)));
   return (data ?? []).map((r) => ({
     approvalRequestId: r.approval_request_id,
     entityType: r.entity_type,
@@ -61,10 +89,10 @@ export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
     requiredLevels: r.required_levels,
     context: (r.context ?? {}) as Record<string, unknown>,
     createdAt: r.created_at,
-    daysWaiting: Math.max(
-      0,
-      Math.floor((now - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24)),
-    ),
+    daysWaiting: days(r.created_at),
+    levelSince: r.level_since,
+    daysAtLevel: days(r.level_since),
+    targetDays: r.target_days,
   }));
 }
 
@@ -80,35 +108,78 @@ export async function decideApproval(
   approvalRequestId: string,
   decision: "approved" | "rejected",
   comments?: string,
+  reasonCode?: RejectReason,
 ): Promise<void> {
   const { error } = await supabase.rpc("approval_decide", {
     _request_id: approvalRequestId,
     _decision: decision,
     _comments: comments?.trim() || undefined,
+    _reason_code: reasonCode,
   });
   if (!error) return;
+  throw decideError(error);
+}
 
+/** One request's outcome from approveMany. */
+export interface BulkOutcome {
+  approvalRequestId: string;
+  approved: boolean;
+  /** Why it was not approved, as a sentence; null when it was. */
+  message: string | null;
+}
+
+/**
+ * Approves several at once. Each goes through the same rules as one at a time,
+ * and each outcome comes back separately: one refusal does not stop the rest.
+ * Approve only; a rejection needs its own reason.
+ */
+export async function approveMany(approvalRequestIds: string[]): Promise<BulkOutcome[]> {
+  const { data, error } = await supabase.rpc("approval_decide_many", {
+    _request_ids: approvalRequestIds,
+  });
+  if (error) throw toAppError(error, "approveMany");
+  return (data ?? []).map((r) => ({
+    approvalRequestId: r.approval_request_id,
+    approved: r.status !== null,
+    message: r.error ? decideError({ message: r.error }).message : null,
+  }));
+}
+
+function decideError(error: { message?: string }): AppError {
   // The database raises bare codes. Each of these is a thing a manager can
   // actually do something about, so each gets a sentence rather than a code.
   const raw = error.message ?? "";
+  if (raw.includes("REASON_CODE_REQUIRED")) {
+    return new AppError("VALIDATION_FAILED", "Choose why you're rejecting this.", 400);
+  }
+  if (raw.includes("NOTE_REQUIRED")) {
+    return new AppError(
+      "VALIDATION_FAILED",
+      "Add a short note for the person. They'll read it with the reason.",
+      400,
+    );
+  }
+  if (raw.includes("SELF_APPROVAL_FORBIDDEN")) {
+    return new AppError("FORBIDDEN", "You can't decide your own request.", 403);
+  }
   if (raw.includes("NOT_YOUR_APPROVAL")) {
-    throw new AppError(
+    return new AppError(
       "FORBIDDEN",
       "This is waiting on somebody else at the moment — an earlier level hasn't been decided yet.",
       403,
     );
   }
   if (raw.includes("ALREADY_DECIDED")) {
-    throw new AppError(
+    return new AppError(
       "ALREADY_DECIDED",
       "This has already been decided. Refresh to see where it ended up.",
       409,
     );
   }
   if (raw.includes("TENANT_MISMATCH") || raw.includes("NOT_FOUND")) {
-    throw new AppError("NOT_FOUND", "We couldn't find that request.", 404);
+    return new AppError("NOT_FOUND", "We couldn't find that request.", 404);
   }
-  throw toAppError(error, "decideApproval");
+  return toAppError(error as Parameters<typeof toAppError>[0], "decideApproval");
 }
 
 export const APPROVER_RULES = ["reporting_manager", "manager_of_manager", "role"] as const;

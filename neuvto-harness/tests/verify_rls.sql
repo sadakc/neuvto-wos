@@ -352,10 +352,12 @@ begin
       raise notice 'ok: single-level approval completes';
 
       -- Deciding twice must not reopen a closed request.
+      -- With a valid reason and note, so the refusal can only be ALREADY_DECIDED.
       v_raised := false;
       begin
-        perform public.approval_decide(v_req, 'rejected', null);
-      exception when raise_exception then v_raised := true;
+        perform public.approval_decide(v_req, 'rejected', 'changed my mind', 'other');
+      exception when raise_exception then
+        v_raised := sqlerrm like '%ALREADY_DECIDED%';
       end;
       if not v_raised then raise exception 'RLS FAIL: a completed approval was decided again'; end if;
       raise notice 'ok: a completed approval cannot be decided again';
@@ -397,7 +399,7 @@ begin
       perform pg_temp.as_user(ravi);
       v_req := public.approval_submit('harness_probe', v_ent, '{"size": 5}'::jsonb);
       perform pg_temp.as_user(mark);
-      v_status := public.approval_decide(v_req, 'rejected', 'clashes with a deadline');
+      v_status := public.approval_decide(v_req, 'rejected', 'clashes with a deadline', 'business_need');
       if v_status <> 'rejected' then
         raise exception 'RLS FAIL: rejection at level 1 should end it, got %', v_status;
       end if;
@@ -1900,7 +1902,7 @@ begin
         v_req2 := public.approval_submit('harness_probe', v_ent2, '{"size": 5}'::jsonb);
 
         perform pg_temp.as_user(mark);
-        perform public.approval_decide(v_req2, 'rejected', 'not this time');
+        perform public.approval_decide(v_req2, 'rejected', 'not this time', 'business_need');
 
         perform pg_temp.as_postgres();
         select count(*) into n from notifications

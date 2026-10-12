@@ -20,10 +20,10 @@ import {
 } from "@/platform/calendar";
 import { getCurrentUser, isModuleAdmin, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
-import { getLeaveTypes, getMyBalances, submitLeave } from "../handlers";
-import type { LeaveBalance } from "../contracts";
+import { getBlackouts, getLeaveTypes, getMyBalances, getMyUnpaid, submitLeave } from "../handlers";
+import type { Blackout, LeaveBalance, LeaveKind, UnpaidSummary } from "../contracts";
 
-type LeaveType = { id: string; name: string };
+type LeaveType = { id: string; name: string; kind: LeaveKind };
 
 /** Today in ISO, for the date inputs' `min`. */
 function todayIso(): string {
@@ -37,6 +37,9 @@ export default function ApplyLeave() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [types, setTypes] = useState<LeaveType[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
+  /** Leave phase 2: unpaid leave has no balance, only what was taken. */
+  const [unpaid, setUnpaid] = useState<UnpaidSummary[]>([]);
+  const [blackouts, setBlackouts] = useState<Blackout[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [typeId, setTypeId] = useState("");
@@ -63,12 +66,28 @@ export default function ApplyLeave() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    // Separately and forgivingly: the database refuses a blackout and counts
+    // unpaid leave whether or not these load; they only let the form say so
+    // before sending.
+    getMyUnpaid()
+      .then(setUnpaid)
+      .catch(() => {});
+    getBlackouts()
+      .then(setBlackouts)
+      .catch(() => {});
   }, []);
 
   const balance = useMemo(
     () => balances.find((b) => b.leaveTypeId === typeId) ?? null,
     [balances, typeId],
   );
+  const isUnpaid = types.find((t) => t.id === typeId)?.kind === "unpaid";
+  const unpaidSummary = unpaid.find((u) => u.leaveTypeId === typeId) ?? null;
+  // ISO dates compare as strings. Inclusive at both ends, as the database's.
+  const blackout =
+    fromDate && toDate
+      ? (blackouts.find((b) => b.fromDate <= toDate && b.toDate >= fromDate) ?? null)
+      : null;
 
   // Asked of the database on every date change, debounced. Deliberately not
   // computed here — see the header.
@@ -133,6 +152,8 @@ export default function ApplyLeave() {
 
   // AC2. The message carries the numbers, because "insufficient balance" tells
   // an employee nothing they can act on.
+  // Unpaid leave has no balance row (the database creates none), so `balance`
+  // is null for it and there is never a shortfall to show.
   const shortfall =
     available !== null && workingDays !== null && workingDays > available
       ? `You need ${workingDays} ${workingDays === 1 ? "day" : "days"} but have ${available} available.`
@@ -146,6 +167,7 @@ export default function ApplyLeave() {
     toDate >= fromDate &&
     !!workingDays &&
     !shortfall &&
+    !blackout &&
     !countingDays &&
     !submitting;
 
@@ -291,6 +313,41 @@ export default function ApplyLeave() {
 
       {/* The live line the PRD asks for. Only shown once there is something true
           to say — a balance line reading "0" before dates are chosen is noise. */}
+      {isUnpaid && (
+        <div
+          data-testid="unpaid-line"
+          className="rounded-md border border-border bg-secondary/40 p-4 text-sm"
+        >
+          <p>
+            <strong>Unpaid.</strong> There is no balance: these days are not paid.
+            {workingDays !== null && !countingDays && (
+              <>
+                {" "}
+                Requested: <strong className="tabular-nums">{workingDays}</strong>
+              </>
+            )}
+          </p>
+          {unpaidSummary && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              {unpaidSummary.takenDays} {unpaidSummary.takenDays === 1 ? "day" : "days"} taken this
+              year
+              {unpaidSummary.pendingDays > 0 &&
+                ` · ${unpaidSummary.pendingDays} awaiting a decision`}
+            </p>
+          )}
+          {exclusionNote && !countingDays && (
+            <p className="mt-2 text-xs text-muted-foreground">{exclusionNote}</p>
+          )}
+        </div>
+      )}
+
+      {blackout && (
+        <p data-testid="blackout" className="text-sm text-destructive">
+          Those dates fall in a blackout period ({blackout.name}), when leave can&apos;t be applied
+          for. Choose dates outside it.
+        </p>
+      )}
+
       {balance && (
         <div
           data-testid="balance-line"

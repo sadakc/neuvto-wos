@@ -245,6 +245,7 @@ export type Database = {
           id: string
           level: number
           organization_id: string
+          reason_code: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -260,6 +261,7 @@ export type Database = {
           id?: string
           level: number
           organization_id: string
+          reason_code?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -275,6 +277,7 @@ export type Database = {
           id?: string
           level?: number
           organization_id?: string
+          reason_code?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -1521,6 +1524,53 @@ export type Database = {
           },
         ]
       }
+      leave_blackouts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          from_date: string
+          id: string
+          name: string
+          organization_id: string
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          from_date: string
+          id?: string
+          name: string
+          organization_id: string
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          from_date?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_blackouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approval_request_id: string | null
@@ -1621,6 +1671,7 @@ export type Database = {
           deleted_at: string | null
           description: string | null
           id: string
+          kind: string
           max_days_per_year: number
           max_per_request: number | null
           min_notice_days: number | null
@@ -1637,6 +1688,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          kind?: string
           max_days_per_year?: number
           max_per_request?: number | null
           min_notice_days?: number | null
@@ -1653,6 +1705,7 @@ export type Database = {
           deleted_at?: string | null
           description?: string | null
           id?: string
+          kind?: string
           max_days_per_year?: number
           max_per_request?: number | null
           min_notice_days?: number | null
@@ -2615,9 +2668,18 @@ export type Database = {
         Args: {
           _comments?: string
           _decision: Database["public"]["Enums"]["approval_decision"]
+          _reason_code?: string
           _request_id: string
         }
         Returns: Database["public"]["Enums"]["approval_status"]
+      }
+      approval_decide_many: {
+        Args: { _request_ids: string[] }
+        Returns: {
+          approval_request_id: string
+          error: string
+          status: string
+        }[]
       }
       approval_entity_label: { Args: { _entity_type: string }; Returns: string }
       approval_queue: {
@@ -2629,11 +2691,14 @@ export type Database = {
           entity_id: string
           entity_type: string
           level: number
+          level_since: string
           requester_id: string
           requester_name: string
           required_levels: number
+          target_days: number
         }[]
       }
+      approval_reject_reasons: { Args: never; Returns: string[] }
       approval_submit: {
         Args: { _context?: Json; _entity_id: string; _entity_type: string }
         Returns: string
@@ -2646,6 +2711,7 @@ export type Database = {
           decided_at: string
           decision: Database["public"]["Enums"]["approval_decision"]
           level: number
+          reason_code: string
         }[]
       }
       assert_own_org: { Args: { _org_id: string }; Returns: undefined }
@@ -3018,6 +3084,7 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_blackout_remove: { Args: { _id: string }; Returns: undefined }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
       leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_all_balances: { Args: never; Returns: number }
@@ -3034,6 +3101,16 @@ export type Database = {
           pending_days: number
           reserved_days: number
           used_days: number
+        }[]
+      }
+      leave_my_unpaid: {
+        Args: never
+        Returns: {
+          fy_label: string
+          leave_type_id: string
+          leave_type_name: string
+          pending_days: number
+          taken_days: number
         }[]
       }
       leave_pending_report: {
@@ -3137,6 +3214,7 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_type_impact: { Args: { _leave_type_id: string }; Returns: Json }
       leave_year_open: {
         Args: { _org_id: string; _ref: string }
         Returns: boolean

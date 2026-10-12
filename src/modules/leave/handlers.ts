@@ -25,6 +25,10 @@ import {
   type LeaveBalanceReportRow,
   type LeaveTakenReportRow,
   type LeavePendingReportRow,
+  type LeaveKind,
+  type UnpaidSummary,
+  type Blackout,
+  type LeaveTypeImpact,
 } from "./contracts";
 
 /**
@@ -188,6 +192,7 @@ export async function getApprovalTimeline(approvalRequestId: string): Promise<Ap
     decision: r.decision as ApprovalStep["decision"],
     comments: r.comments,
     decidedAt: r.decided_at,
+    reasonCode: r.reason_code,
   }));
 }
 
@@ -237,15 +242,75 @@ export async function getApprovalDetail(approvalRequestId: string): Promise<Leav
   };
 }
 
-export async function getLeaveTypes(): Promise<{ id: string; name: string }[]> {
+export async function getLeaveTypes(): Promise<{ id: string; name: string; kind: LeaveKind }[]> {
   const { data, error } = await supabase
     .from("leave_types")
-    .select("id, name")
+    .select("id, name, kind")
     .eq("status", "active")
     .order("name");
 
   if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the leave types.", 500);
-  return data ?? [];
+  return (data ?? []).map((t) => ({ id: t.id, name: t.name, kind: t.kind as LeaveKind }));
+}
+
+/** Leave phase 2: the caller's unpaid leave this year, taken and awaiting a decision. */
+export async function getMyUnpaid(): Promise<UnpaidSummary[]> {
+  const { data, error } = await supabase.rpc("leave_my_unpaid");
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load your unpaid leave.", 500);
+  return (data ?? []).map((r) => ({
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    takenDays: Number(r.taken_days),
+    pendingDays: Number(r.pending_days),
+  }));
+}
+
+/** Leave phase 2: blackout periods, soonest first. Everybody in the company reads them. */
+export async function getBlackouts(): Promise<Blackout[]> {
+  const { data, error } = await supabase
+    .from("leave_blackouts")
+    .select("id, name, from_date, to_date")
+    .order("from_date");
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the blackout periods.", 500);
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    fromDate: b.from_date,
+    toDate: b.to_date,
+  }));
+}
+
+/** Adds a blackout period. The organisation comes from the caller, never the form. */
+export async function saveBlackout(
+  input: { name: string; fromDate: string; toDate: string },
+  organizationId: string,
+): Promise<void> {
+  const { error } = await supabase.from("leave_blackouts").insert({
+    organization_id: organizationId,
+    name: input.name.trim(),
+    from_date: input.fromDate,
+    to_date: input.toDate,
+  });
+  if (error) {
+    if (error.message.includes("row-level security")) {
+      throw new AppError("FORBIDDEN", "Only a Leave Admin can add blackout periods.", 403);
+    }
+    throw new AppError("VALIDATION_FAILED", "That blackout period couldn't be saved.", 400);
+  }
+}
+
+/** Removes a blackout period. Leave already applied for is not touched. */
+export async function removeBlackout(id: string): Promise<void> {
+  const { error } = await supabase.rpc("leave_blackout_remove", { _id: id });
+  if (error)
+    throw new AppError("VALIDATION_FAILED", "That blackout period couldn't be removed.", 400);
+}
+
+/** What archiving a leave type would leave behind, for the confirmation. */
+export async function leaveTypeImpact(id: string): Promise<LeaveTypeImpact> {
+  const { data, error } = await supabase.rpc("leave_type_impact", { _leave_type_id: id });
+  if (error) throw toLeaveError(error.message);
+  return data as unknown as LeaveTypeImpact;
 }
 
 // ─────────────────────────────────────────────────────────── administration
@@ -265,7 +330,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
   const { data, error } = await supabase
     .from("leave_types")
     .select(
-      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status",
+      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind",
     )
     .order("status")
     .order("name");
@@ -281,6 +346,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
     maxPerRequest: r.max_per_request === null ? null : Number(r.max_per_request),
     approvalRequired: r.approval_required,
     status: r.status as LeaveType["status"],
+    kind: r.kind as LeaveKind,
   }));
 }
 
@@ -302,9 +368,15 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
     approval_required: parsed.approvalRequired,
   };
 
+  // A saved type's kind is fixed (the database refuses a change), so it is sent
+  // only when the type is created. Unpaid carries no allowance.
   const { error } = parsed.id
     ? await supabase.from("leave_types").update(row).eq("id", parsed.id)
-    : await supabase.from("leave_types").insert(row);
+    : await supabase.from("leave_types").insert({
+        ...row,
+        kind: parsed.kind,
+        max_days_per_year: parsed.kind === "unpaid" ? 0 : parsed.maxDaysPerYear,
+      });
 
   if (error) {
     // uq_leave_type_name is case-insensitive, so "Casual" and "casual" collide.

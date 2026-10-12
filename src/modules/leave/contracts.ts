@@ -80,8 +80,39 @@ export const LeaveTypeInput = z.object({
    * nobody who can approve anything, because D13 forbids self-approval.
    */
   approvalRequired: z.boolean(),
+  /**
+   * Leave phase 2. Unpaid (loss of pay) has no allowance and no balance; the
+   * database insists on max_days_per_year = 0 and refuses changing a saved
+   * type's kind.
+   */
+  kind: z.enum(["paid", "unpaid"]).default("paid"),
 });
-export type LeaveTypeInput = z.infer<typeof LeaveTypeInput>;
+export type LeaveTypeInput = z.input<typeof LeaveTypeInput>;
+
+export type LeaveKind = "paid" | "unpaid";
+
+/** Leave phase 2: what has been taken and asked for, of one unpaid type, this year. */
+export interface UnpaidSummary {
+  leaveTypeId: string;
+  leaveTypeName: string;
+  takenDays: number;
+  pendingDays: number;
+}
+
+/** Leave phase 2: a date range when no leave can be applied for. */
+export interface Blackout {
+  id: string;
+  name: string;
+  fromDate: string;
+  toDate: string;
+}
+
+/** What archiving a leave type leaves behind. */
+export interface LeaveTypeImpact {
+  pendingRequests: number;
+  upcomingApproved: number;
+  peopleWithDaysLeft: number;
+}
 
 export interface LeaveType {
   id: string;
@@ -92,6 +123,7 @@ export interface LeaveType {
   maxPerRequest: number | null;
   approvalRequired: boolean;
   status: "active" | "archived";
+  kind: LeaveKind;
 }
 
 /**
@@ -123,6 +155,8 @@ export interface ApprovalStep {
   decision: "pending" | "approved" | "rejected";
   comments: string | null;
   decidedAt: string | null;
+  /** Leave phase 2: why it was rejected, as a code. */
+  reasonCode?: string | null;
 }
 
 export interface LeaveRequest {
@@ -266,6 +300,9 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   // it. This message is what makes that distinction visible.
   FORBIDDEN: "Reports cover everybody in the workspace, so they're limited to administrators.",
   LEAVE_TYPE_NAME_TAKEN: "There's already a leave type with that name.",
+  UNPAID_HAS_NO_BALANCE: "Unpaid leave has no balance, so there's no opening balance to set.",
+  LEAVE_TYPE_KIND_FIXED:
+    "A leave type can't switch between paid and unpaid. Archive it and add a new one instead.",
   // Leave is counted in whole days and halves, so an opening balance has to be
   // one too. The screen's step="0.5" is a browser attribute; this is the rule.
   NOT_A_HALF_DAY: "Use whole days or halves — 2 or 2.5, not 2.7.",
@@ -287,6 +324,12 @@ export function leaveErrorMessage(code: string): string {
     if (!m) return LEAVE_ERROR_MESSAGES.INSUFFICIENT_NOTICE;
     const days = Number(m[1]);
     return `This leave type needs at least ${days} ${days === 1 ? "day" : "days"} of notice before you apply.`;
+  }
+  if (code.startsWith("BLACKOUT_PERIOD")) {
+    const name = code.split(":").slice(1).join(":").trim();
+    return name
+      ? `Those dates fall in a blackout period (${name}), when leave can't be applied for.`
+      : "Those dates fall in a blackout period, when leave can't be applied for.";
   }
   if (code.startsWith("INSUFFICIENT_BALANCE")) {
     const m = code.match(/requested\s+([\d.]+),\s+available\s+([\d.]+)/);

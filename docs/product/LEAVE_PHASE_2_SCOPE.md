@@ -1,6 +1,6 @@
 # Leave Management, phase 2: what the Core HR bundle asks for, and what needs deciding
 
-**Version:** 1.0 · **Status:** For decision · **Applies to:** the `leave` module after the Employee Master (E0–E9)
+**Version:** 1.1 · **Status:** Contained items built; the rest for decision · **Applies to:** the `leave` module after the Employee Master (E0–E9)
 
 The Core HR bundle's chapter 08 describes a second phase of Leave Management. The visual
 redesign is done: every Leave screen now uses the Core HR tokens, type scale, cards and
@@ -24,7 +24,7 @@ where it conflicts, so the scope can be decided rather than guessed.
 
 ## New in the bundle, grouped by size
 
-**Contained (days each):**
+**Contained (days each). Built 12 Oct 2026, on Sada's choice:**
 
 - Unpaid leave (LOP) as its own kind: no entitlement, nothing credited, availed only; Apply
   Leave's side panel changes shape for it (criteria 1).
@@ -46,6 +46,40 @@ where it conflicts, so the scope can be decided rather than guessed.
   and custom recipients scoped to a department (criterion 9).
 - **Reports**: liability, comp-off register, approval turnaround and absenteeism, with PDF
   and Excel export besides CSV.
+
+### As built
+
+- **Unpaid leave.** `leave_types.kind` is `paid` or `unpaid`, chosen when the type is created
+  and fixed after (the database refuses a change). An unpaid type has no allowance and **no
+  balance row at all**, so every balance update has nothing to touch; Apply shows "Unpaid,
+  no balance" with the days taken and awaiting a decision this year (`leave_my_unpaid()`),
+  never a shortfall. The balances report and opening balances leave it out.
+- **Reject reason and note.** Rejecting needs a reason code (needed at work, not enough
+  notice, against policy, documents missing, other) and a note of at least three
+  characters, enforced by `approval_decide()` for every module's approvals. The person sees
+  both in the approval history.
+- **Approve selected.** Tick requests in Approvals and approve them together;
+  `approval_decide_many()` approves each through the same rules and reports each refusal by
+  name. Approve only: a rejection needs its own reason.
+- **The escalation line, changed.** The bundle's "Escalates to Level 2 in 1 day" would be
+  false: `escalate_after_days` is stored on each chain level, but **nothing has ever acted
+  on it**. Approvals now says how long a request has waited at its level against that
+  target ("waiting 3 days at level 1 of 2 · over the 2-day target"), and never promises an
+  escalation. **Real automatic escalation is a decision for Sada:** what happens when the
+  target passes (move to the next level, add the approver's manager, or only notify).
+- **Removing behind a statement of the consequence.** Archiving a leave type shows how many
+  requests are waiting, how much approved leave is still to come, and how many people lose
+  days they have left (`leave_type_impact()`). Removing a holiday says that date is counted
+  as a working day from now on and that leave already applied for is not recounted.
+  Removing a blackout says the same of blackouts.
+- **Blackout periods.** Leave configuration has a Blackout periods section (Leave Admin
+  only): a name and a date range. Apply names a blackout the dates fall in and will not
+  send; the database refuses it either way (`BLACKOUT_PERIOD`). Leave already applied for is
+  never touched.
+
+Proved in `neuvto-harness/tests/verify_leave_phase2.sql`, every guard sabotaged, and in the
+render tests of Apply, the approval card, Leave types, Blackouts, Approvals and Settings,
+each watched failing first.
 
 ## Conflicts that need a decision
 
@@ -69,7 +103,8 @@ Nothing paid. Everything above runs on the current Supabase and Cloudflare free 
 
 ## What is needed from Sada
 
-Which of the "substantial" items to build, and in what order. A suggested order, smallest
+The contained items are built. Next: which of the "substantial" items to build, and in
+what order, and what automatic escalation should do (above). A suggested order, smallest
 dependency first: unpaid leave and the reject reason (contained), then compensatory off,
 then accrual and carry-forward review, then delegation and notifications configuration, then
 the extra reports.
