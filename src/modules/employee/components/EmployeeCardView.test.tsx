@@ -22,6 +22,12 @@ import { describe, expect, it, vi } from "vitest";
 import type { EmployeeCard } from "../contracts";
 import cards from "./__fixtures__/cards.json";
 
+// The card loads a person's own change requests and who has looked at their
+// restricted data. Neither is what these tests are about; both answer empty.
+vi.mock("../handlers", () => ({
+  listChangeRequests: vi.fn().mockResolvedValue([]),
+  getRestrictedReads: vi.fn().mockResolvedValue([]),
+}));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children, className }: { children?: React.ReactNode; className?: string }) => (
     <a className={className}>{children}</a>

@@ -279,6 +279,30 @@ export const EMPLOYMENT_TYPES = [
   "consultant",
 ] as const;
 
+export const CHANGE_SECTIONS = [
+  ["contact", "Contact details"],
+  ["emergency_contact", "Emergency contact"],
+  ["address", "Address"],
+  ["family", "Family"],
+  ["nominees", "Nominees"],
+  ["other", "Something else"],
+] as const;
+
+export type ChangeRequestStatus = "open" | "done" | "declined";
+
+export interface ChangeRequest {
+  id: string;
+  employeeId: string;
+  employeeName: string | null;
+  section: string;
+  details: string;
+  status: ChangeRequestStatus;
+  resolutionNote: string | null;
+  resolvedByName: string | null;
+  resolvedAt: string | null;
+  createdAt: string;
+}
+
 export const CASTE_CATEGORIES = ["general", "obc", "sc", "st", "ews", "not_disclosed"] as const;
 export const DISABILITY_STATUSES = ["none", "disabled", "not_disclosed"] as const;
 

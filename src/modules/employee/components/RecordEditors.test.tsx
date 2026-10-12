@@ -35,6 +35,9 @@ const api = vi.hoisted(() => ({
   setStatutory: vi.fn(),
   setBank: vi.fn(),
   setRestricted: vi.fn(),
+  listChangeRequests: vi.fn(),
+  requestChange: vi.fn(),
+  resolveChange: vi.fn(),
 }));
 vi.mock("../handlers", () => api);
 vi.mock("@tanstack/react-router", () => ({
@@ -51,6 +54,7 @@ beforeEach(() => {
   vi.resetAllMocks();
   api.listDesignations.mockResolvedValue([]);
   api.getRestrictedReads.mockResolvedValue([]);
+  api.listChangeRequests.mockResolvedValue([]);
 });
 
 async function openTab(name: string) {

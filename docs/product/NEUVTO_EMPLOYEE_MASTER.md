@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.3 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.4 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -351,9 +351,15 @@ Every writer is an Admin's (§5) and lives in `20261014100000_the_record_is_writ
   removed. A row id belonging to somebody else is NOT_FOUND.
 - **The nominee total is the E4 constraint trigger's**, made immediate inside the function
   so a 90% nomination is refused before anything is written, not at commit.
-- **Not built yet, and why:**
-  - _Request a change_ (the person's own route to a correction) needs a route through the
-    Approval Engine and a notification template. It is the next piece of E7 to land.
+- **Request a change, built.** `employee_request_change`, `employee_change_requests`,
+  `employee_resolve_change`. A person describes the correction; every active admin of the
+  company is emailed; an Admin makes it with the editors and marks it made or declined
+  (declining needs a reason), and the person is emailed. Deliberately not an automatic
+  apply, and not an approval chain: an address change closes a row for good, so an Admin who
+  can see the history makes it. The notification engine gained two generic audiences
+  (`organization_admins`, `recipient_id`) instead of learning this module's event names. Ten
+  open requests per person at most. Proved by `verify_change_requests.sql`.
+- **Still not built:**
   - _Move to another unit:_ the three checkboxes (carry the unit's shift and calendar, notify
     the receiving coordinator, notify the employee) are not offered. There is no shift model
     or unit coordinator assignment yet, and a checkbox that does nothing is worse than none.

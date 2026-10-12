@@ -34,6 +34,7 @@ import {
 import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
 import { StatutoryTab } from "./StatutoryTab";
+import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
 import {
   AddAddressDialog,
   ContactEditors,
@@ -82,6 +83,7 @@ export function EmployeeCardView({
 }) {
   const tabs = cardTabs(card);
   const [tab, setTab] = useState<TabKey>("overview");
+  const [requestsSent, setRequestsSent] = useState(0);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const active = tabs.some((t) => t.key === tab) ? tab : "overview";
 
@@ -168,6 +170,16 @@ export function EmployeeCardView({
               )}
             </ul>
           </div>
+          {card.capabilities.canRequestChange && (
+            <div className="flex w-full flex-col items-start gap-1 @min-[640px]/app:w-auto @min-[640px]/app:items-end">
+              <RequestChangeButton card={card} onSent={() => setRequestsSent((n) => n + 1)} />
+              {requestsSent > 0 && (
+                <p role="status" data-testid="request-sent" className="text-caption text-success">
+                  Sent to your HR admins.
+                </p>
+              )}
+            </div>
+          )}
         </div>
         <dl
           data-testid="card-strip"
@@ -225,7 +237,12 @@ export function EmployeeCardView({
         aria-labelledby={`card-tab-${active}`}
         className="min-w-0"
       >
-        {active === "overview" && <Overview card={card} onChanged={onChanged} />}
+        {active === "overview" && (
+          <div className="flex flex-col gap-4">
+            <Overview card={card} onChanged={onChanged} />
+            {card.capabilities.canRequestChange && <MyChangeRequests refreshKey={requestsSent} />}
+          </div>
+        )}
         {active === "personal" && <Personal card={card} onChanged={onChanged} />}
         {active === "family" && <Family card={card} onChanged={onChanged} />}
         {active === "employment" && (

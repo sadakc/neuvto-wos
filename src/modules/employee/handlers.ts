@@ -10,6 +10,8 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppError } from "@/platform/errors";
 import {
   employeeErrorMessage,
+  type ChangeRequest,
+  type ChangeRequestStatus,
   type RestrictedRead,
   type RevealField,
   type Revealed,
@@ -273,4 +275,55 @@ export async function listActiveUnits(): Promise<Option[]> {
     .order("name");
   if (error) throw toEmployeeError(error.message);
   return (data ?? []).map((u) => ({ id: u.id, name: u.name, detail: u.client_name }));
+}
+
+// ═══════════════════════════════════════════════════════════ change requests (E7)
+
+/** Ask an Admin to correct your own record. Nothing changes until they do. */
+export async function requestChange(
+  employeeId: string,
+  section: string,
+  details: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_request_change", {
+    _employee_id: employeeId,
+    _section: section,
+    _details: details,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+/** An Admin gets the company's; anybody else gets their own. `null` for every status. */
+export async function listChangeRequests(
+  status: ChangeRequestStatus | null,
+): Promise<ChangeRequest[]> {
+  const { data, error } = await supabase.rpc("employee_change_requests", {
+    _status: status ?? undefined,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    section: r.section,
+    details: r.details,
+    status: r.status as ChangeRequestStatus,
+    resolutionNote: r.resolution_note,
+    resolvedByName: r.resolved_by_name,
+    resolvedAt: r.resolved_at,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function resolveChange(
+  requestId: string,
+  outcome: "done" | "declined",
+  note?: string,
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_resolve_change", {
+    _request_id: requestId,
+    _outcome: outcome,
+    _note: note?.trim() || undefined,
+  });
+  if (error) throw toEmployeeError(error.message);
 }

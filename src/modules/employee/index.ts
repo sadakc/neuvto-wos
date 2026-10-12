@@ -23,6 +23,13 @@ export const employee: ModuleDefinition = {
     { label: "My Card", to: "/app/employee" },
     { label: "Directory", to: "/app/employee/directory" },
     { label: "Org Chart", to: "/app/employee/org-chart" },
+    {
+      label: "Change requests",
+      to: "/app/employee/change-requests",
+      group: "company",
+      roles: ["super_admin", "org_admin", "hr_admin"],
+      description: "Corrections people have asked for on their own record",
+    },
   ],
 
   routes: [
@@ -31,11 +38,16 @@ export const employee: ModuleDefinition = {
     // Under Directory, so the tab bar keeps Directory lit while you read somebody.
     { path: "employee/directory/person", component: lazy(() => import("./components/PersonCard")) },
     { path: "employee/org-chart", component: lazy(() => import("./components/OrgChart")) },
+    {
+      path: "employee/change-requests",
+      component: lazy(() => import("./components/ChangeRequests")),
+    },
   ],
 
-  // Nothing to approve and nothing to announce yet; E7 adds change requests.
+  // Change requests go to admins directly, not through approval chains: an
+  // Admin acts on them, nobody signs them off.
   approvalEntityTypes: [],
-  eventKeys: [],
+  eventKeys: ["employee.change_requested", "employee.change_resolved"],
   settingsSchema: z.object({}),
 
   ownedTables: [
@@ -48,6 +60,11 @@ export const employee: ModuleDefinition = {
     "nominees",
     "family_members",
     "previous_organisations",
+    "employee_statutory",
+    "employee_bank",
+    "employee_restricted",
+    "restricted_reads",
+    "employee_change_requests",
   ],
 };
 

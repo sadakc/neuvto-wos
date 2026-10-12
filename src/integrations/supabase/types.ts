@@ -729,6 +729,72 @@ export type Database = {
           },
         ]
       }
+      employee_change_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          details: string
+          employee_id: string
+          id: string
+          organization_id: string
+          requested_by: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          section: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          details: string
+          employee_id: string
+          id?: string
+          organization_id: string
+          requested_by?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          details?: string
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          requested_by?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_change_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_change_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_deployments: {
         Row: {
           created_at: string
@@ -2479,6 +2545,21 @@ export type Database = {
       }
       employee_age: { Args: { _dob: string; _org: string }; Returns: number }
       employee_card: { Args: { _employee_id?: string }; Returns: Json }
+      employee_change_requests: {
+        Args: { _status?: string }
+        Returns: {
+          created_at: string
+          details: string
+          employee_id: string
+          employee_name: string
+          id: string
+          resolution_note: string
+          resolved_at: string
+          resolved_by_name: string
+          section: string
+          status: string
+        }[]
+      }
       employee_directory: {
         Args: { _q?: string }
         Returns: {
@@ -2521,8 +2602,16 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: string[]
       }
+      employee_request_change: {
+        Args: { _details: string; _employee_id: string; _section: string }
+        Returns: string
+      }
       employee_require_admin: {
         Args: { _employee_id: string }
+        Returns: undefined
+      }
+      employee_resolve_change: {
+        Args: { _note?: string; _outcome: string; _request_id: string }
         Returns: undefined
       }
       employee_restricted_reads: {
