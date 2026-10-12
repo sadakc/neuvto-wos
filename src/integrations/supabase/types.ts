@@ -1969,6 +1969,7 @@ export type Database = {
       }
       leave_types: {
         Row: {
+          accrual: string
           approval_required: boolean
           created_at: string
           created_by: string | null
@@ -1989,6 +1990,7 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          accrual?: string
           approval_required?: boolean
           created_at?: string
           created_by?: string | null
@@ -2009,6 +2011,7 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          accrual?: string
           approval_required?: boolean
           created_at?: string
           created_by?: string | null
@@ -3415,6 +3418,7 @@ export type Database = {
         Returns: boolean
       }
       is_super_admin: { Args: never; Returns: boolean }
+      leave_accrue_due: { Args: never; Returns: number }
       leave_all_balances: {
         Args: never
         Returns: {

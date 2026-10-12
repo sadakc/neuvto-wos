@@ -95,3 +95,28 @@ describe("compensatory off (D89)", () => {
     );
   });
 });
+
+describe("monthly crediting (D90)", () => {
+  it("says on the balance that a type is credited monthly, and only that one", async () => {
+    const bal = (id: string, name: string) => ({
+      leaveTypeId: id,
+      leaveTypeName: name,
+      fyLabel: "2026-27",
+      entitledDays: 8.5,
+      carryforwardDays: 0,
+      usedDays: 0,
+      reservedDays: 0,
+      pendingDays: 0,
+      availableDays: 8.5,
+    });
+    h.getMyBalances.mockResolvedValue([bal("el", "Earned leave"), bal("casual", "Casual")]);
+    h.getLeaveTypes.mockResolvedValue([
+      { id: "el", name: "Earned leave", kind: "paid", accrual: "monthly" },
+      { id: "casual", name: "Casual", kind: "paid", accrual: "upfront" },
+    ]);
+    render(<MyLeave />);
+    expect(await screen.findAllByText("Credited monthly: more each month")).toHaveLength(1);
+    const card = screen.getByText("Credited monthly: more each month").closest("div.rounded-xl");
+    expect(card).toHaveTextContent("Earned leave");
+  });
+});

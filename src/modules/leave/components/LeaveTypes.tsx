@@ -35,6 +35,8 @@ type Draft = {
   earnedExpiresAfterDays: string;
   earnedClaimWithinDays: string;
   earnedProofRequired: boolean;
+  /** D90. */
+  accrual: "upfront" | "monthly";
 };
 
 /**
@@ -66,6 +68,7 @@ const EMPTY: Draft = {
   earnedExpiresAfterDays: "",
   earnedClaimWithinDays: "",
   earnedProofRequired: false,
+  accrual: "upfront",
 };
 
 const toDraft = (t: LeaveType): Draft => ({
@@ -80,6 +83,7 @@ const toDraft = (t: LeaveType): Draft => ({
   earnedExpiresAfterDays: t.earnedExpiresAfterDays ? String(t.earnedExpiresAfterDays) : "",
   earnedClaimWithinDays: t.earnedClaimWithinDays ? String(t.earnedClaimWithinDays) : "",
   earnedProofRequired: t.earnedProofRequired ?? false,
+  accrual: t.accrual ?? "upfront",
 });
 
 /** Blank means "no limit", which is not the same as zero — hence null, not 0. */
@@ -150,6 +154,7 @@ export default function LeaveTypes() {
         earnedExpiresAfterDays: optionalNumber(draft.earnedExpiresAfterDays),
         earnedClaimWithinDays: optionalNumber(draft.earnedClaimWithinDays),
         earnedProofRequired: draft.earnedProofRequired,
+        accrual: draft.kind === "paid" ? draft.accrual : "upfront",
       });
       await saveLeaveType(parsed, user.organizationId);
       await load();
@@ -242,7 +247,11 @@ export default function LeaveTypes() {
                     ? "Unpaid · no allowance"
                     : t.kind === "earned"
                       ? earnedSummary(t)
-                      : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year`}
+                      : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year${
+                          t.accrual === "monthly"
+                            ? `, credited monthly (${Math.round((t.maxDaysPerYear / 12) * 100) / 100} a month)`
+                            : ""
+                        }`}
                   {t.minNoticeDays === null
                     ? defaultNotice === null
                       ? " · notice: the workspace default"
@@ -421,6 +430,47 @@ export default function LeaveTypes() {
                 <span className="text-sm">Proof needed with every claim</span>
               </label>
             </div>
+          )}
+
+          {draft.kind === "paid" && (
+            <fieldset>
+              <legend className="block text-sm font-medium">How it&apos;s credited</legend>
+              <div className="mt-2 grid gap-2 @min-[640px]/app:grid-cols-2">
+                {(
+                  [
+                    [
+                      "upfront",
+                      "All at the start of the year",
+                      "The year's days at once, pro-rated for anyone who joins part-way",
+                    ],
+                    [
+                      "monthly",
+                      "A twelfth each month",
+                      "Credited at the start of each month worked, rounded down to the half day",
+                    ],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <label
+                    key={value}
+                    className="flex min-h-12 cursor-pointer items-start gap-2.5 rounded-md border border-border px-3 py-2.5 hover:bg-muted"
+                  >
+                    <input
+                      type="radio"
+                      name="lt-accrual"
+                      value={value}
+                      checked={draft.accrual === value}
+                      onChange={() => setDraft({ ...draft, accrual: value })}
+                      aria-label={label}
+                      className="mt-0.5 size-4 shrink-0 accent-primary"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
           )}
 
           <div className="grid gap-4 @min-[640px]/app:grid-cols-3">

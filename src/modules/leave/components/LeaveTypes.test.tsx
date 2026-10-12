@@ -306,6 +306,49 @@ describe("LeaveTypes — unpaid leave (Leave phase 2)", () => {
   });
 });
 
+describe("LeaveTypes — credited monthly (D90)", () => {
+  it("adds a type credited each month, and says so on its row", async () => {
+    const user = userEvent.setup();
+    listLeaveTypes.mockResolvedValue([
+      CASUAL,
+      { ...CASUAL, id: "el", name: "Earned leave", maxDaysPerYear: 15, accrual: "monthly" },
+    ]);
+    await renderSettled();
+    expect(rowFor("Earned leave")).toHaveTextContent(
+      "15 days a year, credited monthly (1.25 a month)",
+    );
+    expect(rowFor("Casual leave")).toHaveTextContent("12 days a year");
+    expect(rowFor("Casual leave")).not.toHaveTextContent("monthly");
+
+    await user.click(screen.getByTestId("add-leave-type"));
+    await user.type(screen.getByLabelText("Name"), "Privilege leave");
+    expect(screen.getByLabelText(/All at the start of the year/)).toBeChecked();
+    await user.click(screen.getByLabelText(/A twelfth each month/));
+    await user.click(screen.getByTestId("save-leave-type"));
+    expect(saveLeaveType).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Privilege leave", kind: "paid", accrual: "monthly" }),
+      "org",
+    );
+  });
+
+  it("offers monthly crediting only for a paid type", async () => {
+    const user = userEvent.setup();
+    listLeaveTypes.mockResolvedValue([CASUAL]);
+    await renderSettled();
+    await user.click(screen.getByTestId("add-leave-type"));
+    // Chosen while paid, then the kind changes: monthly must not survive it.
+    await user.click(screen.getByLabelText(/A twelfth each month/));
+    await user.click(screen.getByLabelText(/Unpaid \(loss of pay\)/));
+    expect(screen.queryByLabelText(/A twelfth each month/)).toBeNull();
+    await user.type(screen.getByLabelText("Name"), "LOP");
+    await user.click(screen.getByTestId("save-leave-type"));
+    expect(saveLeaveType).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "unpaid", accrual: "upfront" }),
+      "org",
+    );
+  });
+});
+
 describe("LeaveTypes — compensatory off (D89)", () => {
   it("adds an earned type with its expiry, claim window and proof rule, and says so on its row", async () => {
     const user = userEvent.setup();

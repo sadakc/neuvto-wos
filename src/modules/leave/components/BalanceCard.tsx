@@ -23,7 +23,14 @@
 
 import type { LeaveBalance } from "../contracts";
 
-export function BalanceCard({ balance }: { balance: LeaveBalance }) {
+export function BalanceCard({
+  balance,
+  monthly = false,
+}: {
+  balance: LeaveBalance;
+  /** D90: the type is credited a twelfth a month, so Entitled grows. */
+  monthly?: boolean;
+}) {
   const entitled = balance.entitledDays + balance.carryforwardDays;
 
   // Only the parts that are actually non-zero. A row of "− 0 awaiting approval"
@@ -49,6 +56,9 @@ export function BalanceCard({ balance }: { balance: LeaveBalance }) {
         {balance.availableDays}
       </p>
       <p className="text-xs text-muted-foreground">days available</p>
+      {monthly && (
+        <p className="text-xs text-muted-foreground">Credited monthly: more each month</p>
+      )}
 
       <dl className="mt-3 space-y-1 border-t border-border pt-3 text-xs">
         <div className="flex justify-between gap-2">

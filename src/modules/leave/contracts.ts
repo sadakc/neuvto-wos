@@ -106,6 +106,8 @@ export const LeaveTypeInput = z.object({
     .nullable()
     .default(null),
   earnedProofRequired: z.boolean().default(false),
+  /** D90, a paid type only: the year at once, or a twelfth each month. */
+  accrual: z.enum(["upfront", "monthly"]).default("upfront"),
 });
 export type LeaveTypeInput = z.input<typeof LeaveTypeInput>;
 
@@ -145,6 +147,8 @@ export interface LeaveType {
   approvalRequired: boolean;
   status: "active" | "archived";
   kind: LeaveKind;
+  /** D90: how a paid type's allowance is credited. */
+  accrual?: "upfront" | "monthly";
   /** D89, earned types only. */
   earnedExpiresAfterDays?: number | null;
   earnedClaimWithinDays?: number | null;
@@ -463,4 +467,6 @@ export interface EarnedTypeRules {
   earnedExpiresAfterDays?: number | null;
   earnedClaimWithinDays?: number | null;
   earnedProofRequired?: boolean;
+  /** D90. */
+  accrual?: "upfront" | "monthly";
 }

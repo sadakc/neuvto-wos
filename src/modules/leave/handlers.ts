@@ -254,7 +254,7 @@ export async function getLeaveTypes(): Promise<EarnedTypeRules[]> {
   const { data, error } = await supabase
     .from("leave_types")
     .select(
-      "id, name, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required",
+      "id, name, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required, accrual",
     )
     .eq("status", "active")
     .order("name");
@@ -267,6 +267,7 @@ export async function getLeaveTypes(): Promise<EarnedTypeRules[]> {
     earnedExpiresAfterDays: t.earned_expires_after_days,
     earnedClaimWithinDays: t.earned_claim_within_days,
     earnedProofRequired: t.earned_proof_required,
+    accrual: t.accrual as EarnedTypeRules["accrual"],
   }));
 }
 
@@ -347,7 +348,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
   const { data, error } = await supabase
     .from("leave_types")
     .select(
-      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required",
+      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required, accrual",
     )
     .order("status")
     .order("name");
@@ -367,6 +368,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
     earnedExpiresAfterDays: r.earned_expires_after_days,
     earnedClaimWithinDays: r.earned_claim_within_days,
     earnedProofRequired: r.earned_proof_required,
+    accrual: r.accrual as LeaveType["accrual"],
   }));
 }
 
@@ -390,6 +392,8 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
     earned_expires_after_days: parsed.kind === "earned" ? parsed.earnedExpiresAfterDays : null,
     earned_claim_within_days: parsed.kind === "earned" ? parsed.earnedClaimWithinDays : null,
     earned_proof_required: parsed.kind === "earned" ? parsed.earnedProofRequired : false,
+    // D90. Only a paid type accrues; the database refuses anything else.
+    accrual: parsed.kind === "paid" ? parsed.accrual : "upfront",
   };
 
   // A saved type's kind is fixed (the database refuses a change), so it is sent

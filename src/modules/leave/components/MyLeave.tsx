@@ -51,6 +51,8 @@ export default function MyLeave() {
   const [cancelError, setCancelError] = useState("");
   /** D89: whether the company has compensatory off to claim. */
   const [hasEarned, setHasEarned] = useState(false);
+  /** D90: the types credited monthly, so their cards can say why Entitled grows. */
+  const [monthly, setMonthly] = useState<Set<string>>(new Set());
 
   async function load() {
     const [b, r] = await Promise.all([getMyBalances(), getMyRequests()]);
@@ -65,7 +67,11 @@ export default function MyLeave() {
       .catch(() => !cancelled && setState("error"));
     // Decoration: failing it leaves the link out, never the page.
     getLeaveTypes()
-      .then((t) => !cancelled && setHasEarned(t.some((x) => x.kind === "earned")))
+      .then((t) => {
+        if (cancelled) return;
+        setHasEarned(t.some((x) => x.kind === "earned"));
+        setMonthly(new Set(t.filter((x) => x.accrual === "monthly").map((x) => x.id)));
+      })
       .catch(() => {});
     return () => {
       cancelled = true;
@@ -162,7 +168,11 @@ export default function MyLeave() {
         ) : (
           <div className="mt-4 grid gap-3 @min-[560px]/app:grid-cols-2 @min-[900px]/app:grid-cols-3">
             {balances.map((b) => (
-              <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
+              <BalanceCard
+                key={`${b.leaveTypeId}-${b.fyLabel}`}
+                balance={b}
+                monthly={monthly.has(b.leaveTypeId)}
+              />
             ))}
           </div>
         )}
