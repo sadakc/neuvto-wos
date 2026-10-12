@@ -111,7 +111,7 @@ function SettingsPage() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Administrators only</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Workspace settings are managed by your administrator.
         </p>
@@ -122,7 +122,7 @@ function SettingsPage() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">{message}</p>
         <button
           onClick={() => window.location.reload()}
@@ -136,7 +136,7 @@ function SettingsPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">Workspace settings</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">Workspace settings</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         Configuration your organisation owns. Changing the working week or the financial year
         changes how every future request is counted.
@@ -144,7 +144,7 @@ function SettingsPage() {
 
       {/* ─────────────────────────────────────────────── company */}
       <section className="mt-8">
-        <h2 className="font-display text-base font-semibold">Your company</h2>
+        <h2 className="text-card-title font-semibold tracking-card-title">Your company</h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           What this workspace is called, and the mark your people see on every screen and in every
           email from it.
@@ -160,7 +160,7 @@ function SettingsPage() {
           files is a weekend that eventually means two things — with every
           balance in the product counted against it. */}
       <section className="mt-10">
-        <h2 className="font-display text-base font-semibold">Working calendar</h2>
+        <h2 className="text-card-title font-semibold tracking-card-title">Working calendar</h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           Changing the working week or the financial year changes how every future request is
           counted. Leave already booked is not recalculated.
@@ -175,7 +175,9 @@ function SettingsPage() {
           Department column exists on every report and, until now, nothing in
           the product could put anybody in one. */}
       <section className="mt-12">
-        <h2 className="font-display text-lg font-semibold tracking-tight">Departments</h2>
+        <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
+          Departments
+        </h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           How your workforce is grouped on reports. Somebody&apos;s department is set on their row
           under People, or from the department column of a spreadsheet import.
@@ -185,7 +187,9 @@ function SettingsPage() {
 
       {/* ─────────────────────────────────────────────── holidays */}
       <section className="mt-12">
-        <h2 className="font-display text-lg font-semibold tracking-tight">Holidays</h2>
+        <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
+          Holidays
+        </h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           Days excluded from leave when a request spans them. Shared with attendance and shift
           planning when those arrive.
@@ -258,7 +262,9 @@ function SettingsPage() {
 
       {/* ─────────────────────────────────────────────── modules */}
       <section className="mt-12">
-        <h2 className="font-display text-lg font-semibold tracking-tight">Modules</h2>
+        <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
+          Modules
+        </h2>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           What this workspace has, and what is switched on. Neuvto adds modules to your workspace;
           switching them on and off is yours.
@@ -278,7 +284,9 @@ function SettingsPage() {
         const Section = section.component;
         return (
           <section key={`${section.moduleKey}:${section.id}`} className="mt-12">
-            <h2 className="font-display text-lg font-semibold tracking-tight">{section.title}</h2>
+            <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
+              {section.title}
+            </h2>
             {section.description && (
               <p className="mt-1 max-w-prose text-sm text-muted-foreground">
                 {section.description}

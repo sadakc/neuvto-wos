@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.6 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.7 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -331,7 +331,10 @@ screen change has been through `screen-prover`.
 | E8 ✔  | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
 | E9 ✔  | Configuration, and the responsive and role sweeps                                                                 | Every one of the 62 source columns has a home; `scrollWidth === clientWidth` on every route at every width                     |
 
-Leave Management's redesign follows E9, to the same design, reusing E1's shell.
+Leave Management's redesign follows E9, to the same design, reusing E1's shell. **Done for the
+look (16 Oct 2026):** every Leave screen uses the Core HR tokens, type scale, cards and
+container queries. The bundle's Leave chapter is also a feature specification; what it adds,
+where it conflicts and what needs deciding is in `LEAVE_PHASE_2_SCOPE.md`.
 
 ---
 

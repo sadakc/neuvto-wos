@@ -176,13 +176,13 @@ export default function ApplyLeave() {
   if (done) {
     return (
       <div className="mx-auto max-w-lg">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="font-display text-lg font-semibold">Request sent</h1>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <h1 className="text-page-title font-semibold tracking-page-title">Request sent</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Your leave request is with your approver. You&apos;ll get an email when it&apos;s
             decided.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-col gap-3 @min-[640px]/app:flex-row">
             <button
               onClick={() => navigate({ to: "/app/$", params: { _splat: "leave" } })}
               className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
@@ -215,7 +215,7 @@ export default function ApplyLeave() {
   if (types.length === 0) {
     return (
       <div className="max-w-lg">
-        <h1 className="font-display text-lg font-semibold">Apply for leave</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Apply for leave</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           {isAdmin(user)
             ? "No leave types are set up yet, so there's nothing to apply for."
@@ -235,7 +235,7 @@ export default function ApplyLeave() {
 
   return (
     <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-6">
-      <h1 className="font-display text-lg font-semibold">Apply for leave</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">Apply for leave</h1>
 
       <div>
         <label htmlFor="leave-type" className="block text-sm font-medium">
@@ -257,7 +257,7 @@ export default function ApplyLeave() {
       </div>
 
       {/* AC1 — past dates are unselectable rather than rejected after the fact. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+      <div className="grid grid-cols-1 gap-4 @min-[560px]/app:grid-cols-2">
         <div>
           <label htmlFor="from-date" className="block text-sm font-medium">
             First day
@@ -362,7 +362,7 @@ export default function ApplyLeave() {
         type="submit"
         disabled={!canSubmit}
         data-testid="submit-leave"
-        className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50 sm:w-auto"
+        className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50 @min-[640px]/app:w-auto"
       >
         {submitting ? "Sending…" : "Send request"}
       </button>

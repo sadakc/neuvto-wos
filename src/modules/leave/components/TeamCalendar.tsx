@@ -115,7 +115,7 @@ export default function TeamCalendar() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your team&apos;s calendar. Try refreshing.
         </p>
@@ -134,8 +134,8 @@ export default function TeamCalendar() {
             ← My own calendar
           </a>
         </div>
-        <h1 className="font-display text-lg font-semibold">Your team</h1>
-        <p className="mt-4 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        <h1 className="text-page-title font-semibold tracking-page-title">Your team</h1>
+        <p className="mt-4 rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Nobody reports to you yet. Once your administrator sets reporting lines, your team&apos;s
           leave shows here.
         </p>
@@ -157,7 +157,7 @@ export default function TeamCalendar() {
       </div>
 
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-lg font-semibold">
+        <h1 className="text-page-title font-semibold tracking-page-title">
           {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
         </h1>
         <div className="flex gap-2">

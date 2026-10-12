@@ -174,18 +174,18 @@ export default function LeaveTypes() {
   return (
     <div>
       {types.length === 0 && !draft && (
-        <p className="mb-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+        <p className="mb-4 rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
           No leave types yet. Until you add one, nobody in this workspace can apply for leave.
         </p>
       )}
 
       {types.length > 0 && (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-border rounded-xl border border-border bg-card shadow-card">
           {[...active, ...archived].map((t) => (
             <li
               key={t.id}
               data-testid="leave-type-row"
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
+              className="flex flex-col gap-3 p-4 @min-[640px]/app:flex-row @min-[640px]/app:items-start @min-[640px]/app:justify-between"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium">
@@ -260,7 +260,7 @@ export default function LeaveTypes() {
         <form
           onSubmit={onSave}
           data-testid="leave-type-form"
-          className="mt-4 space-y-4 rounded-lg border border-border p-4"
+          className="mt-4 space-y-4 rounded-xl border border-border bg-card p-4 shadow-card"
         >
           <div>
             <label htmlFor="lt-name" className="block text-sm font-medium">
@@ -288,7 +288,7 @@ export default function LeaveTypes() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid gap-4 @min-[640px]/app:grid-cols-3">
             <div>
               <label htmlFor="lt-days" className="block text-sm font-medium">
                 Days a year
@@ -385,7 +385,7 @@ export default function LeaveTypes() {
             </p>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 @min-[640px]/app:flex-row">
             <button
               type="submit"
               disabled={saving}

@@ -76,8 +76,8 @@ export default function LeaveDashboardCard() {
   // an employee acting on a wrong balance is worse than one seeing an error.
   if (state === "error") {
     return (
-      <section className="rounded-lg border border-border bg-card p-6">
-        <h2 className="font-display text-base font-semibold">Leave</h2>
+      <section className="rounded-xl border border-border bg-card p-5 shadow-card">
+        <h2 className="text-card-title font-semibold tracking-card-title">Leave</h2>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your balance just now.
         </p>
@@ -86,9 +86,9 @@ export default function LeaveDashboardCard() {
   }
 
   return (
-    <section className="rounded-lg border border-border bg-card p-6">
+    <section className="rounded-xl border border-border bg-card p-5 shadow-card">
       <div className="flex items-baseline justify-between gap-4">
-        <h2 className="font-display text-base font-semibold">Leave</h2>
+        <h2 className="text-card-title font-semibold tracking-card-title">Leave</h2>
         <ModuleLink path="leave" className="text-sm text-muted-foreground hover:text-foreground">
           View all
         </ModuleLink>
@@ -126,7 +126,7 @@ export default function LeaveDashboardCard() {
         </>
       ) : (
         <>
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-3 @min-[560px]/app:grid-cols-2 @min-[900px]/app:grid-cols-3">
             {currentYear.map((b) => (
               <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
             ))}

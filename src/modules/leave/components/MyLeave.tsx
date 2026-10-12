@@ -118,7 +118,7 @@ export default function MyLeave() {
   if (state === "error") {
     return (
       <div className="max-w-md">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your leave just now. Try refreshing.
         </p>
@@ -129,7 +129,7 @@ export default function MyLeave() {
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="font-display text-lg font-semibold">My leave</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">My leave</h1>
 
         {balances.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">
@@ -137,7 +137,7 @@ export default function MyLeave() {
             leave types.
           </p>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-3 @min-[560px]/app:grid-cols-2 @min-[900px]/app:grid-cols-3">
             {balances.map((b) => (
               <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
             ))}
@@ -147,7 +147,7 @@ export default function MyLeave() {
 
       <section>
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-base font-semibold">History</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">History</h2>
           <div className="flex flex-wrap gap-2" role="group" aria-label="Filter requests">
             {FILTERS.map((f) => (
               <button

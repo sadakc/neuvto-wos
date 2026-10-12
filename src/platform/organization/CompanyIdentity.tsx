@@ -152,7 +152,7 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
                 className="h-full w-full object-contain"
               />
             ) : (
-              <span className="font-display text-2xl font-semibold text-muted-foreground">
+              <span className="text-stat font-semibold tracking-stat text-muted-foreground">
                 {companyName(org).slice(0, 1).toUpperCase() || "?"}
               </span>
             )}

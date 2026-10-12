@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.5 · **Status:** Active · **Updated:** 13 Oct 2026
+**Version:** 1.6 · **Status:** Active · **Updated:** 16 Oct 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -18,24 +18,25 @@ deployed onto it multi-tenant. Leave Management is the first module, not the
 point. If a document here reads as though the leave product is the product, it
 predates 31 Jul 2026 and is wrong.
 
-| If you want to know                                                  | Read                                                                                       |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
-| What is being built, in what order, and what is done                 | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
-| The employee record, who may make whom an admin, and the build order | [product/NEUVTO_EMPLOYEE_MASTER.md](product/NEUVTO_EMPLOYEE_MASTER.md)                     |
-| What a screen looks like (the Core HR design)                        | [standards/NEUVTO_DESIGN_SYSTEM.md](standards/NEUVTO_DESIGN_SYSTEM.md)                     |
-| Why something was built differently from the PRD                     | the **D1–D82** decision table in the same file                                             |
-| Whether the platform itself is finished                              | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
-| How to run the thing on your own machine                             | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
-| How code and schema reach the hosted site                            | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
-| Who hosts `neuvto.com`, and how a deploy is proved                   | [operations/PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)                       |
-| What each tool in the stack is for, in plain English                 | Plate 05 of [architecture/neuvto-architecture.html](architecture/neuvto-architecture.html) |
-| Where the backups are, and whether they restore                      | [operations/BACKUPS.md](operations/BACKUPS.md)                                             |
-| Why email works in one environment and not another                   | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)              |
-| How the system is shaped, for an investor or advisor                 | [architecture/](architecture/)                                                             |
-| What leaving Supabase for AWS would actually cost                    | [architecture/PORTABILITY.md](architecture/PORTABILITY.md)                                 |
-| How the production test data gets deleted, later                     | [operations/TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                             |
-| What the QA/UAT stacks are, and why hosting is moving to Cloudflare  | [operations/ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                                   |
-| How Neuvto is run without Claude Code, and who could take it over    | [operations/CONTINUITY.md](operations/CONTINUITY.md)                                       |
+| If you want to know                                                                       | Read                                                                                       |
+| ----------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------ |
+| What is being built, in what order, and what is done                                      | [product/NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)                       |
+| The employee record, who may make whom an admin, and the build order                      | [product/NEUVTO_EMPLOYEE_MASTER.md](product/NEUVTO_EMPLOYEE_MASTER.md)                     |
+| What the Core HR bundle's Leave chapter adds, where it conflicts, and what needs deciding | [product/LEAVE_PHASE_2_SCOPE.md](product/LEAVE_PHASE_2_SCOPE.md)                           |
+| What a screen looks like (the Core HR design)                                             | [standards/NEUVTO_DESIGN_SYSTEM.md](standards/NEUVTO_DESIGN_SYSTEM.md)                     |
+| Why something was built differently from the PRD                                          | the **D1–D82** decision table in the same file                                             |
+| Whether the platform itself is finished                                                   | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
+| How to run the thing on your own machine                                                  | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
+| How code and schema reach the hosted site                                                 | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
+| Who hosts `neuvto.com`, and how a deploy is proved                                        | [operations/PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)                       |
+| What each tool in the stack is for, in plain English                                      | Plate 05 of [architecture/neuvto-architecture.html](architecture/neuvto-architecture.html) |
+| Where the backups are, and whether they restore                                           | [operations/BACKUPS.md](operations/BACKUPS.md)                                             |
+| Why email works in one environment and not another                                        | the **Vault** section of [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)              |
+| How the system is shaped, for an investor or advisor                                      | [architecture/](architecture/)                                                             |
+| What leaving Supabase for AWS would actually cost                                         | [architecture/PORTABILITY.md](architecture/PORTABILITY.md)                                 |
+| How the production test data gets deleted, later                                          | [operations/TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                             |
+| What the QA/UAT stacks are, and why hosting is moving to Cloudflare                       | [operations/ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                                   |
+| How Neuvto is run without Claude Code, and who could take it over                         | [operations/CONTINUITY.md](operations/CONTINUITY.md)                                       |
 
 ---
 

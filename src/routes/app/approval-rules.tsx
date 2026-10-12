@@ -139,7 +139,7 @@ function ApprovalRulesPage() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Administrators only</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your administrator decides who approves leave.
         </p>
@@ -150,7 +150,7 @@ function ApprovalRulesPage() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your approval rules. Try refreshing.
         </p>
@@ -160,7 +160,7 @@ function ApprovalRulesPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">Approval rules</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">Approval rules</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         Who signs off leave. Level 1 always applies; later levels apply only when their condition
         matches. Requests already in flight keep the rules they were submitted under.
@@ -181,7 +181,7 @@ function ApprovalRulesPage() {
             className="rounded-lg border border-border p-4"
           >
             <div className="flex items-baseline justify-between gap-4">
-              <h2 className="font-display text-base font-semibold">Level {l.level}</h2>
+              <h2 className="text-card-title font-semibold tracking-card-title">Level {l.level}</h2>
               {l.level > 1 && (
                 <button
                   onClick={() => onRemove(l.id)}

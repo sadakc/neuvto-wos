@@ -134,7 +134,7 @@ export default function LeaveTakenReport() {
               disabled={!range}
               onChange={(e) => setRange((r) => (r ? { ...r, from: e.target.value } : r))}
               data-testid="taken-from"
-              className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm sm:w-44"
+              className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm @min-[640px]/app:w-44"
             />
           </label>
 
@@ -146,7 +146,7 @@ export default function LeaveTakenReport() {
               disabled={!range}
               onChange={(e) => setRange((r) => (r ? { ...r, to: e.target.value } : r))}
               data-testid="taken-to"
-              className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm sm:w-44"
+              className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm @min-[640px]/app:w-44"
             />
           </label>
         </>

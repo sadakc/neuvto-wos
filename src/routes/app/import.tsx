@@ -125,7 +125,7 @@ function ImportPage() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Administrators only</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your administrator manages who is in this workspace.
         </p>
@@ -138,7 +138,7 @@ function ImportPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">Import people</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">Import people</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         A spreadsheet of your existing staff. This <strong>invites</strong> them — each person
         follows a link and confirms their own address before they appear in{" "}
@@ -147,7 +147,7 @@ function ImportPage() {
       </p>
 
       <section className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="font-display text-base font-semibold">The file</h2>
+        <h2 className="text-card-title font-semibold tracking-card-title">The file</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           A CSV whose first row is the column names. Required:{" "}
           <span className="text-foreground">{REQUIRED_COLUMNS.join(", ")}</span>. Optional:{" "}
@@ -182,7 +182,7 @@ function ImportPage() {
 
       {results && (
         <section className="mt-8">
-          <h2 className="font-display text-base font-semibold">
+          <h2 className="text-card-title font-semibold tracking-card-title">
             {done ? "What happened" : `${rows.length} rows read`}
           </h2>
           <p className="mt-1 text-sm text-muted-foreground">

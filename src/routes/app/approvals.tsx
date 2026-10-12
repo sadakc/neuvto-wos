@@ -75,7 +75,7 @@ function ApprovalsPage() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">{error}</p>
         <button
           onClick={() => window.location.reload()}
@@ -89,7 +89,7 @@ function ApprovalsPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">Approvals</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">Approvals</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         Waiting on you. Something appears here only while it is at your level — an earlier level
         that has not decided yet is not yours to act on.

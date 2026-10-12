@@ -148,7 +148,7 @@ function SetupWizard() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Nothing to set up</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Nothing to set up</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your administrator configures this workspace.
         </p>
@@ -207,7 +207,9 @@ function SetupWizard() {
 
       {step === "welcome" && (
         <section className="mt-8">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">Welcome to {name}</h1>
+          <h1 className="text-stat font-semibold tracking-stat tracking-tight">
+            Welcome to {name}
+          </h1>
           <p className="mt-3 max-w-prose text-sm text-muted-foreground">
             You&apos;re the administrator of this workspace. A few things to set up, and none of
             them take long — you can leave at any point and pick up where you stopped.
@@ -284,7 +286,7 @@ function SetupWizard() {
 
       {step === "done" && (
         <section className="mt-8">
-          <h1 className="font-display text-2xl font-semibold tracking-tight">
+          <h1 className="text-stat font-semibold tracking-stat tracking-tight">
             {outstanding.length ? "Nearly there" : `${name} is ready`}
           </h1>
 
@@ -367,7 +369,7 @@ function StepShell({
 }) {
   return (
     <section className="mt-8">
-      <h1 className="font-display text-xl font-semibold tracking-tight">{title}</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">{title}</h1>
       <p className="mt-2 max-w-prose text-sm text-muted-foreground">{blurb}</p>
 
       <div className="mt-6">{children}</div>

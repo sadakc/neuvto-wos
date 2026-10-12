@@ -134,7 +134,9 @@ function AppShell() {
     return (
       <main className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-sm text-center">
-          <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+          <h1 className="text-page-title font-semibold tracking-page-title">
+            This didn&apos;t load
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">{message}</p>
           <button
             onClick={() => window.location.reload()}

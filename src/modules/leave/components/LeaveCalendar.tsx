@@ -78,7 +78,7 @@ export default function LeaveCalendar() {
   if (state === "error") {
     return (
       <div className="max-w-md">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your calendar. Try refreshing.
         </p>
@@ -103,7 +103,7 @@ export default function LeaveCalendar() {
       </div>
 
       <div className="flex items-center justify-between">
-        <h1 className="font-display text-lg font-semibold">
+        <h1 className="text-page-title font-semibold tracking-page-title">
           {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
         </h1>
         <div className="flex gap-2">

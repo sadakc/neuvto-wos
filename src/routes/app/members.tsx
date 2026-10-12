@@ -229,7 +229,7 @@ export function MembersPage() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Administrators only</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your administrator manages who is in this workspace.
         </p>
@@ -240,7 +240,7 @@ export function MembersPage() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load the people in this workspace. Try refreshing.
         </p>
@@ -298,14 +298,14 @@ export function MembersPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">People</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">People</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         Everyone in {user?.organizationName ?? "this workspace"}, and anyone waiting to join.
       </p>
 
       {/* ─────────────────────────────────────────────── invite */}
       <section className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="font-display text-base font-semibold">Invite somebody</h2>
+        <h2 className="text-card-title font-semibold tracking-card-title">Invite somebody</h2>
         <p className="mt-1 text-sm text-muted-foreground">
           They&apos;ll get an email with a link. Following it, they confirm their address with a
           six-digit code and land straight in this workspace.
@@ -376,7 +376,7 @@ export function MembersPage() {
       {/* ─────────────────────────────────────────────── pending */}
       {pending.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-display text-base font-semibold">Waiting to join</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">Waiting to join</h2>
           <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
             {pending.map((i) => (
               <li
@@ -430,7 +430,7 @@ export function MembersPage() {
           contradictory answer to the same question. */}
       {(active.length > 0 || !searching) && (
         <section className="mt-10">
-          <h2 className="font-display text-base font-semibold">In this workspace</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">In this workspace</h2>
           <p className="mt-1 max-w-prose text-sm text-muted-foreground">
             Who reports to whom decides who approves what — the approval chain resolves the
             reporting manager, so a person with nobody above them has nowhere to send a request.
@@ -647,7 +647,7 @@ export function MembersPage() {
           like data going missing. */}
       {inactive.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-display text-base font-semibold">No longer active</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">No longer active</h2>
           <ul className="mt-4 divide-y divide-border rounded-lg border border-dashed border-border">
             {inactive.map((m) => (
               <li
