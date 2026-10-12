@@ -108,6 +108,14 @@ export const LeaveTypeInput = z.object({
   earnedProofRequired: z.boolean().default(false),
   /** D90, a paid type only: the year at once, or a twelfth each month. */
   accrual: z.enum(["upfront", "monthly"]).default("upfront"),
+  /** D91, a paid type only: the most days carried into next year. Null: none. */
+  carryForwardMax: z
+    .number()
+    .min(0, "Carry-over cannot be negative")
+    .max(365)
+    .multipleOf(0.5, "Use whole days or halves")
+    .nullable()
+    .default(null),
 });
 export type LeaveTypeInput = z.input<typeof LeaveTypeInput>;
 
@@ -149,6 +157,8 @@ export interface LeaveType {
   kind: LeaveKind;
   /** D90: how a paid type's allowance is credited. */
   accrual?: "upfront" | "monthly";
+  /** D91: the most days carried into next year; null none. */
+  carryForwardMax?: number | null;
   /** D89, earned types only. */
   earnedExpiresAfterDays?: number | null;
   earnedClaimWithinDays?: number | null;
@@ -351,6 +361,14 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   ALREADY_CLAIMED: "You've already claimed one of those days.",
   PROOF_REQUIRED: "This kind of compensatory off needs proof. Attach it and send again.",
   PROOF_NOT_YOURS: "That attachment couldn't be used. Attach it again.",
+  // D91, the carry-forward review.
+  INVALID_YEAR: "That leave year can't be reviewed: it hasn't begun.",
+  MORE_THAN_LEFT: "That's more than they have left this year.",
+  REVIEW_LOCKED: "This review is locked. Nothing in it can change.",
+  REVIEW_STALE:
+    "Somebody's balance has moved since this review was prepared. Prepare it again, check it, then lock it.",
+  CARRY_WOULD_OVERDRAW:
+    "Somebody has already booked next year's leave against more carried-over days than this gives them. Raise their line, then lock.",
   // D88. Staging is for somebody not yet joined; once they have, their own
   // balance is set in the list above.
   ALREADY_JOINED:
@@ -469,4 +487,30 @@ export interface EarnedTypeRules {
   earnedProofRequired?: boolean;
   /** D90. */
   accrual?: "upfront" | "monthly";
+}
+
+/** D91 — one person and type in a carry-forward review. */
+export interface CarryLine {
+  id: string;
+  employeeName: string;
+  leaveTypeName: string;
+  availableDays: number;
+  proposedDays: number;
+  /** The Leave Admin's number, when they changed it. */
+  adjustedDays: number | null;
+  carryForwardMax: number;
+}
+
+/** D91 — a leave year's carry-forward review. */
+export interface CarryReview {
+  id: string;
+  fromFy: string;
+  toFy: string;
+  status: "draft" | "locked";
+  preparedAt: string;
+  lockedAt: string | null;
+  lockedBy: string | null;
+  /** Whether the year being carried into is open yet (D34): lockable only then. */
+  nextYearOpen: boolean;
+  lines: CarryLine[];
 }

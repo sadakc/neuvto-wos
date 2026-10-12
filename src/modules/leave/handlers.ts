@@ -35,6 +35,7 @@ import {
   type CompOffApprovalDetail,
   type CompOffDay,
   type EarnedTypeRules,
+  type CarryReview,
 } from "./contracts";
 
 /**
@@ -348,7 +349,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
   const { data, error } = await supabase
     .from("leave_types")
     .select(
-      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required, accrual",
+      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required, accrual, carry_forward_max",
     )
     .order("status")
     .order("name");
@@ -369,6 +370,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
     earnedClaimWithinDays: r.earned_claim_within_days,
     earnedProofRequired: r.earned_proof_required,
     accrual: r.accrual as LeaveType["accrual"],
+    carryForwardMax: r.carry_forward_max === null ? null : Number(r.carry_forward_max),
   }));
 }
 
@@ -394,6 +396,8 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
     earned_proof_required: parsed.kind === "earned" ? parsed.earnedProofRequired : false,
     // D90. Only a paid type accrues; the database refuses anything else.
     accrual: parsed.kind === "paid" ? parsed.accrual : "upfront",
+    // D91. Only a paid type carries over.
+    carry_forward_max: parsed.kind === "paid" ? parsed.carryForwardMax : null,
   };
 
   // A saved type's kind is fixed (the database refuses a change), so it is sent
@@ -675,4 +679,66 @@ export async function getProofUrl(path: string): Promise<string> {
   const { data, error } = await supabase.storage.from(PROOF_BUCKET).createSignedUrl(path, 300);
   if (error || !data) throw new AppError("FORBIDDEN", "That attachment can't be opened.", 403);
   return data.signedUrl;
+}
+
+// ═══════════════════════════════════════════════ carry-forward review (D91)
+
+function toCarryError(message: string): AppError {
+  const e = toLeaveError(message);
+  return e.details?.code === "FORBIDDEN"
+    ? new AppError("FORBIDDEN", "Only the Leave Admin can review carry-forward.", 403, e.details)
+    : e;
+}
+
+export async function getCarryYears(): Promise<{ current: string; previous: string }> {
+  const { data, error } = await supabase.rpc("leave_carry_years");
+  if (error) throw toCarryError(error.message);
+  return data as { current: string; previous: string };
+}
+
+export async function getCarryReview(fromFy: string): Promise<CarryReview | null> {
+  const { data, error } = await supabase.rpc("leave_carry_review", { _from_fy: fromFy });
+  if (error) throw toCarryError(error.message);
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: r.id as string,
+    fromFy: r.fromFy as string,
+    toFy: r.toFy as string,
+    status: r.status as CarryReview["status"],
+    preparedAt: r.preparedAt as string,
+    lockedAt: (r.lockedAt as string | null) ?? null,
+    lockedBy: (r.lockedBy as string | null) ?? null,
+    nextYearOpen: Boolean(r.nextYearOpen),
+    lines: ((r.lines as Record<string, unknown>[]) ?? []).map((l) => ({
+      id: l.id as string,
+      employeeName: l.employeeName as string,
+      leaveTypeName: l.leaveTypeName as string,
+      availableDays: Number(l.availableDays),
+      proposedDays: Number(l.proposedDays),
+      adjustedDays: l.adjustedDays === null ? null : Number(l.adjustedDays),
+      carryForwardMax: Number(l.carryForwardMax),
+    })),
+  };
+}
+
+export async function prepareCarry(fromFy: string): Promise<string> {
+  const { data, error } = await supabase.rpc("leave_carry_prepare", { _from_fy: fromFy });
+  if (error) throw toCarryError(error.message);
+  return data as string;
+}
+
+/** Null puts the rule's number back. */
+export async function adjustCarry(lineId: string, days: number | null): Promise<void> {
+  const { error } = await supabase.rpc("leave_carry_adjust", {
+    _line_id: lineId,
+    _days: days as number,
+  });
+  if (error) throw toCarryError(error.message);
+}
+
+export async function lockCarry(reviewId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("leave_carry_lock", { _review_id: reviewId });
+  if (error) throw toCarryError(error.message);
+  return data as number;
 }

@@ -349,6 +349,44 @@ describe("LeaveTypes — credited monthly (D90)", () => {
   });
 });
 
+describe("LeaveTypes — carrying over (D91)", () => {
+  it("sets how much carries into next year, and says so on the row", async () => {
+    const user = userEvent.setup();
+    listLeaveTypes.mockResolvedValue([
+      CASUAL,
+      { ...CASUAL, id: "pl", name: "Privilege leave", carryForwardMax: 5 },
+    ]);
+    await renderSettled();
+    expect(rowFor("Privilege leave")).toHaveTextContent("carries up to 5 days into next year");
+    expect(rowFor("Casual leave")).not.toHaveTextContent("carries");
+
+    await user.click(screen.getByTestId("add-leave-type"));
+    await user.type(screen.getByLabelText("Name"), "Annual");
+    await user.type(screen.getByLabelText("Carry over up to"), "10");
+    await user.click(screen.getByTestId("save-leave-type"));
+    expect(saveLeaveType).toHaveBeenCalledWith(
+      expect.objectContaining({ name: "Annual", carryForwardMax: 10 }),
+      "org",
+    );
+  });
+
+  it("leaves it blank as nothing carried, and never for a type that is not paid", async () => {
+    const user = userEvent.setup();
+    listLeaveTypes.mockResolvedValue([CASUAL]);
+    await renderSettled();
+    await user.click(screen.getByTestId("add-leave-type"));
+    await user.type(screen.getByLabelText("Name"), "Annual");
+    await user.type(screen.getByLabelText("Carry over up to"), "4");
+    await user.click(screen.getByLabelText(/Unpaid \(loss of pay\)/));
+    expect(screen.queryByLabelText("Carry over up to")).toBeNull();
+    await user.click(screen.getByTestId("save-leave-type"));
+    expect(saveLeaveType).toHaveBeenCalledWith(
+      expect.objectContaining({ kind: "unpaid", carryForwardMax: null }),
+      "org",
+    );
+  });
+});
+
 describe("LeaveTypes — compensatory off (D89)", () => {
   it("adds an earned type with its expiry, claim window and proof rule, and says so on its row", async () => {
     const user = userEvent.setup();

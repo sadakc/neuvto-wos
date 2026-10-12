@@ -23,7 +23,8 @@ export const leave: ModuleDefinition = {
   section: "Time",
   icon: CalendarDays,
   reportsDescription: "Balances, leave taken, what is waiting",
-  configurationDescription: "Leave types, opening balances and blackout periods",
+  configurationDescription:
+    "Leave types, opening balances, blackout periods and the carry-forward review",
 
   // "Approvals" used to be declared here, as `soon: "step 8"` — a module laying
   // claim to a platform screen. It now lives in the platform's own navigation,
@@ -79,6 +80,14 @@ export const leave: ModuleDefinition = {
         "Dates when nobody can apply for leave, paid or unpaid: an audit, a peak season. Leave already applied for is not changed.",
       component: lazy(() => import("./components/Blackouts")),
       order: 30,
+    },
+    {
+      id: "carry-forward",
+      title: "Carry-forward review",
+      description:
+        "What each person takes into next year. Nothing changes until you lock the review, and a locked review is final.",
+      component: lazy(() => import("./components/CarryForwardReview")),
+      order: 40,
     },
     {
       id: "leave-types",

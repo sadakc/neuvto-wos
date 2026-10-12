@@ -37,6 +37,8 @@ type Draft = {
   earnedProofRequired: boolean;
   /** D90. */
   accrual: "upfront" | "monthly";
+  /** D91. Blank: nothing carried. */
+  carryForwardMax: string;
 };
 
 /**
@@ -69,6 +71,7 @@ const EMPTY: Draft = {
   earnedClaimWithinDays: "",
   earnedProofRequired: false,
   accrual: "upfront",
+  carryForwardMax: "",
 };
 
 const toDraft = (t: LeaveType): Draft => ({
@@ -84,6 +87,8 @@ const toDraft = (t: LeaveType): Draft => ({
   earnedClaimWithinDays: t.earnedClaimWithinDays ? String(t.earnedClaimWithinDays) : "",
   earnedProofRequired: t.earnedProofRequired ?? false,
   accrual: t.accrual ?? "upfront",
+  carryForwardMax:
+    t.carryForwardMax === null || t.carryForwardMax === undefined ? "" : String(t.carryForwardMax),
 });
 
 /** Blank means "no limit", which is not the same as zero — hence null, not 0. */
@@ -155,6 +160,7 @@ export default function LeaveTypes() {
         earnedClaimWithinDays: optionalNumber(draft.earnedClaimWithinDays),
         earnedProofRequired: draft.earnedProofRequired,
         accrual: draft.kind === "paid" ? draft.accrual : "upfront",
+        carryForwardMax: draft.kind === "paid" ? optionalNumber(draft.carryForwardMax) : null,
       });
       await saveLeaveType(parsed, user.organizationId);
       await load();
@@ -250,6 +256,10 @@ export default function LeaveTypes() {
                       : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year${
                           t.accrual === "monthly"
                             ? `, credited monthly (${Math.round((t.maxDaysPerYear / 12) * 100) / 100} a month)`
+                            : ""
+                        }${
+                          t.carryForwardMax
+                            ? ` · carries up to ${t.carryForwardMax} ${t.carryForwardMax === 1 ? "day" : "days"} into next year`
                             : ""
                         }`}
                   {t.minNoticeDays === null
@@ -494,6 +504,28 @@ export default function LeaveTypes() {
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
                   Whole days or halves. Pro-rated for anyone who joins part-way through the year
+                </p>
+              </div>
+            )}
+
+            {draft.kind === "paid" && (
+              <div>
+                <label htmlFor="lt-carry" className="block text-sm font-medium">
+                  Carry over up to
+                </label>
+                <input
+                  id="lt-carry"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={365}
+                  step={0.5}
+                  value={draft.carryForwardMax}
+                  onChange={(e) => setDraft({ ...draft, carryForwardMax: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Days into next year, applied when the year&apos;s review is locked. Blank: none
                 </p>
               </div>
             )}

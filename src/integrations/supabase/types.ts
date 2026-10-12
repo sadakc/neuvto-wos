@@ -1802,6 +1802,128 @@ export type Database = {
           },
         ]
       }
+      leave_carry_lines: {
+        Row: {
+          adjusted_days: number | null
+          available_days: number
+          employee_id: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          proposed_days: number
+          review_id: string
+        }
+        Insert: {
+          adjusted_days?: number | null
+          available_days: number
+          employee_id: string
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          proposed_days: number
+          review_id: string
+        }
+        Update: {
+          adjusted_days?: number | null
+          available_days?: number
+          employee_id?: string
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          proposed_days?: number
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_carry_lines_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_lines_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_lines_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "leave_carry_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_carry_reviews: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          from_fy: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          organization_id: string
+          prepared_at: string
+          status: string
+          to_fy: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          from_fy: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          organization_id: string
+          prepared_at?: string
+          status?: string
+          to_fy: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          from_fy?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          organization_id?: string
+          prepared_at?: string
+          status?: string
+          to_fy?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_carry_reviews_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_reviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_opening_staged: {
         Row: {
           applied_at: string | null
@@ -1971,6 +2093,7 @@ export type Database = {
         Row: {
           accrual: string
           approval_required: boolean
+          carry_forward_max: number | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
@@ -1992,6 +2115,7 @@ export type Database = {
         Insert: {
           accrual?: string
           approval_required?: boolean
+          carry_forward_max?: number | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -2013,6 +2137,7 @@ export type Database = {
         Update: {
           accrual?: string
           approval_required?: boolean
+          carry_forward_max?: number | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
@@ -3457,6 +3582,14 @@ export type Database = {
       }
       leave_blackout_remove: { Args: { _id: string }; Returns: undefined }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
+      leave_carry_adjust: {
+        Args: { _days: number; _line_id: string }
+        Returns: undefined
+      }
+      leave_carry_lock: { Args: { _review_id: string }; Returns: number }
+      leave_carry_prepare: { Args: { _from_fy: string }; Returns: string }
+      leave_carry_review: { Args: { _from_fy: string }; Returns: Json }
+      leave_carry_years: { Args: never; Returns: Json }
       leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_all_balances: { Args: never; Returns: number }
       leave_mature_balances: { Args: { _org_id: string }; Returns: number }
@@ -3484,6 +3617,7 @@ export type Database = {
           taken_days: number
         }[]
       }
+      leave_next_fy: { Args: { _fy: string; _org_id: string }; Returns: string }
       leave_pending_report: {
         Args: never
         Returns: {
