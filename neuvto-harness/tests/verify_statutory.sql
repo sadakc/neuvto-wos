@@ -322,7 +322,70 @@ begin
     format('select * from public.employee_restricted_reads(%L)', e), 'FORBIDDEN');
   perform pg_temp.st_ok('the person and a Super Admin see who looked');
 
-  -- ── 6 · module off
+  -- ── 6 · rotating the key changes every cipher and no value
+  if to_regprocedure('public.statutory_rotate_key()') is not null then
+    perform pg_temp.st_refused('nobody signed in can rotate the key', alice,
+      'select public.statutory_rotate_key()', 'permission denied');
+    perform pg_temp.st_refused('rotating needs the next key first', null,
+      'select public.statutory_rotate_key()', 'NEXT_KEY_NOT_SET');
+    select aadhaar_cipher::text into role_ from public.employee_statutory where employee_id = e;
+    select count(*) into n from public.audit_logs;
+    perform vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'), 'statutory_encryption_key_next');
+    r := public.statutory_rotate_key();
+    if (r ->> 'statutoryRows')::int is distinct from 2 then
+      raise exception 'STATUTORY FAIL: rotation reports %', r;
+    end if;
+    if (select aadhaar_cipher::text from public.employee_statutory where employee_id = e) = role_ then
+      raise exception 'STATUTORY FAIL: the Aadhaar cipher did not change';
+    end if;
+    if pg_temp.st_reveal(stat, e, array['aadhaar'], 'after rotation') ->> 'aadhaar' is distinct from aadhaar
+       or pg_temp.st_reveal(pay, e, array['bank_account'], 'after rotation') ->> 'bankAccount' is distinct from account
+       or pg_temp.st_reveal(priya, e, array['religion'], 'after rotation') ->> 'religion' is distinct from 'Hindu'
+       or pg_temp.st_card(pay, e) -> 'statutory' ->> 'uan' is distinct from '101234567890' then
+      raise exception 'STATUTORY FAIL: a value read differently after rotation';
+    end if;
+    perform pg_temp.st_refused('the keyed index still refuses a duplicate Aadhaar after rotation', hema,
+      format($q$select public.employee_set_statutory(%L, '{"aadhaar":"%s"}')$q$, e_ravi, aadhaar),
+      'AADHAAR_ALREADY_RECORDED');
+    if not exists (select 1 from vault.secrets where name like 'statutory_encryption_key_retired_%')
+       or exists (select 1 from vault.secrets where name = 'statutory_encryption_key_next') then
+      raise exception 'STATUTORY FAIL: the old key was not kept, or the next key was not promoted';
+    end if;
+    -- One summary row per company, not one per person.
+    if (select count(*) from public.audit_logs where entity_type in ('employee_statutory','employee_bank','employee_restricted')
+          and created_at = now()) > 0 and (select count(*) from public.audit_logs) - n > 3 then
+      raise exception 'STATUTORY FAIL: rotation wrote % audit rows', (select count(*) from public.audit_logs) - n;
+    end if;
+    raise notice 'ok: rotating the key changes every cipher and no value, and keeps the old key';
+  end if;
+
+  -- ── 7 · the reveal log keeps three years, and not a day less
+  if to_regprocedure('public.restricted_reads_prune()') is not null then
+    insert into public.restricted_reads (organization_id, reader_id, employee_id, fields, reason, read_at)
+    values (acme, stat, e, '{aadhaar}', 'an old look', now() - interval '3 years 1 day'),
+           (acme, stat, e, '{aadhaar}', 'a recent look', now() - interval '2 years 11 months');
+    -- Two statements: one expression would read the table in the snapshot
+    -- taken before the prune deleted anything.
+    n := public.restricted_reads_prune();
+    if n is distinct from 1
+       or exists (select 1 from public.restricted_reads where reason = 'an old look')
+       or not exists (select 1 from public.restricted_reads where reason = 'a recent look') then
+      raise exception 'STATUTORY FAIL: retention did not remove exactly the look older than three years';
+    end if;
+    perform set_config('neuvto.retention', 'on', true);
+    begin
+      delete from public.restricted_reads where reason = 'a recent look';
+      raise exception 'STATUTORY FAIL: the retention flag erased a recent look';
+    exception when others then
+      if sqlerrm not like '%REVEAL_LOG_IS_APPEND_ONLY%' then raise; end if;
+    end;
+    perform set_config('neuvto.retention', '', true);
+    perform pg_temp.st_refused('nobody signed in can prune the log', alice,
+      'select public.restricted_reads_prune()', 'permission denied');
+    raise notice 'ok: the reveal log keeps three years, and the retention escape cannot erase a younger look';
+  end if;
+
+  -- ── 8 · module off
   update public.organization_modules set enabled = false
    where organization_id = acme and module_key = 'employee';
   perform pg_temp.st_refused('module off: no reveal', stat,

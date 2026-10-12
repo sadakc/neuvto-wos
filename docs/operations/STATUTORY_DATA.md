@@ -1,6 +1,6 @@
 # Statutory and bank data: the encryption key, and going live
 
-**Version:** 1.0 · **Status:** Active · **Applies to:** every environment's Vault, before any Aadhaar, PAN or bank account is entered there
+**Version:** 1.1 · **Status:** Active · **Applies to:** every environment's Vault, before any Aadhaar, PAN or bank account is entered there
 
 D80. Neuvto stores Aadhaar, PAN, UAN, EPF and ESIC numbers, the bank account, and
 religion, caste category and disability status. Every one of those values is
@@ -71,11 +71,35 @@ Until the key is set, every write and every reveal refuses with _"Statutory data
 be stored yet: this environment's encryption key isn't set."_ Nothing is ever stored in
 clear as a fallback.
 
-> **Never change or delete the key once numbers are stored.** Every row was encrypted
-> under it. Rotation means decrypting and re-encrypting every row in one transaction;
-> that procedure is not built yet and is listed in the build spec's known gaps.
+> **Never change or delete the key by hand once numbers are stored.** Every row was
+> encrypted under it. Use the rotation below, which re-encrypts everything first.
 
 ---
+
+## Rotating the key
+
+`statutory_rotate_key()` re-encrypts every Aadhaar, PAN, UAN, EPF, ESIC, bank account and
+restricted value, and recomputes every keyed index, under a new key, **in one transaction**.
+If anything fails, nothing changes. It then makes the new key the one in use and keeps the
+old one in Vault, renamed `statutory_encryption_key_retired_<when>`, because backups taken
+before today are encrypted under it. Nobody signed in can run it; it writes one audit row per
+company rather than one per person. Proved in `verify_statutory.sql`, section 6.
+
+1. Generate a new key on your own machine: `openssl rand -hex 32`. Put it in the password
+   manager first.
+2. SQL Editor, as the project owner:
+
+   ```sql
+   select vault.create_secret('<the new 64 hex characters>', 'statutory_encryption_key_next');
+   select public.statutory_rotate_key();
+   ```
+
+   It returns how many rows it re-encrypted and the retired key's new name.
+
+3. Keep the retired key in the password manager until every backup older than today has
+   expired (see `BACKUPS.md`), then delete it from Vault.
+
+## Rotate when somebody who could read Vault leaves, or if the key may have been seen.
 
 ## Before any real number goes into production
 
@@ -89,5 +113,7 @@ D80 says this data does not reach production until all of these hold. Tick each 
       Super Admin, not by default.
 - [ ] The purge order in `TEST_DATA_PURGE.md` includes the restricted tables (it does,
       from version 1.3).
+- [ ] The reveal log's three-year retention job is registered: `select active from cron.job
+    where jobname = 'neuvto-employee-reveal-retention'` returns `true`.
 - [ ] The legal position on collecting Aadhaar (D59's original concern) is settled. The
       software is ready; whether to collect is not a software question.
