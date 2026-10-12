@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.2 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.3 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -327,13 +327,37 @@ screen change has been through `screen-prover`.
 | E4 ✔  | Schema: `employees`, managed lists, temporal and repeating tables, the backfill from `profiles`                   | Overlap refused by constraint; a closed row refuses UPDATE; three sons save; shares ≠ 100 refused; every guard watched failing |
 | E5 ✔  | My Card read tabs, Directory, Org chart                                                                           | Per-role render tests against §5; a restricted field is absent from the RPC response, not hidden                               |
 | E6 ✔  | Restricted data: encryption, reveal, `restricted_reads`                                                           | Reveal writes its audit row in the same transaction; the value never enters the query cache                                    |
-| E7    | Writes: family, nominees, previous organisations, add an address, move to another unit                            | The bundle's acceptance criteria 1–5 and 10                                                                                    |
+| E7 ✔  | Writes: family, nominees, previous organisations, add an address, move to another unit                            | The bundle's acceptance criteria 1–5 and 10                                                                                    |
 | E8    | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
 | E9    | Configuration, and the responsive and role sweeps                                                                 | Every one of the 62 source columns has a home; `scrollWidth === clientWidth` on every route at every width                     |
 
 Leave Management's redesign follows E9, to the same design, reusing E1's shell.
 
 ---
+
+### E7 as built (14 Oct 2026)
+
+Every writer is an Admin's (§5) and lives in `20261014100000_the_record_is_written.sql`:
+`employee_update`, `employee_add_address`, `employee_move_unit`, `employee_save_family`,
+`employee_save_previous_orgs`, `employee_save_nomination`. Proved by
+`verify_employee_writes.sql` (criteria 1–5 from the database side) and
+`RecordEditors.test.tsx` (the same from the screen).
+
+- **End dates are exclusive in the table.** A row closed for a successor starting 1 Mar
+  has `effective_to = 1 Mar` and last ran on 28 or 29 Feb. The screen always shows the
+  last day; showing the stored value would claim one day too many.
+- **Repeating lists are saved whole** (family, previous organisations): the screen sends
+  the list it holds, existing rows by id, new rows without one, and anything missing is
+  removed. A row id belonging to somebody else is NOT_FOUND.
+- **The nominee total is the E4 constraint trigger's**, made immediate inside the function
+  so a 90% nomination is refused before anything is written, not at commit.
+- **Not built yet, and why:**
+  - _Request a change_ (the person's own route to a correction) needs a route through the
+    Approval Engine and a notification template. It is the next piece of E7 to land.
+  - _Move to another unit:_ the three checkboxes (carry the unit's shift and calendar, notify
+    the receiving coordinator, notify the employee) are not offered. There is no shift model
+    or unit coordinator assignment yet, and a checkbox that does nothing is worse than none.
+  - Proof uploads on an address.
 
 ## 8. Acceptance criteria, module level
 

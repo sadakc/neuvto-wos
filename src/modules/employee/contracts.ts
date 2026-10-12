@@ -253,6 +253,32 @@ export interface RestrictedRead {
   reason: string;
 }
 
+export const RELATIONS = [
+  "father",
+  "mother",
+  "husband",
+  "wife",
+  "son",
+  "daughter",
+  "brother",
+  "sister",
+  "guardian",
+  "other",
+] as const;
+export const ADDRESS_TYPES = ["present", "permanent", "while_deployed", "emergency"] as const;
+export const NOMINATION_SCHEMES = ["pf_and_gratuity", "esic", "insurance"] as const;
+export const SEXES = ["male", "female", "other", "undisclosed"] as const;
+export const MARITAL_STATUSES = ["single", "married", "widowed", "divorced", "separated"] as const;
+export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
+export const EMPLOYMENT_TYPES = [
+  "full_time",
+  "contract",
+  "apprentice",
+  "part_time",
+  "intern",
+  "consultant",
+] as const;
+
 export const CASTE_CATEGORIES = ["general", "obc", "sc", "st", "ews", "not_disclosed"] as const;
 export const DISABILITY_STATUSES = ["none", "disabled", "not_disclosed"] as const;
 
@@ -312,6 +338,19 @@ export function employeeErrorMessage(code: string): string {
     ["FORBIDDEN", "Your role can't do that. Ask somebody with the Statutory or Payroll role."],
     ["INVALID_VALUE", "One of those values isn't allowed. Check the fields and try again."],
     ["UNKNOWN_FIELD", "That field isn't recognised."],
+    [
+      "EFFECTIVE_DATE_CLASH",
+      "That date isn't after the current row's start. History can't be rewritten; pick a later date.",
+    ],
+    ["ORDER_REF_REQUIRED", "A move needs a deployment order reference."],
+    ["UNIT_NOT_AVAILABLE", "That unit isn't available. Choose an active unit."],
+    ["ALREADY_DEPLOYED_THERE", "They're already deployed there."],
+    ["NOMINEE_SHARES_NOT_100", "Nominee shares must add up to exactly 100%."],
+    ["NOMINEES_REQUIRED", "Add at least one nominee."],
+    [
+      "DESIGNATION_NOT_AVAILABLE",
+      "That designation isn't available any more. Choose an active one.",
+    ],
   ];
   for (const [needle, message] of write) if (code.includes(needle)) return message;
   if (code.includes("NOT_AUTHENTICATED")) {

@@ -13,6 +13,18 @@ export function formatDate(iso: string | null | undefined): string {
   return `${m[3]} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
 }
 
+/**
+ * The last day of a closed row. The table stores an exclusive end (a row
+ * closed "from 1 Mar" has effective_to = 1 Mar and last ran on 28 Feb), so
+ * showing effective_to itself would claim one day too many.
+ */
+export function lastDay(exclusiveEnd: string | null | undefined): string | null {
+  if (!exclusiveEnd) return null;
+  const [y, m, d] = exclusiveEnd.slice(0, 10).split("-").map(Number);
+  const t = new Date(Date.UTC(y, m - 1, d - 1));
+  return t.toISOString().slice(0, 10);
+}
+
 /** 40 → `3 yr 4 mo`; 11 → `11 mo`; 24 → `2 yr`. */
 export function formatMonths(months: number | null | undefined): string {
   if (months == null || months < 0) return "—";
@@ -70,3 +82,9 @@ export function initials(name: string | null | undefined): string {
 
 /** Today in the browser, as a calendar date. Durations only; nothing is decided on it. */
 export const todayIso = () => new Date().toISOString().slice(0, 10);
+
+/** The running total, as the design writes it. */
+export function shareTotal(rows: { share: string }[]): number {
+  // Two decimals, the column's precision, so 33.33 × 3 reads 99.99, not 100.
+  return Math.round(rows.reduce((s, r) => s + (Number(r.share) || 0), 0) * 100) / 100;
+}

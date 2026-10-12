@@ -2473,6 +2473,10 @@ export type Database = {
         Args: { _event_key: string; _payload: Json }
         Returns: undefined
       }
+      employee_add_address: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: Json
+      }
       employee_age: { Args: { _dob: string; _org: string }; Returns: number }
       employee_card: { Args: { _employee_id?: string }; Returns: Json }
       employee_directory: {
@@ -2498,6 +2502,10 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: number
       }
+      employee_move_unit: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: Json
+      }
       employee_org_chart: {
         Args: never
         Returns: {
@@ -2513,6 +2521,10 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: string[]
       }
+      employee_require_admin: {
+        Args: { _employee_id: string }
+        Returns: undefined
+      }
       employee_restricted_reads: {
         Args: { _employee_id: string }
         Returns: {
@@ -2526,6 +2538,18 @@ export type Database = {
         Args: { _employee_id: string; _fields: string[]; _reason: string }
         Returns: Json
       }
+      employee_save_family: {
+        Args: { _employee_id: string; _rows: Json }
+        Returns: undefined
+      }
+      employee_save_nomination: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: string
+      }
+      employee_save_previous_orgs: {
+        Args: { _employee_id: string; _rows: Json }
+        Returns: undefined
+      }
       employee_set_bank: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
@@ -2535,6 +2559,10 @@ export type Database = {
         Returns: undefined
       }
       employee_set_statutory: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_update: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
       }

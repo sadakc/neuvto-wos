@@ -1,6 +1,6 @@
 # NEUVTO WOS — Build Spec
 
-**Version:** 1.10 · **Status:** Active · **Updated:** 13 Oct 2026
+**Version:** 1.11 · **Status:** Active · **Updated:** 14 Oct 2026
 
 ## The platform is the product
 
@@ -726,7 +726,7 @@ function our migrations define is referenced nowhere but its own definition.
 | **done** | 17   | Company access — Super Admin, Payroll and Statutory roles, `member_set_roles` (D78)                 | An Admin cannot grant Admin, from SQL and from the screen; the last Super Admin cannot be removed                                                                                                |
 | **done** | 18   | Face and fingerprint sign-in — passkeys (D79)                                                       | A passkey reaches `/app`; a passkey on a deactivated account buys nothing                                                                                                                        |
 | **done** | 19   | Neuvto adds and removes a company's Super Admins from the console (D83)                             | A company's own Super Admin is refused the console functions; the last Super Admin cannot be removed by Neuvto either                                                                            |
-| progress | 20+  | Employee Master stages E4–E9, per `NEUVTO_EMPLOYEE_MASTER.md` §7 (E4, E5 and E6 done)               | That document's acceptance criteria 1–10                                                                                                                                                         |
+| progress | 20+  | Employee Master stages E4–E9, per `NEUVTO_EMPLOYEE_MASTER.md` §7 (E4 to E7 done)                    | That document's acceptance criteria 1–10                                                                                                                                                         |
 
 ### Testing
 

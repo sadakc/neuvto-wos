@@ -67,7 +67,7 @@ begin
 
   insert into public.employee_addresses
     (organization_id, employee_id, address_type, line, city, state, pincode, effective_from, effective_to)
-  values (acme, e, 'present', '12 Old Road', 'Mysuru', 'Karnataka', '570001', '2020-01-01', '2024-02-29');
+  values (acme, e, 'present', '12 Old Road', 'Mysuru', 'Karnataka', '570001', '2020-01-01', '2024-03-01');  -- exclusive end: last day 29 Feb
   insert into public.employee_addresses
     (organization_id, employee_id, address_type, line, city, state, pincode, effective_from)
   values (acme, e, 'present', '402 Brigade Meadows', 'Bengaluru', 'Karnataka', '560062', '2024-03-01');
@@ -81,7 +81,7 @@ begin
   values (acme, 'Tata AIG, Hosur', 'client_site', 'Tata AIG') returning id into unit2;
   insert into public.employee_deployments
     (organization_id, employee_id, deployment_unit_id, effective_from, effective_to, deployment_order_ref)
-  values (acme, e, unit1, '2024-04-01', '2025-05-31', 'DO-2024-0001');
+  values (acme, e, unit1, '2024-04-01', '2025-06-01', 'DO-2024-0001');  -- exclusive end: last day 31 May
   insert into public.employee_deployments
     (organization_id, employee_id, deployment_unit_id, effective_from, deployment_order_ref)
   values (acme, e, unit2, '2025-06-01', 'DO-2025-0042');

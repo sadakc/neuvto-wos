@@ -5,6 +5,7 @@ import {
   formatMonths,
   humanise,
   initials,
+  lastDay,
   monthsBetween,
 } from "./format";
 
@@ -41,5 +42,11 @@ describe("employee formatting", () => {
     expect(initials("Priya Employee")).toBe("PE");
     expect(initials("Priya")).toBe("P");
     expect(initials(" ")).toBe("?");
+  });
+
+  it("shows a closed row's last day, not its exclusive end", () => {
+    expect(lastDay("2024-03-01")).toBe("2024-02-29");
+    expect(lastDay("2025-01-01")).toBe("2024-12-31");
+    expect(lastDay(null)).toBeNull();
   });
 });

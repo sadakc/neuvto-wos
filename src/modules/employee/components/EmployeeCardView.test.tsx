@@ -104,8 +104,8 @@ describe("EmployeeCardView", () => {
     expect(current).toHaveTextContent("Current");
 
     const postings = within(screen.getByTestId("deployment-history")).getAllByRole("row").slice(1);
-    // Apr 2024 to May 2025 is a year and a month.
-    expect(postings.find((r) => r.textContent?.includes("Acme HQ"))).toHaveTextContent("1 yr 1 mo");
+    // April 2024 to May 2025, both months whole, is a year and two months.
+    expect(postings.find((r) => r.textContent?.includes("Acme HQ"))).toHaveTextContent("1 yr 2 mo");
   });
 
   it("counts the family the way the design writes it", async () => {

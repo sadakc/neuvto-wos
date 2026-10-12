@@ -27,12 +27,23 @@ import {
   formatMonths,
   humanise,
   initials,
+  lastDay,
   monthsBetween,
   todayIso,
 } from "../format";
 import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
 import { StatutoryTab } from "./StatutoryTab";
+import {
+  AddAddressDialog,
+  ContactEditors,
+  EmploymentEditors,
+  FamilyEditor,
+  MoveUnitDialog,
+  NominationEditor,
+  PersonalEditors,
+  PreviousOrgsEditor,
+} from "./RecordEditors";
 
 const STATUS_TONE: Record<EmployeeStatus, StatusTone> = {
   working: "success",
@@ -41,6 +52,8 @@ const STATUS_TONE: Record<EmployeeStatus, StatusTone> = {
   suspended: "destructive",
   left: "neutral",
 };
+
+type Changed = () => Promise<void> | void;
 
 type TabKey = "overview" | "personal" | "family" | "employment" | "statutory" | "history";
 
@@ -212,19 +225,20 @@ export function EmployeeCardView({
         aria-labelledby={`card-tab-${active}`}
         className="min-w-0"
       >
-        {active === "overview" && <Overview card={card} />}
-        {active === "personal" && <Personal card={card} />}
-        {active === "family" && <Family card={card} />}
+        {active === "overview" && <Overview card={card} onChanged={onChanged} />}
+        {active === "personal" && <Personal card={card} onChanged={onChanged} />}
+        {active === "family" && <Family card={card} onChanged={onChanged} />}
         {active === "employment" && (
           <Employment
             card={card}
+            onChanged={onChanged}
             onSeeHistory={
               tabs.some((t) => t.key === "history") ? () => setTab("history") : undefined
             }
           />
         )}
         {active === "statutory" && <StatutoryTab card={card} onChanged={onChanged} />}
-        {active === "history" && <History card={card} />}
+        {active === "history" && <History card={card} onChanged={onChanged} />}
       </div>
     </div>
   );
@@ -244,143 +258,149 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 // ═══════════════════════════════════════════════════════════════ Overview
 
-function Overview({ card }: { card: EmployeeCard }) {
+function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const earlier = card.deployments ? card.deployments.filter((d) => d.effectiveTo).length : null;
   const open = card.deployments?.find((d) => !d.effectiveTo);
   return (
-    <Grid>
-      <Panel title="Contact" testId="panel-contact">
-        <Fields
-          items={[
-            { label: "Work email", value: card.workEmail },
-            { label: "Mobile", value: card.mobile, mono: true },
-            { label: "Alternate mobile", value: card.alternateMobile, mono: true },
-            ...("personalEmail" in card
-              ? [{ label: "Personal email", value: card.personalEmail }]
-              : []),
-          ]}
-        />
-      </Panel>
-
-      <Panel
-        title="Current deployment"
-        testId="panel-deployment"
-        footer="Changing the unit never edits this row. The posting is closed and a new one opened, so the old one is still there for the day a client invoice asks about it."
-      >
-        <Fields
-          items={[
-            { label: "Unit", value: card.currentDeployment?.unitName },
-            {
-              label: "Type",
-              value: card.currentDeployment
-                ? (UNIT_TYPE_LABEL[card.currentDeployment.unitType] ??
-                  humanise(card.currentDeployment.unitType))
-                : null,
-            },
-            { label: "Effective from", value: formatDate(card.currentDeployment?.effectiveFrom) },
-            ...(open
-              ? [
-                  { label: "Order ref", value: open.deploymentOrderRef, mono: true },
-                  { label: "Moved by", value: open.movedBy },
-                ]
-              : []),
-            ...(earlier !== null ? [{ label: "Earlier postings", value: String(earlier) }] : []),
-          ]}
-        />
-      </Panel>
-
-      {card.emergencyContact && (
-        <Panel title="Emergency contact" testId="panel-emergency">
+    <div className="flex flex-col gap-4">
+      <Grid>
+        <Panel title="Contact" testId="panel-contact">
           <Fields
             items={[
-              { label: "Name", value: card.emergencyContact.name },
-              { label: "Relation", value: humanise(card.emergencyContact.relation) },
-              { label: "Phone", value: card.emergencyContact.phone, mono: true },
+              { label: "Work email", value: card.workEmail },
+              { label: "Mobile", value: card.mobile, mono: true },
+              { label: "Alternate mobile", value: card.alternateMobile, mono: true },
+              ...("personalEmail" in card
+                ? [{ label: "Personal email", value: card.personalEmail }]
+                : []),
             ]}
           />
         </Panel>
-      )}
-    </Grid>
+
+        <Panel
+          title="Current deployment"
+          testId="panel-deployment"
+          footer="Changing the unit never edits this row. The posting is closed and a new one opened, so the old one is still there for the day a client invoice asks about it."
+        >
+          <Fields
+            items={[
+              { label: "Unit", value: card.currentDeployment?.unitName },
+              {
+                label: "Type",
+                value: card.currentDeployment
+                  ? (UNIT_TYPE_LABEL[card.currentDeployment.unitType] ??
+                    humanise(card.currentDeployment.unitType))
+                  : null,
+              },
+              { label: "Effective from", value: formatDate(card.currentDeployment?.effectiveFrom) },
+              ...(open
+                ? [
+                    { label: "Order ref", value: open.deploymentOrderRef, mono: true },
+                    { label: "Moved by", value: open.movedBy },
+                  ]
+                : []),
+              ...(earlier !== null ? [{ label: "Earlier postings", value: String(earlier) }] : []),
+            ]}
+          />
+        </Panel>
+
+        {card.emergencyContact && (
+          <Panel title="Emergency contact" testId="panel-emergency">
+            <Fields
+              items={[
+                { label: "Name", value: card.emergencyContact.name },
+                { label: "Relation", value: humanise(card.emergencyContact.relation) },
+                { label: "Phone", value: card.emergencyContact.phone, mono: true },
+              ]}
+            />
+          </Panel>
+        )}
+      </Grid>
+      {card.capabilities.canEdit && <ContactEditors card={card} onChanged={onChanged} />}
+    </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════ Personal
 
-function Personal({ card }: { card: EmployeeCard }) {
+function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   return (
-    <Grid>
-      <Panel title="Identity" testId="panel-identity">
-        <Fields
-          items={[
-            { label: "Full name", value: card.fullName },
-            { label: "Name as printed on ID", value: card.nameAsPerId },
-            { label: "Sex", value: humanise(card.sex) },
-            { label: "Date of birth", value: formatDate(card.dateOfBirth) },
-            { label: "Age", value: card.age != null ? `${card.age} (worked out)` : null },
-            { label: "Marital status", value: humanise(card.maritalStatus) },
-            { label: "Nationality", value: card.nationality },
-            { label: "Native state", value: card.nativeState },
-          ]}
-        />
-      </Panel>
+    <div className="flex flex-col gap-4">
+      <Grid>
+        <Panel title="Identity" testId="panel-identity">
+          <Fields
+            items={[
+              { label: "Full name", value: card.fullName },
+              { label: "Name as printed on ID", value: card.nameAsPerId },
+              { label: "Sex", value: humanise(card.sex) },
+              { label: "Date of birth", value: formatDate(card.dateOfBirth) },
+              { label: "Age", value: card.age != null ? `${card.age} (worked out)` : null },
+              { label: "Marital status", value: humanise(card.maritalStatus) },
+              { label: "Nationality", value: card.nationality },
+              { label: "Native state", value: card.nativeState },
+            ]}
+          />
+        </Panel>
 
-      <Panel
-        title="Education and experience"
-        footer="Total experience is the previous organisations on the History tab plus service here. Nobody types it."
-      >
-        <Fields
-          items={[
-            { label: "Qualification", value: card.educationQualification },
-            {
-              label: "Total experience",
-              value:
-                card.totalExperienceMonths != null
-                  ? formatMonths(card.totalExperienceMonths)
-                  : null,
-            },
-            { label: "Reason for leaving last org", value: card.reasonForLeavingLastOrg },
-          ]}
-          columns={1}
-        />
-      </Panel>
+        <Panel
+          title="Education and experience"
+          footer="Total experience is the previous organisations on the History tab plus service here. Nobody types it."
+        >
+          <Fields
+            items={[
+              { label: "Qualification", value: card.educationQualification },
+              {
+                label: "Total experience",
+                value:
+                  card.totalExperienceMonths != null
+                    ? formatMonths(card.totalExperienceMonths)
+                    : null,
+              },
+              { label: "Reason for leaving last org", value: card.reasonForLeavingLastOrg },
+            ]}
+            columns={1}
+          />
+        </Panel>
 
-      <Panel
-        title="Physical record"
-        footer="For uniform and safety equipment issue. It appears in no export."
-      >
-        <Fields
-          items={[
-            {
-              label: "Height",
-              value: card.physical?.heightCm ? `${card.physical.heightCm} cm` : null,
-            },
-            {
-              label: "Chest",
-              value: card.physical?.chestCm ? `${card.physical.chestCm} cm` : null,
-            },
-            {
-              label: "Weight",
-              value: card.physical?.weightKg ? `${card.physical.weightKg} kg` : null,
-            },
-            { label: "Blood group", value: card.bloodGroup },
-          ]}
-        />
-      </Panel>
+        <Panel
+          title="Physical record"
+          footer="For uniform and safety equipment issue. It appears in no export."
+        >
+          <Fields
+            items={[
+              {
+                label: "Height",
+                value: card.physical?.heightCm ? `${card.physical.heightCm} cm` : null,
+              },
+              {
+                label: "Chest",
+                value: card.physical?.chestCm ? `${card.physical.chestCm} cm` : null,
+              },
+              {
+                label: "Weight",
+                value: card.physical?.weightKg ? `${card.physical.weightKg} kg` : null,
+              },
+              { label: "Blood group", value: card.bloodGroup },
+            ]}
+          />
+        </Panel>
 
-      <Panel title="Restricted" testId="panel-restricted">
-        <p className="text-sm text-foreground-secondary">
-          Religion, caste category and disability status are held separately, on the Statutory and
-          bank tab. Only the Statutory role and the person themselves can see them, and every look
-          is logged.
-        </p>
-      </Panel>
-    </Grid>
+        <Panel title="Restricted" testId="panel-restricted">
+          <p className="text-sm text-foreground-secondary">
+            Religion, caste category and disability status are held separately, on the Statutory and
+            bank tab. Only the Statutory role and the person themselves can see them, and every look
+            is logged.
+          </p>
+        </Panel>
+      </Grid>
+      {card.capabilities.canEdit && <PersonalEditors card={card} onChanged={onChanged} />}
+    </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════ Family
 
-function Family({ card }: { card: EmployeeCard }) {
+function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const family = card.familyMembers ?? [];
   const current = card.nominations?.find((n) => !n.effectiveTo);
   const total = current?.nominees.reduce((s, n) => s + Number(n.sharePercent), 0) ?? 0;
@@ -442,100 +462,126 @@ function Family({ card }: { card: EmployeeCard }) {
           <p className="text-sm text-muted-foreground">No nomination recorded yet.</p>
         )}
       </Panel>
+      {card.capabilities.canEdit && (
+        <div className="flex flex-wrap gap-2">
+          <FamilyEditor card={card} onChanged={onChanged} />
+          <NominationEditor card={card} onChanged={onChanged} />
+        </div>
+      )}
     </div>
   );
 }
 
 // ═══════════════════════════════════════════════════════════════ Employment
 
-function Employment({ card, onSeeHistory }: { card: EmployeeCard; onSeeHistory?: () => void }) {
+function Employment({
+  card,
+  onSeeHistory,
+  onChanged,
+}: {
+  card: EmployeeCard;
+  onSeeHistory?: () => void;
+  onChanged: Changed;
+}) {
   const postings = card.deployments?.length;
   return (
-    <Grid>
-      <Panel title="Position">
-        <Fields
-          items={[
-            { label: "Employee code", value: card.employeeCode, mono: true },
-            { label: "Designation", value: card.designation?.name },
-            { label: "Grade", value: card.designation?.grade },
-            { label: "Department", value: card.department?.name },
-            ...("employmentType" in card
-              ? [
-                  {
-                    label: "Employment type",
-                    value: card.employmentType
-                      ? (EMPLOYMENT_TYPE_LABEL[card.employmentType] ??
-                        humanise(card.employmentType))
-                      : null,
-                  },
-                ]
-              : []),
-            {
-              label: "Reports to",
-              value: card.reportsTo?.fullName ? (
-                card.reportsTo.id ? (
-                  <PersonLink employeeId={card.reportsTo.id}>{card.reportsTo.fullName}</PersonLink>
-                ) : (
-                  card.reportsTo.fullName
-                )
-              ) : null,
-            },
-            { label: "Direct reports", value: String(card.directReportCount) },
-          ]}
-        />
-      </Panel>
+    <div className="flex flex-col gap-4">
+      <Grid>
+        <Panel title="Position">
+          <Fields
+            items={[
+              { label: "Employee code", value: card.employeeCode, mono: true },
+              { label: "Designation", value: card.designation?.name },
+              { label: "Grade", value: card.designation?.grade },
+              { label: "Department", value: card.department?.name },
+              ...("employmentType" in card
+                ? [
+                    {
+                      label: "Employment type",
+                      value: card.employmentType
+                        ? (EMPLOYMENT_TYPE_LABEL[card.employmentType] ??
+                          humanise(card.employmentType))
+                        : null,
+                    },
+                  ]
+                : []),
+              {
+                label: "Reports to",
+                value: card.reportsTo?.fullName ? (
+                  card.reportsTo.id ? (
+                    <PersonLink employeeId={card.reportsTo.id}>
+                      {card.reportsTo.fullName}
+                    </PersonLink>
+                  ) : (
+                    card.reportsTo.fullName
+                  )
+                ) : null,
+              },
+              { label: "Direct reports", value: String(card.directReportCount) },
+            ]}
+          />
+        </Panel>
 
-      <Panel
-        title="Dates and status"
-        footer={
-          "reJoiningDate" in card
-            ? "Re-joining keeps the original joining date. Continuity is worked out from both."
-            : undefined
-        }
-      >
-        <Fields
-          items={[
-            { label: "Joined", value: formatDate(card.dateOfJoining) },
-            ...("reJoiningDate" in card
-              ? [{ label: "Re-joined", value: formatDate(card.reJoiningDate) }]
-              : []),
-            ...("confirmedOn" in card
-              ? [{ label: "Confirmed", value: formatDate(card.confirmedOn) }]
-              : []),
-            { label: "Status", value: EMPLOYEE_STATUS_LABEL[card.status] },
-            ...("terminationDate" in card
-              ? [
-                  { label: "Termination date", value: formatDate(card.terminationDate) },
-                  { label: "Termination reason", value: card.terminationReason },
-                ]
-              : []),
-          ]}
-        />
-      </Panel>
+        <Panel
+          title="Dates and status"
+          footer={
+            "reJoiningDate" in card
+              ? "Re-joining keeps the original joining date. Continuity is worked out from both."
+              : undefined
+          }
+        >
+          <Fields
+            items={[
+              { label: "Joined", value: formatDate(card.dateOfJoining) },
+              ...("reJoiningDate" in card
+                ? [{ label: "Re-joined", value: formatDate(card.reJoiningDate) }]
+                : []),
+              ...("confirmedOn" in card
+                ? [{ label: "Confirmed", value: formatDate(card.confirmedOn) }]
+                : []),
+              { label: "Status", value: EMPLOYEE_STATUS_LABEL[card.status] },
+              ...("terminationDate" in card
+                ? [
+                    { label: "Termination date", value: formatDate(card.terminationDate) },
+                    { label: "Termination reason", value: card.terminationReason },
+                  ]
+                : []),
+            ]}
+          />
+        </Panel>
 
-      <Panel
-        title="Deployment"
-        aside={
-          onSeeHistory ? (
-            <button
-              type="button"
-              onClick={onSeeHistory}
-              className="text-sm font-medium text-primary hover:underline"
-            >
-              See history
-            </button>
-          ) : null
-        }
-      >
-        <Fields
-          items={[
-            { label: "Current unit", value: card.currentDeployment?.unitName },
-            { label: "Since", value: formatDate(card.currentDeployment?.effectiveFrom) },
-            ...(postings != null ? [{ label: "Postings on record", value: String(postings) }] : []),
-          ]}
-        />
-      </Panel>
-    </Grid>
+        <Panel
+          title="Deployment"
+          aside={
+            onSeeHistory ? (
+              <button
+                type="button"
+                onClick={onSeeHistory}
+                className="text-sm font-medium text-primary hover:underline"
+              >
+                See history
+              </button>
+            ) : null
+          }
+        >
+          <Fields
+            items={[
+              { label: "Current unit", value: card.currentDeployment?.unitName },
+              { label: "Since", value: formatDate(card.currentDeployment?.effectiveFrom) },
+              ...(postings != null
+                ? [{ label: "Postings on record", value: String(postings) }]
+                : []),
+            ]}
+          />
+        </Panel>
+      </Grid>
+      {card.capabilities.canEdit && (
+        <div className="flex flex-wrap gap-2">
+          <EmploymentEditors card={card} onChanged={onChanged} />
+          <MoveUnitDialog card={card} onChanged={onChanged} />
+        </div>
+      )}
+    </div>
   );
 }
 
@@ -549,7 +595,7 @@ function CurrentOrArchived({ open }: { open: boolean }) {
   );
 }
 
-function History({ card }: { card: EmployeeCard }) {
+function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const today = todayIso();
   return (
     <div className="flex flex-col gap-4">
@@ -559,6 +605,13 @@ function History({ card }: { card: EmployeeCard }) {
         who changed it and when, because an address or a posting from three years ago is what a
         statutory notice or a claim will ask about.
       </p>
+
+      {card.capabilities.canEdit && (
+        <div className="flex flex-wrap gap-2">
+          <AddAddressDialog card={card} onChanged={onChanged} />
+          <MoveUnitDialog card={card} onChanged={onChanged} />
+        </div>
+      )}
 
       {card.addresses && (
         <Panel
@@ -576,7 +629,7 @@ function History({ card }: { card: EmployeeCard }) {
                 humanise(a.addressType),
                 [a.line, a.city, a.district, a.state, a.pincode].filter(Boolean).join(", "),
                 formatDate(a.effectiveFrom),
-                formatDate(a.effectiveTo),
+                formatDate(lastDay(a.effectiveTo)),
                 a.nearestPoliceStation ?? "—",
                 a.recordedBy ?? "—",
                 <CurrentOrArchived key="s" open={a.effectiveTo === null} />,
@@ -601,7 +654,7 @@ function History({ card }: { card: EmployeeCard }) {
               cells: [
                 d.unitRetired ? `${d.unitName} (retired unit)` : d.unitName,
                 formatDate(d.effectiveFrom),
-                formatDate(d.effectiveTo),
+                formatDate(lastDay(d.effectiveTo)),
                 formatMonths(monthsBetween(d.effectiveFrom, d.effectiveTo, today)),
                 <span key="o" className="font-mono">
                   {d.deploymentOrderRef}
@@ -636,6 +689,9 @@ function History({ card }: { card: EmployeeCard }) {
             }))}
           />
         </Panel>
+      )}
+      {card.capabilities.canEdit && "previousOrganisations" in card && (
+        <PreviousOrgsEditor card={card} onChanged={onChanged} />
       )}
     </div>
   );

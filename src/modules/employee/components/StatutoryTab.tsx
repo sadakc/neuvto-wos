@@ -34,6 +34,7 @@ import {
   setStatutory,
 } from "../handlers";
 import { formatDate, humanise } from "../format";
+import { FieldEditor as Editor, type FieldSpec } from "./FieldEditor";
 import { Fields, Panel } from "./parts";
 
 export const REVEAL_LIFETIME_MS = 2 * 60 * 1000;
@@ -439,16 +440,6 @@ function RevealPrompt({
 
 // ═══════════════════════════════════════════════════════════════ editors
 
-type FieldSpec = {
-  key: string;
-  label: string;
-  kind?: "text" | "date" | "select";
-  options?: readonly string[];
-  /** What is on record, for a prefilled field. Numbers are never prefilled. */
-  current?: string | null;
-  placeholder?: string;
-};
-
 function Editors({
   card,
   onChanged,
@@ -467,7 +458,7 @@ function Editors({
     id: string;
     title: string;
     fields: FieldSpec[];
-    save: (vals: Record<string, string>) => Promise<void>;
+    save: (vals: Record<string, string | null>) => Promise<void>;
   }[] = [];
 
   if (caps.canEditStatutory) {
@@ -592,137 +583,5 @@ function Editors({
         <Editor key={ed.id} {...ed} onSaved={onChanged} />
       ))}
     </div>
-  );
-}
-
-function Editor({
-  id,
-  title,
-  fields,
-  save,
-  onSaved,
-}: {
-  id: string;
-  title: string;
-  fields: FieldSpec[];
-  save: (vals: Record<string, string>) => Promise<void>;
-  onSaved: () => Promise<void> | void;
-}) {
-  const initial = () => Object.fromEntries(fields.map((f) => [f.key, f.current ?? ""]));
-  const [open, setOpen] = useState(false);
-  const [vals, setVals] = useState<Record<string, string>>(initial);
-  const [busy, setBusy] = useState(false);
-  const [error, setError] = useState("");
-
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    setError("");
-    // Only what changed. An empty number field means "keep what is on record";
-    // nothing on this form can blank a number by accident.
-    const changed: Record<string, string> = {};
-    for (const f of fields) {
-      const now = vals[f.key].trim();
-      const before = (f.current ?? "").trim();
-      if (now !== before && now !== "") changed[f.key] = now;
-    }
-    if (Object.keys(changed).length === 0) {
-      setOpen(false);
-      return;
-    }
-    setBusy(true);
-    try {
-      await save(changed);
-      setOpen(false);
-      await onSaved();
-    } catch (err) {
-      setError(isAppError(err) ? err.message : "That couldn't be saved.");
-    } finally {
-      setBusy(false);
-    }
-  }
-
-  if (!open) {
-    return (
-      <button
-        type="button"
-        data-testid={`edit-${id}`}
-        onClick={() => {
-          setVals(initial());
-          setError("");
-          setOpen(true);
-        }}
-        className="h-11 w-fit rounded-md border border-border px-4 text-sm font-medium"
-      >
-        Edit {title.toLowerCase()}
-      </button>
-    );
-  }
-
-  return (
-    <form
-      onSubmit={submit}
-      data-testid={`editor-${id}`}
-      className="rounded-xl border border-border bg-card p-4 shadow-card"
-    >
-      <h3 className="text-card-title font-semibold tracking-card-title">{title}</h3>
-      <div className="mt-3 grid gap-3 @min-[640px]/app:grid-cols-2">
-        {fields.map((f) => (
-          <label key={f.key} className="min-w-0 text-sm">
-            <span className="block text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
-              {f.label}
-            </span>
-            {f.kind === "select" ? (
-              <select
-                value={vals[f.key]}
-                onChange={(e) => setVals((c) => ({ ...c, [f.key]: e.target.value }))}
-                className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
-              >
-                <option value="">Not recorded</option>
-                {f.options!.map((o) => (
-                  <option key={o} value={o}>
-                    {humanise(o)}
-                  </option>
-                ))}
-              </select>
-            ) : (
-              <input
-                type={f.kind === "date" ? "date" : "text"}
-                value={vals[f.key]}
-                onChange={(e) => setVals((c) => ({ ...c, [f.key]: e.target.value }))}
-                placeholder={f.placeholder}
-                autoComplete="off"
-                className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 font-mono"
-              />
-            )}
-          </label>
-        ))}
-      </div>
-      {error && (
-        <p
-          role="alert"
-          data-testid={`editor-${id}-error`}
-          className="mt-2 text-sm text-destructive"
-        >
-          {error}
-        </p>
-      )}
-      <div className="mt-3 flex flex-wrap gap-2">
-        <button
-          type="submit"
-          disabled={busy}
-          data-testid={`save-${id}`}
-          className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
-        >
-          {busy ? "Saving…" : "Save"}
-        </button>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
-          className="h-11 rounded-md border border-border px-4 text-sm"
-        >
-          Cancel
-        </button>
-      </div>
-    </form>
   );
 }
