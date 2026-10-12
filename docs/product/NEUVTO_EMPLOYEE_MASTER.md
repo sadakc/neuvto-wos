@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.5 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.6 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -329,7 +329,7 @@ screen change has been through `screen-prover`.
 | E6 ✔  | Restricted data: encryption, reveal, `restricted_reads`                                                           | Reveal writes its audit row in the same transaction; the value never enters the query cache                                    |
 | E7 ✔  | Writes: family, nominees, previous organisations, add an address, move to another unit                            | The bundle's acceptance criteria 1–5 and 10                                                                                    |
 | E8 ✔  | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
-| E9    | Configuration, and the responsive and role sweeps                                                                 | Every one of the 62 source columns has a home; `scrollWidth === clientWidth` on every route at every width                     |
+| E9 ✔  | Configuration, and the responsive and role sweeps                                                                 | Every one of the 62 source columns has a home; `scrollWidth === clientWidth` on every route at every width                     |
 
 Leave Management's redesign follows E9, to the same design, reusing E1's shell.
 
@@ -403,6 +403,33 @@ and `verify_employee_import.sql`, and on screen by `Lifecycle.test.tsx` and
   - _Deactivate_ does not cancel the person's own pending leave requests or hand final
     settlement to Payroll: the first belongs to Leave and the second to the parked Payroll
     module (D81). Both are listed in the build spec's known gaps.
+
+### E9 as built (16 Oct 2026)
+
+`20261016100000_configuration.sql`, proved by `verify_employee_config.sql`; the screen by
+`Configuration.test.tsx` and `fieldCatalogue.test.tsx`.
+
+- **01 Fields and visibility** is the bundle's field inventory as data
+  (`src/modules/employee/fieldCatalogue.ts`), with one column the bundle lacks: where each
+  field now lives. `fieldCatalogue.test.tsx` renders a real card, opens every tab and fails if
+  any field's home is not a panel that is actually there. That is criterion 8, run rather
+  than asserted. **The bundle's inventory names 56 source columns, not the 62 criterion 8
+  counts**; the six are most likely FATHER NAME and HUSBAND NAME appearing twice in the sheet
+  plus blank or serial columns. Settling it needs the real master sheet. Who sees each field
+  is not a setting: §5 is enforced by `employee_card()`, and a switch that could loosen it
+  would be the leak.
+- **02 Deployment units and designations**: add, edit, retire and bring back. A rename
+  relabels every posting, because postings point at the id. A unit somebody is posted to now
+  cannot be retired. Duplicate names are refused however they are spelt or spaced, which is
+  the spreadsheet's duplicate-unit problem stopped at the source. Working calendars, shifts
+  and attendance capture per unit arrive with Attendance.
+- **03 Record rules**: the three rules and the corrections table, stated.
+- **04 Onboarding checklist**: twelve items, each one a check the database runs against the
+  record; a company sets each one's due window and whether it is mandatory. Add Employee's
+  "missing" list is now this checklist, with an overdue flag counted from the joining date.
+  Reminders and escalation need scheduled notifications for this module and are not built.
+- **05 Access and admin roles**: the role table and the rules that are always on. Roles are
+  changed on People (Change access). Logging every card view, not only reveals, is not built.
 
 ## 8. Acceptance criteria, module level
 

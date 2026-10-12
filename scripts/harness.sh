@@ -151,6 +151,7 @@ run "verifying the record is written" "$HARNESS_DIR/tests/verify_employee_writes
 run "verifying change requests" "$HARNESS_DIR/tests/verify_change_requests.sql"
 run "verifying adding people and letting them go" "$HARNESS_DIR/tests/verify_employee_lifecycle.sql"
 run "verifying employee import" "$HARNESS_DIR/tests/verify_employee_import.sql"
+run "verifying employee configuration" "$HARNESS_DIR/tests/verify_employee_config.sql"
 run "verifying Neuvto names Super Admins" "$HARNESS_DIR/tests/verify_platform_super_admins.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the

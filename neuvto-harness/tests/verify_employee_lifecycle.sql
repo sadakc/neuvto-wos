@@ -257,7 +257,8 @@ begin
   if (r ->> 'drafts')::int is distinct from drafts0 + 1
      or not exists (select 1 from jsonb_array_elements(r -> 'recent') x
                      where x ->> 'id' = d2::text and x ->> 'stage' = 'draft'
-                       and x -> 'gaps' ? 'email' and x -> 'gaps' ? 'statutory') then
+                       and x -> 'gaps' @> '[{"key":"work_email"}]'
+                       and x -> 'gaps' @> '[{"key":"uan"}]') then
     raise exception 'LIFECYCLE FAIL: the overview reads %', r;
   end if;
   raise notice 'ok: the overview counts drafts and lists each record''s gaps';

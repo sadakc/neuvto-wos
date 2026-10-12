@@ -871,6 +871,47 @@ export type Database = {
           },
         ]
       }
+      employee_onboarding_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          due_within_days: number
+          item_key: string
+          mandatory: boolean
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          due_within_days: number
+          item_key: string
+          mandatory: boolean
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          due_within_days?: number
+          item_key?: string
+          mandatory?: boolean
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_restricted: {
         Row: {
           created_at: string
@@ -2657,6 +2698,30 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: Json
       }
+      employee_onboarding_defaults: {
+        Args: never
+        Returns: {
+          due_within_days: number
+          item_key: string
+          label: string
+          mandatory: boolean
+          sort: number
+        }[]
+      }
+      employee_onboarding_gaps: {
+        Args: { _employee_id: string }
+        Returns: Json
+      }
+      employee_onboarding_items: {
+        Args: never
+        Returns: {
+          customised: boolean
+          due_within_days: number
+          item_key: string
+          label: string
+          mandatory: boolean
+        }[]
+      }
       employee_org_chart: {
         Args: never
         Returns: {
@@ -2680,6 +2745,7 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: undefined
       }
+      employee_require_config_admin: { Args: never; Returns: string }
       employee_resolve_change: {
         Args: { _note?: string; _outcome: string; _request_id: string }
         Returns: undefined
@@ -2697,6 +2763,10 @@ export type Database = {
         Args: { _employee_id: string; _fields: string[]; _reason: string }
         Returns: Json
       }
+      employee_save_designation: {
+        Args: { _designation_id: string; _values: Json }
+        Returns: string
+      }
       employee_save_family: {
         Args: { _employee_id: string; _rows: Json }
         Returns: undefined
@@ -2705,9 +2775,21 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: string
       }
+      employee_save_onboarding_item: {
+        Args: {
+          _due_within_days: number
+          _item_key: string
+          _mandatory: boolean
+        }
+        Returns: undefined
+      }
       employee_save_previous_orgs: {
         Args: { _employee_id: string; _rows: Json }
         Returns: undefined
+      }
+      employee_save_unit: {
+        Args: { _unit_id: string; _values: Json }
+        Returns: string
       }
       employee_send_invite: {
         Args: {
@@ -2720,6 +2802,10 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
       }
+      employee_set_designation_status: {
+        Args: { _designation_id: string; _status: string }
+        Returns: undefined
+      }
       employee_set_restricted: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
@@ -2727,6 +2813,27 @@ export type Database = {
       employee_set_statutory: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
+      }
+      employee_set_unit_status: {
+        Args: { _status: string; _unit_id: string }
+        Returns: undefined
+      }
+      employee_units: {
+        Args: never
+        Returns: {
+          attendance_capture_mode: string
+          client_name: string
+          id: string
+          is_billable: boolean
+          location: string
+          name: string
+          posted_now: number
+          postings_ever: number
+          requires_police_verification: boolean
+          state: string
+          status: string
+          unit_type: string
+        }[]
       }
       employee_update: {
         Args: { _employee_id: string; _values: Json }

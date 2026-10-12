@@ -424,3 +424,130 @@ export async function commitImport(
   if (error) throw toEmployeeError(error.message);
   return data as unknown as { created: number; skipped: number };
 }
+
+// ═══════════════════════════════════════════════════════════ configuration (E9)
+
+export interface UnitRow {
+  id: string;
+  name: string;
+  unitType: string;
+  clientName: string | null;
+  location: string | null;
+  state: string | null;
+  attendanceCaptureMode: string | null;
+  requiresPoliceVerification: boolean;
+  isBillable: boolean;
+  status: "active" | "retired";
+  postedNow: number;
+  postingsEver: number;
+}
+
+export async function listUnits(): Promise<UnitRow[]> {
+  const { data, error } = await supabase.rpc("employee_units");
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((u) => ({
+    id: u.id,
+    name: u.name,
+    unitType: u.unit_type,
+    clientName: u.client_name,
+    location: u.location,
+    state: u.state,
+    attendanceCaptureMode: u.attendance_capture_mode,
+    requiresPoliceVerification: u.requires_police_verification,
+    isBillable: u.is_billable,
+    status: u.status as UnitRow["status"],
+    postedNow: u.posted_now,
+    postingsEver: u.postings_ever,
+  }));
+}
+
+export async function saveUnit(unitId: string | null, values: Values): Promise<string> {
+  const { data, error } = await supabase.rpc("employee_save_unit", {
+    // null adds a unit; the generated type cannot say a uuid argument may be null.
+    _unit_id: unitId as string,
+    _values: values,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+export async function setUnitStatus(unitId: string, status: "active" | "retired"): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_unit_status", {
+    _unit_id: unitId,
+    _status: status,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export interface DesignationRow {
+  id: string;
+  name: string;
+  grade: string | null;
+  status: "active" | "retired";
+}
+
+/** Every designation, retired ones too, for the Admin who may bring one back. */
+export async function listAllDesignations(): Promise<DesignationRow[]> {
+  const { data, error } = await supabase
+    .from("designations")
+    .select("id, name, grade, status")
+    .order("name");
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((d) => ({ ...d, status: d.status as DesignationRow["status"] }));
+}
+
+export async function saveDesignation(
+  designationId: string | null,
+  values: Values,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("employee_save_designation", {
+    _designation_id: designationId as string,
+    _values: values,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+export async function setDesignationStatus(
+  designationId: string,
+  status: "active" | "retired",
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_designation_status", {
+    _designation_id: designationId,
+    _status: status,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export interface OnboardingItem {
+  key: string;
+  label: string;
+  dueWithinDays: number;
+  mandatory: boolean;
+  customised: boolean;
+}
+
+export async function listOnboardingItems(): Promise<OnboardingItem[]> {
+  const { data, error } = await supabase.rpc("employee_onboarding_items");
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((i) => ({
+    key: i.item_key,
+    label: i.label,
+    dueWithinDays: i.due_within_days,
+    mandatory: i.mandatory,
+    customised: i.customised,
+  }));
+}
+
+export async function saveOnboardingItem(
+  key: string,
+  dueWithinDays: number,
+  mandatory: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_save_onboarding_item", {
+    _item_key: key,
+    _due_within_days: dueWithinDays,
+    _mandatory: mandatory,
+  });
+  if (error) throw toEmployeeError(error.message);
+}

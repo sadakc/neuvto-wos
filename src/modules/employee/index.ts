@@ -38,6 +38,13 @@ export const employee: ModuleDefinition = {
       description: "Bring a workforce in from a spreadsheet, as drafts",
     },
     {
+      label: "Configuration",
+      to: "/app/employee/config",
+      group: "company",
+      roles: ["super_admin", "org_admin", "hr_admin"],
+      description: "Units, designations, the onboarding checklist and the record's rules",
+    },
+    {
       label: "Change requests",
       to: "/app/employee/change-requests",
       group: "company",
@@ -54,6 +61,7 @@ export const employee: ModuleDefinition = {
     { path: "employee/org-chart", component: lazy(() => import("./components/OrgChart")) },
     { path: "employee/add", component: lazy(() => import("./components/Lifecycle")) },
     { path: "employee/import", component: lazy(() => import("./components/ImportRecords")) },
+    { path: "employee/config", component: lazy(() => import("./components/Configuration")) },
     {
       path: "employee/change-requests",
       component: lazy(() => import("./components/ChangeRequests")),
@@ -81,6 +89,7 @@ export const employee: ModuleDefinition = {
     "employee_restricted",
     "restricted_reads",
     "employee_change_requests",
+    "employee_onboarding_items",
   ],
 };
 
