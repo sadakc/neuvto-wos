@@ -206,7 +206,7 @@ begin
   if v_type.id is null then
     raise exception 'LEAVE_TYPE_NOT_FOUND' using errcode = 'P0002';
   end if;
-  if v_type.kind <> 'paid' then
+  if v_type.kind = 'unpaid' then
     raise exception 'UNPAID_HAS_NO_BALANCE' using errcode = 'P0001';
   end if;
 
@@ -241,7 +241,7 @@ comment on function public.leave_stage_opening_balance is
 revoke all on function public.leave_stage_opening_balance(uuid, uuid, numeric, numeric) from public, anon;
 grant execute on function public.leave_stage_opening_balance(uuid, uuid, numeric, numeric) to authenticated;
 
-/** Everybody not yet joined, against every active paid type, with what is staged. */
+/** Everybody not yet joined, against every active type with a balance, with what is staged. */
 create or replace function public.leave_staged_opening_balances()
 returns table (
   employee_record_id uuid,
@@ -295,7 +295,7 @@ begin
        and s.applied_at is null and s.deleted_at is null
      where e.organization_id = v_org and e.deleted_at is null and e.profile_id is null
        and t.organization_id = v_org and t.deleted_at is null and t.status = 'active'
-       and t.kind = 'paid'
+       and t.kind <> 'unpaid'
      order by 2, t.name;
 end $$;
 

@@ -157,6 +157,7 @@ run "verifying an admin for each module" "$HARNESS_DIR/tests/verify_module_admin
 run "verifying leave phase 2" "$HARNESS_DIR/tests/verify_leave_phase2.sql"
 run "verifying waiting approvals move up" "$HARNESS_DIR/tests/verify_escalation.sql"
 run "verifying opening balances wait for them" "$HARNESS_DIR/tests/verify_opening_staged.sql"
+run "verifying compensatory off" "$HARNESS_DIR/tests/verify_comp_off.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

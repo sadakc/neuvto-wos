@@ -31,6 +31,10 @@ import {
   type LeaveTypeImpact,
   type StagedOpeningBalance,
   type StagedOpeningProblem,
+  type CompOffClaim,
+  type CompOffApprovalDetail,
+  type CompOffDay,
+  type EarnedTypeRules,
 } from "./contracts";
 
 /**
@@ -246,15 +250,24 @@ export async function getApprovalDetail(approvalRequestId: string): Promise<Leav
   };
 }
 
-export async function getLeaveTypes(): Promise<{ id: string; name: string; kind: LeaveKind }[]> {
+export async function getLeaveTypes(): Promise<EarnedTypeRules[]> {
   const { data, error } = await supabase
     .from("leave_types")
-    .select("id, name, kind")
+    .select(
+      "id, name, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required",
+    )
     .eq("status", "active")
     .order("name");
 
   if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the leave types.", 500);
-  return (data ?? []).map((t) => ({ id: t.id, name: t.name, kind: t.kind as LeaveKind }));
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    kind: t.kind as LeaveKind,
+    earnedExpiresAfterDays: t.earned_expires_after_days,
+    earnedClaimWithinDays: t.earned_claim_within_days,
+    earnedProofRequired: t.earned_proof_required,
+  }));
 }
 
 /** Leave phase 2: the caller's unpaid leave this year, taken and awaiting a decision. */
@@ -334,7 +347,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
   const { data, error } = await supabase
     .from("leave_types")
     .select(
-      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind",
+      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required",
     )
     .order("status")
     .order("name");
@@ -351,6 +364,9 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
     approvalRequired: r.approval_required,
     status: r.status as LeaveType["status"],
     kind: r.kind as LeaveKind,
+    earnedExpiresAfterDays: r.earned_expires_after_days,
+    earnedClaimWithinDays: r.earned_claim_within_days,
+    earnedProofRequired: r.earned_proof_required,
   }));
 }
 
@@ -370,6 +386,10 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
     min_notice_days: parsed.minNoticeDays,
     max_per_request: parsed.maxPerRequest,
     approval_required: parsed.approvalRequired,
+    // D89. Only an earned type has these; any other kind stores none.
+    earned_expires_after_days: parsed.kind === "earned" ? parsed.earnedExpiresAfterDays : null,
+    earned_claim_within_days: parsed.kind === "earned" ? parsed.earnedClaimWithinDays : null,
+    earned_proof_required: parsed.kind === "earned" ? parsed.earnedProofRequired : false,
   };
 
   // A saved type's kind is fixed (the database refuses a change), so it is sent
@@ -379,7 +399,7 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
     : await supabase.from("leave_types").insert({
         ...row,
         kind: parsed.kind,
-        max_days_per_year: parsed.kind === "unpaid" ? 0 : parsed.maxDaysPerYear,
+        max_days_per_year: parsed.kind === "paid" ? parsed.maxDaysPerYear : 0,
       });
 
   if (error) {
@@ -548,4 +568,107 @@ export async function getStagedOpeningProblems(): Promise<StagedOpeningProblem[]
     carryforwardDays: Number(r.carryforward_days),
     problem: r.problem as StagedOpeningProblem["problem"],
   }));
+}
+
+// ═══════════════════════════════════════════════ compensatory off (D89)
+
+const PROOF_BUCKET = "leave-proofs";
+const PROOF_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+
+function toDays(raw: unknown): CompOffDay[] {
+  return ((raw as { date: string; days: number | string; note: string | null }[]) ?? []).map(
+    (d) => ({ date: d.date, days: Number(d.days), note: d.note }),
+  );
+}
+
+export async function getMyCompOffClaims(): Promise<CompOffClaim[]> {
+  const { data, error } = await supabase.rpc("comp_off_my_claims");
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load your claims.", 500);
+  return (data ?? []).map((r) => ({
+    claimId: r.claim_id,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    reason: r.reason,
+    totalDays: Number(r.total_days),
+    status: r.status as CompOffClaim["status"],
+    hasProof: r.has_proof,
+    submittedAt: r.submitted_at,
+    decidedAt: r.decided_at,
+    expiresOn: r.expires_on,
+    expiredDays: Number(r.expired_days),
+    days: toDays(r.days),
+  }));
+}
+
+/**
+ * Claims compensatory off. Proof, if any, is uploaded first into the person's
+ * own folder (the bucket refuses any other), and its path sent with the claim.
+ */
+export async function submitCompOff(input: {
+  leaveTypeId: string;
+  days: { date: string; days: number; note: string }[];
+  reason: string;
+  proof: File | null;
+}): Promise<string> {
+  let proofPath: string | null = null;
+  if (input.proof) {
+    if (!PROOF_TYPES.includes(input.proof.type)) {
+      throw new AppError("VALIDATION_FAILED", "Attach a PDF or a photo (PNG, JPEG or WebP).", 400);
+    }
+    if (input.proof.size > PROOF_MAX_BYTES) {
+      throw new AppError("VALIDATION_FAILED", "Attach a file of 5 MB or less.", 400);
+    }
+    const { data: session } = await supabase.auth.getSession();
+    const uid = session.session?.user.id;
+    const { data: org } = await supabase.rpc("current_org_id");
+    if (!uid || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
+    const safe = input.proof.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
+    proofPath = `${org}/${uid}/${crypto.randomUUID()}-${safe}`;
+    const { error: upErr } = await supabase.storage
+      .from(PROOF_BUCKET)
+      .upload(proofPath, input.proof, { contentType: input.proof.type, upsert: false });
+    if (upErr)
+      throw new AppError("INTERNAL_ERROR", "The attachment didn't upload. Try again.", 500);
+  }
+  const { data, error } = await supabase.rpc("comp_off_submit", {
+    _leave_type_id: input.leaveTypeId,
+    _days: input.days.map((d) => ({ date: d.date, days: d.days, note: d.note || null })),
+    _reason: input.reason,
+    _proof_path: proofPath ?? undefined,
+  });
+  if (error) throw toLeaveError(error.message);
+  return data as string;
+}
+
+export async function cancelCompOff(claimId: string): Promise<void> {
+  const { error } = await supabase.rpc("comp_off_cancel", { _claim_id: claimId });
+  if (error) throw toLeaveError(error.message);
+}
+
+export async function getCompOffApprovalDetail(
+  approvalRequestId: string,
+): Promise<CompOffApprovalDetail> {
+  const { data, error } = await supabase.rpc("comp_off_approval_detail", {
+    _approval_request_id: approvalRequestId,
+  });
+  if (error) throw toLeaveError(error.message);
+  const r = data as Record<string, unknown>;
+  return {
+    claimId: r.claimId as string,
+    employeeName: r.employeeName as string,
+    leaveTypeName: r.leaveTypeName as string,
+    reason: r.reason as string,
+    totalDays: Number(r.totalDays),
+    status: r.status as CompOffApprovalDetail["status"],
+    proofPath: (r.proofPath as string | null) ?? null,
+    days: toDays(r.days),
+  };
+}
+
+/** A short-lived link to a claim's proof. The bucket decides who may have one. */
+export async function getProofUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(PROOF_BUCKET).createSignedUrl(path, 300);
+  if (error || !data) throw new AppError("FORBIDDEN", "That attachment can't be opened.", 403);
+  return data.signedUrl;
 }

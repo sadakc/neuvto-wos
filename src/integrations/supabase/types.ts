@@ -484,6 +484,162 @@ export type Database = {
           },
         ]
       }
+      comp_off_claim_days: {
+        Row: {
+          claim_id: string
+          created_at: string
+          days: number
+          employee_id: string
+          id: string
+          live: boolean
+          note: string | null
+          organization_id: string
+          worked_on: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          days: number
+          employee_id: string
+          id?: string
+          live?: boolean
+          note?: string | null
+          organization_id: string
+          worked_on: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          days?: number
+          employee_id?: string
+          id?: string
+          live?: boolean
+          note?: string | null
+          organization_id?: string
+          worked_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comp_off_claim_days_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "comp_off_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claim_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claim_days_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comp_off_claims: {
+        Row: {
+          approval_request_id: string | null
+          created_at: string
+          created_by: string | null
+          credited_at: string | null
+          credited_fy: string | null
+          decided_at: string | null
+          deleted_at: string | null
+          employee_id: string
+          expired_at: string | null
+          expired_days: number
+          expires_on: string | null
+          id: string
+          leave_type_id: string
+          organization_id: string
+          proof_path: string | null
+          reason: string
+          status: string
+          total_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approval_request_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credited_at?: string | null
+          credited_fy?: string | null
+          decided_at?: string | null
+          deleted_at?: string | null
+          employee_id: string
+          expired_at?: string | null
+          expired_days?: number
+          expires_on?: string | null
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          proof_path?: string | null
+          reason: string
+          status?: string
+          total_days: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approval_request_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credited_at?: string | null
+          credited_fy?: string | null
+          decided_at?: string | null
+          deleted_at?: string | null
+          employee_id?: string
+          expired_at?: string | null
+          expired_days?: number
+          expires_on?: string | null
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          proof_path?: string | null
+          reason?: string
+          status?: string
+          total_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comp_off_claims_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claims_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claims_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claims_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_requests: {
         Row: {
           company: string | null
@@ -1818,6 +1974,9 @@ export type Database = {
           created_by: string | null
           deleted_at: string | null
           description: string | null
+          earned_claim_within_days: number | null
+          earned_expires_after_days: number | null
+          earned_proof_required: boolean
           id: string
           kind: string
           max_days_per_year: number
@@ -1835,6 +1994,9 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           description?: string | null
+          earned_claim_within_days?: number | null
+          earned_expires_after_days?: number | null
+          earned_proof_required?: boolean
           id?: string
           kind?: string
           max_days_per_year?: number
@@ -1852,6 +2014,9 @@ export type Database = {
           created_by?: string | null
           deleted_at?: string | null
           description?: string | null
+          earned_claim_within_days?: number | null
+          earned_expires_after_days?: number | null
+          earned_proof_required?: boolean
           id?: string
           kind?: string
           max_days_per_year?: number
@@ -2897,6 +3062,39 @@ export type Database = {
         Args: { _context: Json; _field: string; _op: string; _value: number }
         Returns: boolean
       }
+      comp_off_approval_detail: {
+        Args: { _approval_request_id: string }
+        Returns: Json
+      }
+      comp_off_cancel: { Args: { _claim_id: string }; Returns: undefined }
+      comp_off_expire_due: { Args: never; Returns: number }
+      comp_off_my_claims: {
+        Args: never
+        Returns: {
+          approval_request_id: string
+          claim_id: string
+          days: Json
+          decided_at: string
+          expired_days: number
+          expires_on: string
+          has_proof: boolean
+          leave_type_id: string
+          leave_type_name: string
+          reason: string
+          status: string
+          submitted_at: string
+          total_days: number
+        }[]
+      }
+      comp_off_submit: {
+        Args: {
+          _days: Json
+          _leave_type_id: string
+          _proof_path?: string
+          _reason: string
+        }
+        Returns: string
+      }
       current_org_id: { Args: never; Returns: string }
       deactivate_employee: {
         Args: { _employee_id: string; _successor_id: string }
@@ -3316,6 +3514,7 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_proof_readable: { Args: { _name: string }; Returns: boolean }
       leave_report_schedule_run: { Args: never; Returns: number }
       leave_set_opening_balance: {
         Args: {

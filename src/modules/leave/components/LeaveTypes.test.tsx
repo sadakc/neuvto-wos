@@ -306,6 +306,72 @@ describe("LeaveTypes — unpaid leave (Leave phase 2)", () => {
   });
 });
 
+describe("LeaveTypes — compensatory off (D89)", () => {
+  it("adds an earned type with its expiry, claim window and proof rule, and says so on its row", async () => {
+    const user = userEvent.setup();
+    listLeaveTypes.mockResolvedValue([
+      CASUAL,
+      {
+        ...CASUAL,
+        id: "coff",
+        name: "Comp off",
+        kind: "earned",
+        maxDaysPerYear: 0,
+        earnedExpiresAfterDays: 90,
+        earnedClaimWithinDays: 30,
+        earnedProofRequired: true,
+      },
+    ]);
+    await renderSettled();
+    expect(rowFor("Comp off")).toHaveTextContent(
+      "Earned by working · expires 90 days after approval · claim within 30 days · proof needed",
+    );
+
+    await user.click(screen.getByTestId("add-leave-type"));
+    await user.type(screen.getByLabelText("Name"), "Comp off 2");
+    await user.click(screen.getByLabelText(/Earned \(compensatory off\)/));
+    expect(screen.queryByLabelText("Days a year")).toBeNull();
+    await user.type(screen.getByLabelText("Expires after"), "60");
+    await user.type(screen.getByLabelText("Claim within"), "15");
+    await user.click(screen.getByLabelText("Proof needed with every claim"));
+    await user.click(screen.getByTestId("save-leave-type"));
+    expect(saveLeaveType).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "Comp off 2",
+        kind: "earned",
+        maxDaysPerYear: 0,
+        earnedExpiresAfterDays: 60,
+        earnedClaimWithinDays: 15,
+        earnedProofRequired: true,
+      }),
+      "org",
+    );
+  });
+
+  it("leaves expiry and the claim window blank as never and any time", async () => {
+    const user = userEvent.setup();
+    listLeaveTypes.mockResolvedValue([
+      CASUAL,
+      { ...CASUAL, id: "coff", name: "Comp off", kind: "earned", maxDaysPerYear: 0 },
+    ]);
+    await renderSettled();
+    expect(rowFor("Comp off")).toHaveTextContent("Earned by working · never expires");
+    await user.click(screen.getByTestId("add-leave-type"));
+    await user.type(screen.getByLabelText("Name"), "Comp off 3");
+    await user.click(screen.getByLabelText(/Earned \(compensatory off\)/));
+    await user.click(screen.getByTestId("save-leave-type"));
+    expect(saveLeaveType).toHaveBeenCalledWith(
+      expect.objectContaining({
+        kind: "earned",
+        earnedExpiresAfterDays: null,
+        earnedClaimWithinDays: null,
+        earnedProofRequired: false,
+      }),
+      "org",
+    );
+  });
+});
+
 describe("LeaveTypes — archiving says what it does (Leave phase 2)", () => {
   it("states the consequence with the numbers, and archives only on confirmation", async () => {
     const user = userEvent.setup();

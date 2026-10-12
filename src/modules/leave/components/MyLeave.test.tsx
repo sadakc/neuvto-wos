@@ -16,14 +16,21 @@ const h = vi.hoisted(() => ({
   getMyRequests: vi.fn(),
   getApprovalTimeline: vi.fn(),
   cancelLeave: vi.fn(),
+  getLeaveTypes: vi.fn(),
 }));
 vi.mock("../handlers", () => h);
+vi.mock("@/platform/modules", () => ({
+  ModuleLink: ({ children, path }: { children?: React.ReactNode; path: string }) => (
+    <a data-path={path}>{children}</a>
+  ),
+}));
 
 import MyLeave from "./MyLeave";
 
 beforeEach(() => {
   vi.resetAllMocks();
   h.getMyBalances.mockResolvedValue([]);
+  h.getLeaveTypes.mockResolvedValue([{ id: "casual", name: "Casual", kind: "paid" }]);
   h.getMyRequests.mockResolvedValue([
     {
       id: "r1",
@@ -71,5 +78,20 @@ describe("the approval history", () => {
     expect(
       screen.getAllByText(/Moved up from Mark Manager, who had it longer than the company allows/),
     ).toHaveLength(1);
+  });
+});
+
+describe("compensatory off (D89)", () => {
+  it("offers to claim it only where the company has it", async () => {
+    const { unmount } = render(<MyLeave />);
+    await screen.findByTestId("request-row");
+    expect(screen.queryByText("Claim compensatory off")).toBeNull();
+    unmount();
+    h.getLeaveTypes.mockResolvedValue([{ id: "coff", name: "Comp off", kind: "earned" }]);
+    render(<MyLeave />);
+    expect(await screen.findByText("Claim compensatory off")).toHaveAttribute(
+      "data-path",
+      "leave/comp-off",
+    );
   });
 });

@@ -232,6 +232,8 @@ begin
       ('00000000-0000-0000-0000-0000000000a0','leave_request',1,'reporting_manager',  null,          null,null,2),
       ('00000000-0000-0000-0000-0000000000a0','leave_request',2,'manager_of_manager','working_days','>', 3,  2),
       ('00000000-0000-0000-0000-0000000000b0','leave_request',1,'reporting_manager',  null,          null,null,3),
+      -- D89: compensatory off claims go to the reporting manager.
+      ('00000000-0000-0000-0000-0000000000a0','comp_off_claim',1,'reporting_manager',  null,          null,null,2),
 
       -- A deliberately non-leave entity type. The Approval Engine's gate is that
       -- it can be driven end to end without any leave table existing — a service

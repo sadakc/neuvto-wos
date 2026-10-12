@@ -47,6 +47,9 @@ export const leave: ModuleDefinition = {
     { path: "leave/apply", component: lazy(() => import("./components/ApplyLeave")) },
     { path: "leave/calendar", component: lazy(() => import("./components/LeaveCalendar")) },
     { path: "leave/team", component: lazy(() => import("./components/TeamCalendar")) },
+    // D89. No nav entry, like the team calendar: reached from My Leave, which
+    // offers it only where the company has compensatory off.
+    { path: "leave/comp-off", component: lazy(() => import("./components/CompOff")) },
   ],
 
   dashboardCards: () => [
@@ -126,7 +129,7 @@ export const leave: ModuleDefinition = {
 
   // Registered with the Approval Engine, which knows nothing about leave and
   // would happily let a second module claim the same string.
-  approvalEntityTypes: ["leave_request"],
+  approvalEntityTypes: ["leave_request", "comp_off_claim"],
 
   // How a leave request looks in the platform's approvals queue. The queue is
   // handed `entity_type` as an opaque string and asks whoever claimed it to
@@ -137,6 +140,10 @@ export const leave: ModuleDefinition = {
       entityType: "leave_request",
       component: lazy(() => import("./components/LeaveApprovalCard")),
     },
+    {
+      entityType: "comp_off_claim",
+      component: lazy(() => import("./components/CompOffApprovalCard")),
+    },
   ],
 
   // Emitted through the platform. This module never sends an email.
@@ -144,7 +151,15 @@ export const leave: ModuleDefinition = {
 
   settingsSchema: LeaveSettings,
 
-  ownedTables: ["leave_types", "leave_balances", "leave_requests"],
+  ownedTables: [
+    "leave_types",
+    "leave_balances",
+    "leave_requests",
+    "leave_blackouts",
+    "leave_opening_staged",
+    "comp_off_claims",
+    "comp_off_claim_days",
+  ],
 };
 
 export {

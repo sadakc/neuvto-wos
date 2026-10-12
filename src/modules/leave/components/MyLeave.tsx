@@ -16,7 +16,14 @@
 
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
-import { cancelLeave, getApprovalTimeline, getMyBalances, getMyRequests } from "../handlers";
+import {
+  cancelLeave,
+  getApprovalTimeline,
+  getLeaveTypes,
+  getMyBalances,
+  getMyRequests,
+} from "../handlers";
+import { ModuleLink } from "@/platform/modules";
 import { BalanceCard } from "./BalanceCard";
 import type { ApprovalStep, LeaveBalance, LeaveRequest } from "../contracts";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -42,6 +49,8 @@ export default function MyLeave() {
   const [timeline, setTimeline] = useState<ApprovalStep[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
+  /** D89: whether the company has compensatory off to claim. */
+  const [hasEarned, setHasEarned] = useState(false);
 
   async function load() {
     const [b, r] = await Promise.all([getMyBalances(), getMyRequests()]);
@@ -54,6 +63,10 @@ export default function MyLeave() {
     load()
       .then(() => !cancelled && setState("ready"))
       .catch(() => !cancelled && setState("error"));
+    // Decoration: failing it leaves the link out, never the page.
+    getLeaveTypes()
+      .then((t) => !cancelled && setHasEarned(t.some((x) => x.kind === "earned")))
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -129,7 +142,17 @@ export default function MyLeave() {
   return (
     <div className="space-y-8">
       <section>
-        <h1 className="text-page-title font-semibold tracking-page-title">My leave</h1>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h1 className="text-page-title font-semibold tracking-page-title">My leave</h1>
+          {hasEarned && (
+            <ModuleLink
+              path="leave/comp-off"
+              className="text-sm font-medium underline underline-offset-4"
+            >
+              Claim compensatory off
+            </ModuleLink>
+          )}
+        </div>
 
         {balances.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">

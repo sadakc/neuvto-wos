@@ -85,11 +85,32 @@ export const LeaveTypeInput = z.object({
    * database insists on max_days_per_year = 0 and refuses changing a saved
    * type's kind.
    */
-  kind: z.enum(["paid", "unpaid"]).default("paid"),
+  kind: z.enum(["paid", "unpaid", "earned"]).default("paid"),
+  /**
+   * D89, an earned type (compensatory off) only. Days after approval a credit
+   * expires; null never. How far back a day worked can be claimed; null any
+   * time. Whether every claim must carry proof.
+   */
+  earnedExpiresAfterDays: z
+    .number()
+    .int("Whole days")
+    .min(1, "At least one day, or leave it blank for never")
+    .max(730, "At most two years")
+    .nullable()
+    .default(null),
+  earnedClaimWithinDays: z
+    .number()
+    .int("Whole days")
+    .min(1, "At least one day, or leave it blank for any time")
+    .max(365, "At most a year")
+    .nullable()
+    .default(null),
+  earnedProofRequired: z.boolean().default(false),
 });
 export type LeaveTypeInput = z.input<typeof LeaveTypeInput>;
 
-export type LeaveKind = "paid" | "unpaid";
+/** D89 adds earned: compensatory off, credited for days worked. */
+export type LeaveKind = "paid" | "unpaid" | "earned";
 
 /** Leave phase 2: what has been taken and asked for, of one unpaid type, this year. */
 export interface UnpaidSummary {
@@ -124,6 +145,10 @@ export interface LeaveType {
   approvalRequired: boolean;
   status: "active" | "archived";
   kind: LeaveKind;
+  /** D89, earned types only. */
+  earnedExpiresAfterDays?: number | null;
+  earnedClaimWithinDays?: number | null;
+  earnedProofRequired?: boolean;
 }
 
 /**
@@ -311,6 +336,17 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   NOT_A_HALF_DAY: "Use whole days or halves — 2 or 2.5, not 2.7.",
   OPENING_BALANCE_OVERDRAWN:
     "That's more days than this person was ever entitled to. Check the figure, or set their entitlement first.",
+  // D89, compensatory off.
+  NOT_AN_EARNED_TYPE: "That leave type isn't compensatory off.",
+  REASON_REQUIRED: "Say why you're owed this: what you worked, and for whom.",
+  NO_DAYS_CLAIMED: "Add the days you worked.",
+  TOO_MANY_DAYS: "Claim at most 31 days at a time.",
+  INVALID_DAY: "Each day is a full day or a half, on a date.",
+  WORKED_DATE_IN_FUTURE: "You can only claim a day you've already worked.",
+  SAME_DAY_TWICE: "The same day is listed twice.",
+  ALREADY_CLAIMED: "You've already claimed one of those days.",
+  PROOF_REQUIRED: "This kind of compensatory off needs proof. Attach it and send again.",
+  PROOF_NOT_YOURS: "That attachment couldn't be used. Attach it again.",
   // D88. Staging is for somebody not yet joined; once they have, their own
   // balance is set in the list above.
   ALREADY_JOINED:
@@ -321,6 +357,13 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
 
 /** INSUFFICIENT_BALANCE and INSUFFICIENT_NOTICE carry numbers, so both match by prefix. */
 export function leaveErrorMessage(code: string): string {
+  // D89. The window comes back with the refusal, as notice does.
+  if (code.startsWith("CLAIM_TOO_LATE")) {
+    const m = code.match(/(\d+)\s*days?/i);
+    return m
+      ? `Days worked can be claimed for up to ${m[1]} days afterwards. One of these is older than that.`
+      : "One of those days is too long ago to claim.";
+  }
   // The required notice comes back from leave_submit rather than being read off
   // the form, because the form's copy of min_notice_days is as old as the page.
   // An administrator who changes a leave type from 1 day to 5 while somebody has
@@ -373,4 +416,51 @@ export interface StagedOpeningProblem {
   usedDays: number;
   carryforwardDays: number;
   problem: "OPENING_BALANCE_OVERDRAWN" | "MODULE_NOT_ENABLED";
+}
+
+/** D89 — one day listed on a compensatory off claim. */
+export interface CompOffDay {
+  date: string;
+  /** 1 or 0.5. */
+  days: number;
+  note: string | null;
+}
+
+/** D89 — a claim for compensatory off, as its owner sees it. */
+export interface CompOffClaim {
+  claimId: string;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  reason: string;
+  totalDays: number;
+  status: "pending_approval" | "approved" | "rejected" | "cancelled";
+  hasProof: boolean;
+  submittedAt: string;
+  decidedAt: string | null;
+  /** Approved only; null when the type never expires. */
+  expiresOn: string | null;
+  expiredDays: number;
+  days: CompOffDay[];
+}
+
+/** D89 — what an approver sees of a claim. */
+export interface CompOffApprovalDetail {
+  claimId: string;
+  employeeName: string;
+  leaveTypeName: string;
+  reason: string;
+  totalDays: number;
+  status: CompOffClaim["status"];
+  proofPath: string | null;
+  days: CompOffDay[];
+}
+
+/** An earned type as the claim form needs it. */
+export interface EarnedTypeRules {
+  id: string;
+  name: string;
+  kind: LeaveKind;
+  earnedExpiresAfterDays?: number | null;
+  earnedClaimWithinDays?: number | null;
+  earnedProofRequired?: boolean;
 }

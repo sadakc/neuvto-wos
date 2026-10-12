@@ -31,6 +31,10 @@ type Draft = {
   maxPerRequest: string;
   approvalRequired: boolean;
   kind: LeaveKind;
+  /** D89, earned only. Blank means never and any time. */
+  earnedExpiresAfterDays: string;
+  earnedClaimWithinDays: string;
+  earnedProofRequired: boolean;
 };
 
 /**
@@ -59,6 +63,9 @@ const EMPTY: Draft = {
   approvalRequired: true,
   maxPerRequest: "",
   kind: "paid",
+  earnedExpiresAfterDays: "",
+  earnedClaimWithinDays: "",
+  earnedProofRequired: false,
 };
 
 const toDraft = (t: LeaveType): Draft => ({
@@ -70,6 +77,9 @@ const toDraft = (t: LeaveType): Draft => ({
   maxPerRequest: t.maxPerRequest === null ? "" : String(t.maxPerRequest),
   approvalRequired: t.approvalRequired,
   kind: t.kind,
+  earnedExpiresAfterDays: t.earnedExpiresAfterDays ? String(t.earnedExpiresAfterDays) : "",
+  earnedClaimWithinDays: t.earnedClaimWithinDays ? String(t.earnedClaimWithinDays) : "",
+  earnedProofRequired: t.earnedProofRequired ?? false,
 });
 
 /** Blank means "no limit", which is not the same as zero — hence null, not 0. */
@@ -132,11 +142,14 @@ export default function LeaveTypes() {
         id: draft.id,
         name: draft.name,
         description: draft.description || undefined,
-        maxDaysPerYear: draft.kind === "unpaid" ? 0 : Number(draft.maxDaysPerYear),
+        maxDaysPerYear: draft.kind === "paid" ? Number(draft.maxDaysPerYear) : 0,
         minNoticeDays: optionalNumber(draft.minNoticeDays),
         maxPerRequest: optionalNumber(draft.maxPerRequest),
         approvalRequired: draft.approvalRequired,
         kind: draft.kind,
+        earnedExpiresAfterDays: optionalNumber(draft.earnedExpiresAfterDays),
+        earnedClaimWithinDays: optionalNumber(draft.earnedClaimWithinDays),
+        earnedProofRequired: draft.earnedProofRequired,
       });
       await saveLeaveType(parsed, user.organizationId);
       await load();
@@ -227,7 +240,9 @@ export default function LeaveTypes() {
                 <p className="mt-0.5 text-xs text-muted-foreground">
                   {t.kind === "unpaid"
                     ? "Unpaid · no allowance"
-                    : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year`}
+                    : t.kind === "earned"
+                      ? earnedSummary(t)
+                      : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year`}
                   {t.minNoticeDays === null
                     ? defaultNotice === null
                       ? " · notice: the workspace default"
@@ -313,12 +328,12 @@ export default function LeaveTypes() {
             />
           </div>
 
-          {/* Chosen once: the database refuses switching a saved type between
-              paid and unpaid, because balances would be stranded. */}
+          {/* Chosen once: the database refuses switching a saved type's kind,
+              because balances would be stranded. */}
           {!draft.id && (
             <fieldset>
-              <legend className="block text-sm font-medium">Paid or unpaid</legend>
-              <div className="mt-2 grid gap-2 @min-[640px]/app:grid-cols-2">
+              <legend className="block text-sm font-medium">Kind</legend>
+              <div className="mt-2 grid gap-2 @min-[640px]/app:grid-cols-3">
                 {(
                   [
                     ["paid", "Paid", "Has a yearly allowance and a balance"],
@@ -326,6 +341,11 @@ export default function LeaveTypes() {
                       "unpaid",
                       "Unpaid (loss of pay)",
                       "No allowance and no balance. Days taken are counted, not paid",
+                    ],
+                    [
+                      "earned",
+                      "Earned (compensatory off)",
+                      "No allowance. Credited for days worked, once a manager approves the claim",
                     ],
                   ] as const
                 ).map(([value, label, hint]) => (
@@ -350,6 +370,57 @@ export default function LeaveTypes() {
                 ))}
               </div>
             </fieldset>
+          )}
+
+          {draft.kind === "earned" && (
+            <div className="grid gap-4 @min-[640px]/app:grid-cols-3">
+              <div>
+                <label htmlFor="lt-expires" className="block text-sm font-medium">
+                  Expires after
+                </label>
+                <input
+                  id="lt-expires"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={730}
+                  value={draft.earnedExpiresAfterDays}
+                  onChange={(e) => setDraft({ ...draft, earnedExpiresAfterDays: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Days after approval. Blank: it never expires. Days already booked never expire
+                </p>
+              </div>
+              <div>
+                <label htmlFor="lt-within" className="block text-sm font-medium">
+                  Claim within
+                </label>
+                <input
+                  id="lt-within"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={365}
+                  value={draft.earnedClaimWithinDays}
+                  onChange={(e) => setDraft({ ...draft, earnedClaimWithinDays: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Days after the day worked. Blank: any time
+                </p>
+              </div>
+              <label className="flex min-h-12 cursor-pointer items-start gap-2.5 self-end rounded-md border border-border px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={draft.earnedProofRequired}
+                  onChange={(e) => setDraft({ ...draft, earnedProofRequired: e.target.checked })}
+                  aria-label="Proof needed with every claim"
+                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                />
+                <span className="text-sm">Proof needed with every claim</span>
+              </label>
+            </div>
           )}
 
           <div className="grid gap-4 @min-[640px]/app:grid-cols-3">
@@ -505,4 +576,17 @@ export default function LeaveTypes() {
       </ConfirmRemoval>
     </div>
   );
+}
+
+/** D89 — how an earned type's rules read on its row. */
+function earnedSummary(t: LeaveType): string {
+  const parts = ["Earned by working"];
+  parts.push(
+    t.earnedExpiresAfterDays
+      ? `expires ${t.earnedExpiresAfterDays} days after approval`
+      : "never expires",
+  );
+  if (t.earnedClaimWithinDays) parts.push(`claim within ${t.earnedClaimWithinDays} days`);
+  if (t.earnedProofRequired) parts.push("proof needed");
+  return parts.join(" · ");
 }
