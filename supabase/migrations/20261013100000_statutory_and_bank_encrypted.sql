@@ -321,12 +321,18 @@ create trigger restricted_reads_are_append_only
 
 -- ═══════════════════════════════════════════════════════════ access
 
+-- Written out, not looped: CI's guardrail reads each migration for a literal
+-- `alter table <t> enable row level security` beside every `create table`.
+alter table public.employee_statutory enable row level security;
+alter table public.employee_bank enable row level security;
+alter table public.employee_restricted enable row level security;
+alter table public.restricted_reads enable row level security;
+
 -- RLS on, no policy, no grant: reachable only through the functions below.
 do $$
 declare t text;
 begin
   foreach t in array array['employee_statutory','employee_bank','employee_restricted','restricted_reads'] loop
-    execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon, authenticated', t);
   end loop;
 end $$;

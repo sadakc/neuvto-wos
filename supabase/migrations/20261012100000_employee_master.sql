@@ -459,6 +459,16 @@ create policy "read deployment units in scope" on public.deployment_units
   for select to authenticated
   using (organization_id = public.current_org_id() and deleted_at is null);
 
+-- Written out, not looped: CI's guardrail reads each migration for a literal
+-- `alter table <t> enable row level security` beside every `create table`.
+alter table public.employees enable row level security;
+alter table public.employee_addresses enable row level security;
+alter table public.employee_deployments enable row level security;
+alter table public.nomination_versions enable row level security;
+alter table public.nominees enable row level security;
+alter table public.family_members enable row level security;
+alter table public.previous_organisations enable row level security;
+
 -- The record and everything under it: RLS on, NO policy. Reached only through
 -- the role-shaped functions (E5). D42 holds as everywhere else: a platform
 -- admin has no organisation, so even those functions answer nothing.
@@ -468,7 +478,6 @@ begin
   foreach t in array array['employees','employee_addresses','employee_deployments',
     'nomination_versions','nominees','family_members','previous_organisations']
   loop
-    execute format('alter table public.%I enable row level security', t);
     execute format('revoke all on public.%I from anon, authenticated', t);
   end loop;
   foreach t in array array['designations','deployment_units'] loop
