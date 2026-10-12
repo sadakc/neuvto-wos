@@ -136,21 +136,32 @@ export type Database = {
           created_at: string
           entity_type: string
           label: string
+          module_key: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           entity_type: string
           label: string
+          module_key?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           entity_type?: string
           label?: string
+          module_key?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_entity_labels_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+        ]
       }
       approval_requests: {
         Row: {

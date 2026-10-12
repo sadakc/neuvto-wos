@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.8 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.9 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -251,7 +251,9 @@ When Sada provisions a company, the administrator he names becomes that company'
   module: not People, departments, holidays, approval rules or another module's records.
   The grants are rows in `module_admins`, written only by `member_set_module_admins` (Super
   Admin only, never your own), and every module check asks `is_module_admin(module)`. On
-  screen it is the **Administers a module** section of the People access panel. Proved in
+  screen it is the **Administers a module** section of the People access panel. A module's
+  approvals name their module in `approval_entity_labels.module_key` (set by the module's own
+  migration), so a Leave Admin also reads any leave request's approval history. Proved in
   `verify_module_admins.sql`.
 
 Module access is unchanged and already built (D44): a module is **granted** by Neuvto from

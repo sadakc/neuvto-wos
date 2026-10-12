@@ -173,6 +173,22 @@ begin
   end if;
   perform pg_temp.ma_ok('a Leave Admin reads every leave request in the company');
 
+  -- The approval history of a request Mark neither made nor approves: No
+  -- Manager's, who reports to nobody. Reachable only as the Leave Admin.
+  if to_regclass('public.approval_entity_labels') is not null
+     and exists (select 1 from information_schema.columns
+                  where table_name = 'approval_entity_labels' and column_name = 'module_key') then
+    insert into public.approval_requests (organization_id, entity_type, entity_id, requester_id, current_level, required_levels)
+    values (acme, 'leave_request', gen_random_uuid(), '00000000-0000-0000-0000-00000000a008', 1, 1)
+    returning id into lt;
+    perform pg_temp.ma_allowed('a Leave Admin reads any leave request''s approval history', mark,
+      format('select count(*) from public.approval_timeline(%L)', lt));
+    perform pg_temp.ma_refused('an Employee Admin does not', dan,
+      format('select count(*) from public.approval_timeline(%L)', lt), 'FORBIDDEN');
+    perform pg_temp.ma_refused('nor a colleague', ravi,
+      format('select count(*) from public.approval_timeline(%L)', lt), 'FORBIDDEN');
+  end if;
+
   perform pg_temp.ma_as(mark);
   sched := public.report_schedule_save('leave.summary', 'weekly', array['mark@acme.test'], null, 1::smallint);
   perform pg_temp.ma_root();
