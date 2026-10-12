@@ -2489,6 +2489,114 @@ export type Database = {
           },
         ]
       }
+      notification_custom_recipients: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          entity_type: string
+          event_key: string
+          id: string
+          organization_id: string
+          profile_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          entity_type: string
+          event_key: string
+          id?: string
+          organization_id: string
+          profile_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          entity_type?: string
+          event_key?: string
+          id?: string
+          organization_id?: string
+          profile_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_custom_recipients_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_custom_recipients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_custom_recipients_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_rules: {
+        Row: {
+          audience: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          entity_type: string
+          event_key: string
+          id: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          audience: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          entity_type: string
+          event_key: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          audience?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          entity_type?: string
+          event_key?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       notification_templates: {
         Row: {
           body_template: string
@@ -3924,6 +4032,29 @@ export type Database = {
           subject: string
         }[]
       }
+      notification_custom_add: {
+        Args: {
+          _department_id?: string
+          _entity_type: string
+          _event_key: string
+          _profile_id: string
+        }
+        Returns: string
+      }
+      notification_custom_list: {
+        Args: { _module_key: string }
+        Returns: {
+          department_id: string
+          department_name: string
+          entity_label: string
+          entity_type: string
+          event_key: string
+          id: string
+          person_name: string
+          profile_id: string
+        }[]
+      }
+      notification_custom_remove: { Args: { _id: string }; Returns: undefined }
       notification_mark_failed: {
         Args: { _id: string; _reason: string }
         Returns: undefined
@@ -3933,7 +4064,34 @@ export type Database = {
         Returns: undefined
       }
       notification_mark_sent: { Args: { _id: string }; Returns: undefined }
+      notification_matrix: {
+        Args: { _module_key: string }
+        Returns: {
+          audience: string
+          enabled: boolean
+          entity_label: string
+          entity_type: string
+          event_key: string
+          mandatory: boolean
+        }[]
+      }
       notification_max_attempts: { Args: never; Returns: number }
+      notification_people: {
+        Args: { _module_key: string }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
+      notification_rule_set: {
+        Args: {
+          _audience: string
+          _enabled: boolean
+          _entity_type: string
+          _event_key: string
+        }
+        Returns: undefined
+      }
       notify: {
         Args: { _event_key: string; _payload: Json; _recipient_id: string }
         Returns: string
@@ -4147,6 +4305,10 @@ export type Database = {
           email: string
           name: string
         }[]
+      }
+      resolve_notification_fyi: {
+        Args: { _event_key: string; _payload: Json }
+        Returns: string[]
       }
       resolve_notification_recipients: {
         Args: { _event_key: string; _payload: Json }

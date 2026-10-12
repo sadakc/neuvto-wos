@@ -161,6 +161,7 @@ run "verifying compensatory off" "$HARNESS_DIR/tests/verify_comp_off.sql"
 run "verifying leave credited monthly" "$HARNESS_DIR/tests/verify_accrual.sql"
 run "verifying the carry-forward review" "$HARNESS_DIR/tests/verify_carry_forward.sql"
 run "verifying approvals handed over" "$HARNESS_DIR/tests/verify_delegation.sql"
+run "verifying who is told of what" "$HARNESS_DIR/tests/verify_notification_rules.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

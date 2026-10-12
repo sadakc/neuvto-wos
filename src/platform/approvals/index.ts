@@ -401,3 +401,119 @@ export async function cancelDelegation(id: string): Promise<void> {
   const { error } = await supabase.rpc("approval_delegation_cancel", { _id: id });
   if (error) throw delegationError(error, "cancelDelegation");
 }
+
+// ═══════════════════════════════════════════════ who is told of what (D93)
+
+export type NotificationEvent = "approval.submitted" | "approval.completed" | "approval.escalated";
+export type NotificationAudience = "approver" | "requester" | "requester_manager" | "module_admins";
+
+/** One event against one audience, for one entity type. */
+export interface NotificationCell {
+  entityType: string;
+  entityLabel: string;
+  eventKey: NotificationEvent;
+  audience: NotificationAudience;
+  enabled: boolean;
+  /** The engine's own rule: always sent, never switchable. */
+  mandatory: boolean;
+}
+
+export interface CustomRecipient {
+  id: string;
+  entityType: string;
+  entityLabel: string;
+  eventKey: NotificationEvent;
+  profileId: string;
+  personName: string;
+  /** Null: requests from every department. */
+  departmentId: string | null;
+  departmentName: string | null;
+}
+
+const NOTIFY_MESSAGES: Record<string, string> = {
+  FORBIDDEN: "Only this module's admin can change who is told.",
+  MANDATORY_NOTIFICATION: "That one is always sent, so it can't be switched off.",
+  ALREADY_TOLD: "They're already told of that.",
+  NOT_FOUND: "That person or department isn't in this company.",
+};
+
+function notifyError(error: { message?: string }, where: string): AppError {
+  const code = Object.keys(NOTIFY_MESSAGES).find((k) => (error.message ?? "").includes(k));
+  return code
+    ? new AppError("VALIDATION_FAILED", NOTIFY_MESSAGES[code], 400, { code })
+    : toAppError(error, where);
+}
+
+export async function getNotificationMatrix(moduleKey: string): Promise<NotificationCell[]> {
+  const { data, error } = await supabase.rpc("notification_matrix", { _module_key: moduleKey });
+  if (error) throw notifyError(error, "getNotificationMatrix");
+  return (data ?? []).map((r) => ({
+    entityType: r.entity_type,
+    entityLabel: r.entity_label,
+    eventKey: r.event_key as NotificationEvent,
+    audience: r.audience as NotificationAudience,
+    enabled: r.enabled,
+    mandatory: r.mandatory,
+  }));
+}
+
+export async function setNotificationRule(
+  entityType: string,
+  eventKey: NotificationEvent,
+  audience: NotificationAudience,
+  enabled: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("notification_rule_set", {
+    _entity_type: entityType,
+    _event_key: eventKey,
+    _audience: audience,
+    _enabled: enabled,
+  });
+  if (error) throw notifyError(error, "setNotificationRule");
+}
+
+export async function listCustomRecipients(moduleKey: string): Promise<CustomRecipient[]> {
+  const { data, error } = await supabase.rpc("notification_custom_list", {
+    _module_key: moduleKey,
+  });
+  if (error) throw notifyError(error, "listCustomRecipients");
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    entityType: r.entity_type,
+    entityLabel: r.entity_label,
+    eventKey: r.event_key as NotificationEvent,
+    profileId: r.profile_id,
+    personName: r.person_name,
+    departmentId: r.department_id,
+    departmentName: r.department_name,
+  }));
+}
+
+export async function addCustomRecipient(
+  entityType: string,
+  eventKey: NotificationEvent,
+  profileId: string,
+  departmentId: string | null,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("notification_custom_add", {
+    _entity_type: entityType,
+    _event_key: eventKey,
+    _profile_id: profileId,
+    _department_id: departmentId ?? undefined,
+  });
+  if (error) throw notifyError(error, "addCustomRecipient");
+  return data as string;
+}
+
+export async function removeCustomRecipient(id: string): Promise<void> {
+  const { error } = await supabase.rpc("notification_custom_remove", { _id: id });
+  if (error) throw notifyError(error, "removeCustomRecipient");
+}
+
+export async function listNotificationPeople(
+  moduleKey: string,
+): Promise<{ id: string; fullName: string }[]> {
+  const { data, error } = await supabase.rpc("notification_people", { _module_key: moduleKey });
+  if (error) throw notifyError(error, "listNotificationPeople");
+  return (data ?? []).map((r) => ({ id: r.id, fullName: r.full_name }));
+}

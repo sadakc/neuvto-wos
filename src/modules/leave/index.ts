@@ -24,7 +24,7 @@ export const leave: ModuleDefinition = {
   icon: CalendarDays,
   reportsDescription: "Balances, leave taken, what is waiting",
   configurationDescription:
-    "Leave types, opening balances, blackout periods and the carry-forward review",
+    "Leave types, opening balances, blackout periods, the carry-forward review and notifications",
 
   // "Approvals" used to be declared here, as `soon: "step 8"` — a module laying
   // claim to a platform screen. It now lives in the platform's own navigation,
@@ -88,6 +88,14 @@ export const leave: ModuleDefinition = {
         "What each person takes into next year. Nothing changes until you lock the review, and a locked review is final.",
       component: lazy(() => import("./components/CarryForwardReview")),
       order: 40,
+    },
+    {
+      id: "notifications",
+      title: "Notifications",
+      description:
+        "Who is told when leave is applied for, decided or moves up. What the approver and the person asking always hear is locked on.",
+      component: lazy(() => import("./components/LeaveNotifications")),
+      order: 50,
     },
     {
       id: "leave-types",
