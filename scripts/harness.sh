@@ -164,6 +164,7 @@ run "verifying approvals handed over" "$HARNESS_DIR/tests/verify_delegation.sql"
 run "verifying who is told of what" "$HARNESS_DIR/tests/verify_notification_rules.sql"
 run "verifying four more leave reports" "$HARNESS_DIR/tests/verify_leave_reports_more.sql"
 run "verifying the record's documents" "$HARNESS_DIR/tests/verify_employee_documents.sql"
+run "verifying the rest of the card" "$HARNESS_DIR/tests/verify_card_rest.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

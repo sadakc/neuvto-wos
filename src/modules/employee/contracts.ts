@@ -60,6 +60,18 @@ export interface Address {
   effectiveTo: string | null;
   recordedBy: string | null;
   recordedAt: string;
+  /**
+   * D98: the proof on file for this address. The key is present only for the
+   * person and the Employee Admin, the two who may open it; null means none.
+   */
+  proof?: AddressProof | null;
+}
+
+export interface AddressProof {
+  documentId: string;
+  fileName: string;
+  uploadedAt: string;
+  verified: boolean;
 }
 
 export interface Deployment {
@@ -192,6 +204,10 @@ export interface EmployeeCard {
     canEditBank?: boolean;
     canEditRestricted?: boolean;
     canSeeReveals?: boolean;
+    /** D100: who has looked at this record. The person and a Super Admin. */
+    canSeeViews?: boolean;
+    /** D97: the year so far. The person, the Employee Admin and their manager. */
+    canSeeThisYear?: boolean;
     canSendInvite?: boolean;
     canDeactivate?: boolean;
     canEditDraft?: boolean;
@@ -522,8 +538,44 @@ export interface EmployeeDocument {
 
 export interface DocumentView {
   documentId: string;
-  docType: DocumentType;
+  /** A Documents tab type, or "address_proof" for a proof on an address (D98). */
+  docType: DocumentType | "address_proof";
   title: string | null;
   viewerName: string;
   viewedAt: string;
+}
+
+// ═══════════════════════════════════════════════ the rest of the card (D97–D100)
+
+/** D97: Overview's "This year". */
+export interface ThisYear {
+  leaveYear: string | null;
+  /** Null when the company has not switched Leave on. */
+  leave:
+    | {
+        leaveTypeId: string;
+        name: string;
+        kind: "paid" | "earned";
+        entitled: number;
+        used: number;
+        pending: number;
+        available: number;
+      }[]
+    | null;
+  openRequests: { label: string; count: number }[];
+  openCorrections: number;
+}
+
+/** D100: one look at somebody's record. */
+export interface CardView {
+  viewerName: string;
+  viewedAt: string;
+}
+
+/** D99: how often the Employee Admins are reminded, and when Super Admins are told. */
+export interface OnboardingSettings {
+  remindEveryDays: number;
+  escalateAfterDays: number;
+  lastReminder: { sentAt: string; people: number } | null;
+  lastEscalation: { sentAt: string; people: number } | null;
 }

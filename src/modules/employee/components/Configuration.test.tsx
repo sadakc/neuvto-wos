@@ -7,6 +7,9 @@
  * - editing a unit says how many postings a rename will relabel, before saving;
  * - a client is asked for only for a client site, and a refusal keeps the dialog;
  * - an onboarding row saves only when changed and valid, and sends what was set;
+ * - the reminder cadence and escalation window save within their limits, and
+ *   the last reminder sent is shown (D99);
+ * - the access section says every look at a record is logged (D100);
  * - the catalogue shows every field, with the new ones marked.
  */
 
@@ -26,6 +29,8 @@ const api = vi.hoisted(() => ({
   setDesignationStatus: vi.fn(),
   listOnboardingItems: vi.fn(),
   saveOnboardingItem: vi.fn(),
+  getOnboardingSettings: vi.fn(),
+  saveOnboardingSettings: vi.fn(),
 }));
 vi.mock("../handlers", () => api);
 
@@ -56,6 +61,12 @@ beforeEach(() => {
   api.listOnboardingItems.mockResolvedValue([
     { key: "uan", label: "UAN", dueWithinDays: 15, mandatory: true, customised: false },
   ]);
+  api.getOnboardingSettings.mockResolvedValue({
+    remindEveryDays: 3,
+    escalateAfterDays: 7,
+    lastReminder: { sentAt: "2026-10-12T03:30:00Z", people: 4 },
+    lastEscalation: null,
+  });
 });
 
 async function openUnits() {
@@ -132,6 +143,54 @@ describe("the onboarding checklist", () => {
     await user.click(within(row).getByLabelText("UAN: mandatory"));
     await user.click(save);
     expect(api.saveOnboardingItem).toHaveBeenCalledWith("uan", 30, false);
+  });
+});
+
+describe("onboarding reminders", () => {
+  it("saves the cadence and the escalation window within their limits", async () => {
+    const user = userEvent.setup();
+    api.saveOnboardingSettings.mockResolvedValue(undefined);
+    render(<Configuration />);
+    await user.click(screen.getByTestId("config-onboarding"));
+    const box = await screen.findByTestId("onboarding-reminders");
+    expect(box).toHaveTextContent("Last reminder 12 Oct 2026, 4 people.");
+    expect(box).toHaveTextContent("No escalation sent yet.");
+    const save = within(box).getByRole("button", { name: "Save reminders" });
+    expect(save).toBeDisabled();
+
+    const every = within(box).getByLabelText("Remind the Employee Admins every (days)");
+    const after = within(box).getByLabelText("Tell the Super Admins after (days past due)");
+    await user.clear(every);
+    await user.type(every, "31");
+    expect(save).toBeDisabled();
+    await user.clear(every);
+    await user.type(every, "5");
+    await user.clear(after);
+    await user.type(after, "91");
+    expect(save).toBeDisabled();
+    await user.clear(after);
+    await user.type(after, "10");
+    await user.click(save);
+    expect(api.saveOnboardingSettings).toHaveBeenCalledWith(5, 10);
+  });
+
+  it("says that 0 switches each one off", async () => {
+    render(<Configuration />);
+    await userEvent.setup().click(screen.getByTestId("config-onboarding"));
+    expect(await screen.findByTestId("onboarding-reminders")).toHaveTextContent(
+      "0 switches it off.",
+    );
+  });
+});
+
+describe("access", () => {
+  it("says every look at somebody's record is logged", async () => {
+    render(<Configuration />);
+    await userEvent.setup().click(screen.getByTestId("config-access"));
+    expect(
+      await screen.findByText(/Every look at somebody else's record is logged too/),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/not built yet/)).toBeNull();
   });
 });
 

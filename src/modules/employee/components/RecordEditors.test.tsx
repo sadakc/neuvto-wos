@@ -24,6 +24,13 @@ import cards from "./__fixtures__/cards.json";
 const api = vi.hoisted(() => ({
   listDocuments: vi.fn(async () => []),
   listDocumentViews: vi.fn(async () => []),
+  getThisYear: vi.fn(async () => ({
+    leaveYear: null,
+    leave: null,
+    openRequests: [],
+    openCorrections: 0,
+  })),
+  listCardViews: vi.fn(async () => []),
   addAddress: vi.fn(),
   listActiveUnits: vi.fn(),
   listDesignations: vi.fn(),
@@ -54,6 +61,13 @@ const admin = as("admin");
 
 beforeEach(() => {
   vi.resetAllMocks();
+  api.getThisYear.mockResolvedValue({
+    leaveYear: null,
+    leave: null,
+    openRequests: [],
+    openCorrections: 0,
+  });
+  api.listCardViews.mockResolvedValue([]);
   api.listDesignations.mockResolvedValue([]);
   api.getRestrictedReads.mockResolvedValue([]);
   api.listChangeRequests.mockResolvedValue([]);

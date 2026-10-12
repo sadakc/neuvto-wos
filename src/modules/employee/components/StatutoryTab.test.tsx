@@ -25,6 +25,8 @@ import type { EmployeeCard } from "../contracts";
 import cards from "./__fixtures__/cards.json";
 
 const api = vi.hoisted(() => ({
+  getThisYear: vi.fn(),
+  listCardViews: vi.fn(),
   getRestrictedReads: vi.fn(),
   revealRestricted: vi.fn(),
   setStatutory: vi.fn(),
@@ -44,6 +46,13 @@ const AADHAAR = "234567890124";
 
 beforeEach(() => {
   vi.resetAllMocks();
+  api.getThisYear.mockResolvedValue({
+    leaveYear: null,
+    leave: null,
+    openRequests: [],
+    openCorrections: 0,
+  });
+  api.listCardViews.mockResolvedValue([]);
   api.getRestrictedReads.mockResolvedValue([]);
 });
 afterEach(() => {

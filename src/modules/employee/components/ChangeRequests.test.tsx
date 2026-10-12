@@ -19,6 +19,8 @@ import type { ChangeRequest, EmployeeCard } from "../contracts";
 import cards from "./__fixtures__/cards.json";
 
 const api = vi.hoisted(() => ({
+  getThisYear: vi.fn(),
+  listCardViews: vi.fn(),
   listChangeRequests: vi.fn(),
   requestChange: vi.fn(),
   resolveChange: vi.fn(),
@@ -51,6 +53,13 @@ function request(id: string, status: ChangeRequest["status"] = "open"): ChangeRe
 
 beforeEach(() => {
   vi.resetAllMocks();
+  api.getThisYear.mockResolvedValue({
+    leaveYear: null,
+    leave: null,
+    openRequests: [],
+    openCorrections: 0,
+  });
+  api.listCardViews.mockResolvedValue([]);
   api.listChangeRequests.mockResolvedValue([]);
   api.getRestrictedReads.mockResolvedValue([]);
 });

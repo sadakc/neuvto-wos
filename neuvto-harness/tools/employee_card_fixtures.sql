@@ -42,7 +42,7 @@ end $$ language plpgsql;
 do $$
 declare
   acme uuid := '00000000-0000-0000-0000-0000000000a0';
-  e uuid; unit1 uuid; unit2 uuid; ver uuid; dsg uuid;
+  e uuid; unit1 uuid; unit2 uuid; ver uuid; dsg uuid; addr uuid; proof_path text;
 begin
   insert into public.organization_modules (organization_id, module_key, enabled, enabled_at)
   values (acme, 'employee', true, now())
@@ -75,7 +75,17 @@ begin
   values (acme, e, 'present', '12 Old Road', 'Mysuru', 'Karnataka', '570001', '2020-01-01', '2024-03-01');  -- exclusive end: last day 29 Feb
   insert into public.employee_addresses
     (organization_id, employee_id, address_type, line, city, state, pincode, effective_from)
-  values (acme, e, 'present', '402 Brigade Meadows', 'Bengaluru', 'Karnataka', '560062', '2024-03-01');
+  values (acme, e, 'present', '402 Brigade Meadows', 'Bengaluru', 'Karnataka', '560062', '2024-03-01')
+  returning id into addr;
+
+  -- D98: a proof on the current address, filed by Hema through the real function.
+  if to_regprocedure('public.employee_address_attach_proof(uuid,text,text,text,integer)') is not null then
+    proof_path := acme::text || '/' || e::text || '/fixture-rent-agreement.pdf';
+    insert into storage.objects (bucket_id, name) values ('employee-documents', proof_path);
+    perform pg_temp.as_('00000000-0000-0000-0000-00000000a002');
+    perform public.employee_address_attach_proof(addr, proof_path, 'rent-agreement.pdf', 'application/pdf', 52000);
+    perform pg_temp.root_();
+  end if;
 
   insert into public.family_members (organization_id, employee_id, relation, name)
   values (acme, e, 'son', 'Aarav'), (acme, e, 'daughter', 'Diya'), (acme, e, 'son', 'Kabir');

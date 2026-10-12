@@ -11,6 +11,10 @@
  * appears for those two relationships, and the database refuses anybody else.
  * Export record (D96) writes what this card was sent, for anybody who can see
  * it.
+ *
+ * "This year" (D97) and "Who has looked" (D100) are asked for only when the
+ * card's capabilities say so. A proof on an address (D98) is drawn only where
+ * the card carried one, which it does for the person and the Employee Admin.
  */
 
 import { useRef, useState, type KeyboardEvent } from "react";
@@ -38,6 +42,8 @@ import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
 import { StatutoryTab } from "./StatutoryTab";
 import { DocumentsTab } from "./DocumentsTab";
+import { ThisYearPanel, WhoHasLooked } from "./ThisYear";
+import { AttachProofForm, ProofCell } from "./AddressProof";
 import { downloadRecordPdf } from "../recordExport";
 import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
 import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
@@ -383,8 +389,11 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
             />
           </Panel>
         )}
+
+        {card.capabilities.canSeeThisYear && <ThisYearPanel employeeId={card.id} />}
       </Grid>
       {card.capabilities.canEdit && <ContactEditors card={card} onChanged={onChanged} />}
+      {card.capabilities.canSeeViews && <WhoHasLooked employeeId={card.id} />}
     </div>
   );
 }
@@ -665,6 +674,10 @@ function CurrentOrArchived({ open }: { open: boolean }) {
 
 function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const today = todayIso();
+  // D98: the card carries `proof` only to those who may open and attach one.
+  const proofs = (card.addresses ?? []).some((a) => "proof" in a);
+  const [attaching, setAttaching] = useState<string | null>(null);
+  const [proofError, setProofError] = useState("");
   return (
     <div className="flex flex-col gap-4">
       <p className="rounded-lg border border-info-line bg-info-muted px-3.5 py-2.5 text-sm">
@@ -688,7 +701,16 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
         >
           <RecordTable
             testId="address-history"
-            headers={["Type", "Address", "From", "To", "Police station", "Recorded by", "Status"]}
+            headers={[
+              "Type",
+              "Address",
+              "From",
+              "To",
+              "Police station",
+              "Recorded by",
+              ...(proofs ? ["Proof"] : []),
+              "Status",
+            ]}
             empty="No address recorded yet."
             rows={card.addresses.map((a) => ({
               key: a.id,
@@ -700,10 +722,41 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
                 formatDate(lastDay(a.effectiveTo)),
                 a.nearestPoliceStation ?? "—",
                 a.recordedBy ?? "—",
+                ...(proofs
+                  ? [
+                      <ProofCell
+                        key="p"
+                        address={a}
+                        onAttach={(id) => {
+                          setProofError("");
+                          setAttaching(id);
+                        }}
+                        onError={setProofError}
+                      />,
+                    ]
+                  : []),
                 <CurrentOrArchived key="s" open={a.effectiveTo === null} />,
               ],
             }))}
           />
+          {proofError && (
+            <p role="alert" className="mt-2 text-sm text-destructive">
+              {proofError}
+            </p>
+          )}
+          {attaching && (
+            <div className="mt-3">
+              <AttachProofForm
+                employeeId={card.id}
+                addressId={attaching}
+                onCancel={() => setAttaching(null)}
+                onDone={async () => {
+                  setAttaching(null);
+                  await onChanged();
+                }}
+              />
+            </div>
+          )}
         </Panel>
       )}
 

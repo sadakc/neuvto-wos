@@ -29,6 +29,10 @@ vi.mock("../handlers", () => ({
   getRestrictedReads: vi.fn().mockResolvedValue([]),
   listDocuments: vi.fn().mockResolvedValue([]),
   listDocumentViews: vi.fn().mockResolvedValue([]),
+  getThisYear: vi
+    .fn()
+    .mockResolvedValue({ leaveYear: null, leave: null, openRequests: [], openCorrections: 0 }),
+  listCardViews: vi.fn().mockResolvedValue([]),
 }));
 const exportRecord = vi.hoisted(() => vi.fn());
 vi.mock("../recordExport", () => ({ downloadRecordPdf: exportRecord }));

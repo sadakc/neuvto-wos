@@ -10,6 +10,10 @@
  * Opening a document is logged first and only then signed (openDocument), so
  * the person and the Admin can each be told, truthfully, that every opening is
  * on record.
+ *
+ * A proof on an address (D98) is listed here too, one row each, so the proof
+ * of an archived address, whose History row carries no control, can still be
+ * opened. It is attached from the address, never uploaded here.
  */
 
 import { useEffect, useState } from "react";
@@ -45,7 +49,17 @@ const STATUS: Record<EmployeeDocument["status"] | "missing", { label: string; to
     missing: { label: "Not submitted", tone: "warning" },
   };
 
-type Row = { type: (typeof DOCUMENT_TYPES)[number]; doc: EmployeeDocument | null };
+/** Not one of the twelve: attached from an address on the History tab (D98). */
+const ADDRESS_PROOF = {
+  key: "address_proof",
+  label: "Address proof",
+  category: "Address",
+} as const;
+
+type Row = {
+  type: (typeof DOCUMENT_TYPES)[number] | typeof ADDRESS_PROOF;
+  doc: EmployeeDocument | null;
+};
 
 export function DocumentsTab({
   employeeId,
@@ -128,10 +142,15 @@ export function DocumentsTab({
   }
 
   // Every type once; a named type (relieving letters) once per document on file.
-  const rows: Row[] = DOCUMENT_TYPES.flatMap<Row>((type) => {
-    const onFile = docs.filter((d) => d.docType === type.key);
-    return onFile.length ? onFile.map((doc) => ({ type, doc })) : [{ type, doc: null }];
-  });
+  const rows: Row[] = [
+    ...DOCUMENT_TYPES.flatMap<Row>((type) => {
+      const onFile = docs.filter((d) => d.docType === type.key);
+      return onFile.length ? onFile.map((doc) => ({ type, doc })) : [{ type, doc: null }];
+    }),
+    ...docs
+      .filter((d) => (d.docType as string) === ADDRESS_PROOF.key)
+      .map((doc) => ({ type: ADDRESS_PROOF, doc })),
+  ];
   const kind = uploading ? DOCUMENT_TYPES.find((t) => t.key === uploading) : null;
 
   return (
@@ -244,7 +263,12 @@ export function DocumentsTab({
 
       <ul className="divide-y divide-border rounded-xl border border-border bg-card shadow-card">
         {rows.map(({ type, doc }) => {
-          const name = doc?.title ? `${type.label}, ${doc.title}` : type.label;
+          const name =
+            type.key === ADDRESS_PROOF.key && doc
+              ? `${type.label}, ${doc.fileName}`
+              : doc?.title
+                ? `${type.label}, ${doc.title}`
+                : type.label;
           const status = STATUS[doc?.status ?? "missing"];
           return (
             <li
@@ -300,7 +324,8 @@ export function DocumentsTab({
                   <button
                     type="button"
                     aria-label={`Upload ${name}`}
-                    onClick={() => startUpload(type.key)}
+                    // Only the twelve are ever empty: an address proof row has its document.
+                    onClick={() => startUpload(type.key as DocumentType)}
                     className="text-sm underline underline-offset-4"
                   >
                     Upload
@@ -375,7 +400,8 @@ export function DocumentsTab({
               {views.map((v, i) => (
                 <li key={i}>
                   {v.viewerName} opened{" "}
-                  {DOCUMENT_TYPES.find((t) => t.key === v.docType)?.label ?? v.docType}
+                  {[...DOCUMENT_TYPES, ADDRESS_PROOF].find((t) => t.key === v.docType)?.label ??
+                    v.docType}
                   {v.title ? `, ${v.title}` : ""} on {day(v.viewedAt)}
                 </li>
               ))}

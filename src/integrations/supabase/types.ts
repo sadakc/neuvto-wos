@@ -1061,6 +1061,52 @@ export type Database = {
           },
         ]
       }
+      employee_card_views: {
+        Row: {
+          employee_id: string
+          id: string
+          organization_id: string
+          viewed_at: string
+          viewer_id: string
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          organization_id: string
+          viewed_at?: string
+          viewer_id: string
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          viewed_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_card_views_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_card_views_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_card_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_change_requests: {
         Row: {
           created_at: string
@@ -1244,6 +1290,7 @@ export type Database = {
       }
       employee_documents: {
         Row: {
+          address_id: string | null
           created_at: string
           created_by: string | null
           doc_type: string
@@ -1268,6 +1315,7 @@ export type Database = {
           verified_by: string | null
         }
         Insert: {
+          address_id?: string | null
           created_at?: string
           created_by?: string | null
           doc_type: string
@@ -1292,6 +1340,7 @@ export type Database = {
           verified_by?: string | null
         }
         Update: {
+          address_id?: string | null
           created_at?: string
           created_by?: string | null
           doc_type?: string
@@ -1316,6 +1365,13 @@ export type Database = {
           verified_by?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "employee_documents_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "employee_addresses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "employee_documents_employee_id_fkey"
             columns: ["employee_id"]
@@ -1389,6 +1445,79 @@ export type Database = {
             foreignKeyName: "employee_onboarding_items_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_onboarding_reminders: {
+        Row: {
+          detail: Json
+          id: string
+          kind: string
+          organization_id: string
+          people: number
+          sent_at: string
+        }
+        Insert: {
+          detail: Json
+          id?: string
+          kind: string
+          organization_id: string
+          people: number
+          sent_at?: string
+        }
+        Update: {
+          detail?: Json
+          id?: string
+          kind?: string
+          organization_id?: string
+          people?: number
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_reminders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_onboarding_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          escalate_after_days: number
+          organization_id: string
+          remind_every_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          escalate_after_days?: number
+          organization_id: string
+          remind_every_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          escalate_after_days?: number
+          organization_id?: string
+          remind_every_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
             referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
@@ -3647,6 +3776,16 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: Json
       }
+      employee_address_attach_proof: {
+        Args: {
+          _address_id: string
+          _file_name: string
+          _file_path: string
+          _mime_type: string
+          _size_bytes: number
+        }
+        Returns: string
+      }
       employee_admin_overview: { Args: never; Returns: Json }
       employee_age: { Args: { _dob: string; _org: string }; Returns: number }
       employee_apply_draft: {
@@ -3654,6 +3793,14 @@ export type Database = {
         Returns: undefined
       }
       employee_card: { Args: { _employee_id?: string }; Returns: Json }
+      employee_card_views_list: {
+        Args: { _employee_id: string }
+        Returns: {
+          viewed_at: string
+          viewer_name: string
+        }[]
+      }
+      employee_card_views_prune: { Args: never; Returns: number }
       employee_change_requests: {
         Args: { _status?: string }
         Returns: {
@@ -3809,6 +3956,17 @@ export type Database = {
           mandatory: boolean
         }[]
       }
+      employee_onboarding_overdue: {
+        Args: { _org_id: string }
+        Returns: {
+          days_overdue: number
+          employee_id: string
+          full_name: string
+          items: string[]
+        }[]
+      }
+      employee_onboarding_remind_due: { Args: never; Returns: number }
+      employee_onboarding_settings: { Args: never; Returns: Json }
       employee_org_chart: {
         Args: never
         Returns: {
@@ -3874,6 +4032,10 @@ export type Database = {
         }
         Returns: undefined
       }
+      employee_save_onboarding_settings: {
+        Args: { _escalate_after_days: number; _remind_every_days: number }
+        Returns: undefined
+      }
       employee_save_previous_orgs: {
         Args: { _employee_id: string; _rows: Json }
         Returns: undefined
@@ -3909,6 +4071,7 @@ export type Database = {
         Args: { _status: string; _unit_id: string }
         Returns: undefined
       }
+      employee_this_year: { Args: { _employee_id: string }; Returns: Json }
       employee_units: {
         Args: never
         Returns: {

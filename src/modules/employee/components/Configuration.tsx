@@ -23,11 +23,14 @@ import {
 } from "@/components/ui/dialog";
 import { isAppError } from "@/platform/errors";
 import { cn } from "@/lib/utils";
-import { UNIT_TYPE_LABEL } from "../contracts";
+import { UNIT_TYPE_LABEL, type OnboardingSettings } from "../contracts";
+import { formatDate } from "../format";
 import { FIELD_CATALOGUE } from "../fieldCatalogue";
 import {
+  getOnboardingSettings,
   listAllDesignations,
   listOnboardingItems,
+  saveOnboardingSettings,
   listUnits,
   saveDesignation,
   saveOnboardingItem,
@@ -670,8 +673,9 @@ function OnboardingSection() {
   return (
     <Panel
       title="Onboarding checklist"
-      footer="A mandatory item a record lacks is listed against it on Add Employee, and marked overdue once its window from the joining date has passed. Reminders and escalation arrive with scheduled notifications for this module."
+      footer="A mandatory item a record lacks is listed against it on Add Employee, and marked overdue once its window from the joining date has passed. Deactivated records are not chased."
     >
+      <OnboardingReminders />
       {error && (
         <p role="alert" className="mb-2 text-sm text-destructive">
           {error}
@@ -687,6 +691,128 @@ function OnboardingSection() {
         </ul>
       )}
     </Panel>
+  );
+}
+
+/**
+ * D99. How often the Employee Admins are told which records have mandatory
+ * items past due, and after how many days past due the Super Admins are told.
+ * One email a company, sent each morning the cadence comes round.
+ */
+function OnboardingReminders() {
+  const [s, setS] = useState<OnboardingSettings | null>(null);
+  const [every, setEvery] = useState("");
+  const [after, setAfter] = useState("");
+  const [error, setError] = useState("");
+  const [saved, setSaved] = useState(false);
+
+  async function load() {
+    try {
+      const v = await getOnboardingSettings();
+      setS(v);
+      setEvery(String(v.remindEveryDays));
+      setAfter(String(v.escalateAfterDays));
+    } catch (e) {
+      setError(errorText(e, "The reminder settings didn't load."));
+    }
+  }
+  useEffect(() => {
+    void load();
+  }, []);
+
+  const valid =
+    /^\d{1,2}$/.test(every) &&
+    Number(every) <= 30 &&
+    /^\d{1,2}$/.test(after) &&
+    Number(after) <= 90;
+  const changed =
+    !!s && (Number(every) !== s.remindEveryDays || Number(after) !== s.escalateAfterDays);
+
+  async function save() {
+    setError("");
+    setSaved(false);
+    try {
+      await saveOnboardingSettings(Number(every), Number(after));
+      setSaved(true);
+      await load();
+    } catch (e) {
+      setError(errorText(e, "That couldn't be saved."));
+    }
+  }
+
+  const last = (x: OnboardingSettings["lastReminder"], none: string, what: string) =>
+    x
+      ? `Last ${what} ${formatDate(x.sentAt)}, ${x.people} ${x.people === 1 ? "person" : "people"}.`
+      : none;
+
+  return (
+    <div
+      data-testid="onboarding-reminders"
+      className="mb-4 flex flex-col gap-3 rounded-lg border border-border p-3 text-sm"
+    >
+      {s === null && !error ? (
+        <div className="h-16 animate-pulse rounded bg-muted" />
+      ) : (
+        <>
+          <div className="flex flex-wrap items-end gap-3">
+            <label className="flex flex-col gap-1">
+              <span className="text-caption text-muted-foreground">
+                Remind the Employee Admins every (days)
+              </span>
+              <input
+                aria-label="Remind the Employee Admins every (days)"
+                inputMode="numeric"
+                value={every}
+                onChange={(e) => setEvery(e.target.value)}
+                className="h-10 w-20 rounded-md border border-input bg-background px-2 text-sm"
+              />
+            </label>
+            <label className="flex flex-col gap-1">
+              <span className="text-caption text-muted-foreground">
+                Tell the Super Admins after (days past due)
+              </span>
+              <input
+                aria-label="Tell the Super Admins after (days past due)"
+                inputMode="numeric"
+                value={after}
+                onChange={(e) => setAfter(e.target.value)}
+                className="h-10 w-20 rounded-md border border-input bg-background px-2 text-sm"
+              />
+            </label>
+            <button
+              type="button"
+              disabled={!changed || !valid}
+              onClick={() => void save()}
+              className="h-10 rounded-md border border-border px-3 text-sm disabled:opacity-40"
+            >
+              Save reminders
+            </button>
+            {saved && (
+              <span role="status" className="text-caption text-success">
+                Saved
+              </span>
+            )}
+          </div>
+          <p className="text-caption text-muted-foreground">
+            One email each morning the reminder comes round, naming every record with a mandatory
+            item past due. Up to 30 days between reminders, and up to 90 days past due before the
+            Super Admins are told; 0 switches it off. With reminders off, the Super Admins are not
+            told either.
+          </p>
+          {s && (
+            <p className="text-caption text-muted-foreground">
+              {last(s.lastReminder, "No reminder sent yet.", "reminder")}{" "}
+              {last(s.lastEscalation, "No escalation sent yet.", "escalation")}
+            </p>
+          )}
+        </>
+      )}
+      {error && (
+        <p role="alert" className="text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
   );
 }
 
@@ -811,8 +937,10 @@ function AccessSection() {
             <strong>Only a Super Admin makes administrators</strong>, and a company always keeps at
             least one Super Admin.
           </li>
-          <li className="text-muted-foreground">
-            Logging every view of a card, not only reveals, is not built yet.
+          <li>
+            <strong>Every look at somebody else&apos;s record is logged too</strong>, not only
+            reveals: who opened it and when, kept three years. The person and a Super Admin can see
+            who looked.
           </li>
         </ul>
       </Panel>

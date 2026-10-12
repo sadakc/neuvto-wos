@@ -24,6 +24,10 @@ vi.mock("../handlers", () => ({
   getRestrictedReads: vi.fn().mockResolvedValue([]),
   listDocuments: vi.fn().mockResolvedValue([]),
   listDocumentViews: vi.fn().mockResolvedValue([]),
+  getThisYear: vi
+    .fn()
+    .mockResolvedValue({ leaveYear: null, leave: null, openRequests: [], openCorrections: 0 }),
+  listCardViews: vi.fn().mockResolvedValue([]),
 }));
 vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children?: React.ReactNode }) => <a>{children}</a>,

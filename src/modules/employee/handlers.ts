@@ -26,6 +26,9 @@ import {
   type DocumentType,
   type DocumentView,
   type EmployeeDocument,
+  type CardView,
+  type OnboardingSettings,
+  type ThisYear,
 } from "./contracts";
 
 function toEmployeeError(message: string): AppError {
@@ -180,13 +183,23 @@ export interface AddressInput {
   alsoPermanent?: boolean;
 }
 
-/** Adds an address and closes the open one of that type the day before. */
-export async function addAddress(employeeId: string, input: AddressInput): Promise<void> {
-  const { error } = await supabase.rpc("employee_add_address", {
+/**
+ * Adds an address and closes the open one of that type the day before.
+ * Returns the id of each row it added, by type ("also the permanent address"
+ * adds two), so a proof can be attached to the one it was given for (D98).
+ */
+export async function addAddress(
+  employeeId: string,
+  input: AddressInput,
+): Promise<{ id: string; addressType: string }[]> {
+  const { data, error } = await supabase.rpc("employee_add_address", {
     _employee_id: employeeId,
     _values: input as unknown as Values,
   });
   if (error) throw toEmployeeError(error.message);
+  return ((data as { added?: { id: string; addressType: string }[] } | null)?.added ?? []).map(
+    (a) => ({ id: a.id, addressType: a.addressType }),
+  );
 }
 
 export interface MoveInput {
@@ -611,9 +624,25 @@ export async function listDocuments(employeeId: string): Promise<EmployeeDocumen
 }
 
 /**
- * Uploads a file into the record's own folder, then files it. Storage refuses
- * any other folder, and the database refuses a path outside the record.
+ * Puts a file into the record's own folder and returns its path. Storage
+ * refuses any other folder, and the database refuses a path outside the record.
  */
+async function uploadToRecord(employeeId: string, file: File): Promise<string> {
+  if (!DOCUMENT_MIME.includes(file.type) || file.size > DOCUMENT_MAX_BYTES) {
+    throw new AppError("VALIDATION_FAILED", employeeErrorMessage("INVALID_DOCUMENT"), 400);
+  }
+  const { data: org, error: orgErr } = await supabase.rpc("current_org_id");
+  if (orgErr || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
+  const safe = file.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
+  const path = `${org}/${employeeId}/${crypto.randomUUID()}-${safe}`;
+  const { error: upErr } = await supabase.storage
+    .from(DOCUMENT_BUCKET)
+    .upload(path, file, { contentType: file.type, upsert: false });
+  if (upErr) throw new AppError("INTERNAL_ERROR", "The file didn't upload. Try again.", 500);
+  return path;
+}
+
+/** Uploads a file into the record's own folder, then files it. */
 export async function uploadDocument(input: {
   employeeId: string;
   docType: DocumentType;
@@ -621,17 +650,7 @@ export async function uploadDocument(input: {
   expiresOn: string | null;
   file: File;
 }): Promise<string> {
-  if (!DOCUMENT_MIME.includes(input.file.type) || input.file.size > DOCUMENT_MAX_BYTES) {
-    throw new AppError("VALIDATION_FAILED", employeeErrorMessage("INVALID_DOCUMENT"), 400);
-  }
-  const { data: org, error: orgErr } = await supabase.rpc("current_org_id");
-  if (orgErr || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
-  const safe = input.file.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
-  const path = `${org}/${input.employeeId}/${crypto.randomUUID()}-${safe}`;
-  const { error: upErr } = await supabase.storage
-    .from(DOCUMENT_BUCKET)
-    .upload(path, input.file, { contentType: input.file.type, upsert: false });
-  if (upErr) throw new AppError("INTERNAL_ERROR", "The file didn't upload. Try again.", 500);
+  const path = await uploadToRecord(input.employeeId, input.file);
   const { data, error } = await supabase.rpc("employee_document_add", {
     _employee_id: input.employeeId,
     _doc_type: input.docType,
@@ -687,4 +706,72 @@ export async function listDocumentViews(employeeId: string): Promise<DocumentVie
     viewerName: r.viewer_name,
     viewedAt: r.viewed_at,
   }));
+}
+
+// ═══════════════════════════════════════════════ the rest of the card (D97–D100)
+
+/** D98: uploads a proof and files it against one address row, replacing any before it. */
+export async function attachAddressProof(input: {
+  employeeId: string;
+  addressId: string;
+  file: File;
+}): Promise<string> {
+  const path = await uploadToRecord(input.employeeId, input.file);
+  const { data, error } = await supabase.rpc("employee_address_attach_proof", {
+    _address_id: input.addressId,
+    _file_path: path,
+    _file_name: input.file.name,
+    _mime_type: input.file.type,
+    _size_bytes: input.file.size,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+/** D97: leave left and what the person is waiting on, this year. */
+export async function getThisYear(employeeId: string): Promise<ThisYear> {
+  const { data, error } = await supabase.rpc("employee_this_year", { _employee_id: employeeId });
+  if (error) throw toEmployeeError(error.message);
+  const raw = data as unknown as ThisYear;
+  return {
+    leaveYear: raw.leaveYear ?? null,
+    leave: raw.leave
+      ? raw.leave.map((l) => ({
+          ...l,
+          entitled: Number(l.entitled),
+          used: Number(l.used),
+          pending: Number(l.pending),
+          available: Number(l.available),
+        }))
+      : null,
+    openRequests: (raw.openRequests ?? []).map((r) => ({ label: r.label, count: Number(r.count) })),
+    openCorrections: Number(raw.openCorrections ?? 0),
+  };
+}
+
+/** D100: who has looked at this record, newest first. */
+export async function listCardViews(employeeId: string): Promise<CardView[]> {
+  const { data, error } = await supabase.rpc("employee_card_views_list", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((r) => ({ viewerName: r.viewer_name, viewedAt: r.viewed_at }));
+}
+
+/** D99: the company's onboarding reminder settings, and the last of each sent. */
+export async function getOnboardingSettings(): Promise<OnboardingSettings> {
+  const { data, error } = await supabase.rpc("employee_onboarding_settings");
+  if (error) throw toEmployeeError(error.message);
+  return data as unknown as OnboardingSettings;
+}
+
+export async function saveOnboardingSettings(
+  remindEveryDays: number,
+  escalateAfterDays: number,
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_save_onboarding_settings", {
+    _remind_every_days: remindEveryDays,
+    _escalate_after_days: escalateAfterDays,
+  });
+  if (error) throw toEmployeeError(error.message);
 }

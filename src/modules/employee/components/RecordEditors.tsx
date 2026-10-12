@@ -36,6 +36,7 @@ import {
 } from "../contracts";
 import {
   addAddress,
+  attachAddressProof,
   listActiveUnits,
   listDesignations,
   moveUnit,
@@ -931,6 +932,9 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dateError, setDateError] = useState("");
+  // D98: the proof, filed against the row added for the type chosen.
+  const [proof, setProof] = useState<File | null>(null);
+  const [proofFailed, setProofFailed] = useState(false);
   const openRow = card.addresses?.find((a) => a.addressType === v.addressType && !a.effectiveTo);
   const openPermanent = card.addresses?.find(
     (a) => a.addressType === "permanent" && !a.effectiveTo,
@@ -942,10 +946,20 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
     setDateError("");
     setBusy(true);
     try {
-      await addAddress(card.id, {
+      const added = await addAddress(card.id, {
         ...v,
         alsoPermanent: v.addressType === "present" && v.alsoPermanent,
       });
+      const row = added.find((a) => a.addressType === v.addressType);
+      if (proof && row) {
+        // The address is saved whatever happens to the file; a proof that
+        // fails is attached afterwards from the row, never by saving again.
+        try {
+          await attachAddressProof({ employeeId: card.id, addressId: row.id, file: proof });
+        } catch {
+          setProofFailed(true);
+        }
+      }
       setOpen(false);
       await onChanged();
     } catch (err) {
@@ -970,12 +984,19 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
           setV(blank);
           setError("");
           setDateError("");
+          setProof(null);
+          setProofFailed(false);
           setOpen(true);
         }}
         className="h-11 w-fit rounded-md border border-border px-4 text-sm font-medium"
       >
         Add an address
       </button>
+      {proofFailed && (
+        <p role="alert" data-testid="address-proof-failed" className="text-sm text-destructive">
+          The address was saved, but the proof didn&apos;t attach. Attach it from the address row.
+        </p>
+      )}
       <Dialog open={open} onOpenChange={setOpen}>
         <DialogContent className="max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -1087,6 +1108,19 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 </span>
               </label>
             )}
+            <Field label="Proof (optional)">
+              <input
+                type="file"
+                aria-label="Proof (optional)"
+                accept="application/pdf,image/png,image/jpeg,image/webp"
+                onChange={(e) => setProof(e.target.files?.[0] ?? null)}
+                className="block w-full text-sm"
+              />
+              <span className="mt-1 block text-caption text-muted-foreground">
+                A rent agreement, a utility bill or an ID showing this address. PDF or a photo, up
+                to 10 MB.
+              </span>
+            </Field>
             {error && (
               <p role="alert" data-testid="address-error" className="text-sm text-destructive">
                 {error}

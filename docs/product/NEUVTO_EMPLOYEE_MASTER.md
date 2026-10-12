@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.12 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.13 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -396,7 +396,7 @@ Every writer is an Admin's (§5) and lives in `20261014100000_the_record_is_writ
   - _Move to another unit:_ the three checkboxes (carry the unit's shift and calendar, notify
     the receiving coordinator, notify the employee) are not offered. There is no shift model
     or unit coordinator assignment yet, and a checkbox that does nothing is worse than none.
-  - Proof uploads on an address.
+  - ~~Proof uploads on an address.~~ Built: D98, below.
 
 ### E8 as built (15 Oct 2026)
 
@@ -497,9 +497,9 @@ template. Import records now downloads and reads one Excel workbook:
 - **04 Onboarding checklist**: twelve items, each one a check the database runs against the
   record; a company sets each one's due window and whether it is mandatory. Add Employee's
   "missing" list is now this checklist, with an overdue flag counted from the joining date.
-  Reminders and escalation need scheduled notifications for this module and are not built.
+  Reminders and escalation are built (D99, below).
 - **05 Access and admin roles**: the role table and the rules that are always on. Roles are
-  changed on People (Change access). Logging every card view, not only reveals, is not built.
+  changed on People (Change access). Every card view is logged, not only reveals (D100, below).
 
 ### Documents and Export record (D95, D96, 12 Oct 2026)
 
@@ -513,6 +513,42 @@ template. Import records now downloads and reads one Excel workbook:
   Proved by `verify_employee_documents.sql`.
 - **Export record** in the card header writes a PDF of the card as its viewer received it.
   Numbers to their last four, always; the physical record and the restricted fields never.
+
+### The rest of the card (D97–D100, 12 Oct 2026)
+
+`20261021110000_the_rest_of_the_card.sql`; proved by `verify_card_rest.sql`, and on screen by
+`CardRest.test.tsx` and `Configuration.test.tsx`.
+
+- **This year** (D97) is Overview's fourth card, for the person, the Employee Admin and their
+  manager (`employee_this_year`). Leave left of each paid and earned type, "10 of 12 days
+  left · 1.5 awaiting a decision", the same figures as the person's own Leave screen; a
+  balance not made yet is worked out, never created, so looking at a card cannot change
+  anybody's leave. No leave block when Leave is off. Open requests by kind, and open record
+  corrections. Attendance and the last appraisal (bundle §7.1) join it when those modules
+  exist; no empty rows until then.
+- **Proof on an address** (D98). Add an address takes an optional proof, filed against the
+  row added for the type chosen (not the permanent copy). The current address row shows the
+  proof with View and Replace, or Attach; an archived row says "On file" or "None" and has no
+  control (criterion 2), and every address proof is listed on the Documents tab, where it
+  opens. A proof is a document (`address_proof`, pointing at its address), so it is opened
+  through the logged open, replaced not overwritten, verified and removed like any other,
+  by the same two people; the address row itself never changes. The card carries the proof
+  to the person and the Employee Admin only; the Statutory role, which sees addresses, sees
+  no proof column. If the address saves and the proof does not, the screen says so and the
+  proof is attached from the row.
+- **Onboarding reminders** (D99), on Configuration's checklist: remind the Employee Admins
+  every N days (default 3, up to 30) and tell the Super Admins once an item is N days past
+  due (default 7, up to 90); 0 switches each off, and reminders off means no escalation
+  either. A daily job at 09:00 India time sends one email a company naming each record with
+  mandatory items past due and what they lack, never one per record, and nothing when nothing
+  is due. Deactivated records are not chased. Each send is recorded, and the screen shows
+  the last of each. "Blocks the first payroll run" waits for Payroll.
+- **Every look is logged** (D100). `employee_card()` writes who opened whose record before it
+  returns any of it, so asking the database directly is logged too. Ten minutes of one
+  person looking at one record is one row (the screen re-reads the card after every save);
+  your own record is not logged; a refused look writes nothing. The person and a Super Admin
+  see "Who has looked at this record" on Overview. Append-only, pruned after three years,
+  never switchable off.
 
 ## 8. Acceptance criteria, module level
 

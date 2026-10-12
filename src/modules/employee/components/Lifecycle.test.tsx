@@ -20,6 +20,8 @@ import type { AdminOverview, EmployeeCard } from "../contracts";
 import cards from "./__fixtures__/cards.json";
 
 const api = vi.hoisted(() => ({
+  getThisYear: vi.fn(),
+  listCardViews: vi.fn(),
   createDraft: vi.fn(),
   updateDraft: vi.fn(),
   sendInvite: vi.fn(),
@@ -65,6 +67,13 @@ const OVERVIEW: AdminOverview = {
 
 beforeEach(() => {
   vi.resetAllMocks();
+  api.getThisYear.mockResolvedValue({
+    leaveYear: null,
+    leave: null,
+    openRequests: [],
+    openCorrections: 0,
+  });
+  api.listCardViews.mockResolvedValue([]);
   api.getAdminOverview.mockResolvedValue(OVERVIEW);
   api.listDesignations.mockResolvedValue([{ id: "g-1", name: "Guard" }]);
   api.listChangeRequests.mockResolvedValue([]);
