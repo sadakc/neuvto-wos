@@ -9,6 +9,9 @@
  * Contributed as an adminSection rather than routed, so it appears in Settings
  * without the platform naming Leave (D30) — the same arrangement as leave types.
  *
+ * People who have not joined yet (drafts and the invited) are beneath, in
+ * StagedOpeningBalances (D88): their numbers wait and apply when they accept.
+ *
  * It lists people whose balance row does not exist yet, showing the entitlement
  * they *would* get. Those are exactly the people an opening balance is for, and
  * a screen that only listed materialised rows would hide them.
@@ -17,6 +20,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { isAppError, toAppError } from "@/platform/errors";
+import StagedOpeningBalances from "./StagedOpeningBalances";
 
 interface Row {
   employeeId: string;
@@ -234,6 +238,8 @@ export default function OpeningBalances() {
       <p className="mt-3 text-xs text-muted-foreground">
         Every change is recorded with the previous value, so a balance that moves can be traced.
       </p>
+
+      <StagedOpeningBalances />
     </div>
   );
 }

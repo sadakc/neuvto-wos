@@ -311,6 +311,10 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   NOT_A_HALF_DAY: "Use whole days or halves — 2 or 2.5, not 2.7.",
   OPENING_BALANCE_OVERDRAWN:
     "That's more days than this person was ever entitled to. Check the figure, or set their entitlement first.",
+  // D88. Staging is for somebody not yet joined; once they have, their own
+  // balance is set in the list above.
+  ALREADY_JOINED:
+    "They've joined since this page loaded. Set their balance in the list of people who have joined.",
   LEAVE_TYPE_IN_USE:
     "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",
 };
@@ -341,4 +345,32 @@ export function leaveErrorMessage(code: string): string {
       : "You don't have enough days available.";
   }
   return LEAVE_ERROR_MESSAGES[code] ?? "That didn't work. Please try again.";
+}
+
+/** D88 — somebody not yet joined, against one paid leave type. */
+export interface StagedOpeningBalance {
+  employeeRecordId: string;
+  employeeName: string;
+  employeeCode: string | null;
+  stage: "draft" | "invited";
+  /** Their expected joining date; null when nobody has said yet (priced as a full year). */
+  joinedDate: string | null;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  /** What their joining date entitles them to this year. */
+  entitledDays: number;
+  usedDays: number;
+  carryforwardDays: number;
+  /** Whether anything is waiting for them for this type. */
+  staged: boolean;
+}
+
+/** D88 — a staged number that could not be applied when the person joined. */
+export interface StagedOpeningProblem {
+  employeeId: string;
+  employeeName: string;
+  leaveTypeName: string;
+  usedDays: number;
+  carryforwardDays: number;
+  problem: "OPENING_BALANCE_OVERDRAWN" | "MODULE_NOT_ENABLED";
 }

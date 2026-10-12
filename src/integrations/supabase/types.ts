@@ -1646,6 +1646,79 @@ export type Database = {
           },
         ]
       }
+      leave_opening_staged: {
+        Row: {
+          applied_at: string | null
+          carryforward_days: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          employee_record_id: string
+          fy_label: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          problem: string | null
+          updated_at: string
+          updated_by: string | null
+          used_days: number
+        }
+        Insert: {
+          applied_at?: string | null
+          carryforward_days?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          employee_record_id: string
+          fy_label: string
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          problem?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          used_days?: number
+        }
+        Update: {
+          applied_at?: string | null
+          carryforward_days?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          employee_record_id?: string
+          fy_label?: string
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          problem?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          used_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_opening_staged_employee_record_id_fkey"
+            columns: ["employee_record_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_opening_staged_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_opening_staged_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approval_request_id: string | null
@@ -2806,6 +2879,15 @@ export type Database = {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
         Returns: number
       }
+      calculate_entitlement_from: {
+        Args: {
+          _fy: string
+          _joined: string
+          _leave_type_id: string
+          _org_id: string
+        }
+        Returns: number
+      }
       calculate_working_days: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: number
@@ -2943,6 +3025,10 @@ export type Database = {
           manager_profile_id: string
           profile_id: string
         }[]
+      }
+      employee_record_joining_date: {
+        Args: { _employee_record_id: string }
+        Returns: string
       }
       employee_relationship: {
         Args: { _employee_id: string }
@@ -3239,6 +3325,44 @@ export type Database = {
           _used: number
         }
         Returns: undefined
+      }
+      leave_stage_opening_balance: {
+        Args: {
+          _carryforward: number
+          _employee_record_id: string
+          _leave_type_id: string
+          _used: number
+        }
+        Returns: undefined
+      }
+      leave_staged_opening_balances: {
+        Args: never
+        Returns: {
+          carryforward_days: number
+          employee_code: string
+          employee_name: string
+          employee_record_id: string
+          entitled_days: number
+          fy_label: string
+          joined_date: string
+          leave_type_id: string
+          leave_type_name: string
+          problem: string
+          stage: string
+          staged: boolean
+          used_days: number
+        }[]
+      }
+      leave_staged_opening_problems: {
+        Args: never
+        Returns: {
+          carryforward_days: number
+          employee_id: string
+          employee_name: string
+          leave_type_name: string
+          problem: string
+          used_days: number
+        }[]
       }
       leave_submit: {
         Args: {

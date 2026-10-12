@@ -29,6 +29,8 @@ import {
   type UnpaidSummary,
   type Blackout,
   type LeaveTypeImpact,
+  type StagedOpeningBalance,
+  type StagedOpeningProblem,
 } from "./contracts";
 
 /**
@@ -489,5 +491,61 @@ export async function getLeavePendingReport(): Promise<LeavePendingReportRow[]> 
     currentLevel: Number(r.current_level),
     requiredLevels: Number(r.required_levels),
     waitingOn: r.waiting_on ?? null,
+  }));
+}
+
+// ═══════════════════════════════════════════════ opening balances, before joining (D88)
+
+/** Staging and its lists are the Leave Admin's; FORBIDDEN here is not about reports. */
+function toStagingError(message: string): AppError {
+  const e = toLeaveError(message);
+  return e.details?.code === "FORBIDDEN"
+    ? new AppError("FORBIDDEN", "Only the Leave Admin can set opening balances.", 403, e.details)
+    : e;
+}
+
+export async function getStagedOpeningBalances(): Promise<StagedOpeningBalance[]> {
+  const { data, error } = await supabase.rpc("leave_staged_opening_balances");
+  if (error) throw toStagingError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeRecordId: r.employee_record_id,
+    employeeName: r.employee_name,
+    employeeCode: r.employee_code,
+    stage: r.stage as StagedOpeningBalance["stage"],
+    joinedDate: r.joined_date,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    entitledDays: Number(r.entitled_days),
+    usedDays: Number(r.used_days),
+    carryforwardDays: Number(r.carryforward_days),
+    staged: r.staged,
+  }));
+}
+
+export async function stageOpeningBalance(
+  employeeRecordId: string,
+  leaveTypeId: string,
+  used: number,
+  carryforward: number,
+): Promise<void> {
+  const { error } = await supabase.rpc("leave_stage_opening_balance", {
+    _employee_record_id: employeeRecordId,
+    _leave_type_id: leaveTypeId,
+    _used: used,
+    _carryforward: carryforward,
+  });
+  if (error) throw toStagingError(error.message);
+}
+
+export async function getStagedOpeningProblems(): Promise<StagedOpeningProblem[]> {
+  const { data, error } = await supabase.rpc("leave_staged_opening_problems");
+  if (error) throw toStagingError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    leaveTypeName: r.leave_type_name,
+    usedDays: Number(r.used_days),
+    carryforwardDays: Number(r.carryforward_days),
+    problem: r.problem as StagedOpeningProblem["problem"],
   }));
 }
