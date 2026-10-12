@@ -192,6 +192,9 @@ export interface EmployeeCard {
   /** Self and Statutory: only whether anything is held. Values come by reveal. */
   restricted?: { recorded: boolean };
 
+  /** D102: the calendar and shift they work to today. Everybody in the company. */
+  workPattern?: WorkPattern;
+
   capabilities: {
     canEdit: boolean;
     canRequestChange: boolean;
@@ -208,6 +211,8 @@ export interface EmployeeCard {
     canSeeViews?: boolean;
     /** D97: the year so far. The person, the Employee Admin and their manager. */
     canSeeThisYear?: boolean;
+    /** D102: give the person their own shift, or return them to their unit's. */
+    canSetShift?: boolean;
     canSendInvite?: boolean;
     canDeactivate?: boolean;
     canEditDraft?: boolean;
@@ -424,6 +429,19 @@ export function employeeErrorMessage(code: string): string {
     ["ORDER_REF_REQUIRED", "A move needs a deployment order reference."],
     ["UNIT_NOT_AVAILABLE", "That unit isn't available. Choose an active unit."],
     ["ALREADY_DEPLOYED_THERE", "They're already deployed there."],
+    // D102, shift and calendar.
+    ["CALENDAR_NOT_AVAILABLE", "That calendar isn't available. Choose one in use."],
+    ["CALENDAR_NAME_TAKEN", "There's already a calendar with that name."],
+    ["CALENDAR_IN_USE", "A unit uses that calendar. Give the unit another one first."],
+    [
+      "COMPANY_CALENDAR_IS_SET_IN_SETTINGS",
+      "The Company calendar's days off are set on Settings, under Working calendar.",
+    ],
+    ["SHIFT_NOT_AVAILABLE", "That shift isn't available. Choose one in use."],
+    ["SHIFT_NAME_TAKEN", "There's already a shift with that name."],
+    ["SHIFT_IN_USE", "That shift is a unit's default or somebody's own. Change those first."],
+    ["NO_OWN_SHIFT", "They already work their unit's shift."],
+    ["ALREADY_ON_THAT_SHIFT", "They already work that shift."],
     ["NOMINEE_SHARES_NOT_100", "Nominee shares must add up to exactly 100%."],
     ["NOMINEES_REQUIRED", "Add at least one nominee."],
     ["NOT_ON_PEOPLE", "Not on the People tab. Check the employee code."],
@@ -578,4 +596,51 @@ export interface OnboardingSettings {
   escalateAfterDays: number;
   lastReminder: { sentAt: string; people: number } | null;
   lastEscalation: { sentAt: string; people: number } | null;
+}
+
+// ═══════════════════════════════════════════════ shift and calendar (D102)
+
+export interface ShiftTimes {
+  startTime: string;
+  endTime: string;
+  breakMinutes: number;
+}
+
+export interface WorkPattern {
+  calendar: { id: string; name: string; weeklyOff: number[]; isDefault: boolean };
+  /** "unit": the unit names its calendar; "company": the Company calendar. */
+  calendarSource: "unit" | "company";
+  unitName: string | null;
+  shift: (ShiftTimes & { id: string; name: string }) | null;
+  /** "person": their own shift; "unit": their unit's default; null: none. */
+  shiftSource: "person" | "unit" | null;
+  ownShiftSince: string | null;
+  /** The person, the Employee Admin and their manager only. */
+  ownShifts?: {
+    id: string;
+    shiftName: string;
+    startTime: string;
+    endTime: string;
+    effectiveFrom: string;
+    effectiveTo: string | null;
+    reason: string | null;
+    setBy: string | null;
+  }[];
+}
+
+export interface CalendarRow {
+  id: string;
+  name: string;
+  weeklyOff: number[];
+  isDefault: boolean;
+  status: "active" | "retired";
+  units: number;
+}
+
+export interface ShiftRow extends ShiftTimes {
+  id: string;
+  name: string;
+  status: "active" | "retired";
+  units: number;
+  people: number;
 }

@@ -20,7 +20,7 @@ const h = vi.hoisted(() => ({
   getMyUnpaid: vi.fn(),
   getBlackouts: vi.fn(),
   submitLeave: vi.fn(),
-  getWorkingDays: vi.fn(),
+  getMyWorkingDays: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
@@ -39,8 +39,8 @@ vi.mock("@/platform/auth", () => ({
   isModuleAdmin: () => false,
 }));
 vi.mock("@/platform/calendar", () => ({
-  getWorkingDays: h.getWorkingDays,
-  getExcludedDays: async () => [],
+  getMyWorkingDays: h.getMyWorkingDays,
+  getMyExcludedDays: async () => [],
   describeExcludedDays: () => "",
 }));
 vi.mock("../handlers", () => ({
@@ -78,7 +78,7 @@ beforeEach(() => {
   h.getBlackouts.mockResolvedValue([
     { id: "b1", name: "Year-end audit", fromDate: "2099-03-23", toDate: "2099-03-27" },
   ]);
-  h.getWorkingDays.mockResolvedValue(5);
+  h.getMyWorkingDays.mockResolvedValue(5);
 });
 
 async function choose(typeName: string, from: string, to: string) {
@@ -117,7 +117,10 @@ describe("blackout periods", () => {
     expect(await screen.findByTestId("blackout")).toHaveTextContent("Year-end audit");
     // Once the count has landed, so the button is not merely disabled for counting.
     await screen.findByText("Requested:", { exact: false });
-    await waitFor(() => expect(h.getWorkingDays).toHaveBeenCalled());
+    // D102: counted on the applicant's own calendar, not the company's.
+    await waitFor(() =>
+      expect(h.getMyWorkingDays).toHaveBeenCalledWith("2099-03-26", "2099-03-30"),
+    );
     await new Promise((r) => setTimeout(r, 400));
     expect(screen.getByTestId("submit-leave")).toBeDisabled();
   });

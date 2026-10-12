@@ -1,6 +1,6 @@
 {
   "self": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "age": 32,
     "sex": "female",
     "bank": {
@@ -22,19 +22,19 @@
     },
     "addresses": [
       {
-        "id": "2012cd61-52c0-4d8d-bfe1-745e23f4535a",
+        "id": "074eb4c4-6488-4288-99dd-e565a3c9b53f",
         "city": "Bengaluru",
         "line": "402 Brigade Meadows",
         "proof": {
           "fileName": "rent-agreement.pdf",
           "verified": false,
-          "documentId": "a912e124-ef85-429f-804b-b1b58ee04854",
-          "uploadedAt": "2026-10-12T17:04:47.157729+00:00"
+          "documentId": "a5df4a73-e1ee-47f2-907c-a1c6b599c660",
+          "uploadedAt": "2026-10-12T17:25:59.441595+00:00"
         },
         "state": "Karnataka",
         "pincode": "560062",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": null,
@@ -42,14 +42,14 @@
         "nearestPoliceStation": null
       },
       {
-        "id": "70fd1f8a-d8d4-4555-9d97-730692d64f9a",
+        "id": "c7b1d9a0-3d15-4bbc-b1ee-f335cfb5e84f",
         "city": "Mysuru",
         "line": "12 Old Road",
         "proof": null,
         "state": "Karnataka",
         "pincode": "570001",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": "2024-03-01",
@@ -58,7 +58,7 @@
       }
     ],
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "statutory": {
@@ -86,9 +86,9 @@
     "dateOfBirth": "1994-06-12",
     "deployments": [
       {
-        "id": "f625be67-5cf0-482e-90ec-8b2e036c34ce",
+        "id": "a3844edc-cb08-41fd-9d68-d62501ad33f6",
         "reason": null,
-        "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+        "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
         "movedBy": null,
         "unitName": "Tata AIG, Hosur",
         "unitType": "client_site",
@@ -99,9 +99,9 @@
         "deploymentOrderRef": "DO-2025-0042"
       },
       {
-        "id": "f248bb7c-e064-4500-86ba-333221c33087",
+        "id": "64a8cfed-8388-4cee-8c85-c8e4221c6a30",
         "reason": null,
-        "unitId": "a3646659-3f4b-4628-b980-1657c68a7019",
+        "unitId": "4756f4dc-00cf-495d-b85d-3e4884124b1b",
         "movedBy": null,
         "unitName": "Acme HQ, Bengaluru",
         "unitType": "own_establishment",
@@ -113,7 +113,7 @@
       }
     ],
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
@@ -123,18 +123,18 @@
     "nativeState": "Karnataka",
     "nominations": [
       {
-        "id": "7f8d1690-0531-45f6-8fdb-7ec6e8db1a68",
+        "id": "167b7c19-d179-4249-aba1-b9dfd70777b3",
         "scheme": "pf_and_gratuity",
         "nominees": [
           {
-            "id": "c5406ebe-6abd-4938-9bae-028713372114",
+            "id": "4873ea58-dff6-4be6-9f4a-a61ce052045b",
             "name": "Lakshmi",
             "relation": "mother",
             "dateOfBirth": null,
             "sharePercent": 70.0
           },
           {
-            "id": "31d37ed8-bb69-44b0-82c0-aeb5e11f0543",
+            "id": "a360cf04-50c7-40aa-adae-d0f08dec714a",
             "name": "Aarav",
             "relation": "son",
             "dateOfBirth": null,
@@ -145,10 +145,42 @@
         "effectiveFrom": "2024-04-01"
       }
     ],
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "ownShifts": [
+        {
+          "id": "32380237-1d8d-43ef-9c79-199424833312",
+          "setBy": "Hema HR",
+          "reason": "Night post at the gate",
+          "endTime": "08:00",
+          "shiftName": "Night",
+          "startTime": "20:00",
+          "effectiveTo": null,
+          "effectiveFrom": "2025-07-01"
+        }
+      ],
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": false,
       "canEditBank": false,
       "canSeeViews": true,
+      "canSetShift": false,
       "canEditDraft": false,
       "canDeactivate": false,
       "canRevealBank": false,
@@ -175,21 +207,21 @@
     "dateOfJoining": "2024-04-01",
     "familyMembers": [
       {
-        "id": "e55c2c22-d627-4c58-bd85-f6603b5f72da",
+        "id": "d916fc31-3318-4ac0-9bfb-ba793204eaf5",
         "name": "Aarav",
         "relation": "son",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "15bdf553-75fc-40b1-bfcf-74467841c54a",
+        "id": "37c36835-4312-4c82-b422-f3c0b0f146fd",
         "name": "Diya",
         "relation": "daughter",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "36f5e4d6-91e0-4636-9cf3-abd3a47fa6b0",
+        "id": "1dbb0696-9aa6-4ca7-aaa0-30253472f4aa",
         "name": "Kabir",
         "relation": "son",
         "dateOfBirth": null,
@@ -208,7 +240,7 @@
       "relation": "mother"
     },
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -218,7 +250,7 @@
     "nearestPoliceStation": "Yelahanka",
     "previousOrganisations": [
       {
-        "id": "cfbf3a39-1f00-49c3-acf8-e9e127517b45",
+        "id": "e1072258-22e0-4f23-be38-45a7c865d304",
         "toDate": "2024-03-15",
         "fromDate": "2019-01-01",
         "designation": "Guard",
@@ -231,7 +263,7 @@
     "reasonForLeavingLastOrg": null
   },
   "admin": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "age": 32,
     "sex": "female",
     "bank": {
@@ -255,19 +287,19 @@
     },
     "addresses": [
       {
-        "id": "2012cd61-52c0-4d8d-bfe1-745e23f4535a",
+        "id": "074eb4c4-6488-4288-99dd-e565a3c9b53f",
         "city": "Bengaluru",
         "line": "402 Brigade Meadows",
         "proof": {
           "fileName": "rent-agreement.pdf",
           "verified": false,
-          "documentId": "a912e124-ef85-429f-804b-b1b58ee04854",
-          "uploadedAt": "2026-10-12T17:04:47.157729+00:00"
+          "documentId": "a5df4a73-e1ee-47f2-907c-a1c6b599c660",
+          "uploadedAt": "2026-10-12T17:25:59.441595+00:00"
         },
         "state": "Karnataka",
         "pincode": "560062",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": null,
@@ -275,14 +307,14 @@
         "nearestPoliceStation": null
       },
       {
-        "id": "70fd1f8a-d8d4-4555-9d97-730692d64f9a",
+        "id": "c7b1d9a0-3d15-4bbc-b1ee-f335cfb5e84f",
         "city": "Mysuru",
         "line": "12 Old Road",
         "proof": null,
         "state": "Karnataka",
         "pincode": "570001",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": "2024-03-01",
@@ -291,7 +323,7 @@
       }
     ],
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "statutory": {
@@ -319,9 +351,9 @@
     "dateOfBirth": "1994-06-12",
     "deployments": [
       {
-        "id": "f625be67-5cf0-482e-90ec-8b2e036c34ce",
+        "id": "a3844edc-cb08-41fd-9d68-d62501ad33f6",
         "reason": null,
-        "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+        "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
         "movedBy": null,
         "unitName": "Tata AIG, Hosur",
         "unitType": "client_site",
@@ -332,9 +364,9 @@
         "deploymentOrderRef": "DO-2025-0042"
       },
       {
-        "id": "f248bb7c-e064-4500-86ba-333221c33087",
+        "id": "64a8cfed-8388-4cee-8c85-c8e4221c6a30",
         "reason": null,
-        "unitId": "a3646659-3f4b-4628-b980-1657c68a7019",
+        "unitId": "4756f4dc-00cf-495d-b85d-3e4884124b1b",
         "movedBy": null,
         "unitName": "Acme HQ, Bengaluru",
         "unitType": "own_establishment",
@@ -346,7 +378,7 @@
       }
     ],
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
@@ -356,18 +388,18 @@
     "nativeState": "Karnataka",
     "nominations": [
       {
-        "id": "7f8d1690-0531-45f6-8fdb-7ec6e8db1a68",
+        "id": "167b7c19-d179-4249-aba1-b9dfd70777b3",
         "scheme": "pf_and_gratuity",
         "nominees": [
           {
-            "id": "c5406ebe-6abd-4938-9bae-028713372114",
+            "id": "4873ea58-dff6-4be6-9f4a-a61ce052045b",
             "name": "Lakshmi",
             "relation": "mother",
             "dateOfBirth": null,
             "sharePercent": 70.0
           },
           {
-            "id": "31d37ed8-bb69-44b0-82c0-aeb5e11f0543",
+            "id": "a360cf04-50c7-40aa-adae-d0f08dec714a",
             "name": "Aarav",
             "relation": "son",
             "dateOfBirth": null,
@@ -378,10 +410,42 @@
         "effectiveFrom": "2024-04-01"
       }
     ],
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "ownShifts": [
+        {
+          "id": "32380237-1d8d-43ef-9c79-199424833312",
+          "setBy": "Hema HR",
+          "reason": "Night post at the gate",
+          "endTime": "08:00",
+          "shiftName": "Night",
+          "startTime": "20:00",
+          "effectiveTo": null,
+          "effectiveFrom": "2025-07-01"
+        }
+      ],
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": true,
       "canEditBank": true,
       "canSeeViews": true,
+      "canSetShift": true,
       "canEditDraft": false,
       "canDeactivate": true,
       "canRevealBank": true,
@@ -408,21 +472,21 @@
     "dateOfJoining": "2024-04-01",
     "familyMembers": [
       {
-        "id": "e55c2c22-d627-4c58-bd85-f6603b5f72da",
+        "id": "d916fc31-3318-4ac0-9bfb-ba793204eaf5",
         "name": "Aarav",
         "relation": "son",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "15bdf553-75fc-40b1-bfcf-74467841c54a",
+        "id": "37c36835-4312-4c82-b422-f3c0b0f146fd",
         "name": "Diya",
         "relation": "daughter",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "36f5e4d6-91e0-4636-9cf3-abd3a47fa6b0",
+        "id": "1dbb0696-9aa6-4ca7-aaa0-30253472f4aa",
         "name": "Kabir",
         "relation": "son",
         "dateOfBirth": null,
@@ -441,7 +505,7 @@
       "relation": "mother"
     },
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -451,7 +515,7 @@
     "nearestPoliceStation": "Yelahanka",
     "previousOrganisations": [
       {
-        "id": "cfbf3a39-1f00-49c3-acf8-e9e127517b45",
+        "id": "e1072258-22e0-4f23-be38-45a7c865d304",
         "toDate": "2024-03-15",
         "fromDate": "2019-01-01",
         "designation": "Guard",
@@ -464,7 +528,7 @@
     "reasonForLeavingLastOrg": null
   },
   "draft": {
-    "id": "b44238c6-1cac-46e6-b096-161ca1cbb248",
+    "id": "d5f1b6d2-43d1-4a87-a289-5c1ec0005908",
     "age": null,
     "sex": null,
     "bank": {
@@ -515,10 +579,25 @@
     "nationality": null,
     "nativeState": null,
     "nominations": [],
+    "workPattern": {
+      "shift": null,
+      "calendar": {
+        "id": "13a79ec4-ff13-4f6d-9f1e-974e62dc316d",
+        "name": "Company calendar",
+        "isDefault": true,
+        "weeklyOff": [0, 6]
+      },
+      "unitName": null,
+      "ownShifts": [],
+      "shiftSource": null,
+      "ownShiftSince": null,
+      "calendarSource": "company"
+    },
     "capabilities": {
       "canEdit": true,
       "canEditBank": true,
       "canSeeViews": false,
+      "canSetShift": true,
       "canEditDraft": true,
       "canDeactivate": false,
       "canRevealBank": true,
@@ -565,7 +644,7 @@
     "reasonForLeavingLastOrg": null
   },
   "payroll": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "bank": {
       "ifsc": "HDFC0001234",
       "branch": "Yelahanka",
@@ -581,7 +660,7 @@
     "fullName": "Priya Employee",
     "isActive": true,
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "statutory": {
@@ -609,9 +688,9 @@
     "confirmedOn": "2024-10-01",
     "deployments": [
       {
-        "id": "f625be67-5cf0-482e-90ec-8b2e036c34ce",
+        "id": "a3844edc-cb08-41fd-9d68-d62501ad33f6",
         "reason": null,
-        "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+        "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
         "movedBy": null,
         "unitName": "Tata AIG, Hosur",
         "unitType": "client_site",
@@ -622,9 +701,9 @@
         "deploymentOrderRef": "DO-2025-0042"
       },
       {
-        "id": "f248bb7c-e064-4500-86ba-333221c33087",
+        "id": "64a8cfed-8388-4cee-8c85-c8e4221c6a30",
         "reason": null,
-        "unitId": "a3646659-3f4b-4628-b980-1657c68a7019",
+        "unitId": "4756f4dc-00cf-495d-b85d-3e4884124b1b",
         "movedBy": null,
         "unitName": "Acme HQ, Bengaluru",
         "unitType": "own_establishment",
@@ -636,25 +715,25 @@
       }
     ],
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
     "hasSignedIn": true,
     "nominations": [
       {
-        "id": "7f8d1690-0531-45f6-8fdb-7ec6e8db1a68",
+        "id": "167b7c19-d179-4249-aba1-b9dfd70777b3",
         "scheme": "pf_and_gratuity",
         "nominees": [
           {
-            "id": "c5406ebe-6abd-4938-9bae-028713372114",
+            "id": "4873ea58-dff6-4be6-9f4a-a61ce052045b",
             "name": "Lakshmi",
             "relation": "mother",
             "dateOfBirth": null,
             "sharePercent": 70.0
           },
           {
-            "id": "31d37ed8-bb69-44b0-82c0-aeb5e11f0543",
+            "id": "a360cf04-50c7-40aa-adae-d0f08dec714a",
             "name": "Aarav",
             "relation": "son",
             "dateOfBirth": null,
@@ -665,10 +744,30 @@
         "effectiveFrom": "2024-04-01"
       }
     ],
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": false,
       "canEditBank": true,
       "canSeeViews": false,
+      "canSetShift": false,
       "canEditDraft": false,
       "canDeactivate": false,
       "canRevealBank": true,
@@ -688,21 +787,21 @@
     "dateOfJoining": "2024-04-01",
     "familyMembers": [
       {
-        "id": "e55c2c22-d627-4c58-bd85-f6603b5f72da",
+        "id": "d916fc31-3318-4ac0-9bfb-ba793204eaf5",
         "name": "Aarav",
         "relation": "son",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "15bdf553-75fc-40b1-bfcf-74467841c54a",
+        "id": "37c36835-4312-4c82-b422-f3c0b0f146fd",
         "name": "Diya",
         "relation": "daughter",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "36f5e4d6-91e0-4636-9cf3-abd3a47fa6b0",
+        "id": "1dbb0696-9aa6-4ca7-aaa0-30253472f4aa",
         "name": "Kabir",
         "relation": "son",
         "dateOfBirth": null,
@@ -712,7 +811,7 @@
     "employmentType": "full_time",
     "alternateMobile": "+91 98450 11122",
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -721,14 +820,14 @@
     "totalExperienceMonths": 92
   },
   "approver": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "stage": "active",
     "mobile": null,
     "status": "working",
     "fullName": "Priya Employee",
     "isActive": true,
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "workEmail": "priya.emp@acme.test",
@@ -738,15 +837,47 @@
     },
     "confirmedOn": "2024-10-01",
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
     "hasSignedIn": true,
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "ownShifts": [
+        {
+          "id": "32380237-1d8d-43ef-9c79-199424833312",
+          "setBy": "Hema HR",
+          "reason": "Night post at the gate",
+          "endTime": "08:00",
+          "shiftName": "Night",
+          "startTime": "20:00",
+          "effectiveTo": null,
+          "effectiveFrom": "2025-07-01"
+        }
+      ],
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": false,
       "canEditBank": false,
       "canSeeViews": false,
+      "canSetShift": false,
       "canEditDraft": false,
       "canDeactivate": false,
       "canRevealBank": false,
@@ -772,7 +903,7 @@
       "relation": "mother"
     },
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -781,14 +912,14 @@
     "totalExperienceMonths": 92
   },
   "colleague": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "stage": "active",
     "mobile": null,
     "status": "working",
     "fullName": "Priya Employee",
     "isActive": true,
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "workEmail": "priya.emp@acme.test",
@@ -797,15 +928,35 @@
       "name": "Operations"
     },
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
     "hasSignedIn": true,
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": false,
       "canEditBank": false,
       "canSeeViews": false,
+      "canSetShift": false,
       "canEditDraft": false,
       "canDeactivate": false,
       "canRevealBank": false,
@@ -825,7 +976,7 @@
     "dateOfJoining": "2024-04-01",
     "alternateMobile": "+91 98450 11122",
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -833,7 +984,7 @@
     "directReportCount": 0
   },
   "statutory": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "stage": "active",
     "mobile": null,
     "status": "working",
@@ -841,13 +992,13 @@
     "isActive": true,
     "addresses": [
       {
-        "id": "2012cd61-52c0-4d8d-bfe1-745e23f4535a",
+        "id": "074eb4c4-6488-4288-99dd-e565a3c9b53f",
         "city": "Bengaluru",
         "line": "402 Brigade Meadows",
         "state": "Karnataka",
         "pincode": "560062",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": null,
@@ -855,13 +1006,13 @@
         "nearestPoliceStation": null
       },
       {
-        "id": "70fd1f8a-d8d4-4555-9d97-730692d64f9a",
+        "id": "c7b1d9a0-3d15-4bbc-b1ee-f335cfb5e84f",
         "city": "Mysuru",
         "line": "12 Old Road",
         "state": "Karnataka",
         "pincode": "570001",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": "2024-03-01",
@@ -870,7 +1021,7 @@
       }
     ],
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "statutory": {
@@ -901,9 +1052,9 @@
     "confirmedOn": "2024-10-01",
     "deployments": [
       {
-        "id": "f625be67-5cf0-482e-90ec-8b2e036c34ce",
+        "id": "a3844edc-cb08-41fd-9d68-d62501ad33f6",
         "reason": null,
-        "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+        "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
         "movedBy": null,
         "unitName": "Tata AIG, Hosur",
         "unitType": "client_site",
@@ -914,9 +1065,9 @@
         "deploymentOrderRef": "DO-2025-0042"
       },
       {
-        "id": "f248bb7c-e064-4500-86ba-333221c33087",
+        "id": "64a8cfed-8388-4cee-8c85-c8e4221c6a30",
         "reason": null,
-        "unitId": "a3646659-3f4b-4628-b980-1657c68a7019",
+        "unitId": "4756f4dc-00cf-495d-b85d-3e4884124b1b",
         "movedBy": null,
         "unitName": "Acme HQ, Bengaluru",
         "unitType": "own_establishment",
@@ -928,25 +1079,25 @@
       }
     ],
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
     "hasSignedIn": true,
     "nominations": [
       {
-        "id": "7f8d1690-0531-45f6-8fdb-7ec6e8db1a68",
+        "id": "167b7c19-d179-4249-aba1-b9dfd70777b3",
         "scheme": "pf_and_gratuity",
         "nominees": [
           {
-            "id": "c5406ebe-6abd-4938-9bae-028713372114",
+            "id": "4873ea58-dff6-4be6-9f4a-a61ce052045b",
             "name": "Lakshmi",
             "relation": "mother",
             "dateOfBirth": null,
             "sharePercent": 70.0
           },
           {
-            "id": "31d37ed8-bb69-44b0-82c0-aeb5e11f0543",
+            "id": "a360cf04-50c7-40aa-adae-d0f08dec714a",
             "name": "Aarav",
             "relation": "son",
             "dateOfBirth": null,
@@ -957,10 +1108,30 @@
         "effectiveFrom": "2024-04-01"
       }
     ],
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": false,
       "canEditBank": false,
       "canSeeViews": false,
+      "canSetShift": false,
       "canEditDraft": false,
       "canDeactivate": false,
       "canRevealBank": false,
@@ -987,21 +1158,21 @@
     "dateOfJoining": "2024-04-01",
     "familyMembers": [
       {
-        "id": "e55c2c22-d627-4c58-bd85-f6603b5f72da",
+        "id": "d916fc31-3318-4ac0-9bfb-ba793204eaf5",
         "name": "Aarav",
         "relation": "son",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "15bdf553-75fc-40b1-bfcf-74467841c54a",
+        "id": "37c36835-4312-4c82-b422-f3c0b0f146fd",
         "name": "Diya",
         "relation": "daughter",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "36f5e4d6-91e0-4636-9cf3-abd3a47fa6b0",
+        "id": "1dbb0696-9aa6-4ca7-aaa0-30253472f4aa",
         "name": "Kabir",
         "relation": "son",
         "dateOfBirth": null,
@@ -1011,7 +1182,7 @@
     "employmentType": "full_time",
     "alternateMobile": "+91 98450 11122",
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -1021,7 +1192,7 @@
     "totalExperienceMonths": 92
   },
   "employeeAdmin": {
-    "id": "0bf246bc-5b69-4ed7-9d1f-d77065d7a9a5",
+    "id": "434067ce-14f8-48aa-a6e7-49ca332afa61",
     "age": 32,
     "sex": "female",
     "bank": {
@@ -1045,19 +1216,19 @@
     },
     "addresses": [
       {
-        "id": "2012cd61-52c0-4d8d-bfe1-745e23f4535a",
+        "id": "074eb4c4-6488-4288-99dd-e565a3c9b53f",
         "city": "Bengaluru",
         "line": "402 Brigade Meadows",
         "proof": {
           "fileName": "rent-agreement.pdf",
           "verified": false,
-          "documentId": "a912e124-ef85-429f-804b-b1b58ee04854",
-          "uploadedAt": "2026-10-12T17:04:47.157729+00:00"
+          "documentId": "a5df4a73-e1ee-47f2-907c-a1c6b599c660",
+          "uploadedAt": "2026-10-12T17:25:59.441595+00:00"
         },
         "state": "Karnataka",
         "pincode": "560062",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": null,
@@ -1065,14 +1236,14 @@
         "nearestPoliceStation": null
       },
       {
-        "id": "70fd1f8a-d8d4-4555-9d97-730692d64f9a",
+        "id": "c7b1d9a0-3d15-4bbc-b1ee-f335cfb5e84f",
         "city": "Mysuru",
         "line": "12 Old Road",
         "proof": null,
         "state": "Karnataka",
         "pincode": "570001",
         "district": null,
-        "recordedAt": "2026-10-12T17:04:47.157729+00:00",
+        "recordedAt": "2026-10-12T17:25:59.441595+00:00",
         "recordedBy": null,
         "addressType": "present",
         "effectiveTo": "2024-03-01",
@@ -1081,7 +1252,7 @@
       }
     ],
     "reportsTo": {
-      "id": "020095a9-a39a-4c35-9632-8f58d149b373",
+      "id": "436ffe89-43ea-4bf2-85c7-98ad13e69b24",
       "fullName": "Mark Manager"
     },
     "statutory": {
@@ -1109,9 +1280,9 @@
     "dateOfBirth": "1994-06-12",
     "deployments": [
       {
-        "id": "f625be67-5cf0-482e-90ec-8b2e036c34ce",
+        "id": "a3844edc-cb08-41fd-9d68-d62501ad33f6",
         "reason": null,
-        "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+        "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
         "movedBy": null,
         "unitName": "Tata AIG, Hosur",
         "unitType": "client_site",
@@ -1122,9 +1293,9 @@
         "deploymentOrderRef": "DO-2025-0042"
       },
       {
-        "id": "f248bb7c-e064-4500-86ba-333221c33087",
+        "id": "64a8cfed-8388-4cee-8c85-c8e4221c6a30",
         "reason": null,
-        "unitId": "a3646659-3f4b-4628-b980-1657c68a7019",
+        "unitId": "4756f4dc-00cf-495d-b85d-3e4884124b1b",
         "movedBy": null,
         "unitName": "Acme HQ, Bengaluru",
         "unitType": "own_establishment",
@@ -1136,7 +1307,7 @@
       }
     ],
     "designation": {
-      "id": "580f93d0-fe66-4da4-a4a1-e4646f48be6a",
+      "id": "7eabf487-ad74-42e7-90c4-245a7ce21d76",
       "name": "Security Supervisor",
       "grade": "S2"
     },
@@ -1146,18 +1317,18 @@
     "nativeState": "Karnataka",
     "nominations": [
       {
-        "id": "7f8d1690-0531-45f6-8fdb-7ec6e8db1a68",
+        "id": "167b7c19-d179-4249-aba1-b9dfd70777b3",
         "scheme": "pf_and_gratuity",
         "nominees": [
           {
-            "id": "c5406ebe-6abd-4938-9bae-028713372114",
+            "id": "4873ea58-dff6-4be6-9f4a-a61ce052045b",
             "name": "Lakshmi",
             "relation": "mother",
             "dateOfBirth": null,
             "sharePercent": 70.0
           },
           {
-            "id": "31d37ed8-bb69-44b0-82c0-aeb5e11f0543",
+            "id": "a360cf04-50c7-40aa-adae-d0f08dec714a",
             "name": "Aarav",
             "relation": "son",
             "dateOfBirth": null,
@@ -1168,10 +1339,42 @@
         "effectiveFrom": "2024-04-01"
       }
     ],
+    "workPattern": {
+      "shift": {
+        "id": "2951a5ab-5434-4086-9418-8195fbafaf13",
+        "name": "Night",
+        "endTime": "08:00",
+        "startTime": "20:00",
+        "breakMinutes": 30
+      },
+      "calendar": {
+        "id": "6e7d2876-8d25-4c8b-b5a7-4c8f413dd40f",
+        "name": "Six-day sites",
+        "isDefault": false,
+        "weeklyOff": [0]
+      },
+      "unitName": "Tata AIG, Hosur",
+      "ownShifts": [
+        {
+          "id": "32380237-1d8d-43ef-9c79-199424833312",
+          "setBy": "Hema HR",
+          "reason": "Night post at the gate",
+          "endTime": "08:00",
+          "shiftName": "Night",
+          "startTime": "20:00",
+          "effectiveTo": null,
+          "effectiveFrom": "2025-07-01"
+        }
+      ],
+      "shiftSource": "person",
+      "ownShiftSince": "2025-07-01",
+      "calendarSource": "unit"
+    },
     "capabilities": {
       "canEdit": true,
       "canEditBank": true,
       "canSeeViews": false,
+      "canSetShift": true,
       "canEditDraft": false,
       "canDeactivate": true,
       "canRevealBank": true,
@@ -1198,21 +1401,21 @@
     "dateOfJoining": "2024-04-01",
     "familyMembers": [
       {
-        "id": "e55c2c22-d627-4c58-bd85-f6603b5f72da",
+        "id": "d916fc31-3318-4ac0-9bfb-ba793204eaf5",
         "name": "Aarav",
         "relation": "son",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "15bdf553-75fc-40b1-bfcf-74467841c54a",
+        "id": "37c36835-4312-4c82-b422-f3c0b0f146fd",
         "name": "Diya",
         "relation": "daughter",
         "dateOfBirth": null,
         "isDependent": true
       },
       {
-        "id": "36f5e4d6-91e0-4636-9cf3-abd3a47fa6b0",
+        "id": "1dbb0696-9aa6-4ca7-aaa0-30253472f4aa",
         "name": "Kabir",
         "relation": "son",
         "dateOfBirth": null,
@@ -1231,7 +1434,7 @@
       "relation": "mother"
     },
     "currentDeployment": {
-      "unitId": "b9d3ff9e-aaa5-4fa9-8b13-6a2f3382abf7",
+      "unitId": "16691ab1-d7fa-4fb1-a2e7-953e420a991d",
       "unitName": "Tata AIG, Hosur",
       "unitType": "client_site",
       "effectiveFrom": "2025-06-01"
@@ -1241,7 +1444,7 @@
     "nearestPoliceStation": "Yelahanka",
     "previousOrganisations": [
       {
-        "id": "cfbf3a39-1f00-49c3-acf8-e9e127517b45",
+        "id": "e1072258-22e0-4f23-be38-45a7c865d304",
         "toDate": "2024-03-15",
         "fromDate": "2019-01-01",
         "designation": "Guard",

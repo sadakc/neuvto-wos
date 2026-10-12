@@ -13,8 +13,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  getWorkingDays,
-  getExcludedDays,
+  getMyWorkingDays,
+  getMyExcludedDays,
   describeExcludedDays,
   type ExcludedDay,
 } from "@/platform/calendar";
@@ -104,8 +104,9 @@ export default function ApplyLeave() {
       // still shows — a missing sentence is worse than nothing, but a missing
       // number stops the form.
       Promise.all([
-        getWorkingDays(user.organizationId, fromDate, toDate),
-        getExcludedDays(user.organizationId, fromDate, toDate).catch(() => []),
+        // D102: on the applicant's own calendar, which their unit decides.
+        getMyWorkingDays(fromDate, toDate),
+        getMyExcludedDays(fromDate, toDate).catch(() => []),
       ])
         .then(([d, x]) => {
           if (cancelled) return;

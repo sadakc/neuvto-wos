@@ -29,6 +29,8 @@ import {
   type CardView,
   type OnboardingSettings,
   type ThisYear,
+  type CalendarRow,
+  type ShiftRow,
 } from "./contracts";
 
 function toEmployeeError(message: string): AppError {
@@ -203,6 +205,8 @@ export async function addAddress(
 }
 
 export interface MoveInput {
+  /** D102: keep the person's own shift through the move; otherwise it ends there. */
+  keepOwnShift?: boolean;
   unitId: string;
   effectiveFrom: string;
   orderRef: string;
@@ -275,6 +279,8 @@ export interface Option {
   id: string;
   name: string;
   detail?: string | null;
+  /** A unit's: the calendar leave is counted on there (D102). */
+  calendar?: { name: string; weeklyOff: number[] } | null;
 }
 
 /** Active designations, for the select. Managed lists are readable by everybody in the company. */
@@ -288,15 +294,32 @@ export async function listDesignations(): Promise<Option[]> {
   return (data ?? []).map((d) => ({ id: d.id, name: d.name, detail: d.grade }));
 }
 
-/** Active deployment units. The only source of a unit: there is no text path (criterion 4). */
+/**
+ * Active deployment units, with the calendar each counts leave on (D102; no
+ * calendar of its own means the Company calendar). The only source of a unit:
+ * there is no text path (criterion 4).
+ */
 export async function listActiveUnits(): Promise<Option[]> {
-  const { data, error } = await supabase
-    .from("deployment_units")
-    .select("id, name, unit_type, client_name")
-    .eq("status", "active")
-    .order("name");
+  const [{ data, error }, { data: cals, error: calErr }] = await Promise.all([
+    supabase
+      .from("deployment_units")
+      .select("id, name, unit_type, client_name, working_calendar_id")
+      .eq("status", "active")
+      .order("name"),
+    supabase.from("working_calendars").select("id, name, weekly_off, is_default"),
+  ]);
   if (error) throw toEmployeeError(error.message);
-  return (data ?? []).map((u) => ({ id: u.id, name: u.name, detail: u.client_name }));
+  if (calErr) throw toEmployeeError(calErr.message);
+  const company = (cals ?? []).find((c) => c.is_default);
+  return (data ?? []).map((u) => {
+    const c = (cals ?? []).find((x) => x.id === u.working_calendar_id) ?? company;
+    return {
+      id: u.id,
+      name: u.name,
+      detail: u.client_name,
+      calendar: c ? { name: c.name, weeklyOff: c.weekly_off } : null,
+    };
+  });
 }
 
 // ═══════════════════════════════════════════════════════════ change requests (E7)
@@ -485,6 +508,9 @@ export interface UnitRow {
   status: "active" | "retired";
   postedNow: number;
   postingsEver: number;
+  /** D102: null is the Company calendar. */
+  workingCalendarId: string | null;
+  defaultShiftId: string | null;
 }
 
 export async function listUnits(): Promise<UnitRow[]> {
@@ -503,6 +529,8 @@ export async function listUnits(): Promise<UnitRow[]> {
     status: u.status as UnitRow["status"],
     postedNow: u.posted_now,
     postingsEver: u.postings_ever,
+    workingCalendarId: u.working_calendar_id,
+    defaultShiftId: u.default_shift_id,
   }));
 }
 
@@ -772,6 +800,89 @@ export async function saveOnboardingSettings(
   const { error } = await supabase.rpc("employee_save_onboarding_settings", {
     _remind_every_days: remindEveryDays,
     _escalate_after_days: escalateAfterDays,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+// ═══════════════════════════════════════════════ shift and calendar (D102)
+
+export async function listCalendars(): Promise<CalendarRow[]> {
+  const { data, error } = await supabase.rpc("employee_calendars");
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    weeklyOff: c.weekly_off,
+    isDefault: c.is_default,
+    status: c.status as CalendarRow["status"],
+    units: c.units,
+  }));
+}
+
+export async function saveCalendar(
+  calendarId: string | null,
+  values: { name: string; weeklyOff: number[] },
+): Promise<string> {
+  const { data, error } = await supabase.rpc("employee_save_calendar", {
+    // null adds one; the generated type cannot say a uuid argument may be null.
+    _calendar_id: calendarId as string,
+    _values: values as unknown as Values,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+export async function setCalendarStatus(id: string, status: "active" | "retired"): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_calendar_status", {
+    _calendar_id: id,
+    _status: status,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export async function listShifts(): Promise<ShiftRow[]> {
+  const { data, error } = await supabase.rpc("employee_shifts");
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((s) => ({
+    id: s.id,
+    name: s.name,
+    startTime: s.start_time.slice(0, 5),
+    endTime: s.end_time.slice(0, 5),
+    breakMinutes: s.break_minutes,
+    status: s.status as ShiftRow["status"],
+    units: s.units,
+    people: s.people,
+  }));
+}
+
+export async function saveShift(
+  shiftId: string | null,
+  values: { name: string; startTime: string; endTime: string; breakMinutes: number },
+): Promise<string> {
+  const { data, error } = await supabase.rpc("employee_save_shift", {
+    _shift_id: shiftId as string,
+    _values: values as unknown as Values,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return data as string;
+}
+
+export async function setShiftStatus(id: string, status: "active" | "retired"): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_shift_status", {
+    _shift_id: id,
+    _status: status,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+/** A person's own shift from a date; shiftId null returns them to their unit's. */
+export async function setShift(
+  employeeId: string,
+  input: { shiftId: string | null; effectiveFrom: string; reason: string },
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_shift", {
+    _employee_id: employeeId,
+    _values: input as unknown as Values,
   });
   if (error) throw toEmployeeError(error.message);
 }

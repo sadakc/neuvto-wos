@@ -88,3 +88,23 @@ export function shareTotal(rows: { share: string }[]): number {
   // Two decimals, the column's precision, so 33.33 × 3 reads 99.99, not 100.
   return Math.round(rows.reduce((s, r) => s + (Number(r.share) || 0), 0) * 100) / 100;
 }
+
+const WEEKDAYS = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
+
+/** A calendar's weekly offs in words, Monday first: [0, 6] is "Saturday and Sunday off". */
+export function describeWeek(weeklyOff: number[]): string {
+  const days = [1, 2, 3, 4, 5, 6, 0].filter((d) => weeklyOff.includes(d)).map((d) => WEEKDAYS[d]);
+  if (days.length === 0) return "No weekly off";
+  const list =
+    days.length === 1 ? days[0] : `${days.slice(0, -1).join(", ")} and ${days[days.length - 1]}`;
+  return `${list} off`;
+}
+
+/** "20:00 to 08:00 next day, 30 min break": a shift ending before it starts ends the next day. */
+export function describeShift(s: { startTime: string; endTime: string; breakMinutes: number }) {
+  const start = s.startTime.slice(0, 5);
+  const end = s.endTime.slice(0, 5);
+  return `${start} to ${end}${end < start ? " next day" : ""}${
+    s.breakMinutes ? `, ${s.breakMinutes} min break` : ""
+  }`;
+}

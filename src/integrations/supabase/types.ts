@@ -814,6 +814,7 @@ export type Database = {
           client_name: string | null
           created_at: string
           created_by: string | null
+          default_shift_id: string | null
           deleted_at: string | null
           id: string
           is_billable: boolean
@@ -826,12 +827,14 @@ export type Database = {
           unit_type: string
           updated_at: string
           updated_by: string | null
+          working_calendar_id: string | null
         }
         Insert: {
           attendance_capture_mode?: string | null
           client_name?: string | null
           created_at?: string
           created_by?: string | null
+          default_shift_id?: string | null
           deleted_at?: string | null
           id?: string
           is_billable?: boolean
@@ -844,12 +847,14 @@ export type Database = {
           unit_type: string
           updated_at?: string
           updated_by?: string | null
+          working_calendar_id?: string | null
         }
         Update: {
           attendance_capture_mode?: string | null
           client_name?: string | null
           created_at?: string
           created_by?: string | null
+          default_shift_id?: string | null
           deleted_at?: string | null
           id?: string
           is_billable?: boolean
@@ -862,13 +867,28 @@ export type Database = {
           unit_type?: string
           updated_at?: string
           updated_by?: string | null
+          working_calendar_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "deployment_units_default_shift_id_fkey"
+            columns: ["default_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "deployment_units_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deployment_units_working_calendar_id_fkey"
+            columns: ["working_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "working_calendars"
             referencedColumns: ["id"]
           },
         ]
@@ -1568,6 +1588,73 @@ export type Database = {
           },
         ]
       }
+      employee_shift_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          organization_id: string
+          reason: string | null
+          shift_id: string
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          organization_id: string
+          reason?: string | null
+          shift_id: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          shift_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_shift_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_shift_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_shift_overrides_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_statutory: {
         Row: {
           aadhaar_cipher: string | null
@@ -1907,6 +1994,46 @@ export type Database = {
           },
           {
             foreignKeyName: "family_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holiday_calendars: {
+        Row: {
+          calendar_id: string
+          holiday_id: string
+          organization_id: string
+        }
+        Insert: {
+          calendar_id: string
+          holiday_id: string
+          organization_id: string
+        }
+        Update: {
+          calendar_id?: string
+          holiday_id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holiday_calendars_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "working_calendars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_calendars_holiday_id_fkey"
+            columns: ["holiday_id"]
+            isOneToOne: false
+            referencedRelation: "holidays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_calendars_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -3512,6 +3639,56 @@ export type Database = {
           },
         ]
       }
+      shifts: {
+        Row: {
+          break_minutes: number
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          name: string
+          organization_id: string
+          start_time: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          break_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          end_time: string
+          id?: string
+          name: string
+          organization_id: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          break_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          end_time?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -3549,6 +3726,53 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "user_roles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      working_calendars: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          organization_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          weekly_off: number[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekly_off?: number[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekly_off?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "working_calendars_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -3704,6 +3928,18 @@ export type Database = {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: number
       }
+      calculate_working_days_for: {
+        Args: { _from: string; _profile_id: string; _to: string }
+        Returns: number
+      }
+      calendar_day: {
+        Args: { _calendar_id: string; _day: string; _org_id: string }
+        Returns: {
+          label: string
+          reason: string
+          working: boolean
+        }[]
+      }
       can_approve: { Args: { _user_id: string }; Returns: boolean }
       chain_condition_matches: {
         Args: { _context: Json; _field: string; _op: string; _value: number }
@@ -3791,6 +4027,21 @@ export type Database = {
       employee_apply_draft: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
+      }
+      employee_calendar_on: {
+        Args: { _day: string; _profile_id: string }
+        Returns: string
+      }
+      employee_calendars: {
+        Args: never
+        Returns: {
+          id: string
+          is_default: boolean
+          name: string
+          status: string
+          units: number
+          weekly_off: number[]
+        }[]
       }
       employee_card: { Args: { _employee_id?: string }; Returns: Json }
       employee_card_views_list: {
@@ -4012,6 +4263,10 @@ export type Database = {
         Args: { _employee_id: string; _fields: string[]; _reason?: string }
         Returns: Json
       }
+      employee_save_calendar: {
+        Args: { _calendar_id: string; _values: Json }
+        Returns: string
+      }
       employee_save_designation: {
         Args: { _designation_id: string; _values: Json }
         Returns: string
@@ -4040,6 +4295,10 @@ export type Database = {
         Args: { _employee_id: string; _rows: Json }
         Returns: undefined
       }
+      employee_save_shift: {
+        Args: { _shift_id: string; _values: Json }
+        Returns: string
+      }
       employee_save_unit: {
         Args: { _unit_id: string; _values: Json }
         Returns: string
@@ -4055,12 +4314,24 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
       }
+      employee_set_calendar_status: {
+        Args: { _calendar_id: string; _status: string }
+        Returns: undefined
+      }
       employee_set_designation_status: {
         Args: { _designation_id: string; _status: string }
         Returns: undefined
       }
       employee_set_restricted: {
         Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_shift: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_shift_status: {
+        Args: { _shift_id: string; _status: string }
         Returns: undefined
       }
       employee_set_statutory: {
@@ -4071,12 +4342,26 @@ export type Database = {
         Args: { _status: string; _unit_id: string }
         Returns: undefined
       }
+      employee_shifts: {
+        Args: never
+        Returns: {
+          break_minutes: number
+          end_time: string
+          id: string
+          name: string
+          people: number
+          start_time: string
+          status: string
+          units: number
+        }[]
+      }
       employee_this_year: { Args: { _employee_id: string }; Returns: Json }
       employee_units: {
         Args: never
         Returns: {
           attendance_capture_mode: string
           client_name: string
+          default_shift_id: string
           id: string
           is_billable: boolean
           location: string
@@ -4087,6 +4372,7 @@ export type Database = {
           state: string
           status: string
           unit_type: string
+          working_calendar_id: string
         }[]
       }
       employee_update: {
@@ -4096,6 +4382,10 @@ export type Database = {
       employee_update_draft: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
+      }
+      employee_work_pattern: {
+        Args: { _employee_id: string; _with_history: boolean }
+        Returns: Json
       }
       ensure_balance: {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
@@ -4140,6 +4430,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      holiday_set_calendars: {
+        Args: { _calendar_ids: string[]; _holiday_id: string }
+        Returns: undefined
       }
       install_default_approval_chain: {
         Args: { _org_id: string }
@@ -4457,6 +4751,15 @@ export type Database = {
         Returns: boolean
       }
       my_account_status: { Args: never; Returns: string }
+      my_days_excluded: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          day: string
+          label: string
+          reason: string
+        }[]
+      }
+      my_working_days: { Args: { _from: string; _to: string }; Returns: number }
       notification_claim_batch: {
         Args: { _limit?: number }
         Returns: {
@@ -4774,8 +5077,20 @@ export type Database = {
       statutory_key: { Args: never; Returns: string }
       statutory_normalise: { Args: { _v: string }; Returns: string }
       statutory_rotate_key: { Args: never; Returns: Json }
+      working_calendar_default_id: {
+        Args: { _org_id: string }
+        Returns: string
+      }
       working_days_excluded: {
         Args: { _from: string; _org_id: string; _to: string }
+        Returns: {
+          day: string
+          label: string
+          reason: string
+        }[]
+      }
+      working_days_excluded_for: {
+        Args: { _from: string; _profile_id: string; _to: string }
         Returns: {
           day: string
           label: string

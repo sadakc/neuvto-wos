@@ -10,6 +10,10 @@
  * - the reminder cadence and escalation window save within their limits, and
  *   the last reminder sent is shown (D99);
  * - the access section says every look at a record is logged (D100);
+ * - calendars and shifts (D102): a new calendar starts Sunday off and sends
+ *   the days ticked; the Company calendar is set on Settings, not here; a
+ *   night shift says it ends the next day; nothing in use can be retired;
+ * - a unit picks its calendar and default shift from active ones only;
  * - the catalogue shows every field, with the new ones marked.
  */
 
@@ -31,12 +35,20 @@ const api = vi.hoisted(() => ({
   saveOnboardingItem: vi.fn(),
   getOnboardingSettings: vi.fn(),
   saveOnboardingSettings: vi.fn(),
+  listCalendars: vi.fn(),
+  saveCalendar: vi.fn(),
+  setCalendarStatus: vi.fn(),
+  listShifts: vi.fn(),
+  saveShift: vi.fn(),
+  setShiftStatus: vi.fn(),
 }));
 vi.mock("../handlers", () => api);
 
 import Configuration from "./Configuration";
 
 const unit = (id: string, name: string, postedNow: number, postingsEver: number): UnitRow => ({
+  workingCalendarId: null,
+  defaultShiftId: null,
   id,
   name,
   unitType: "own_establishment",
@@ -60,6 +72,65 @@ beforeEach(() => {
   api.listAllDesignations.mockResolvedValue([]);
   api.listOnboardingItems.mockResolvedValue([
     { key: "uan", label: "UAN", dueWithinDays: 15, mandatory: true, customised: false },
+  ]);
+  api.listCalendars.mockResolvedValue([
+    {
+      id: "c-co",
+      name: "Company calendar",
+      weeklyOff: [0, 6],
+      isDefault: true,
+      status: "active",
+      units: 1,
+    },
+    {
+      id: "c-six",
+      name: "Six-day sites",
+      weeklyOff: [0],
+      isDefault: false,
+      status: "active",
+      units: 2,
+    },
+    { id: "c-spare", name: "Spare", weeklyOff: [0], isDefault: false, status: "active", units: 0 },
+    {
+      id: "c-old",
+      name: "Old week",
+      weeklyOff: [5],
+      isDefault: false,
+      status: "retired",
+      units: 0,
+    },
+  ]);
+  api.listShifts.mockResolvedValue([
+    {
+      id: "s-gen",
+      name: "General",
+      startTime: "09:00",
+      endTime: "18:00",
+      breakMinutes: 60,
+      status: "active",
+      units: 1,
+      people: 0,
+    },
+    {
+      id: "s-night",
+      name: "Night",
+      startTime: "20:00",
+      endTime: "08:00",
+      breakMinutes: 30,
+      status: "active",
+      units: 0,
+      people: 0,
+    },
+    {
+      id: "s-old",
+      name: "Retired one",
+      startTime: "06:00",
+      endTime: "14:00",
+      breakMinutes: 0,
+      status: "retired",
+      units: 0,
+      people: 0,
+    },
   ]);
   api.getOnboardingSettings.mockResolvedValue({
     remindEveryDays: 3,
@@ -143,6 +214,106 @@ describe("the onboarding checklist", () => {
     await user.click(within(row).getByLabelText("UAN: mandatory"));
     await user.click(save);
     expect(api.saveOnboardingItem).toHaveBeenCalledWith("uan", 30, false);
+  });
+});
+
+describe("calendars and shifts", () => {
+  async function open() {
+    render(<Configuration />);
+    await userEvent.setup().click(screen.getByTestId("config-calendars"));
+    return screen.findAllByTestId("calendar-row");
+  }
+
+  it("adds a calendar starting Sunday off, sending the days ticked", async () => {
+    const user = userEvent.setup();
+    api.saveCalendar.mockResolvedValue("c-new");
+    await open();
+    await user.click(screen.getByRole("button", { name: "Add a calendar" }));
+    const form = screen.getByTestId("calendar-form");
+    expect(within(form).getByLabelText("Sunday")).toBeChecked();
+    expect(within(form).getByLabelText("Saturday")).not.toBeChecked();
+    await user.type(within(form).getByLabelText("Name"), "Five-day offices");
+    await user.click(within(form).getByLabelText("Saturday"));
+    await user.click(within(form).getByRole("button", { name: "Save calendar" }));
+    expect(api.saveCalendar).toHaveBeenCalledWith(null, {
+      name: "Five-day offices",
+      weeklyOff: [0, 6],
+    });
+  });
+
+  it("will not save a week with no working day", async () => {
+    const user = userEvent.setup();
+    await open();
+    await user.click(screen.getByRole("button", { name: "Add a calendar" }));
+    const form = screen.getByTestId("calendar-form");
+    await user.type(within(form).getByLabelText("Name"), "Never");
+    for (const d of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]) {
+      await user.click(within(form).getByLabelText(d));
+    }
+    expect(within(form).getByRole("button", { name: "Save calendar" })).toBeDisabled();
+  });
+
+  it("sends the Company calendar to Settings and retires only what nothing uses", async () => {
+    const user = userEvent.setup();
+    api.setCalendarStatus.mockResolvedValue(undefined);
+    const rows = await open();
+    const company = rows.find((r) => r.textContent?.includes("Company calendar"))!;
+    expect(company).toHaveTextContent("Saturday and Sunday off");
+    expect(company).toHaveTextContent("Set on Settings");
+    expect(within(company).queryAllByRole("button")).toHaveLength(0);
+    const busy = rows.find((r) => r.textContent?.includes("Six-day sites"))!;
+    expect(within(busy).getByRole("button", { name: "Retire" })).toBeDisabled();
+    const spare = rows.find((r) => r.textContent?.includes("Spare"))!;
+    await user.click(within(spare).getByRole("button", { name: "Retire" }));
+    expect(api.setCalendarStatus).toHaveBeenCalledWith("c-spare", "retired");
+  });
+
+  it("adds a shift, says a night shift ends the next day, and will not retire one in use", async () => {
+    const user = userEvent.setup();
+    api.saveShift.mockResolvedValue("s-new");
+    await open();
+    const rows = await screen.findAllByTestId("shift-row");
+    const night = rows.find((r) => r.textContent?.includes("Night"))!;
+    expect(night).toHaveTextContent("20:00 to 08:00 next day, 30 min break");
+    const general = rows.find((r) => r.textContent?.includes("General"))!;
+    expect(within(general).getByRole("button", { name: "Retire" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Add a shift" }));
+    const form = screen.getByTestId("shift-form");
+    await user.type(within(form).getByLabelText("Name"), "Morning");
+    await user.type(within(form).getByLabelText("Starts"), "06:00");
+    await user.type(within(form).getByLabelText("Ends"), "14:00");
+    await user.clear(within(form).getByLabelText("Unpaid break (minutes)"));
+    await user.type(within(form).getByLabelText("Unpaid break (minutes)"), "30");
+    await user.click(within(form).getByRole("button", { name: "Save shift" }));
+    expect(api.saveShift).toHaveBeenCalledWith(null, {
+      name: "Morning",
+      startTime: "06:00",
+      endTime: "14:00",
+      breakMinutes: 30,
+    });
+  });
+});
+
+describe("a unit's calendar and shift", () => {
+  it("picks from active calendars and shifts, and sends both", async () => {
+    const user = userEvent.setup();
+    api.saveUnit.mockResolvedValue("u-busy");
+    render(<Configuration />);
+    await user.click(screen.getByTestId("config-units"));
+    const rows = await screen.findAllByTestId("unit-row");
+    await user.click(within(rows[0]).getByRole("button", { name: "Edit" }));
+    const cal = await screen.findByLabelText("Working calendar");
+    await within(cal).findByRole("option", { name: /Six-day sites/ });
+    expect(within(cal).queryByRole("option", { name: /Old week/ })).toBeNull();
+    const shift = screen.getByLabelText("Default shift");
+    expect(within(shift).queryByRole("option", { name: /Retired one/ })).toBeNull();
+    await user.selectOptions(cal, "c-six");
+    await user.selectOptions(shift, "s-night");
+    await user.click(screen.getByTestId("unit-save"));
+    expect(api.saveUnit).toHaveBeenCalledWith(
+      "u-busy",
+      expect.objectContaining({ workingCalendarId: "c-six", defaultShiftId: "s-night" }),
+    );
   });
 });
 

@@ -188,7 +188,8 @@ export function WorkingCalendar({
         <h3 className="text-sm font-medium">The working week</h3>
         <p className="mt-1 max-w-prose text-sm text-muted-foreground">
           Which days are <strong>not</strong> worked. A six-day week has only Sunday selected; a
-          five-day week has Saturday and Sunday.
+          five-day week has Saturday and Sunday. This is the Company calendar: leave is counted on
+          it for anybody whose unit names no calendar of its own.
         </p>
 
         <div className="mt-3 flex flex-wrap gap-2" role="group" aria-label="Non-working days">

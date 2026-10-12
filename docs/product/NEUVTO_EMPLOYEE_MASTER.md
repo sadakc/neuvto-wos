@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.13 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.14 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -393,9 +393,11 @@ Every writer is an Admin's (§5) and lives in `20261014100000_the_record_is_writ
   (`organization_admins`, `recipient_id`) instead of learning this module's event names. Ten
   open requests per person at most. Proved by `verify_change_requests.sql`.
 - **Still not built:**
-  - _Move to another unit:_ the three checkboxes (carry the unit's shift and calendar, notify
-    the receiving coordinator, notify the employee) are not offered. There is no shift model
-    or unit coordinator assignment yet, and a checkbox that does nothing is worse than none.
+  - _Move to another unit:_ of the three checkboxes, the shift and calendar one is built
+    (D102, below): the calendar always follows the unit, and a person's own shift ends at the
+    move unless "Keep their own shift" is ticked. Notify the receiving coordinator and notify
+    the employee are still not offered: there is no unit coordinator assignment yet, and a
+    checkbox that does nothing is worse than none.
   - ~~Proof uploads on an address.~~ Built: D98, below.
 
 ### E8 as built (15 Oct 2026)
@@ -491,8 +493,9 @@ template. Import records now downloads and reads one Excel workbook:
 - **02 Deployment units and designations**: add, edit, retire and bring back. A rename
   relabels every posting, because postings point at the id. A unit somebody is posted to now
   cannot be retired. Duplicate names are refused however they are spelt or spaced, which is
-  the spreadsheet's duplicate-unit problem stopped at the source. Working calendars, shifts
-  and attendance capture per unit arrive with Attendance.
+  the spreadsheet's duplicate-unit problem stopped at the source. A unit's working calendar
+  and default shift are set here since D102 (06 Calendars and shifts); attendance capture per
+  unit arrives with Attendance.
 - **03 Record rules**: the three rules and the corrections table, stated.
 - **04 Onboarding checklist**: twelve items, each one a check the database runs against the
   record; a company sets each one's due window and whether it is mandatory. Add Employee's
@@ -549,6 +552,37 @@ template. Import records now downloads and reads one Excel workbook:
   your own record is not logged; a refused look writes nothing. The person and a Super Admin
   see "Who has looked at this record" on Overview. Append-only, pruned after three years,
   never switchable off.
+
+### Shift and calendar (D102, 12 Oct 2026)
+
+`20261022100000_shift_and_calendar.sql`; proved by `verify_shift_calendar.sql`, and on screen
+by `ShiftCalendar.test.tsx`, `Configuration.test.tsx`, `settings.holidays.test.tsx` and
+`ApplyLeave.test.tsx`. Sada's choices, 12 Oct 2026:
+
+- **The unit carries the calendar, and leave is counted on it.** Each day of a leave request
+  costs leave unless, on that day, the calendar of the unit the person was posted to then
+  makes it a day off or a holiday. A move to a six-day site changes the count from the move.
+  Somebody posted nowhere, or at a unit naming no calendar, is on the Company calendar.
+- **A calendar is the days of the week that are off**, chosen by the Admin; a new one starts
+  with Sunday off. No alternate-Saturday or sandwich rules. The Company calendar is the one
+  Settings has always set (the trigger keeps them equal), listed in Configuration and edited
+  only on Settings. One in use by a unit is not retired.
+- **Holidays stay one company list.** A holiday applies to every calendar unless an Admin
+  limits it to some (Settings, "Applies to"), say a state holiday for one state's units.
+- **Shifts**: name, start, end (earlier than the start for a night shift, which ends the
+  next morning) and unpaid break. A unit has a default shift; the Employee Admin can give one
+  person their own from a date, or return them to the unit's. Their own-shift history is
+  rule 2's: closed rows never change. Rosters, swaps, grace, late marks and overtime are
+  Attendance's.
+- **On the card**, the Employment tab's "Shift and calendar" says which calendar and shift a
+  person works today and where each comes from, to everybody in the company; the own-shift
+  history to the person, the Employee Admin and their manager. Change shift for an Admin.
+- **Moving somebody** says which calendar their leave is counted on from the move, and, when
+  they have their own shift, asks whether to keep it.
+- **Leave already asked for keeps the days it was counted at.** Moving somebody, changing a
+  unit's calendar or limiting a holiday changes what new requests cost, not old ones.
+- The apply screen's preview and its "Not counted" sentence ask for the applicant's own
+  calendar (`my_working_days`, `my_days_excluded`), the same rule `leave_submit` charges.
 
 ## 8. Acceptance criteria, module level
 

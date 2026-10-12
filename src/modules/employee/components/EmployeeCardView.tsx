@@ -44,6 +44,7 @@ import { StatutoryTab } from "./StatutoryTab";
 import { DocumentsTab } from "./DocumentsTab";
 import { ThisYearPanel, WhoHasLooked } from "./ThisYear";
 import { AttachProofForm, ProofCell } from "./AddressProof";
+import { ShiftCalendarPanel } from "./ShiftAndCalendar";
 import { downloadRecordPdf } from "../recordExport";
 import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
 import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
@@ -651,6 +652,8 @@ function Employment({
             ]}
           />
         </Panel>
+
+        <ShiftCalendarPanel card={card} onChanged={onChanged} />
       </Grid>
       {card.capabilities.canEdit && (
         <div className="flex flex-wrap gap-2">

@@ -46,7 +46,7 @@ import {
   updateEmployee,
   type Option,
 } from "../handlers";
-import { familySummary, formatDate, humanise, shareTotal, todayIso } from "../format";
+import { describeWeek, familySummary, formatDate, humanise, shareTotal, todayIso } from "../format";
 import { FieldEditor, type FieldSpec } from "./FieldEditor";
 
 type Changed = () => Promise<void> | void;
@@ -1156,6 +1156,9 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
   const [error, setError] = useState("");
   const [dateError, setDateError] = useState("");
   const currentUnit = card.currentDeployment;
+  // D102: a person's own shift ends at the move unless the Admin keeps it.
+  const ownShift = card.workPattern?.shiftSource === "person" ? card.workPattern.shift : null;
+  const [keepOwnShift, setKeepOwnShift] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -1170,7 +1173,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
     setDateError("");
     setBusy(true);
     try {
-      await moveUnit(card.id, v);
+      await moveUnit(card.id, ownShift ? { ...v, keepOwnShift } : v);
       setOpen(false);
       await onChanged();
     } catch (err) {
@@ -1185,6 +1188,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
 
   // Where they are now is not somewhere they can be moved to.
   const choices = (units ?? []).filter((u) => u.id !== currentUnit?.unitId);
+  const chosen = choices.find((u) => u.id === v.unitId);
 
   return (
     <>
@@ -1195,6 +1199,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
           setV(blank);
           setError("");
           setDateError("");
+          setKeepOwnShift(false);
           setOpen(true);
         }}
         className="h-11 w-fit rounded-md border border-border px-4 text-sm font-medium"
@@ -1249,6 +1254,32 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 className={input}
               />
             </Field>
+            {chosen?.calendar && v.effectiveFrom && (
+              <p
+                data-testid="move-calendar-note"
+                className="rounded-lg border border-info-line bg-info-muted px-3 py-2 text-sm"
+              >
+                From {formatDate(v.effectiveFrom)} their leave is counted on {chosen.calendar.name}:{" "}
+                {describeWeek(chosen.calendar.weeklyOff)}.
+              </p>
+            )}
+            {ownShift && (
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  aria-label={`Keep their own shift (${ownShift.name})`}
+                  checked={keepOwnShift}
+                  onChange={(e) => setKeepOwnShift(e.target.checked)}
+                  className="mt-0.5 size-4"
+                />
+                <span>
+                  Keep their own shift ({ownShift.name})
+                  <span className="block text-caption text-muted-foreground">
+                    Unticked, they work the new unit&apos;s shift from the move.
+                  </span>
+                </span>
+              </label>
+            )}
             <Field label="Deployment order reference">
               <input
                 required

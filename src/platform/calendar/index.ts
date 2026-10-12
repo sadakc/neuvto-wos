@@ -17,25 +17,29 @@ export interface Holiday {
   id: string;
   name: string;
   holidayDate: string; // YYYY-MM-DD
+  /** D102: the calendars it is limited to; empty means every calendar. */
+  calendarIds: string[];
+}
+
+/** A working calendar (D102): the days of the week that are off. */
+export interface CalendarOption {
+  id: string;
+  name: string;
+  weeklyOff: number[];
+  isDefault: boolean;
 }
 
 /**
- * Working days between two dates, inclusive, honouring the organisation's
- * weekend and holiday configuration. Friday to Monday costs 2 days on a
- * Saturday/Sunday week and 3 on a six-day one (PRD Case 4) — which is the point
- * of asking the database rather than counting here.
+ * What the signed-in person's leave over these dates would cost, inclusive.
+ * Friday to Monday costs 2 days on a Saturday/Sunday week and 3 on a six-day
+ * one (PRD Case 4) — which is the point of asking the database rather than
+ * counting here. Since D102 each day is counted on the calendar of the unit
+ * the person is posted to that day, which only the database knows; the
+ * company's own calendar is not theirs if their unit names another.
  */
-export async function getWorkingDays(
-  organizationId: string,
-  from: string,
-  to: string,
-): Promise<number> {
-  const { data, error } = await supabase.rpc("calculate_working_days", {
-    _org_id: organizationId,
-    _from: from,
-    _to: to,
-  });
-  if (error) throw mapCalendarError(error, "getWorkingDays");
+export async function getMyWorkingDays(from: string, to: string): Promise<number> {
+  const { data, error } = await supabase.rpc("my_working_days", { _from: from, _to: to });
+  if (error) throw mapCalendarError(error, "getMyWorkingDays");
   return Number(data ?? 0);
 }
 
@@ -59,17 +63,9 @@ export interface ExcludedDay {
  * that function is called by `leave_submit` and the invariant suite on every
  * request, and this is presentation.
  */
-export async function getExcludedDays(
-  organizationId: string,
-  from: string,
-  to: string,
-): Promise<ExcludedDay[]> {
-  const { data, error } = await supabase.rpc("working_days_excluded", {
-    _org_id: organizationId,
-    _from: from,
-    _to: to,
-  });
-  if (error) throw mapCalendarError(error, "getExcludedDays");
+export async function getMyExcludedDays(from: string, to: string): Promise<ExcludedDay[]> {
+  const { data, error } = await supabase.rpc("my_days_excluded", { _from: from, _to: to });
+  if (error) throw mapCalendarError(error, "getMyExcludedDays");
   return (data ?? []).map((r) => ({
     day: r.day,
     reason: r.reason as ExcludedDay["reason"],
@@ -134,7 +130,7 @@ export async function getOrgToday(organizationId: string): Promise<string> {
 export async function listHolidays(): Promise<Holiday[]> {
   const { data, error } = await supabase
     .from("holidays")
-    .select("id, name, holiday_date")
+    .select("id, name, holiday_date, holiday_calendars(calendar_id)")
     .order("holiday_date", { ascending: true });
 
   if (error) throw toAppError(error, "listHolidays");
@@ -143,7 +139,34 @@ export async function listHolidays(): Promise<Holiday[]> {
     id: h.id,
     name: h.name,
     holidayDate: h.holiday_date,
+    calendarIds: (h.holiday_calendars ?? []).map((c) => c.calendar_id),
   }));
+}
+
+/** The company's calendars in use, the Company calendar first (D102). */
+export async function listCalendars(): Promise<CalendarOption[]> {
+  const { data, error } = await supabase
+    .from("working_calendars")
+    .select("id, name, weekly_off, is_default")
+    .eq("status", "active")
+    .order("is_default", { ascending: false })
+    .order("name");
+  if (error) throw toAppError(error, "listCalendars");
+  return (data ?? []).map((c) => ({
+    id: c.id,
+    name: c.name,
+    weeklyOff: c.weekly_off,
+    isDefault: c.is_default,
+  }));
+}
+
+/** Limits a holiday to some calendars; an empty list makes it every calendar's. */
+export async function setHolidayCalendars(holidayId: string, calendarIds: string[]) {
+  const { error } = await supabase.rpc("holiday_set_calendars", {
+    _holiday_id: holidayId,
+    _calendar_ids: calendarIds,
+  });
+  if (error) throw toAppError(error, "setHolidayCalendars");
 }
 
 /**

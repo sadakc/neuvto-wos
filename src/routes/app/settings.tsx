@@ -8,7 +8,15 @@ import {
   type CurrentUser,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
-import { addHoliday, listHolidays, removeHoliday, type Holiday } from "@/platform/calendar";
+import {
+  addHoliday,
+  listCalendars,
+  listHolidays,
+  removeHoliday,
+  type CalendarOption,
+  type Holiday,
+} from "@/platform/calendar";
+import { HolidayCalendars } from "@/platform/calendar/HolidayCalendars";
 import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platform/modules";
 import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
 import { Departments } from "@/platform/organization/Departments";
@@ -43,6 +51,8 @@ function SettingsPage() {
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
   const [holidays, setHolidays] = useState<Holiday[]>([]);
+  /** D102: a holiday can be limited to some calendars. */
+  const [calendars, setCalendars] = useState<CalendarOption[]>([]);
   const [sections, setSections] = useState<(ModuleAdminSection & { moduleKey: string })[]>([]);
 
   const [message, setMessage] = useState("");
@@ -71,12 +81,14 @@ function SettingsPage() {
 
         // None of these are worth blanking the page for — the settings above
         // are still editable if the holiday list or the module sections fail.
-        const [h, sec] = await Promise.allSettled([
+        const [h, sec, cal] = await Promise.allSettled([
           isAdmin(u) ? listHolidays() : Promise.resolve([]),
           getAdminSections(u),
+          isAdmin(u) ? listCalendars() : Promise.resolve([]),
         ]);
         if (!cancelled) {
           if (h.status === "fulfilled") setHolidays(h.value);
+          if (cal.status === "fulfilled") setCalendars(cal.value);
           if (sec.status === "fulfilled") {
             setSections(sec.value.filter((s) => isModuleAdmin(u, s.moduleKey)));
           }
@@ -288,6 +300,11 @@ function SettingsPage() {
                           year: "numeric",
                         })}
                       </span>
+                      <HolidayCalendars
+                        holiday={h}
+                        calendars={calendars}
+                        onSaved={async () => setHolidays(await listHolidays())}
+                      />
                     </span>
                     <button
                       onClick={() => setRemoving(h)}

@@ -101,6 +101,20 @@ begin
     (organization_id, employee_id, deployment_unit_id, effective_from, deployment_order_ref)
   values (acme, e, unit2, '2025-06-01', 'DO-2025-0042');
 
+  -- D102: Hosur works a six-day week on the General shift; Priya has worked
+  -- nights there since July 2025. Written through the real functions.
+  if to_regprocedure('public.employee_save_calendar(uuid,jsonb)') is not null then
+    perform pg_temp.as_('00000000-0000-0000-0000-00000000a002');
+    perform public.employee_save_unit(unit2, jsonb_build_object(
+      'name', 'Tata AIG, Hosur', 'unitType', 'client_site', 'clientName', 'Tata AIG',
+      'workingCalendarId', public.employee_save_calendar(null, '{"name":"Six-day sites","weeklyOff":[0]}'),
+      'defaultShiftId', public.employee_save_shift(null, '{"name":"General","startTime":"09:00","endTime":"18:00","breakMinutes":60}')));
+    perform public.employee_set_shift(e, jsonb_build_object(
+      'shiftId', public.employee_save_shift(null, '{"name":"Night","startTime":"20:00","endTime":"08:00","breakMinutes":30}'),
+      'effectiveFrom', '2025-07-01', 'reason', 'Night post at the gate'));
+    perform pg_temp.root_();
+  end if;
+
   insert into public.nomination_versions (organization_id, employee_id, effective_from)
   values (acme, e, '2024-04-01') returning id into ver;
   insert into public.nominees (organization_id, version_id, name, relation, share_percent)

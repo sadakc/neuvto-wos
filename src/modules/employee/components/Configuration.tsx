@@ -23,10 +23,17 @@ import {
 } from "@/components/ui/dialog";
 import { isAppError } from "@/platform/errors";
 import { cn } from "@/lib/utils";
-import { UNIT_TYPE_LABEL, type OnboardingSettings } from "../contracts";
-import { formatDate } from "../format";
+import {
+  UNIT_TYPE_LABEL,
+  type CalendarRow,
+  type OnboardingSettings,
+  type ShiftRow,
+} from "../contracts";
+import { describeShift, describeWeek, formatDate } from "../format";
 import { FIELD_CATALOGUE } from "../fieldCatalogue";
 import {
+  listCalendars,
+  listShifts,
   getOnboardingSettings,
   listAllDesignations,
   listOnboardingItems,
@@ -42,6 +49,7 @@ import {
   type UnitRow,
 } from "../handlers";
 import { Panel } from "./parts";
+import { CalendarsAndShifts } from "./CalendarsAndShifts";
 
 const SECTIONS = [
   ["fields", "01 Fields and visibility"],
@@ -49,6 +57,7 @@ const SECTIONS = [
   ["rules", "03 Record rules"],
   ["onboarding", "04 Onboarding checklist"],
   ["access", "05 Access and admin roles"],
+  ["calendars", "06 Calendars and shifts"],
 ] as const;
 type Section = (typeof SECTIONS)[number][0];
 
@@ -96,6 +105,7 @@ export default function Configuration() {
           {section === "rules" && <RulesSection />}
           {section === "onboarding" && <OnboardingSection />}
           {section === "access" && <AccessSection />}
+          {section === "calendars" && <CalendarsAndShifts />}
         </div>
       </div>
     </div>
@@ -290,8 +300,9 @@ function UnitsSection() {
       <Panel title="What a unit controls">
         <p className="text-sm text-foreground-secondary">
           Every posting, so the muster roll and a client invoice read the unit that was current on
-          the day. Whether police verification is required there, and whether it is billable.
-          Working calendars, shift patterns and attendance capture per unit arrive with Attendance.
+          the day. The working calendar leave is counted on there, and the shift people posted there
+          work unless they have their own (Calendars and shifts). Whether police verification is
+          required there, and whether it is billable. Attendance capture arrives with Attendance.
         </p>
       </Panel>
 
@@ -328,9 +339,29 @@ function UnitDialog({
     state: unit?.state ?? "",
     requiresPoliceVerification: unit?.requiresPoliceVerification ?? false,
     isBillable: unit?.isBillable ?? false,
+    // D102: "" is the Company calendar, or no default shift.
+    workingCalendarId: unit?.workingCalendarId ?? "",
+    defaultShiftId: unit?.defaultShiftId ?? "",
   });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [calendars, setCalendars] = useState<CalendarRow[]>([]);
+  const [shifts, setShifts] = useState<ShiftRow[]>([]);
+
+  useEffect(() => {
+    listCalendars()
+      .then(setCalendars)
+      .catch(() => setCalendars([]));
+    listShifts()
+      .then(setShifts)
+      .catch(() => setShifts([]));
+  }, []);
+  // Only what is in use, plus whatever this unit already has.
+  const calendarChoices = calendars.filter(
+    (c) => !c.isDefault && (c.status === "active" || c.id === v.workingCalendarId),
+  );
+  const company = calendars.find((c) => c.isDefault);
+  const shiftChoices = shifts.filter((s) => s.status === "active" || s.id === v.defaultShiftId);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -416,6 +447,48 @@ function UnitDialog({
               />
             </label>
           </div>
+          <div className="grid gap-3 @min-[480px]/app:grid-cols-2">
+            <label className="text-sm">
+              <span className="block font-medium">Working calendar</span>
+              <select
+                aria-label="Working calendar"
+                value={v.workingCalendarId}
+                onChange={(e) => setV({ ...v, workingCalendarId: e.target.value })}
+                className={`mt-1 ${input}`}
+              >
+                <option value="">
+                  Company calendar{company ? ` (${describeWeek(company.weeklyOff)})` : ""}
+                </option>
+                {calendarChoices.map((c) => (
+                  <option key={c.id} value={c.id}>
+                    {c.name} ({describeWeek(c.weeklyOff)})
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label className="text-sm">
+              <span className="block font-medium">Default shift</span>
+              <select
+                aria-label="Default shift"
+                value={v.defaultShiftId}
+                onChange={(e) => setV({ ...v, defaultShiftId: e.target.value })}
+                className={`mt-1 ${input}`}
+              >
+                <option value="">No default shift</option>
+                {shiftChoices.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.name} ({describeShift(s)})
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+          {unit && v.workingCalendarId !== (unit.workingCalendarId ?? "") && (
+            <p className="text-caption text-muted-foreground" data-testid="unit-calendar-warning">
+              Leave asked for from now on by the {unit.postedNow} posted here is counted on the new
+              calendar. Leave already asked for keeps its count.
+            </p>
+          )}
           <label className="flex items-center gap-2 text-sm">
             <input
               type="checkbox"
