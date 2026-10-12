@@ -371,8 +371,8 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
   ),
   f(
     "Family",
-    "Sons, any number",
-    ["SON 1", "SON 2"],
+    "Sons, any number, each with date of birth",
+    ["SON 1", "SON 1 DOB", "SON 2", "SON 2 DOB"],
     "No",
     "Yes",
     "People Ops",
@@ -381,8 +381,8 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
   ),
   f(
     "Family",
-    "Daughters, any number",
-    ["DAUGHTER 1", "DAUGHTER 2"],
+    "Daughters, any number, each with date of birth",
+    ["DAUGHTER 1", "DAUGHTER 1 DOB", "DAUGHTER 2", "DAUGHTER 2 DOB"],
     "No",
     "Yes",
     "People Ops",
@@ -542,7 +542,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
   f(
     "Physical",
     "Height, chest, weight",
-    ["HEIGHT", "CHEST", "WEIGHT"],
+    ["HEIGHT (C.M)", "CHEST (C.M)", "WEIGHT (K.G)"],
     "No",
     "No",
     "People Ops, unit",

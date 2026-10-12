@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.9 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.10 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -446,9 +446,13 @@ and `verify_employee_import.sql`, and on screen by `Lifecycle.test.tsx` and
   (`src/modules/employee/fieldCatalogue.ts`), with one column the bundle lacks: where each
   field now lives. `fieldCatalogue.test.tsx` renders a real card, opens every tab and fails if
   any field's home is not a panel that is actually there. That is criterion 8, run rather
-  than asserted. **The bundle's inventory names 56 source columns, not the 62 criterion 8
-  counts**; the six are most likely FATHER NAME and HUSBAND NAME appearing twice in the sheet
-  plus blank or serial columns. Settling it needs the real master sheet. Who sees each field
+  than asserted. **Settled against the real master sheet (12 Oct 2026):** it has 62 named
+  columns (two blank ones, H and BM, are not columns). Two are repeats, FATHER NAME and
+  HUSBAND NAME in E/F and again in AQ/AR, and Neuvto keeps each once (Sada: take duplicates
+  out). The bundle's 56-name inventory also left out SON 1 DOB, SON 2 DOB, DAUGHTER 1 DOB and
+  DAUGHTER 2 DOB, which live on each family row's date of birth. Sons and daughters are any
+  number of rows, never numbered slots. The headers are in `src/modules/employee/masterSheet.ts`
+  and `masterSheet.test.ts` fails if any column loses its field or a repeat is kept twice. Who sees each field
   is not a setting: §5 is enforced by `employee_card()`, and a switch that could loosen it
   would be the leak.
 - **02 Deployment units and designations**: add, edit, retire and bring back. A rename

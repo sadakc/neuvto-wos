@@ -4,7 +4,7 @@
  * Criterion 8: every source column has a home in the UI, and the catalogue is
  * the checklist. This runs the checklist.
  *
- * - every column the bundle's inventory names is in the catalogue, once;
+ * - every column of the real master sheet is in the catalogue, once;
  * - every home is a real panel on a real tab of a real card. The card is
  *   rendered from employee_card() output for the person themselves (the one
  *   role that receives every block), each tab is opened, and the panel titles
@@ -16,6 +16,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 import type { EmployeeCard } from "../contracts";
 import { FIELD_CATALOGUE, SOURCE_COLUMNS } from "../fieldCatalogue";
+import { MASTER_SHEET_HEADERS, normaliseHeader } from "../masterSheet";
 import cards from "./__fixtures__/cards.json";
 
 vi.mock("../handlers", () => ({
@@ -28,69 +29,12 @@ vi.mock("@tanstack/react-router", () => ({
 
 import { EmployeeCardView } from "./EmployeeCardView";
 
-/** The bundle's "Full field inventory", column by column (02-data-model.md). */
-const INVENTORY = [
-  "EMPLOYEE ID",
-  "EMPLOYEE NAME",
-  "Sex",
-  "DATE OF BIRTH",
-  "AGE",
-  "MARITAL -STATUS",
-  "NATIONALITY",
-  "Native from which state",
-  "BLOOD GROUP",
-  "Education Qualification",
-  "Mobile / Phone No",
-  "EMERGENCY CONTACT",
-  "NEAREST POLICE STATION",
-  "PRESENT ADDRESS",
-  "PERMANENT ADDRESS",
-  "DESIGNATION",
-  "DATE OF JOINING",
-  "RE-JOINING DATE",
-  "STATUS",
-  "EMPLOYMENT TERMINATION",
-  "TOTAL EXPERIENCE",
-  "REASON FOR LEAVING LAST ORG",
-  "Deputation / Deployed Unit",
-  "FATHER NAME",
-  "FATHER DOB",
-  "MOTHER",
-  "MOTHER DOB",
-  "HUSBAND NAME",
-  "HUSBAND DOB",
-  "WIFE",
-  "WIFE DOB",
-  "SON 1",
-  "SON 2",
-  "DAUGHTER 1",
-  "DAUGHTER 2",
-  "NOMINEE NAME",
-  "RELATION WITH MEMBER",
-  "DATE OF BIRTH OF NOMINEE",
-  "UAN",
-  "EPF NUMBER",
-  "ESIC NUMBER",
-  "OLD EPF UAN NO",
-  "OLD ESIC NO",
-  "Type of Documents",
-  "AADHAAR NO",
-  "PAN NO",
-  "BANK ACCOUNT NO",
-  "IFSC Code",
-  "Bank Name",
-  "Branch Name",
-  "HEIGHT",
-  "CHEST",
-  "WEIGHT",
-  "RELIGION",
-  "CASTE",
-  "Physically Handicap",
-];
+/** The real master sheet's columns, each once (the sheet repeats two). */
+const INVENTORY = [...new Set(MASTER_SHEET_HEADERS.map(normaliseHeader))];
 
 describe("the field catalogue", () => {
   it("places every column of the inventory, once", () => {
-    expect([...SOURCE_COLUMNS].sort()).toEqual([...INVENTORY].sort());
+    expect([...SOURCE_COLUMNS].map(normaliseHeader).sort()).toEqual([...INVENTORY].sort());
     expect(new Set(SOURCE_COLUMNS).size).toBe(SOURCE_COLUMNS.length);
   });
 

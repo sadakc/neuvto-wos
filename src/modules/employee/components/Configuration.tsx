@@ -106,7 +106,7 @@ function FieldsSection() {
     <Panel
       title="Fields and visibility"
       aside={`${FIELD_CATALOGUE.length} fields`}
-      footer="Fields marked new do not exist in the master sheet. They were added because the sheet works around their absence: one mobile column where two numbers are needed, a single address cell that gets overwritten, and Son 1 and Son 2 columns that cannot hold a third. Who sees each field is enforced by the record itself and is not a setting."
+      footer="Fields marked new do not exist in the master sheet. They were added because the sheet works around their absence: one mobile column where two numbers are needed, a single address cell that gets overwritten, and Son 1 and Son 2 columns that cannot hold a third. Columns the sheet repeats (Father name, Husband name) are kept once. Who sees each field is enforced by the record itself and is not a setting."
     >
       <div className="-mx-4 overflow-x-auto">
         <table className="w-full min-w-[60rem] text-table-cell" data-testid="field-catalogue">
