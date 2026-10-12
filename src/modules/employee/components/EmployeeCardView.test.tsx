@@ -53,7 +53,14 @@ describe("EmployeeCardView", () => {
   it("gives you every tab of your own card, with the age worked out", async () => {
     const user = userEvent.setup();
     render(<EmployeeCardView card={as("self")} />);
-    expect(tabNames()).toEqual(["Overview", "Personal", "Family", "Employment", "History"]);
+    expect(tabNames()).toEqual([
+      "Overview",
+      "Personal",
+      "Family",
+      "Employment",
+      "Statutory and bank",
+      "History",
+    ]);
     expect(within(screen.getByTestId("card-strip")).getByText("Yelahanka")).toBeInTheDocument();
 
     await user.click(screen.getByRole("tab", { name: "Personal" }));
@@ -73,7 +80,13 @@ describe("EmployeeCardView", () => {
 
   it("gives payroll family and history, but not personal details", () => {
     render(<EmployeeCardView card={as("payroll")} />);
-    expect(tabNames()).toEqual(["Overview", "Family", "Employment", "History"]);
+    expect(tabNames()).toEqual([
+      "Overview",
+      "Family",
+      "Employment",
+      "Statutory and bank",
+      "History",
+    ]);
   });
 
   it("mutes archived history and puts no control in an archived row", async () => {

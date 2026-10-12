@@ -157,13 +157,104 @@ export interface EmployeeCard {
   nominations?: Nomination[];
   deployments?: Deployment[];
 
+  // ── E6 (D80). Full numbers only where §5 grants them; otherwise last four.
+  /** Self, Admin, Payroll, Statutory. `uan` and friends only for Payroll and Statutory. */
+  statutory?: StatutoryBlock;
+  /** Self, Admin, Statutory. */
+  verification?: VerificationBlock;
+  /** Self (last four) and Payroll. Never Admin or Statutory. */
+  bank?: BankBlock;
+  /** Self and Statutory: only whether anything is held. Values come by reveal. */
+  restricted?: { recorded: boolean };
+
   capabilities: {
     canEdit: boolean;
     canRequestChange: boolean;
     canSeeHistory: boolean;
     canRevealStatutory: boolean;
+    canRevealBank?: boolean;
+    canRevealRestricted?: boolean;
+    canEditStatutory?: boolean;
+    canEditVerification?: boolean;
+    canEditBank?: boolean;
+    canEditRestricted?: boolean;
+    canSeeReveals?: boolean;
   };
 }
+
+export interface StatutoryBlock {
+  recorded: boolean;
+  identityDocumentType: string | null;
+  aadhaarLast4: string | null;
+  panLast4: string | null;
+  verifiedOn: string | null;
+  uanLast4: string | null;
+  epfLast4: string | null;
+  esicLast4: string | null;
+  oldUanLast4: string | null;
+  oldEsicLast4: string | null;
+  uan?: string | null;
+  epfNumber?: string | null;
+  esicNumber?: string | null;
+  oldUan?: string | null;
+  oldEsicNumber?: string | null;
+}
+
+export const CHECK_STATUSES = [
+  "not_started",
+  "pending",
+  "verified",
+  "failed",
+  "not_applicable",
+] as const;
+export type CheckStatus = (typeof CHECK_STATUSES)[number];
+
+export interface VerificationBlock {
+  policeVerification: CheckStatus;
+  policeVerifiedOn: string | null;
+  previousEmployerCheck: CheckStatus;
+  educationCheck: CheckStatus;
+  reverificationDue: string | null;
+}
+
+export interface BankBlock {
+  recorded: boolean;
+  bankName: string | null;
+  ifsc: string | null;
+  accountLast4: string | null;
+  pennyDropStatus: "not_checked" | "verified" | "failed";
+  branch?: string | null;
+  accountHolder?: string | null;
+}
+
+/** What a reveal may ask for (employee_reveal_restricted). */
+export type RevealField =
+  | "aadhaar"
+  | "pan"
+  | "bank_account"
+  | "religion"
+  | "caste_category"
+  | "disability";
+
+export interface Revealed {
+  aadhaar?: string | null;
+  pan?: string | null;
+  bankAccount?: string | null;
+  religion?: string | null;
+  casteCategory?: string | null;
+  disabilityStatus?: string | null;
+  disabilityPercent?: number | null;
+}
+
+export interface RestrictedRead {
+  readAt: string;
+  readerName: string | null;
+  fields: string[];
+  reason: string;
+}
+
+export const CASTE_CATEGORIES = ["general", "obc", "sc", "st", "ews", "not_disclosed"] as const;
+export const DISABILITY_STATUSES = ["none", "disabled", "not_disclosed"] as const;
 
 export interface DirectoryRow {
   id: string;
@@ -200,6 +291,29 @@ export function employeeErrorMessage(code: string): string {
   if (code.includes("NOT_FOUND")) {
     return "There's nobody with that record in your company.";
   }
+  const write: [string, string][] = [
+    [
+      "STATUTORY_KEY_NOT_SET",
+      "Statutory data can't be stored yet: this environment's encryption key isn't set. Tell Neuvto support.",
+    ],
+    ["INVALID_AADHAAR", "That isn't a valid Aadhaar number. Check the 12 digits."],
+    ["INVALID_PAN", "A PAN is five letters, four digits and a letter, like ABCDE1234F."],
+    ["INVALID_UAN", "A UAN is 12 digits."],
+    ["INVALID_ESIC", "An ESIC number is 10 or 17 digits."],
+    ["INVALID_EPF", "That doesn't look like an EPF member number."],
+    ["INVALID_IFSC", "An IFSC is four letters, a zero, then six letters or digits."],
+    ["INVALID_ACCOUNT", "An account number is 9 to 18 digits."],
+    ["AADHAAR_ALREADY_RECORDED", "Somebody else in your company already has this Aadhaar number."],
+    ["PAN_ALREADY_RECORDED", "Somebody else in your company already has this PAN."],
+    [
+      "REASON_REQUIRED",
+      "Say why you need to see it. The reason is kept with the record of this look.",
+    ],
+    ["FORBIDDEN", "Your role can't do that. Ask somebody with the Statutory or Payroll role."],
+    ["INVALID_VALUE", "One of those values isn't allowed. Check the fields and try again."],
+    ["UNKNOWN_FIELD", "That field isn't recognised."],
+  ];
+  for (const [needle, message] of write) if (code.includes(needle)) return message;
   if (code.includes("NOT_AUTHENTICATED")) {
     return "Your session has ended. Sign in again.";
   }

@@ -10,6 +10,9 @@ import { supabase } from "@/integrations/supabase/client";
 import { AppError } from "@/platform/errors";
 import {
   employeeErrorMessage,
+  type RestrictedRead,
+  type RevealField,
+  type Revealed,
   type DirectoryRow,
   type EmployeeCard,
   type EmployeeStatus,
@@ -22,8 +25,11 @@ function toEmployeeError(message: string): AppError {
     ? "NOT_FOUND"
     : code.includes("MODULE_NOT_ENABLED")
       ? "MODULE_NOT_ENABLED"
-      : "VALIDATION_FAILED";
-  return new AppError(kind, employeeErrorMessage(code), kind === "NOT_FOUND" ? 404 : 400, {
+      : code.includes("FORBIDDEN")
+        ? "FORBIDDEN"
+        : "VALIDATION_FAILED";
+  const status = kind === "NOT_FOUND" ? 404 : kind === "FORBIDDEN" ? 403 : 400;
+  return new AppError(kind, employeeErrorMessage(code), status, {
     code,
   });
 }
@@ -73,5 +79,69 @@ export async function getOrgChart(): Promise<OrgChartNode[]> {
     fullName: r.full_name,
     designation: r.designation,
     directReports: r.direct_reports,
+  }));
+}
+
+// ═══════════════════════════════════════════════════════════ restricted (E6, D80)
+
+type Values = Record<string, string | number | null>;
+
+/** Statutory numbers and verification. Present keys are set (null clears); absent keys are left. */
+export async function setStatutory(employeeId: string, values: Values): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_statutory", {
+    _employee_id: employeeId,
+    _values: values,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export async function setBank(employeeId: string, values: Values): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_bank", {
+    _employee_id: employeeId,
+    _values: values,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+export async function setRestricted(employeeId: string, values: Values): Promise<void> {
+  const { error } = await supabase.rpc("employee_set_restricted", {
+    _employee_id: employeeId,
+    _values: values,
+  });
+  if (error) throw toEmployeeError(error.message);
+}
+
+/**
+ * The full values, once. The database logs the look before it answers.
+ *
+ * The result is returned to the caller and kept NOWHERE here: no cache, no
+ * module state, no log line. The component that asked holds it in its own
+ * state and drops it (D80).
+ */
+export async function revealRestricted(
+  employeeId: string,
+  fields: RevealField[],
+  reason: string,
+): Promise<Revealed> {
+  const { data, error } = await supabase.rpc("employee_reveal_restricted", {
+    _employee_id: employeeId,
+    _fields: fields,
+    _reason: reason,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? {}) as Revealed;
+}
+
+/** Who has looked at this person's restricted data, newest first. */
+export async function getRestrictedReads(employeeId: string): Promise<RestrictedRead[]> {
+  const { data, error } = await supabase.rpc("employee_restricted_reads", {
+    _employee_id: employeeId,
+  });
+  if (error) throw toEmployeeError(error.message);
+  return (data ?? []).map((r) => ({
+    readAt: r.read_at,
+    readerName: r.reader_name,
+    fields: r.fields,
+    reason: r.reason,
   }));
 }

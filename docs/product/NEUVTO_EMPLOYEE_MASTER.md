@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.1 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.2 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -164,6 +164,18 @@ statutory returns this product exists to produce ask for it, so the full design 
 - **Not to a phone.** A mobile session gets last-four only and no reveal (§7 of
   `NEUVTO_NATIVE_TRANSLATION.md` when the app exists).
 
+- **As built (E6, 13 Oct 2026).** Every number is encrypted, UAN, EPF and ESIC included,
+  not only Aadhaar and PAN: the generic audit trigger copies whole rows into `audit_logs`,
+  which admins read, so anything in clear there would reach them. The three tables audit
+  through `tf_restricted_audit` instead, which records which fields changed and never a
+  value. Decisions taken in building it: an Admin may **write** statutory numbers (onboarding)
+  but reads only the last four; bank details are written by Payroll only; verification by an
+  Admin only; restricted data by the Statutory role only. A person may reveal their own
+  restricted data (logged like anybody's); not their own Aadhaar, which they already hold.
+  Aadhaar and PAN are unique per company through a keyed hash. "Who has looked" is shown to
+  the person, a Super Admin and the Statutory role. Operator steps:
+  `operations/STATUTORY_DATA.md`.
+
 This is the most sensitive data Neuvto will hold. It does not go to production until the
 encryption key, the reveal audit and the purge story (`operations/TEST_DATA_PURGE.md`) are
 in place, and each is in the harness.
@@ -314,7 +326,7 @@ screen change has been through `screen-prover`.
 | E3    | Passkeys: enrol and sign in with face or fingerprint (D79)                                                        | Sign-in by passkey reaches `/app`; a passkey on a deactivated account buys nothing (D52)                                       |
 | E4 ✔  | Schema: `employees`, managed lists, temporal and repeating tables, the backfill from `profiles`                   | Overlap refused by constraint; a closed row refuses UPDATE; three sons save; shares ≠ 100 refused; every guard watched failing |
 | E5 ✔  | My Card read tabs, Directory, Org chart                                                                           | Per-role render tests against §5; a restricted field is absent from the RPC response, not hidden                               |
-| E6    | Restricted data: encryption, reveal, `restricted_reads`                                                           | Reveal writes its audit row in the same transaction; the value never enters the query cache                                    |
+| E6 ✔  | Restricted data: encryption, reveal, `restricted_reads`                                                           | Reveal writes its audit row in the same transaction; the value never enters the query cache                                    |
 | E7    | Writes: family, nominees, previous organisations, add an address, move to another unit                            | The bundle's acceptance criteria 1–5 and 10                                                                                    |
 | E8    | Add Employee, Manage, Deactivate, bulk import                                                                     | An incomplete record can be invited; a dry run is required before commit                                                       |
 | E9    | Configuration, and the responsive and role sweeps                                                                 | Every one of the 62 source columns has a home; `scrollWidth === clientWidth` on every route at every width                     |

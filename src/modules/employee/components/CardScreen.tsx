@@ -33,6 +33,13 @@ export function CardScreen({ employeeId }: { employeeId?: string }) {
     };
   }, [employeeId]);
 
+  // A quiet re-read after a write: no loading state, so the card stays on the
+  // sub-tab the person was using.
+  async function reload() {
+    const card = await getEmployeeCard(employeeId);
+    setState({ kind: "ready", card });
+  }
+
   if (state.kind === "loading") {
     return (
       <div className="flex flex-col gap-4" aria-busy="true">
@@ -54,5 +61,5 @@ export function CardScreen({ employeeId }: { employeeId?: string }) {
   }
   // Keyed, so moving from one person to another starts on Overview rather than
   // carrying a sub-tab across that the next person's card may not have.
-  return <EmployeeCardView key={state.card.id} card={state.card} />;
+  return <EmployeeCardView key={state.card.id} card={state.card} onChanged={reload} />;
 }

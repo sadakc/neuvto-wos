@@ -1,6 +1,6 @@
 # Purging test data from production
 
-**Version:** 1.2 · **Status:** Active · **Updated:** 9 Aug 2026
+**Version:** 1.3 · **Status:** Active · **Updated:** 13 Oct 2026
 
 Neuvto is being tested **in production**, on purpose — it is the only environment
 that proves the real thing works. Sada's instruction, 8 Aug 2026:
@@ -142,6 +142,9 @@ the harness's ordering (`neuvto-harness/seed/seed_test_data.sql`) adapted from
 `truncate ... cascade`, which cannot be scoped to one tenant:
 
 ```
+restricted_reads → employee_restricted → employee_bank → employee_statutory
+nominees → nomination_versions → family_members → previous_organisations
+employee_addresses → employee_deployments → employees → designations → deployment_units
 leave_requests → leave_balances → leave_types
 approval_steps → approval_requests → approval_chains
 notifications → notification_templates → audit_logs → holidays
@@ -153,6 +156,13 @@ organizations
 
 then the members' `auth.users` rows, and only those who belong to no surviving
 organisation.
+
+> **The Employee Master's tables refuse deletion** (history is append-only, the
+> reveal log too, and managed lists are retired, never deleted; D82, D80). A purge
+> runs inside one transaction that first says `set local neuvto.purge = 'on'`, the
+> one escape those triggers honour, and nothing else ever sets it. The first three
+> tables hold encrypted Aadhaar, PAN, bank and restricted data: deleting the rows
+> is the purge; the Vault key stays, because other companies' rows still need it.
 
 > ⚠️ **`notification_templates` must be filtered by `organization_id = _org`, not
 > emptied.** The rows with `organization_id is null` are installed by migrations —

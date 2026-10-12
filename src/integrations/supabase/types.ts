@@ -666,6 +666,69 @@ export type Database = {
           },
         ]
       }
+      employee_bank: {
+        Row: {
+          account_cipher: string | null
+          account_holder: string | null
+          account_last4: string | null
+          bank_name: string | null
+          branch: string | null
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          ifsc: string | null
+          organization_id: string
+          penny_drop_status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_cipher?: string | null
+          account_holder?: string | null
+          account_last4?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          ifsc?: string | null
+          organization_id: string
+          penny_drop_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_cipher?: string | null
+          account_holder?: string | null
+          account_last4?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          ifsc?: string | null
+          organization_id?: string
+          penny_drop_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_bank_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_bank_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_deployments: {
         Row: {
           created_at: string
@@ -735,6 +798,162 @@ export type Database = {
           },
           {
             foreignKeyName: "employee_deployments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_restricted: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+          values_cipher: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+          values_cipher: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          values_cipher?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_restricted_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_restricted_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_statutory: {
+        Row: {
+          aadhaar_cipher: string | null
+          aadhaar_index: string | null
+          aadhaar_last4: string | null
+          created_at: string
+          created_by: string | null
+          education_check: string
+          employee_id: string
+          epf_cipher: string | null
+          epf_last4: string | null
+          esic_cipher: string | null
+          esic_last4: string | null
+          identity_document_type: string | null
+          old_esic_cipher: string | null
+          old_esic_last4: string | null
+          old_uan_cipher: string | null
+          old_uan_last4: string | null
+          organization_id: string
+          pan_cipher: string | null
+          pan_index: string | null
+          pan_last4: string | null
+          police_verification: string
+          police_verified_on: string | null
+          previous_employer_check: string
+          reverification_due: string | null
+          uan_cipher: string | null
+          uan_last4: string | null
+          updated_at: string
+          updated_by: string | null
+          verified_on: string | null
+        }
+        Insert: {
+          aadhaar_cipher?: string | null
+          aadhaar_index?: string | null
+          aadhaar_last4?: string | null
+          created_at?: string
+          created_by?: string | null
+          education_check?: string
+          employee_id: string
+          epf_cipher?: string | null
+          epf_last4?: string | null
+          esic_cipher?: string | null
+          esic_last4?: string | null
+          identity_document_type?: string | null
+          old_esic_cipher?: string | null
+          old_esic_last4?: string | null
+          old_uan_cipher?: string | null
+          old_uan_last4?: string | null
+          organization_id: string
+          pan_cipher?: string | null
+          pan_index?: string | null
+          pan_last4?: string | null
+          police_verification?: string
+          police_verified_on?: string | null
+          previous_employer_check?: string
+          reverification_due?: string | null
+          uan_cipher?: string | null
+          uan_last4?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_on?: string | null
+        }
+        Update: {
+          aadhaar_cipher?: string | null
+          aadhaar_index?: string | null
+          aadhaar_last4?: string | null
+          created_at?: string
+          created_by?: string | null
+          education_check?: string
+          employee_id?: string
+          epf_cipher?: string | null
+          epf_last4?: string | null
+          esic_cipher?: string | null
+          esic_last4?: string | null
+          identity_document_type?: string | null
+          old_esic_cipher?: string | null
+          old_esic_last4?: string | null
+          old_uan_cipher?: string | null
+          old_uan_last4?: string | null
+          organization_id?: string
+          pan_cipher?: string | null
+          pan_index?: string | null
+          pan_last4?: string | null
+          police_verification?: string
+          police_verified_on?: string | null
+          previous_employer_check?: string
+          reverification_due?: string | null
+          uan_cipher?: string | null
+          uan_last4?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_on?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_statutory_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_statutory_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -2083,6 +2302,47 @@ export type Database = {
           },
         ]
       }
+      restricted_reads: {
+        Row: {
+          employee_id: string
+          fields: string[]
+          id: string
+          organization_id: string
+          read_at: string
+          reader_id: string
+          reader_name: string | null
+          reason: string
+        }
+        Insert: {
+          employee_id: string
+          fields: string[]
+          id?: string
+          organization_id: string
+          read_at?: string
+          reader_id: string
+          reader_name?: string | null
+          reason: string
+        }
+        Update: {
+          employee_id?: string
+          fields?: string[]
+          id?: string
+          organization_id?: string
+          read_at?: string
+          reader_id?: string
+          reader_name?: string | null
+          reason?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restricted_reads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -2132,6 +2392,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      aadhaar_is_valid: { Args: { _n: string }; Returns: boolean }
       active_super_admin_count: {
         Args: { _except?: string; _org: string }
         Returns: number
@@ -2251,6 +2512,31 @@ export type Database = {
       employee_relationship: {
         Args: { _employee_id: string }
         Returns: string[]
+      }
+      employee_restricted_reads: {
+        Args: { _employee_id: string }
+        Returns: {
+          fields: string[]
+          read_at: string
+          reader_name: string
+          reason: string
+        }[]
+      }
+      employee_reveal_restricted: {
+        Args: { _employee_id: string; _fields: string[]; _reason: string }
+        Returns: Json
+      }
+      employee_set_bank: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_restricted: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_statutory: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
       }
       ensure_balance: {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
@@ -2740,6 +3026,14 @@ export type Database = {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
       }
+      restricted_decrypt: { Args: { _cipher: string }; Returns: string }
+      restricted_encrypt: { Args: { _value: string }; Returns: string }
+      restricted_index: { Args: { _value: string }; Returns: string }
+      restricted_known_keys: {
+        Args: { _known: string[]; _values: Json }
+        Returns: undefined
+      }
+      restricted_target: { Args: { _employee_id: string }; Returns: string[] }
       scrub_client_text: {
         Args: { _limit: number; _text: string }
         Returns: string
@@ -2751,6 +3045,8 @@ export type Database = {
           idle_minutes: number
         }[]
       }
+      statutory_key: { Args: never; Returns: string }
+      statutory_normalise: { Args: { _v: string }; Returns: string }
       working_days_excluded: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: {

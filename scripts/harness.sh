@@ -146,6 +146,7 @@ run "verifying session policy"   "$HARNESS_DIR/tests/verify_session_policy.sql"
 run "verifying company access"   "$HARNESS_DIR/tests/verify_company_access.sql"
 run "verifying the employee record" "$HARNESS_DIR/tests/verify_employee_master.sql"
 run "verifying the employee card"   "$HARNESS_DIR/tests/verify_employee_card.sql"
+run "verifying statutory and bank data" "$HARNESS_DIR/tests/verify_statutory.sql"
 run "verifying Neuvto names Super Admins" "$HARNESS_DIR/tests/verify_platform_super_admins.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the

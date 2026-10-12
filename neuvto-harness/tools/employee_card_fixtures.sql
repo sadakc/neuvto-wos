@@ -26,6 +26,19 @@ begin
   return v;
 end $$ language plpgsql;
 
+create function pg_temp.as_(_uid uuid) returns void as $$
+begin
+  perform set_config('role', 'authenticated', true);
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', _uid::text, 'role', 'authenticated')::text, true);
+end $$ language plpgsql;
+
+create function pg_temp.root_() returns void as $$
+begin
+  perform set_config('role', 'postgres', true);
+  perform set_config('request.jwt.claims', '', true);
+end $$ language plpgsql;
+
 do $$
 declare
   acme uuid := '00000000-0000-0000-0000-0000000000a0';
@@ -35,7 +48,8 @@ begin
   values (acme, 'employee', true, now())
   on conflict (organization_id, module_key) do update set enabled = true, deleted_at = null;
   insert into public.user_roles (user_id, organization_id, role)
-  values ('00000000-0000-0000-0000-00000000a008', acme, 'payroll_officer');
+  values ('00000000-0000-0000-0000-00000000a008', acme, 'payroll_officer'),
+         ('00000000-0000-0000-0000-00000000a007', acme, 'statutory_officer');
 
   select id into e from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006';
   insert into public.designations (organization_id, name, grade)
@@ -77,6 +91,23 @@ begin
   insert into public.nominees (organization_id, version_id, name, relation, share_percent)
   values (acme, ver, 'Lakshmi', 'mother', 70), (acme, ver, 'Aarav', 'son', 30);
 
+  -- E6: written through the real functions, as the roles §5 lets write them.
+  if to_regprocedure('public.employee_set_statutory(uuid,jsonb)') is not null then
+    perform pg_temp.as_('00000000-0000-0000-0000-00000000a002');  -- Hema, Admin
+    perform public.employee_set_statutory(e, jsonb_build_object(
+      'aadhaar', '234567890124', 'pan', 'ABCDE1234F', 'uan', '101234567890',
+      'epfNumber', 'MHBAN00000640000000125', 'esicNumber', '3100123456',
+      'identityDocumentType', 'aadhaar', 'verifiedOn', '2024-04-10',
+      'policeVerification', 'verified', 'policeVerifiedOn', '2024-05-01'));
+    perform pg_temp.as_('00000000-0000-0000-0000-00000000a008');  -- Payroll
+    perform public.employee_set_bank(e, jsonb_build_object(
+      'bankName', 'HDFC Bank', 'branch', 'Yelahanka', 'account', '004512345678',
+      'ifsc', 'HDFC0001234', 'accountHolder', 'PRIYA E', 'pennyDropStatus', 'verified'));
+    perform pg_temp.as_('00000000-0000-0000-0000-00000000a007');  -- Statutory
+    perform public.employee_set_restricted(e, '{"religion":"Hindu","casteCategory":"obc"}');
+    perform pg_temp.root_();
+  end if;
+
   insert into public.previous_organisations
     (organization_id, employee_id, organisation_name, designation, from_date, to_date, reason_for_leaving)
   values (acme, e, 'SIS Security', 'Guard', '2019-01-01', '2024-03-15', 'Better role');
@@ -91,6 +122,8 @@ select jsonb_pretty(jsonb_build_object(
   'approver',  pg_temp.card_as('00000000-0000-0000-0000-00000000a004',
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006')),
   'payroll',   pg_temp.card_as('00000000-0000-0000-0000-00000000a008',
+                 (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006')),
+  'statutory', pg_temp.card_as('00000000-0000-0000-0000-00000000a007',
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006')),
   'admin',     pg_temp.card_as('00000000-0000-0000-0000-00000000a001',
                  (select id from public.employees where profile_id = '00000000-0000-0000-0000-00000000a006'))

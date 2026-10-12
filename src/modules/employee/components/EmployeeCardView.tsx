@@ -32,6 +32,7 @@ import {
 } from "../format";
 import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
+import { StatutoryTab } from "./StatutoryTab";
 
 const STATUS_TONE: Record<EmployeeStatus, StatusTone> = {
   working: "success",
@@ -41,7 +42,7 @@ const STATUS_TONE: Record<EmployeeStatus, StatusTone> = {
   left: "neutral",
 };
 
-type TabKey = "overview" | "personal" | "family" | "employment" | "history";
+type TabKey = "overview" | "personal" | "family" | "employment" | "statutory" | "history";
 
 /** Which sub-tabs this card can fill, from what the database actually sent. */
 function cardTabs(card: EmployeeCard): { key: TabKey; label: string }[] {
@@ -49,13 +50,23 @@ function cardTabs(card: EmployeeCard): { key: TabKey; label: string }[] {
   if ("nameAsPerId" in card) tabs.push({ key: "personal", label: "Personal" });
   if ("familyMembers" in card) tabs.push({ key: "family", label: "Family" });
   tabs.push({ key: "employment", label: "Employment" });
+  if ("statutory" in card || "bank" in card || "verification" in card || "restricted" in card) {
+    tabs.push({ key: "statutory", label: "Statutory and bank" });
+  }
   if ("addresses" in card || "deployments" in card || "previousOrganisations" in card) {
     tabs.push({ key: "history", label: "History" });
   }
   return tabs;
 }
 
-export function EmployeeCardView({ card }: { card: EmployeeCard }) {
+export function EmployeeCardView({
+  card,
+  onChanged = () => {},
+}: {
+  card: EmployeeCard;
+  /** After a write: re-read the card without leaving the tab. */
+  onChanged?: () => Promise<void> | void;
+}) {
   const tabs = cardTabs(card);
   const [tab, setTab] = useState<TabKey>("overview");
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
@@ -212,6 +223,7 @@ export function EmployeeCardView({ card }: { card: EmployeeCard }) {
             }
           />
         )}
+        {active === "statutory" && <StatutoryTab card={card} onChanged={onChanged} />}
         {active === "history" && <History card={card} />}
       </div>
     </div>
@@ -357,8 +369,9 @@ function Personal({ card }: { card: EmployeeCard }) {
 
       <Panel title="Restricted" testId="panel-restricted">
         <p className="text-sm text-foreground-secondary">
-          Religion, caste category and disability status are held separately. Only People Ops with
-          the Statutory role can see them, and every look is logged.
+          Religion, caste category and disability status are held separately, on the Statutory and
+          bank tab. Only the Statutory role and the person themselves can see them, and every look
+          is logged.
         </p>
       </Panel>
     </Grid>
