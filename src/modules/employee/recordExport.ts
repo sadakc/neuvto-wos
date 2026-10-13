@@ -133,7 +133,7 @@ export function recordSections(card: EmployeeCard): RecordSection[] {
     s.push({
       title: "Statutory",
       rows: [
-        ["Identity document", humanise(st.identityDocumentType)],
+        ["Driving licence", last4(st.licenceLast4)],
         ["Aadhaar", last4(st.aadhaarLast4)],
         ["PAN", last4(st.panLast4)],
         ["UAN", last4(st.uanLast4)],

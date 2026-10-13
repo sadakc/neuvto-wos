@@ -8,7 +8,7 @@
  * manager). Only an Admin is offered Change shift.
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
   DialogContent,
@@ -103,6 +103,7 @@ function ShiftDialog({
   const [open, setOpen] = useState(false);
   const [shifts, setShifts] = useState<ShiftRow[] | null>(null);
   const [shiftId, setShiftId] = useState("");
+  const picked = useRef(false);
   const [from, setFrom] = useState(todayIso());
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -112,14 +113,35 @@ function ShiftDialog({
   useEffect(() => {
     if (!open) return;
     listShifts()
-      .then((s) => setShifts(s.filter((x) => x.status === "active")))
+      .then((s) => {
+        const active = s.filter((x) => x.status === "active");
+        setShifts(active);
+        // The form starts on what they work now, unless the Admin has
+        // already chosen while the list was loading.
+        if (picked.current) return;
+        const own = card.workPattern?.ownShifts?.find((o) => !o.effectiveTo);
+        setShiftId(own ? (active.find((x) => x.name === own.shiftName)?.id ?? "") : "");
+      })
       .catch(() => setShifts([]));
-  }, [open]);
+  }, [open, card.workPattern?.ownShifts]);
+
+  // D105: what they work now, so Save is offered only for a change. Saving
+  // "their unit's shift" for somebody already on it was refused by the
+  // database, after a click that looked like it should work.
+  const openOwn = card.workPattern?.ownShifts?.find((o) => !o.effectiveTo) ?? null;
+  const openShiftId = openOwn
+    ? ((shifts ?? []).find((x) => x.name === openOwn.shiftName)?.id ?? null)
+    : null;
+  const unchanged = openOwn ? shiftId === openShiftId : shiftId === "";
+  const unchangedNote = openOwn
+    ? `They already work ${openOwn.shiftName}. Choose another shift, or their unit's.`
+    : "They already work their unit's shift. Choose a shift to give them their own.";
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setDateError("");
+    if (unchanged) return;
     if (!isIsoDate(from)) {
       setDateError(DATE_FORMAT_MESSAGE);
       return;
@@ -147,6 +169,7 @@ function ShiftDialog({
         type="button"
         onClick={() => {
           setShiftId("");
+          picked.current = false;
           setFrom(todayIso());
           setReason("");
           setError("");
@@ -173,7 +196,10 @@ function ShiftDialog({
               <select
                 aria-label="Shift"
                 value={shiftId}
-                onChange={(e) => setShiftId(e.target.value)}
+                onChange={(e) => {
+                  picked.current = true;
+                  setShiftId(e.target.value);
+                }}
                 className={input}
               >
                 <option value="">Their unit&apos;s shift</option>
@@ -220,11 +246,21 @@ function ShiftDialog({
             )}
             <button
               type="submit"
-              disabled={busy || !from}
+              disabled={busy || !from || unchanged}
+              aria-describedby={unchanged ? "shift-unchanged" : undefined}
               className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
             >
               {busy ? "Saving…" : "Save shift"}
             </button>
+            {unchanged && shifts !== null && (
+              <p
+                id="shift-unchanged"
+                data-testid="shift-unchanged"
+                className="text-caption text-muted-foreground"
+              >
+                {unchangedNote}
+              </p>
+            )}
           </form>
         </DialogContent>
       </Dialog>

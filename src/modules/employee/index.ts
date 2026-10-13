@@ -1,5 +1,5 @@
 /**
- * Employee Master — the module's entire public surface.
+ * Employee Card (named the Employee Master until D105) — the module's entire public surface.
  *
  * The record every other module reads (NEUVTO_EMPLOYEE_MASTER). E5 is the read
  * side: My Card, the Directory and the Org Chart. Who sees which part of a
@@ -13,7 +13,7 @@ import type { ModuleDefinition } from "@/platform/modules";
 
 export const employee: ModuleDefinition = {
   key: "employee",
-  name: "Employee Master",
+  name: "Employee Card",
   version: "0.5.0",
   shortName: "Employees",
   section: "People",

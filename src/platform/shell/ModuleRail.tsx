@@ -12,13 +12,30 @@
  */
 
 import { Link } from "@tanstack/react-router";
-import { LayoutGrid } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutGrid, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { fitRail, type RailMode } from "./fit";
 import { groupBySection, SECTION_HEADINGS_FROM, tabSearch, type ShellModule } from "./model";
 import { NavPanel } from "./NavPanel";
 import { useSize } from "./useSize";
+
+/** D105: the modules can be folded away, and stay so on this device. */
+const FOLD_KEY = "neuvto.modules.folded";
+function readFolded() {
+  try {
+    return typeof window !== "undefined" && window.localStorage.getItem(FOLD_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+function writeFolded(folded: boolean) {
+  try {
+    window.localStorage.setItem(FOLD_KEY, folded ? "1" : "0");
+  } catch {
+    // Private windows and blocked storage: folded for this visit only.
+  }
+}
 
 function entry(m: ShellModule) {
   const first = m.tabs.find((t) => t.group === "main" && !t.soon) ?? m.tabs.find((t) => !t.soon);
@@ -47,6 +64,11 @@ export function ModuleRail({
   const [chipWidths, setChipWidths] = useState<number[]>([]);
   const [overflowWidth, setOverflowWidth] = useState(0);
   const [open, setOpen] = useState(false);
+  const [folded, setFoldedState] = useState(readFolded);
+  const setFolded = (f: boolean) => {
+    setFoldedState(f);
+    writeFolded(f);
+  };
 
   const activeIndex = modules.findIndex((m) => m.key === activeKey);
   const badges = modules.map(badgeOf);
@@ -164,14 +186,79 @@ export function ModuleRail({
       </div>
     );
 
+  if (mode === "column" && folded) {
+    // Icons only, each named for a screen reader and on hover, and the way back.
+    return (
+      <aside
+        data-testid="rail-folded"
+        className="sticky top-0 flex h-dvh w-[64px] shrink-0 flex-col items-center gap-1 overflow-auto border-r border-border bg-card py-3"
+      >
+        <button
+          type="button"
+          onClick={() => setFolded(false)}
+          aria-label="Show the modules column"
+          title="Show the modules column"
+          data-testid="rail-unfold"
+          className="mb-2 inline-flex size-11 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+        >
+          <PanelLeftOpen className="size-5" aria-hidden />
+        </button>
+        <nav aria-label="Modules" className="flex flex-col items-center gap-1">
+          {modules.map((m) => {
+            const Icon = m.icon ?? LayoutGrid;
+            const current = m.key === activeKey;
+            const { to, search } = entry(m);
+            const badge = badgeOf(m);
+            return (
+              <Link
+                key={m.key}
+                to={to}
+                search={search as never}
+                aria-current={current ? "page" : undefined}
+                aria-label={badge ? `${m.name}, ${badge} waiting` : m.name}
+                title={m.name}
+                data-testid={`rail-${m.key}`}
+                className={cn(
+                  "relative inline-flex size-11 items-center justify-center rounded-md border",
+                  current
+                    ? "border-accent-line bg-accent text-accent-foreground"
+                    : "border-transparent text-foreground-secondary hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <Icon className="size-5" aria-hidden />
+                {badge > 0 && (
+                  <span className="absolute -top-1 -right-1 rounded-full bg-destructive px-1 font-mono text-2xs text-destructive-foreground tabular-nums">
+                    {badge}
+                  </span>
+                )}
+              </Link>
+            );
+          })}
+        </nav>
+      </aside>
+    );
+  }
+
   if (mode === "column") {
     const headed = modules.length >= SECTION_HEADINGS_FROM;
     return (
       <aside className="sticky top-0 flex h-dvh w-[246px] shrink-0 flex-col overflow-auto border-r border-border bg-card">
         <div className="border-b border-border px-4 pt-4 pb-3.5">{brand}</div>
-        <p className="px-4 pt-4 pb-1.5 text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase group-data-[short=true]/stage:hidden">
-          Modules
-        </p>
+        <div className="flex items-center justify-between pt-2 pr-2 pl-4 group-data-[short=true]/stage:pt-0">
+          <p className="pt-2 pb-1.5 text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase group-data-[short=true]/stage:hidden">
+            Modules
+          </p>
+          <button
+            type="button"
+            onClick={() => setFolded(true)}
+            aria-label="Hide the modules column"
+            title="Hide the modules column"
+            data-testid="rail-fold"
+            className="ml-auto inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <PanelLeftClose className="size-4" aria-hidden />
+          </button>
+        </div>
         <nav aria-label="Modules" className="flex flex-col gap-0.5 px-2 pb-4">
           {headed
             ? groupBySection(modules).map(({ section, modules: ms }) => (
@@ -188,22 +275,52 @@ export function ModuleRail({
     );
   }
 
+  // Narrower than a column: the module row folds up under its brand.
+  const foldToggle = (
+    <button
+      type="button"
+      onClick={() => setFolded(!folded)}
+      aria-expanded={!folded}
+      data-testid={folded ? "rail-unfold" : "rail-fold"}
+      className="inline-flex min-h-11 shrink-0 items-center gap-1 rounded-md px-2 text-caption font-medium text-muted-foreground hover:bg-muted hover:text-foreground"
+    >
+      {folded ? "Show modules" : "Hide modules"}
+      {folded ? (
+        <ChevronDown className="size-4" aria-hidden />
+      ) : (
+        <ChevronUp className="size-4" aria-hidden />
+      )}
+    </button>
+  );
+
   if (mode === "grid") {
     return (
       <div className="border-b border-border bg-card">
-        <div className="px-4 pt-3 pb-2">{brand}</div>
-        <nav aria-label="Modules" className="grid grid-cols-2 gap-1.5 px-3 pb-3">
-          {modules.map((m, i) => (fit.visible[i] ? item(m, true, "min-w-0") : null))}
-          {overflow(`All ${modules.length} modules`, true)}
-        </nav>
+        <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-2">
+          <div className="min-w-0">{brand}</div>
+          {foldToggle}
+        </div>
+        {!folded && (
+          <nav aria-label="Modules" className="grid grid-cols-2 gap-1.5 px-3 pb-3">
+            {modules.map((m, i) => (fit.visible[i] ? item(m, true, "min-w-0") : null))}
+            {overflow(`All ${modules.length} modules`, true)}
+          </nav>
+        )}
       </div>
     );
   }
 
   return (
     <div className="border-b border-border bg-card">
-      <div className="px-4 pt-3 pb-1.5 group-data-[short=true]/stage:hidden">{brand}</div>
-      <div ref={setRowEl} className="relative px-3 pb-3 group-data-[short=true]/stage:pt-2">
+      <div className="flex items-center justify-between gap-2 px-4 pt-3 pb-1.5">
+        <div className="min-w-0 group-data-[short=true]/stage:hidden">{brand}</div>
+        {foldToggle}
+      </div>
+      <div
+        ref={setRowEl}
+        hidden={folded}
+        className="relative px-3 pb-3 group-data-[short=true]/stage:pt-2"
+      >
         {/* The measuring copy. Invisible, out of flow, and hidden from
             assistive technology: it exists only to be measured. */}
         {/* Clipped: an invisible element still widens the page's scroll area, and

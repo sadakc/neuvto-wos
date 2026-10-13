@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.8 · **Status:** Active · **Updated:** 13 Oct 2026
+**Version:** 1.9 · **Status:** Active · **Updated:** 13 Oct 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -24,7 +24,7 @@ predates 31 Jul 2026 and is wrong.
 | The employee record, who may make whom an admin, and the build order                      | [product/NEUVTO_EMPLOYEE_MASTER.md](product/NEUVTO_EMPLOYEE_MASTER.md)                     |
 | What the Core HR bundle's Leave chapter adds, where it conflicts, and what needs deciding | [product/LEAVE_PHASE_2_SCOPE.md](product/LEAVE_PHASE_2_SCOPE.md)                           |
 | What a screen looks like (the Core HR design)                                             | [standards/NEUVTO_DESIGN_SYSTEM.md](standards/NEUVTO_DESIGN_SYSTEM.md)                     |
-| Why something was built differently from the PRD                                          | the **D1–D104** decision table in the same file                                            |
+| Why something was built differently from the PRD                                          | the **D1–D105** decision table in the same file                                            |
 | Whether the platform itself is finished                                                   | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
 | How to run the thing on your own machine                                                  | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
 | How code and schema reach the hosted site                                                 | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
@@ -49,7 +49,7 @@ predates 31 Jul 2026 and is wrong.
 **[NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)** — the single
 source of truth. The platform and its services, the module contract, the build
 sequence with its status column, the verification gate for every step, and the
-**D1–D104 decision table** recording every deliberate deviation from the PRD with
+**D1–D105 decision table** recording every deliberate deviation from the PRD with
 its reason. Its "Known gaps" section is the live list of launch blockers; there
 is no separate blockers file, because two lists of blockers means one of them is
 wrong.

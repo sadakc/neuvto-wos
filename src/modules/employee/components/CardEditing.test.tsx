@@ -413,10 +413,12 @@ describe("rows and addresses are checked before they are sent", () => {
     await u.click(screen.getByTestId("add-address"));
     await u.type(screen.getByTestId("address-line"), "9 Lake View");
     await u.type(screen.getByTestId("address-city"), "Hosur1");
-    await u.type(screen.getByTestId("address-state"), "Tamil Nadu");
+    await u.selectOptions(screen.getByTestId("address-state"), "Tamil Nadu");
     await u.type(screen.getByTestId("address-pincode"), "635109");
     await u.click(screen.getByTestId("address-save"));
-    expect(screen.getByTestId("address-error")).toHaveTextContent("City: Letters only, up to 60");
+    expect(screen.getByTestId("address-error")).toHaveTextContent(
+      "City/Town: Letters only, up to 60",
+    );
     await u.clear(screen.getByTestId("address-city"));
     await u.type(screen.getByTestId("address-city"), "Hosur");
     await u.clear(screen.getByTestId("address-pincode"));

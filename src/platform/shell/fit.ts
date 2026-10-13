@@ -10,6 +10,8 @@
 
 /** Below this bar width the tab row collapses to a single section picker. */
 export const PICK_WIDTH = 540;
+/** The share of the bar the tabs fill before the rest go behind More (D105). */
+export const TAB_SHARE = 0.7;
 /** The design's allowance for the bar's own padding and rounding. */
 export const BAR_SLACK = 30;
 /** Room reserved for the red count `More` may grow when a hidden tab is badged. */
@@ -34,6 +36,11 @@ export interface TabFitInput {
   roleNoteWidth: number | null;
   /** Pending count per tab, same order as `tabWidths`. 0 for none. */
   badges: readonly number[];
+  /**
+   * The share of the bar the tabs may fill, 0 to 1 (D105: 0.7, so the row
+   * reads as tabs with room around them, not wall to wall). 1 when omitted.
+   */
+  share?: number;
 }
 
 export type TabFit =
@@ -55,7 +62,8 @@ export function fitTabs(input: TabFitInput): TabFit {
   if (barWidth < PICK_WIDTH) return { mode: "pick" };
 
   const all = tabWidths.map(() => true);
-  const available = barWidth - BAR_SLACK - fixedWidth;
+  const share = Math.min(1, Math.max(0, input.share ?? 1));
+  const available = barWidth * share - BAR_SLACK - fixedWidth;
   const total = tabWidths.reduce((a, b) => a + b, 0);
 
   // Steps 3 and 4: everything fits, with or without the role note.

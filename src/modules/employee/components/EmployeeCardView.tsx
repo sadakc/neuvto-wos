@@ -49,6 +49,7 @@ import { downloadRecordPdf } from "../recordExport";
 import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
 import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
 import { STAGE_TONE } from "../status";
+import { addressLine } from "../indiaPlaces";
 import {
   AddAddressDialog,
   ContactEditor,
@@ -58,6 +59,7 @@ import {
   FamilyEditor,
   IdentityEditor,
   MoveUnitDialog,
+  RemovePostingDialog,
   NominationEditor,
   PhysicalEditor,
   PositionEditor,
@@ -345,7 +347,12 @@ function Grid({ children }: { children: React.ReactNode }) {
 
 function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const earlier = card.deployments ? card.deployments.filter((d) => d.effectiveTo).length : null;
-  const open = card.deployments?.find((d) => !d.effectiveTo);
+  // The posting covering today, not merely one with no end (D105).
+  const open = card.deployments?.find(
+    (d) =>
+      d.effectiveFrom === card.currentDeployment?.effectiveFrom &&
+      d.unitId === card.currentDeployment?.unitId,
+  );
   return (
     <div className="flex flex-col gap-4">
       <Grid>
@@ -369,6 +376,8 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
         <Panel
           title="Current deployment"
           testId="panel-deployment"
+          // D105: deploy or move from here too, not only the Employment tab.
+          aside={edit(card) && <MoveUnitDialog card={card} onChanged={onChanged} />}
           footer="Changing the unit never edits this row. The posting is closed and a new one opened, so the old one is still there for the day a client invoice asks about it."
         >
           <Fields
@@ -382,6 +391,14 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
                   : null,
               },
               { label: "Effective from", value: formatDate(card.currentDeployment?.effectiveFrom) },
+              ...(card.nextDeployment
+                ? [
+                    {
+                      label: "Moving to",
+                      value: `${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`,
+                    },
+                  ]
+                : []),
               ...(open
                 ? [
                     { label: "Order ref", value: open.deploymentOrderRef, mono: true },
@@ -564,7 +581,7 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
         {current ? (
           <RecordTable
             testId="nominee-table"
-            headers={["Name", "Relation", "Date of birth", "Share", "Scheme"]}
+            headers={["Name", "Relation", "Date of birth", "Share"]}
             empty="No nominees."
             rows={current.nominees.map((n) => ({
               key: n.id,
@@ -573,7 +590,6 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
                 humanise(n.relation),
                 formatDate(n.dateOfBirth),
                 `${Number(n.sharePercent)}%`,
-                current.scheme ?? "All",
               ],
             }))}
           />
@@ -640,7 +656,7 @@ function Employment({
         </Panel>
 
         <Panel
-          title="Dates and status"
+          title="Joining and exit dates"
           aside={edit(card) && <DatesEditor card={card} onChanged={onChanged} />}
           footer={
             "reJoiningDate" in card
@@ -681,6 +697,9 @@ function Employment({
                   See history
                 </button>
               )}
+              {edit(card) && (card.deployments?.length ?? 0) > 0 && (
+                <RemovePostingDialog card={card} onChanged={onChanged} />
+              )}
               {edit(card) && <MoveUnitDialog card={card} onChanged={onChanged} />}
             </span>
           }
@@ -689,6 +708,14 @@ function Employment({
             items={[
               { label: "Current unit", value: card.currentDeployment?.unitName },
               { label: "Since", value: formatDate(card.currentDeployment?.effectiveFrom) },
+              ...(card.nextDeployment
+                ? [
+                    {
+                      label: "Moving to",
+                      value: `${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`,
+                    },
+                  ]
+                : []),
               ...(postings != null
                 ? [{ label: "Postings on record", value: String(postings) }]
                 : []),
@@ -754,7 +781,7 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
                 // A readable width of its own: the table scrolls sideways on a phone
                 // rather than the address going one word per line.
                 <span key="a" className="block min-w-[13rem]">
-                  {[a.line, a.city, a.district, a.state, a.pincode].filter(Boolean).join(", ")}
+                  {addressLine(a)}
                 </span>,
                 formatDate(a.effectiveFrom),
                 formatDate(lastDay(a.effectiveTo)),
@@ -801,7 +828,16 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
       {card.deployments && (
         <Panel
           title="Deployment history"
-          aside={edit(card) && <MoveUnitDialog card={card} onChanged={onChanged} />}
+          aside={
+            edit(card) && (
+              <span className="flex items-center gap-3">
+                {card.deployments.length > 0 && (
+                  <RemovePostingDialog card={card} onChanged={onChanged} />
+                )}
+                <MoveUnitDialog card={card} onChanged={onChanged} />
+              </span>
+            )
+          }
           footer="Attendance, the muster roll and the client invoice each read whichever unit was current on the day, not the one current now."
         >
           <RecordTable
@@ -820,10 +856,35 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
                   {d.deploymentOrderRef}
                 </span>,
                 d.movedBy ?? "—",
-                <CurrentOrArchived key="s" open={d.effectiveTo === null} />,
+                d.effectiveFrom > today ? (
+                  <StatusBadge key="s" tone="info">
+                    Upcoming
+                  </StatusBadge>
+                ) : (
+                  <CurrentOrArchived
+                    key="s"
+                    open={d.effectiveTo === null || d.effectiveTo > today}
+                  />
+                ),
               ],
             }))}
           />
+          {(card.withdrawnPostings?.length ?? 0) > 0 && (
+            <div className="mt-4 border-t border-border pt-3" data-testid="withdrawn-postings">
+              <p className="text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
+                Removed postings
+              </p>
+              <ul className="mt-1 space-y-1 text-sm">
+                {card.withdrawnPostings!.map((w, k) => (
+                  <li key={`${w.withdrawnAt}-${k}`}>
+                    {w.unitName} from {formatDate(w.effectiveFrom)}, removed by{" "}
+                    {w.withdrawnBy ?? "somebody"} on {formatDate(w.withdrawnAt)}:{" "}
+                    <span className="text-foreground-secondary">{w.reason}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
         </Panel>
       )}
 

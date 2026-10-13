@@ -230,6 +230,8 @@ export function DocumentsTab({
             Expires on (optional)
             <DateField
               label="Expires on (optional)"
+              // A passport runs ten years: the one date that looks further ahead.
+              max={`${new Date().getFullYear() + 10}-12-31`}
               value={expiresOn}
               onChange={setExpiresOn}
               className="mt-2"

@@ -276,14 +276,14 @@ export const MASTER_TEMPLATE: readonly TemplateTab[] = [
   {
     name: "Nominees",
     key: "nominees",
-    purpose: "One row a nominee. Each person's shares in a scheme must add up to 100.",
+    purpose: "One row a nominee. Each person's shares must add up to 100.",
     columns: [
       code,
       {
         header: "Scheme",
         key: "scheme",
         kind: "choice",
-        help: "Blank means PF and gratuity.",
+        help: "No longer used: one nomination covers every scheme (D105). Leave it blank.",
         options: [
           ["PF and gratuity", "pf_and_gratuity"],
           ["ESIC", "esic"],

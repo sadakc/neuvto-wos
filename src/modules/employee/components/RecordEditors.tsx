@@ -33,7 +33,6 @@ import {
   EMPLOYMENT_TYPE_LABEL,
   MARITAL_STATUSES,
   NATIONALITIES,
-  NOMINATION_SCHEMES,
   RELATIONS,
   SEXES,
   type EmployeeCard,
@@ -47,10 +46,13 @@ import {
   saveNomination,
   savePreviousOrgs,
   updateEmployee,
+  withdrawPosting,
+  type MoveInput,
   type Option,
 } from "../handlers";
 import {
   describeWeek,
+  durationText,
   familySummary,
   formatDate,
   formatMonths,
@@ -68,6 +70,7 @@ import {
   usePositionLists,
 } from "../positionLists";
 import { AddInline } from "./FieldEditor";
+import { districtsOf, HOME_STATE, STATES } from "../indiaPlaces";
 
 type Changed = () => Promise<void> | void;
 
@@ -98,7 +101,8 @@ function asRelation(v: string | null | undefined) {
 /** The dropdowns' ranges (D104). The database allows a wider range; a value outside these is still shown. */
 const range = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, i) => from + i);
-const HEIGHTS = range(100, 230).map((cm) => {
+// From 4 ft (122 cm), Sada's floor (D105).
+const HEIGHTS = range(122, 230).map((cm) => {
   const inches = Math.round(cm / 2.54);
   return [String(cm), `${cm} cm (${Math.floor(inches / 12)}′ ${inches % 12}″)`] as const;
 });
@@ -281,9 +285,10 @@ export function IdentityEditor({ card, onChanged }: { card: EmployeeCard; onChan
         {
           key: "nativeState",
           label: "Native state",
+          kind: "select",
+          labelled: STATES.map((st) => [st, st] as const),
           current: card.nativeState,
-          rule: "words",
-          maxLength: 60,
+          defaultValue: HOME_STATE,
         },
       ]}
     />
@@ -509,7 +514,7 @@ export function DatesEditor({ card, onChanged }: { card: EmployeeCard; onChanged
     <RecordFieldEditor
       card={card}
       id="dates"
-      title="Dates and status"
+      title="Joining and exit dates"
       filled
       onChanged={onChanged}
       fields={[
@@ -724,7 +729,7 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
               onClick={() => setRows((rs) => [...rs, blankRelative()])}
               className="mt-3 h-11 rounded-md border border-dashed border-border px-4 text-sm font-medium"
             >
-              Add a relative
+              Add a family member
             </button>
             <p className="mt-3 text-caption text-muted-foreground">
               There is no Son 1 and Son 2. Add as many sons, daughters or other relatives as the
@@ -1004,7 +1009,6 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
     }));
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<NomineeRow[]>(fromCard);
-  const [scheme, setScheme] = useState(current?.scheme ?? "pf_and_gratuity");
   const [from, setFrom] = useState(todayIso());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1025,7 +1029,6 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
     setBusy(true);
     try {
       await saveNomination(card.id, {
-        scheme,
         effectiveFrom: from,
         nominees: rows.map((r) => ({
           name: r.name.trim(),
@@ -1075,20 +1078,6 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
               </span>
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
-              <label className="min-w-0 text-sm">
-                <span className={eyebrow}>Scheme</span>
-                <select
-                  value={scheme}
-                  onChange={(e) => setScheme(e.target.value)}
-                  className={`mt-1 ${input}`}
-                >
-                  {NOMINATION_SCHEMES.map((s) => (
-                    <option key={s} value={s}>
-                      {s === "pf_and_gratuity" ? "PF and gratuity" : humanise(s)}
-                    </option>
-                  ))}
-                </select>
-              </label>
               <label className="min-w-0 text-sm">
                 <span className={eyebrow}>Effective from</span>
                 <DateField
@@ -1176,8 +1165,9 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
               Add a nominee
             </button>
             <p className="mt-3 text-caption text-muted-foreground">
-              Saving archives the current nomination rather than overwriting it. The superseded form
-              is what a claim is settled against, so it stays on the record.
+              One nomination covers PF, gratuity, ESIC and insurance alike (D105). Saving archives
+              the current one rather than overwriting it; the superseded form is what a claim is
+              settled against, so it stays on the record. Saving again the same day corrects it.
             </p>
             {error && (
               <p role="alert" data-testid="nominee-error" className="mt-2 text-sm text-destructive">
@@ -1233,6 +1223,14 @@ function Field({
   );
 }
 
+const OTHER = "__other__";
+
+/** The day after an ISO date. */
+function nextDay(iso: string) {
+  const [y, m, d] = iso.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d + 1)).toISOString().slice(0, 10);
+}
+
 /** The first thing wrong with an address, in words, or null. The database checks again. */
 function addressProblem(v: {
   line: string;
@@ -1244,9 +1242,9 @@ function addressProblem(v: {
 }): string | null {
   if (!v.line.trim()) return "Address: say the house, street and area.";
   if (v.line.trim().length > 300) return "Address: keep it to 300 characters.";
-  if (!v.city.trim()) return "City is required.";
+  if (!v.city.trim()) return "City/Town is required.";
   for (const [label, value] of [
-    ["City", v.city],
+    ["City/Town", v.city],
     ["District", v.district],
     ["State", v.state],
   ] as const) {
@@ -1269,12 +1267,13 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
     line: "",
     city: "",
     district: "",
-    state: "",
+    state: HOME_STATE,
     pincode: "",
     nearestPoliceStation: "",
     alsoPermanent: false,
   };
   const [v, setV] = useState(blank);
+  const [otherDistrict, setOtherDistrict] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dateError, setDateError] = useState("");
@@ -1335,6 +1334,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
         data-testid="add-address"
         onClick={() => {
           setV(blank);
+          setOtherDistrict(false);
           setError("");
           setDateError("");
           setProof(null);
@@ -1387,38 +1387,74 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 }}
               />
             </Field>
-            <Field label="Address">
-              <input
-                required
-                data-testid="address-line"
-                value={v.line}
-                onChange={(e) => setV({ ...v, line: e.target.value })}
-                className={input}
-              />
-            </Field>
-            <div className="grid gap-3 @min-[480px]/app:grid-cols-2">
-              <Field label="City">
-                <input
+            {/* D105: the state first, as a list; its districts follow it. */}
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="State">
+                <select
                   required
-                  data-testid="address-city"
-                  value={v.city}
-                  onChange={(e) => setV({ ...v, city: e.target.value })}
+                  data-testid="address-state"
+                  value={v.state}
+                  onChange={(e) => {
+                    setV({ ...v, state: e.target.value, district: "" });
+                    setOtherDistrict(false);
+                  }}
                   className={input}
-                />
+                >
+                  {STATES.map((st) => (
+                    <option key={st} value={st}>
+                      {st}
+                    </option>
+                  ))}
+                </select>
               </Field>
               <Field label="District">
+                <select
+                  data-testid="address-district"
+                  value={otherDistrict ? OTHER : v.district}
+                  onChange={(e) => {
+                    const other = e.target.value === OTHER;
+                    setOtherDistrict(other);
+                    setV({ ...v, district: other ? "" : e.target.value });
+                  }}
+                  className={input}
+                >
+                  <option value="">Select</option>
+                  {districtsOf(v.state).map((d) => (
+                    <option key={d} value={d}>
+                      {d}
+                    </option>
+                  ))}
+                  <option value={OTHER}>Not listed: type it</option>
+                </select>
+              </Field>
+            </div>
+            {otherDistrict && (
+              <Field label="District, as written">
                 <input
+                  data-testid="address-district-other"
                   value={v.district}
                   onChange={(e) => setV({ ...v, district: e.target.value })}
                   className={input}
                 />
               </Field>
-              <Field label="State">
+            )}
+            <Field label="Address">
+              <input
+                required
+                data-testid="address-line"
+                value={v.line}
+                placeholder="House, street and area"
+                onChange={(e) => setV({ ...v, line: e.target.value })}
+                className={input}
+              />
+            </Field>
+            <div className="grid gap-3 sm:grid-cols-2">
+              <Field label="City/Town">
                 <input
                   required
-                  data-testid="address-state"
-                  value={v.state}
-                  onChange={(e) => setV({ ...v, state: e.target.value })}
+                  data-testid="address-city"
+                  value={v.city}
+                  onChange={(e) => setV({ ...v, city: e.target.value })}
                   className={input}
                 />
               </Field>
@@ -1493,13 +1529,19 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
     unitId: "",
     effectiveFrom: todayIso(),
     orderRef: "",
-    expectedDuration: "",
     reason: "",
+    // D105: the current posting's own last day, and the duration as two lists.
+    endsOn: "",
+    durationYears: "",
+    durationMonths: "",
   };
   const [v, setV] = useState(blank);
+  // Once the Admin picks the start themselves, the last day no longer moves it.
+  const [startChosen, setStartChosen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [dateError, setDateError] = useState("");
+  const [endError, setEndError] = useState("");
   const currentUnit = card.currentDeployment;
   // D102: a person's own shift ends at the move unless the Admin keeps it.
   const ownShift = card.workPattern?.shiftSource === "person" ? card.workPattern.shift : null;
@@ -1525,13 +1567,35 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
     e.preventDefault();
     setError("");
     setDateError("");
+    setEndError("");
+    if (v.endsOn && !isIsoDate(v.endsOn)) {
+      setEndError(DATE_FORMAT_MESSAGE);
+      return;
+    }
     if (!isIsoDate(v.effectiveFrom)) {
       setDateError(DATE_FORMAT_MESSAGE);
       return;
     }
+    if (currentUnit && v.endsOn && v.endsOn < currentUnit.effectiveFrom) {
+      setEndError(`It can't end before it began, on ${formatDate(currentUnit.effectiveFrom)}.`);
+      return;
+    }
+    if (v.endsOn && v.effectiveFrom <= v.endsOn) {
+      setDateError(`The new posting has to start after ${formatDate(v.endsOn)}.`);
+      return;
+    }
+    const input: MoveInput = {
+      unitId: v.unitId,
+      effectiveFrom: v.effectiveFrom,
+      orderRef: v.orderRef,
+      expectedDuration: durationText(v.durationYears, v.durationMonths),
+      reason: v.reason,
+      ...(currentUnit && v.endsOn ? { currentEndsOn: v.endsOn } : {}),
+      ...(ownShift ? { keepOwnShift } : {}),
+    };
     setBusy(true);
     try {
-      await moveUnit(card.id, ownShift ? { ...v, keepOwnShift } : v);
+      await moveUnit(card.id, input);
       setOpen(false);
       await onChanged();
     } catch (err) {
@@ -1557,6 +1621,8 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
           setV(blank);
           setError("");
           setDateError("");
+          setEndError("");
+          setStartChosen(false);
           setKeepOwnShift(false);
           setAddingUnit(false);
           setOpen(true);
@@ -1571,7 +1637,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
             <DialogTitle>{currentUnit ? "Move to another unit" : "Deploy to a unit"}</DialogTitle>
             <DialogDescription data-testid="move-what-happens">
               {currentUnit
-                ? `Currently at ${currentUnit.unitName} since ${formatDate(currentUnit.effectiveFrom)}. That posting is closed the day before the new one starts, not edited.`
+                ? `Currently at ${currentUnit.unitName} since ${formatDate(currentUnit.effectiveFrom)}. That posting is closed, not edited: on the last day you give, or the day before the new one starts.`
                 : "No current posting, so nothing is closed."}
             </DialogDescription>
           </DialogHeader>
@@ -1621,15 +1687,45 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 }}
               />
             )}
-            <Field label="Effective from" error={dateError}>
+            {currentUnit && (
+              <Field label={`Last day at ${currentUnit.unitName} (optional)`} error={endError}>
+                <DateField
+                  label={`Last day at ${currentUnit.unitName}`}
+                  testId="move-ends"
+                  value={v.endsOn}
+                  min={currentUnit.effectiveFrom}
+                  invalid={!!endError}
+                  clearable
+                  onChange={(d) => {
+                    // The next posting starts the day after, unless the Admin
+                    // has chosen its start themselves.
+                    setV({
+                      ...v,
+                      endsOn: d,
+                      effectiveFrom: !startChosen && isIsoDate(d) ? nextDay(d) : v.effectiveFrom,
+                    });
+                    setEndError("");
+                    setDateError("");
+                  }}
+                />
+                <span className="mt-1 block text-caption text-muted-foreground">
+                  Empty, it ends the day before the new posting starts.
+                </span>
+              </Field>
+            )}
+            <Field
+              label={currentUnit ? "Starts at the new unit on" : "Effective from"}
+              error={dateError}
+            >
               <DateField
-                label="Effective from"
+                label={currentUnit ? "Starts at the new unit on" : "Effective from"}
                 required
                 testId="move-from"
                 value={v.effectiveFrom}
                 invalid={!!dateError}
                 onChange={(d) => {
                   setV({ ...v, effectiveFrom: d });
+                  setStartChosen(true);
                   setDateError("");
                 }}
               />
@@ -1669,15 +1765,38 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 className={`${input} font-mono`}
               />
             </Field>
-            <Field label="Expected duration">
-              <input
-                value={v.expectedDuration}
-                placeholder="6 months"
-                onChange={(e) => setV({ ...v, expectedDuration: e.target.value })}
-                className={input}
-              />
-            </Field>
-            <Field label="Reason">
+            <fieldset className="min-w-0 text-sm">
+              <legend className={eyebrow}>Expected duration</legend>
+              <div className="mt-1 grid grid-cols-2 gap-2">
+                <select
+                  aria-label="Expected duration, years"
+                  value={v.durationYears}
+                  onChange={(e) => setV({ ...v, durationYears: e.target.value })}
+                  className={input}
+                >
+                  <option value="">Years</option>
+                  {range(0, 10).map((y) => (
+                    <option key={y} value={String(y)}>
+                      {y === 1 ? "1 year" : `${y} years`}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  aria-label="Expected duration, months"
+                  value={v.durationMonths}
+                  onChange={(e) => setV({ ...v, durationMonths: e.target.value })}
+                  className={input}
+                >
+                  <option value="">Months</option>
+                  {range(0, 11).map((m) => (
+                    <option key={m} value={String(m)}>
+                      {m === 1 ? "1 month" : `${m} months`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </fieldset>
+            <Field label="Reason for deploying">
               <input
                 value={v.reason}
                 onChange={(e) => setV({ ...v, reason: e.target.value })}
@@ -1712,4 +1831,121 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
       </Dialog>
     </>
   );
+}
+
+/**
+ * Takes back the latest posting, added by mistake (D105). Never silent: a
+ * reason is required and kept, with who and when, and the card says which
+ * posting carries on. Only the latest, so history never has a hole in it.
+ */
+export function RemovePostingDialog({
+  card,
+  onChanged,
+}: {
+  card: EmployeeCard;
+  onChanged: Changed;
+}) {
+  const latest = [...(card.deployments ?? [])].sort((a, b) =>
+    b.effectiveFrom.localeCompare(a.effectiveFrom),
+  )[0];
+  const earlier = (card.deployments ?? []).find(
+    (d) => latest && d.id !== latest.id && d.effectiveTo === latest.effectiveFrom,
+  );
+  const [open, setOpen] = useState(false);
+  const [reason, setReason] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  if (!latest) return null;
+
+  async function remove() {
+    setError("");
+    if (reason.trim().length < 3) {
+      setError("Say why it is being removed. The reason is kept with the record.");
+      return;
+    }
+    setBusy(true);
+    try {
+      await withdrawPosting(latest.id, reason.trim());
+      setOpen(false);
+      await onChanged();
+    } catch (err) {
+      setError(errorText(err, "The posting couldn't be removed."));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  return (
+    <>
+      <button
+        type="button"
+        data-testid="remove-posting"
+        onClick={() => {
+          setReason("");
+          setError("");
+          setOpen(true);
+        }}
+        className="-my-2.5 inline-flex min-h-11 items-center text-sm font-medium text-destructive hover:underline"
+      >
+        Remove posting
+      </button>
+      <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Remove the posting to {latest.unitName}?</DialogTitle>
+            <DialogDescription data-testid="remove-posting-what-happens">
+              {`From ${formatDate(latest.effectiveFrom)}${
+                latest.effectiveTo ? ` to ${formatDate(lastDayOf(latest.effectiveTo))}` : ""
+              }, order ${latest.deploymentOrderRef}. `}
+              {earlier
+                ? `${earlier.unitName} carries on as though this move had not been made.`
+                : "They will have no posting from that date."}{" "}
+              The posting is kept, with your name and the reason, for anyone who asks later.
+            </DialogDescription>
+          </DialogHeader>
+          <label className="text-sm">
+            <span className={eyebrow}>Why is it being removed?</span>
+            <input
+              data-testid="remove-posting-reason"
+              value={reason}
+              maxLength={300}
+              onChange={(e) => setReason(e.target.value)}
+              placeholder="Added to the wrong unit"
+              className={`mt-1 ${input}`}
+            />
+          </label>
+          {error && (
+            <p role="alert" data-testid="remove-posting-error" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              onClick={() => void remove()}
+              disabled={busy}
+              data-testid="remove-posting-confirm"
+              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-45"
+            >
+              {busy ? "Removing…" : "Remove the posting"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              disabled={busy}
+              className="h-11 rounded-md border border-border px-4 text-sm"
+            >
+              Keep it
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}
+
+/** The last day of a posting whose end is held exclusive. */
+function lastDayOf(effectiveTo: string) {
+  const [y, m, d] = effectiveTo.split("-").map(Number);
+  return new Date(Date.UTC(y, m - 1, d - 1)).toISOString().slice(0, 10);
 }

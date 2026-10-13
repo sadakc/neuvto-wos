@@ -1,9 +1,10 @@
 /**
  * Platform · Shell · TabBar
  *
- * Algorithm 1 (DESIGN_SYSTEM §7). The module's main and team tabs in a row,
- * its Company tabs behind one `Company` menu, and whatever does not fit behind
- * `More`. Below 540px the whole row becomes one section picker.
+ * Algorithm 1 (DESIGN_SYSTEM §7). The module's tabs in a row, main and team
+ * first and its Company tabs after a divider, as many as fit in 70% of the bar
+ * (D105; they were three and a `Company` menu before), and whatever does not
+ * fit behind `More`. Below 540px the whole row becomes one section picker.
  *
  * Every tab, the `More` button, the `Company` button and the role note are
  * drawn once more in an invisible copy, measured there, and handed to
@@ -20,7 +21,7 @@ import { Link } from "@tanstack/react-router";
 import { ChevronDown, ChevronRight } from "lucide-react";
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import { cn } from "@/lib/utils";
-import { fitTabs } from "./fit";
+import { fitTabs, TAB_SHARE } from "./fit";
 import { tabSearch, type ShellModule, type ShellTab } from "./model";
 import { NavPanel, type NavPanelGroup } from "./NavPanel";
 import { useSize } from "./useSize";
@@ -55,25 +56,30 @@ export function TabBar({
   const [barEl, setBarEl] = useState<HTMLElement | null>(null);
   const copy = useRef<HTMLDivElement>(null);
   const moreRef = useRef<HTMLButtonElement>(null);
-  const companyRef = useRef<HTMLButtonElement>(null);
   const pickRef = useRef<HTMLButtonElement>(null);
-  const [open, setOpen] = useState<"more" | "company" | "pick" | null>(null);
+  const [open, setOpen] = useState<"more" | "pick" | null>(null);
   const measured = useSize(barEl).width;
   const barWidth = forceWidth ?? measured;
 
-  const rowTabs = module.tabs.filter((t) => t.group !== "company");
-  const companyTabs = module.tabs.filter((t) => t.group === "company");
+  const companyTabs = useMemo(
+    () => module.tabs.filter((t) => t.group === "company"),
+    [module.tabs],
+  );
+  // Company tabs are in the row now, after the module's own (D105).
+  const rowTabs = useMemo(
+    () => [...module.tabs.filter((t) => t.group !== "company"), ...companyTabs],
+    [module.tabs, companyTabs],
+  );
+  const firstCompany = rowTabs.findIndex((t) => t.group === "company");
   const active = module.tabs.find((t) => t.id === activeTabId) ?? null;
 
   const [widths, setWidths] = useState<{
     tabs: number[];
     more: number;
-    company: number;
     note: number | null;
   }>({
     tabs: [],
     more: 0,
-    company: 0,
     note: null,
   });
 
@@ -84,12 +90,14 @@ export function TabBar({
     if (!el) return;
     const w = (sel: string) => el.querySelector<HTMLElement>(sel)?.offsetWidth ?? 0;
     setWidths({
-      tabs: Array.from(el.querySelectorAll<HTMLElement>("[data-tab]")).map((t) => t.offsetWidth),
+      // The first Company tab carries its divider's 13px.
+      tabs: Array.from(el.querySelectorAll<HTMLElement>("[data-tab]")).map(
+        (t, i) => t.offsetWidth + (i === firstCompany && i > 0 ? 13 : 0),
+      ),
       more: w("[data-more]"),
-      company: companyTabs.length ? w("[data-company]") + 15 : 0, // + separator and margins
       note: module.hiddenForRole ? w("[data-note]") : null,
     });
-  }, [module, barWidth, companyTabs.length]);
+  }, [module, barWidth, firstCompany]);
 
   const fit = useMemo(
     () =>
@@ -97,10 +105,11 @@ export function TabBar({
         barWidth,
         tabWidths: widths.tabs.length === rowTabs.length ? widths.tabs : rowTabs.map(() => 0),
         activeIndex: rowTabs.findIndex((t) => t.id === activeTabId),
-        fixedWidth: widths.company,
+        fixedWidth: 0,
         moreWidth: widths.more,
         roleNoteWidth: widths.note,
         badges: rowTabs.map((t) => t.badge ?? 0),
+        share: TAB_SHARE,
       }),
     [barWidth, widths, rowTabs, activeTabId],
   );
@@ -199,10 +208,6 @@ export function TabBar({
             More <span className="px-1.5 font-mono text-table-header">99</span>
             <ChevronDown className="size-3" />
           </span>
-          <span data-company className={TAB}>
-            Company <span className="px-1.5 font-mono text-table-header">{companyTabs.length}</span>
-            <ChevronDown className="size-3" />
-          </span>
           <span data-note className="px-2 text-caption">
             {hiddenNote(module.hiddenForRole)}
           </span>
@@ -244,7 +249,22 @@ export function TabBar({
         </div>
       ) : (
         <>
-          {rowTabs.map((t, i) => (fit.visible[i] ? link(t) : null))}
+          {rowTabs.map((t, i) =>
+            fit.visible[i] ? (
+              i === firstCompany && i > 0 ? (
+                <span key={`company-${t.id}`} className="flex">
+                  <span
+                    aria-hidden
+                    data-testid="company-divider"
+                    className="mx-1.5 my-2.5 w-px shrink-0 bg-border"
+                  />
+                  {link(t)}
+                </span>
+              ) : (
+                link(t)
+              )
+            ) : null,
+          )}
 
           {fit.showMore && (
             <div className="relative flex">
@@ -276,57 +296,23 @@ export function TabBar({
                 open={open === "more"}
                 onClose={() => setOpen(null)}
                 trigger={moreRef}
-                groups={[{ items: rowTabs.filter((_, i) => !fit.visible[i]).map(asItem) }]}
+                align="right"
+                groups={[
+                  {
+                    heading: companyTabs.length ? module.name : undefined,
+                    items: rowTabs
+                      .filter((t, i) => !fit.visible[i] && t.group !== "company")
+                      .map(asItem),
+                  },
+                  {
+                    heading: "Company",
+                    items: rowTabs
+                      .filter((t, i) => !fit.visible[i] && t.group === "company")
+                      .map(asItem),
+                  },
+                ].filter((g) => g.items.length > 0)}
               />
             </div>
-          )}
-
-          {companyTabs.length > 0 && (
-            <>
-              <span aria-hidden className="mx-1.5 my-2.5 w-px shrink-0 bg-border" />
-              <div className="relative flex">
-                <button
-                  ref={companyRef}
-                  type="button"
-                  data-menu
-                  aria-expanded={open === "company"}
-                  aria-controls="tab-company"
-                  onClick={() => setOpen(open === "company" ? null : "company")}
-                  data-testid="tab-company"
-                  data-current={active?.group === "company" || undefined}
-                  aria-label={
-                    active?.group === "company" ? `Company, current: ${active.label}` : undefined
-                  }
-                  className={cn(
-                    TAB,
-                    active?.group === "company"
-                      ? "border-primary font-semibold text-primary"
-                      : "border-transparent text-foreground-secondary hover:text-foreground",
-                  )}
-                >
-                  Company
-                  <span
-                    className={cn(
-                      "rounded-full px-1.5 font-mono text-table-header",
-                      active?.group === "company"
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-surface3 text-foreground-secondary",
-                    )}
-                  >
-                    {companyTabs.length}
-                  </span>
-                  <ChevronDown className="size-3 opacity-70" aria-hidden />
-                </button>
-                <NavPanel
-                  id="tab-company"
-                  open={open === "company"}
-                  onClose={() => setOpen(null)}
-                  trigger={companyRef}
-                  align="right"
-                  groups={[{ heading: "Company", items: companyTabs.map(asItem) }]}
-                />
-              </div>
-            </>
           )}
 
           {fit.showRoleNote && (

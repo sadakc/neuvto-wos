@@ -108,3 +108,15 @@ export function describeShift(s: { startTime: string; endTime: string; breakMinu
     s.breakMinutes ? `, ${s.breakMinutes} min break` : ""
   }`;
 }
+
+/** "1 year 6 months" from the two lists; nothing chosen is no duration. */
+export function durationText(years: string, months: string) {
+  const y = Number(years || 0);
+  const m = Number(months || 0);
+  if (years === "" && months === "") return "";
+  const parts = [
+    y ? (y === 1 ? "1 year" : `${y} years`) : "",
+    m ? (m === 1 ? "1 month" : `${m} months`) : "",
+  ].filter(Boolean);
+  return parts.join(" ") || "Under a month";
+}

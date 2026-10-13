@@ -1669,6 +1669,8 @@ export type Database = {
           esic_cipher: string | null
           esic_last4: string | null
           identity_document_type: string | null
+          licence_cipher: string | null
+          licence_last4: string | null
           old_esic_cipher: string | null
           old_esic_last4: string | null
           old_uan_cipher: string | null
@@ -1700,6 +1702,8 @@ export type Database = {
           esic_cipher?: string | null
           esic_last4?: string | null
           identity_document_type?: string | null
+          licence_cipher?: string | null
+          licence_last4?: string | null
           old_esic_cipher?: string | null
           old_esic_last4?: string | null
           old_uan_cipher?: string | null
@@ -1731,6 +1735,8 @@ export type Database = {
           esic_cipher?: string | null
           esic_last4?: string | null
           identity_document_type?: string | null
+          licence_cipher?: string | null
+          licence_last4?: string | null
           old_esic_cipher?: string | null
           old_esic_last4?: string | null
           old_uan_cipher?: string | null
@@ -3511,6 +3517,54 @@ export type Database = {
           },
         ]
       }
+      record_withdrawals: {
+        Row: {
+          employee_id: string
+          id: string
+          kind: string
+          organization_id: string
+          reason: string
+          record: Json
+          withdrawn_at: string
+          withdrawn_by: string | null
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          kind: string
+          organization_id: string
+          reason: string
+          record: Json
+          withdrawn_at?: string
+          withdrawn_by?: string | null
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          kind?: string
+          organization_id?: string
+          reason?: string
+          record?: Json
+          withdrawn_at?: string
+          withdrawn_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_withdrawals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_withdrawals_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       report_definitions: {
         Row: {
           created_at: string
@@ -4397,6 +4451,10 @@ export type Database = {
       employee_update_draft: {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
+      }
+      employee_withdraw_posting: {
+        Args: { _deployment_id: string; _reason: string }
+        Returns: Json
       }
       employee_work_pattern: {
         Args: { _employee_id: string; _with_history: boolean }

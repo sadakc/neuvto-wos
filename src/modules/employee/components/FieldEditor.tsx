@@ -16,6 +16,7 @@
  * chose to change is typed and sent.
  */
 
+import { X } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import {
   Dialog,
@@ -112,6 +113,7 @@ export function FieldEditor({
   accessibleLabel,
   filled = true,
   description,
+  crossCheck,
 }: {
   id: string;
   title: string;
@@ -125,6 +127,11 @@ export function FieldEditor({
   /** Whether the panel holds anything yet: "Edit" if so, "Add" if not. */
   filled?: boolean;
   description?: ReactNode;
+  /**
+   * Rules between fields (D105: an old UAN is not the current one), as
+   * field key → message. Asked of what is typed, after each field's own rule.
+   */
+  crossCheck?: (vals: Record<string, string>) => Record<string, string>;
 }) {
   const initial = () =>
     Object.fromEntries(fields.map((f) => [f.key, f.current || f.defaultValue || ""]));
@@ -184,6 +191,9 @@ export function FieldEditor({
       if (now !== "") changed[f.key] = now;
       else if (f.clearable) changed[f.key] = null;
     }
+    for (const [key, message] of Object.entries(crossCheck?.(vals) ?? {})) {
+      found[key] ??= message;
+    }
     setErrors(found);
     if (Object.keys(found).length > 0) return;
     if (Object.keys(changed).length === 0) {
@@ -231,7 +241,7 @@ export function FieldEditor({
               {description ??
                 (fields.some((f) => f.masked)
                   ? "Only what you change is saved. A number on record stays as it is unless you choose Change."
-                  : "Only what you change is saved. Empty a field to clear it.")}
+                  : "Only what you change is saved. The × in a box clears it.")}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -329,58 +339,79 @@ export function FieldEditor({
               }
               return (
                 <div key={f.key} className="min-w-0 text-sm">
-                  <label className="block">
-                    <span className={eyebrow}>{f.label}</span>
-                    {f.kind === "select" ? (
-                      <select
-                        value={vals[f.key]}
-                        onChange={(e) => {
-                          if (e.target.value === ADD) setAdding(f.key);
-                          else {
-                            setAdding((a) => (a === f.key ? null : a));
-                            set(f, e.target.value);
-                          }
-                        }}
-                        aria-invalid={bad ? true : undefined}
-                        aria-describedby={bad ? errId : undefined}
-                        className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
-                      >
-                        <option value="">{f.emptyLabel ?? "Not recorded"}</option>
-                        {options.map(([value, text]) => (
-                          <option key={value} value={value}>
-                            {text}
-                          </option>
-                        ))}
-                        {f.add && <option value={ADD}>{f.add.label}</option>}
-                      </select>
-                    ) : f.kind === "date" ? (
-                      <DateField
-                        label={f.label}
-                        value={vals[f.key]}
-                        onChange={(value) => set(f, value)}
-                        min={f.min}
-                        max={f.max}
-                        openAt={f.openAt}
-                        invalid={!!bad}
-                        describedBy={bad ? errId : undefined}
-                        className="mt-1"
-                      />
-                    ) : (
-                      <input
-                        type="text"
-                        value={vals[f.key]}
-                        autoFocus={!!f.masked}
-                        onChange={(e) => set(f, e.target.value)}
-                        placeholder={f.placeholder}
-                        inputMode={f.inputMode}
-                        maxLength={f.maxLength}
-                        autoComplete="off"
-                        aria-invalid={bad ? true : undefined}
-                        aria-describedby={bad ? errId : undefined}
-                        className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 font-mono aria-invalid:border-destructive"
-                      />
-                    )}
-                  </label>
+                  <div className="relative">
+                    <label className="block">
+                      <span className={eyebrow}>{f.label}</span>
+                      {f.kind === "select" ? (
+                        <select
+                          value={vals[f.key]}
+                          onChange={(e) => {
+                            if (e.target.value === ADD) setAdding(f.key);
+                            else {
+                              setAdding((a) => (a === f.key ? null : a));
+                              set(f, e.target.value);
+                            }
+                          }}
+                          aria-invalid={bad ? true : undefined}
+                          aria-describedby={bad ? errId : undefined}
+                          className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
+                        >
+                          <option value="">{f.emptyLabel ?? "Not recorded"}</option>
+                          {options.map(([value, text]) => (
+                            <option key={value} value={value}>
+                              {text}
+                            </option>
+                          ))}
+                          {f.add && <option value={ADD}>{f.add.label}</option>}
+                        </select>
+                      ) : f.kind === "date" ? (
+                        <DateField
+                          label={f.label}
+                          value={vals[f.key]}
+                          onChange={(value) => set(f, value)}
+                          min={f.min}
+                          max={f.max}
+                          openAt={f.openAt}
+                          invalid={!!bad}
+                          describedBy={bad ? errId : undefined}
+                          clearable={f.clearable}
+                          className="mt-1"
+                        />
+                      ) : (
+                        // D105: a clearable box has an x at its right that empties
+                        // it in one go, and room kept for it so text never runs under.
+                        // The x sits outside the label, so the label names the box alone.
+                        <span className="mt-1 block">
+                          <input
+                            type="text"
+                            value={vals[f.key]}
+                            autoFocus={!!f.masked}
+                            onChange={(e) => set(f, e.target.value)}
+                            placeholder={f.placeholder}
+                            inputMode={f.inputMode}
+                            maxLength={f.maxLength}
+                            autoComplete="off"
+                            aria-invalid={bad ? true : undefined}
+                            aria-describedby={bad ? errId : undefined}
+                            className={`h-11 w-full rounded-md border border-input bg-background pl-3 font-mono aria-invalid:border-destructive ${f.clearable ? "pr-11" : "pr-3"}`}
+                          />
+                        </span>
+                      )}
+                    </label>
+                    {f.clearable &&
+                      f.kind !== "select" &&
+                      f.kind !== "date" &&
+                      vals[f.key] !== "" && (
+                        <button
+                          type="button"
+                          aria-label={`Clear ${f.label}`}
+                          onClick={() => set(f, "")}
+                          className="absolute right-0 bottom-0 inline-flex h-11 w-11 items-center justify-center rounded-r-md text-muted-foreground hover:text-foreground"
+                        >
+                          <X className="size-4" aria-hidden />
+                        </button>
+                      )}
+                  </div>
                   {f.masked && (
                     <button
                       type="button"

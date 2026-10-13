@@ -114,17 +114,18 @@ async function shellFor(roles: AppRole[]) {
 }
 
 describe("the shell, per role, on a Leave page", () => {
-  it("an employee has no Organisation rail entry and no Company menu", async () => {
+  it("an employee has no Organisation rail entry and no Company tabs", async () => {
     await shellFor(["employee"]);
     expect(screen.getByTestId("rail-home")).toBeInTheDocument();
     expect(screen.queryByTestId("rail-organisation")).toBeNull();
     expect(screen.queryByText("Organisation")).toBeNull();
-    expect(screen.queryByTestId("tab-company")).toBeNull();
+    expect(screen.queryByTestId("company-divider")).toBeNull();
   });
 
   it("an org_admin has both", async () => {
     await shellFor(["employee", "org_admin"]);
     expect(screen.getByTestId("rail-organisation")).toHaveAttribute("href", "/app/members");
-    expect(screen.getByTestId("tab-company")).toBeInTheDocument();
+    // D105: the Company tabs are in the row, after their divider.
+    expect(screen.getByTestId("company-divider")).toBeInTheDocument();
   });
 });

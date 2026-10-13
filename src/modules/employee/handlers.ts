@@ -213,6 +213,24 @@ export interface MoveInput {
   orderRef: string;
   expectedDuration?: string;
   reason?: string;
+  /** D105: the current posting's last day, when it is not the day before the new one starts. */
+  currentEndsOn?: string;
+}
+
+/**
+ * Takes back a posting added by mistake (D105). Kept, with the reason, in
+ * record_withdrawals; the posting it cut short carries on. Only the latest.
+ */
+export async function withdrawPosting(
+  deploymentId: string,
+  reason: string,
+): Promise<{ unitName: string; resumed: string | null }> {
+  const { data, error } = await supabase.rpc("employee_withdraw_posting", {
+    _deployment_id: deploymentId,
+    _reason: reason,
+  });
+  if (error) throw toEmployeeError(error.message, error.details);
+  return data as { unitName: string; resumed: string | null };
 }
 
 /** Closes the current posting the day before and opens the new one. */
@@ -262,12 +280,11 @@ export async function savePreviousOrgs(
 }
 
 export interface NominationInput {
-  scheme: string;
   effectiveFrom: string;
   nominees: { name: string; relation: string; dateOfBirth?: string | null; sharePercent: number }[];
 }
 
-/** A new nomination that supersedes the scheme's open one, which is kept. */
+/** A new nomination, for every scheme (D105), that supersedes the open one, which is kept. */
 export async function saveNomination(employeeId: string, input: NominationInput): Promise<void> {
   const { error } = await supabase.rpc("employee_save_nomination", {
     _employee_id: employeeId,

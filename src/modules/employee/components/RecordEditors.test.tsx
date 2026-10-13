@@ -224,7 +224,10 @@ describe("history", () => {
       "Currently at Tata AIG, Hosur",
     );
     const dialog = screen.getByRole("dialog");
-    expect(within(dialog).queryByRole("textbox", { name: /unit/i })).toBeNull();
+    // The unit is chosen, never typed (the dates name the unit, and are dates).
+    expect(
+      within(dialog).queryByRole("textbox", { name: /^(unit|move to|deploy to)$/i }),
+    ).toBeNull();
 
     expect(screen.getByTestId("move-save")).toBeDisabled();
     await user.selectOptions(select, "u-hq");

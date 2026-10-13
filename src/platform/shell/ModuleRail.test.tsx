@@ -10,8 +10,9 @@
  * measuring copy adds no second set of links for a screen reader or a test.
  */
 
-import { describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
 import { render, screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import type { ModuleSection } from "@/platform/modules";
 import type { ShellModule } from "./model";
 import { ModuleRail } from "./ModuleRail";
@@ -125,5 +126,45 @@ describe("row mode, the measuring copy", () => {
     expect(screen.getAllByTestId("rail-m4")).toHaveLength(1);
     const hrefs = screen.getAllByRole("link", { hidden: true }).map((a) => a.getAttribute("href"));
     expect(new Set(hrefs).size).toBe(hrefs.length);
+  });
+});
+
+describe("folding the modules away (D105)", () => {
+  beforeEach(() => window.localStorage.clear());
+
+  it("folds the column to named icons, keeps it folded, and opens it again", async () => {
+    const u = userEvent.setup();
+    const { unmount } = render(
+      <ModuleRail modules={many(3)} activeKey="m2" mode="column" brand={null} />,
+    );
+    await u.click(screen.getByRole("button", { name: "Hide the modules column" }));
+    expect(screen.getByTestId("rail-folded")).toBeInTheDocument();
+    // Icons only, but every module still a link with its name, and the current one marked.
+    expect(railLinks().map((a) => a.getAttribute("aria-label"))).toEqual([
+      "m1 module",
+      "m2 module",
+      "m3 module",
+    ]);
+    expect(screen.getByTestId("rail-m2")).toHaveAttribute("aria-current", "page");
+    expect(screen.queryByText("m1 module")).toBeNull();
+    unmount();
+
+    // Remembered on this device.
+    render(<ModuleRail modules={many(3)} activeKey="m2" mode="column" brand={null} />);
+    expect(screen.getByTestId("rail-folded")).toBeInTheDocument();
+    await u.click(screen.getByRole("button", { name: "Show the modules column" }));
+    expect(screen.queryByTestId("rail-folded")).toBeNull();
+    expect(screen.getByText("m1 module")).toBeInTheDocument();
+  });
+
+  it("hides the phone grid under its brand, and shows it again", async () => {
+    const u = userEvent.setup();
+    render(<ModuleRail modules={many(3)} activeKey="m1" mode="grid" brand={null} />);
+    const toggle = screen.getByRole("button", { name: "Hide modules" });
+    expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await u.click(toggle);
+    expect(screen.queryAllByRole("link")).toHaveLength(0);
+    await u.click(screen.getByRole("button", { name: "Show modules" }));
+    expect(railLinks()).toHaveLength(3);
   });
 });

@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.18 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.19 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -698,6 +698,46 @@ Found testing the D103 build, all fixed:
 
 Leave's own date boxes are not changed in this round; the same field drops in there when
 wanted.
+
+### Sada's third round (D105, 13 Oct 2026)
+
+- **The module is the Employee Card** on every screen (the rail, the header, the database's
+  module list). This document keeps its name.
+- **Tabs fill the row.** As many as fit in 70% of the bar are shown, the Company tabs after a
+  divider instead of behind a `Company` menu; the rest are behind `More`. Below 540px the row
+  is still the one section picker.
+- **The modules column folds** to a strip of named icons (a row or grid on narrower screens
+  folds up under its brand), and stays folded on that device.
+- **Postings.** Current deployment on the Overview has its own Deploy/Move button. A move can
+  end the current posting on its own last day; the new one starts the day after, unless the
+  Admin picks another start. Expected duration is years and months; the reason is "Reason for
+  deploying". The latest posting can be **removed**, with a reason: it is kept in
+  `record_withdrawals` with who and when, listed under the history as a removed posting, and the
+  posting it cut short carries on. This is the one exception to "history is never deleted"
+  (rule 2): the append-only triggers let through only the row a withdrawing function names.
+- **The blank Current unit, Since and Deployed unit** after a move dated ahead: "current" meant
+  "no end date", and the old posting had one in the future while the new one had not begun.
+  It now means the posting covering today, with the next one shown beside it ("Moving to").
+- **One nomination for every scheme.** The Scheme choice is gone; the ESIC save that did not
+  show was a second, separate nomination. Saving again the same day corrects the nomination
+  (the first is kept in `record_withdrawals`) instead of clashing with it.
+- **Native state** is every state and union territory, Karnataka first and the default, then
+  Maharashtra, Goa and Andhra Pradesh, then the rest alphabetically (`indiaPlaces.ts`). Bijapur
+  is a district of Karnataka (Vijayapura), not a state, so it is not in the state list.
+- **Addresses** start with the state, as a list; its districts follow it, with "Not listed" for
+  one newer than the list. City is **City/Town**. An address is written line, city or town,
+  district, state, India, then the PIN code.
+- **Clearing a box** is the × at its right, with room kept so text never runs under it.
+- **The calendar** goes to the end of next year; a document's expiry goes ten years ahead.
+- **Height** starts at 4 ft. **Add a family member**, not "Add a relative". **Dates and status**
+  is **Joining and exit dates**.
+- **Change shift** starts on the shift they work now and offers Save only for a change; saving
+  "their unit's shift" for somebody already on it used to be refused after the click.
+- **An old UAN or ESIC number that is the current one** is refused, on screen when both are
+  typed and by the database when one is on record.
+- **Identity documents** drop "Document given" (the Documents tab answers it) for a **driving
+  licence number**, encrypted and opened like PAN.
+- **The passbook or cheque photo** is the Documents tab's bank proof, so it is listed there too.
 
 ## 8. Acceptance criteria, module level
 

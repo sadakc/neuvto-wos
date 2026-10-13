@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from "react";
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
@@ -66,11 +66,15 @@ export function DateField({
   describedBy,
   testId,
   required,
+  clearable,
   className,
 }: {
   value: string;
   onChange: (value: string) => void;
-  /** The earliest and latest dates the calendar offers, ISO. */
+  /**
+   * The earliest and latest dates the calendar offers, ISO. The latest is the
+   * end of next year unless said (D105): nothing here is booked further ahead.
+   */
   min?: string;
   max?: string;
   /** Where the calendar opens when nothing is chosen yet, ISO. Today otherwise. */
@@ -82,6 +86,8 @@ export function DateField({
   describedBy?: string;
   testId?: string;
   required?: boolean;
+  /** An x beside the calendar that empties the date (D105). */
+  clearable?: boolean;
   className?: string;
 }) {
   const [text, setText] = useState(() => toText(value));
@@ -95,7 +101,7 @@ export function DateField({
 
   const chosen = isIsoDate(value) ? toDate(value) : undefined;
   const first = toDate(min && isIsoDate(min) ? min : "1900-01-01");
-  const lastIso = max && isIsoDate(max) ? max : `${new Date().getFullYear() + 20}-12-31`;
+  const lastIso = max && isIsoDate(max) ? max : `${new Date().getFullYear() + 1}-12-31`;
   const last = toDate(lastIso);
   const startAt = chosen ?? toDate(openAt && isIsoDate(openAt) ? openAt : todayIso());
   const today = todayIso();
@@ -121,8 +127,24 @@ export function DateField({
           setText(t);
           onChange(fromText(t));
         }}
-        className="h-11 w-full min-w-0 rounded-md border border-input bg-background pr-11 pl-3 font-mono text-sm aria-invalid:border-destructive"
+        className={cn(
+          "h-11 w-full min-w-0 rounded-md border border-input bg-background pl-3 font-mono text-sm aria-invalid:border-destructive",
+          clearable ? "pr-20" : "pr-11",
+        )}
       />
+      {clearable && text !== "" && (
+        <button
+          type="button"
+          aria-label={label ? `Clear ${label.toLowerCase()}` : "Clear the date"}
+          onClick={() => {
+            setText("");
+            onChange("");
+          }}
+          className="absolute right-10 inline-flex h-11 w-9 items-center justify-center text-muted-foreground hover:text-foreground"
+        >
+          <X className="size-4" aria-hidden />
+        </button>
+      )}
       <Popover open={open} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button

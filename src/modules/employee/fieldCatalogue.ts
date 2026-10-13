@@ -247,7 +247,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "No",
     "Everyone",
     "Yes",
-    at("Employment", "Dates and status"),
+    at("Employment", "Joining and exit dates"),
   ),
   f(
     "Employment",
@@ -257,7 +257,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "No",
     "People Ops",
     "Yes",
-    at("Employment", "Dates and status"),
+    at("Employment", "Joining and exit dates"),
   ),
   f(
     "Employment",
@@ -267,7 +267,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "No",
     "Everyone",
     "Yes",
-    at("Employment", "Dates and status"),
+    at("Employment", "Joining and exit dates"),
   ),
   f(
     "Employment",
@@ -277,7 +277,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "No",
     "People Ops",
     "Yes",
-    at("Employment", "Dates and status"),
+    at("Employment", "Joining and exit dates"),
   ),
   f(
     "Employment",

@@ -186,6 +186,16 @@ export interface EmployeeCard {
   familyMembers?: FamilyMember[];
   nominations?: Nomination[];
   deployments?: Deployment[];
+  /** D105: the posting that starts after today, if a move is dated ahead. */
+  nextDeployment?: { unitName: string; effectiveFrom: string } | null;
+  /** D105: postings an Admin took back, with why. The Admin's card only. */
+  withdrawnPostings?: {
+    unitName: string;
+    effectiveFrom: string;
+    reason: string;
+    withdrawnBy: string | null;
+    withdrawnAt: string;
+  }[];
 
   // ── E6 (D80). Full numbers only where §5 grants them; otherwise last four.
   /** Self, Admin, Payroll, Statutory. `uan` and friends only for Payroll and Statutory. */
@@ -229,6 +239,8 @@ export interface StatutoryBlock {
   identityDocumentType: string | null;
   aadhaarLast4: string | null;
   panLast4: string | null;
+  /** D105: a driving licence number, encrypted like PAN. */
+  licenceLast4?: string | null;
   verifiedOn: string | null;
   uanLast4: string | null;
   epfLast4: string | null;
@@ -278,6 +290,7 @@ export type RevealField =
   | "old_esic_number"
   | "aadhaar"
   | "pan"
+  | "driving_licence"
   | "bank_account"
   | "religion"
   | "caste_category"
@@ -291,6 +304,7 @@ export interface Revealed {
   oldEsicNumber?: string | null;
   aadhaar?: string | null;
   pan?: string | null;
+  drivingLicence?: string | null;
   bankAccount?: string | null;
   religion?: string | null;
   casteCategory?: string | null;
@@ -448,6 +462,25 @@ export function employeeErrorMessage(code: string, detail?: string | null): stri
     ["ORDER_REF_REQUIRED", "A move needs a deployment order reference."],
     ["UNIT_NOT_AVAILABLE", "That unit isn't available. Choose an active unit."],
     ["ALREADY_DEPLOYED_THERE", "They're already deployed there."],
+    // D105, deployments, nominations and numbers.
+    [
+      "STARTS_BEFORE_THE_LAST_ENDS",
+      "The new posting has to start after the current one's last day.",
+    ],
+    ["ENDS_BEFORE_IT_BEGAN", "The current posting can't end before it began."],
+    ["NOT_THE_LATEST", "Only the latest posting can be removed. Remove the ones after it first."],
+    [
+      "OLD_UAN_IS_CURRENT",
+      "The old UAN is the same as the current one. An old UAN is a previous account.",
+    ],
+    [
+      "OLD_ESIC_IS_CURRENT",
+      "The old ESIC number is the same as the current one. An old number is a previous one.",
+    ],
+    [
+      "INVALID_LICENCE",
+      "A driving licence number starts with the state's two letters, like KA01 20110012345.",
+    ],
     // D102, shift and calendar.
     ["CALENDAR_NOT_AVAILABLE", "That calendar isn't available. Choose one in use."],
     ["CALENDAR_NAME_TAKEN", "There's already a calendar with that name."],

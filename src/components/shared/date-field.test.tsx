@@ -97,3 +97,32 @@ describe("picking a date", () => {
     expect(await screen.findByRole("button", { name: "Today" })).toBeDisabled();
   });
 });
+
+describe("how far ahead the calendar goes (D105)", () => {
+  it("offers next year at the latest, unless told otherwise", async () => {
+    const u = userEvent.setup();
+    render(<Form />);
+    await u.click(screen.getByRole("button", { name: "Choose date of birth from a calendar" }));
+    const [, year] = within(await screen.findByRole("dialog")).getAllByRole(
+      "combobox",
+    ) as HTMLSelectElement[];
+    expect([...year.options].map((o) => o.value).at(-1)).toBe(String(new Date().getFullYear() + 1));
+  });
+
+  it("has an x that clears the date when asked for one", async () => {
+    const u = userEvent.setup();
+    function Clearable() {
+      const [v, setV] = useState("2001-12-25");
+      return (
+        <>
+          <DateField value={v} onChange={setV} label="Date of birth" clearable />
+          <output data-testid="value">{v}</output>
+        </>
+      );
+    }
+    render(<Clearable />);
+    await u.click(screen.getByRole("button", { name: "Clear date of birth" }));
+    expect(value()).toBe("");
+    expect(screen.queryByRole("button", { name: "Clear date of birth" })).toBeNull();
+  });
+});

@@ -59,6 +59,7 @@ const REVEALED_AS: Record<RevealField, keyof Revealed> = {
   old_esic_number: "oldEsicNumber",
   aadhaar: "aadhaar",
   pan: "pan",
+  driving_licence: "drivingLicence",
   bank_account: "bankAccount",
   religion: "religion",
   caste_category: "casteCategory",
@@ -266,7 +267,6 @@ export function StatutoryTab({
           <Panel title="Identity documents" testId="panel-identity-docs" aside={editors.ids}>
             <Fields
               items={[
-                { label: "Document given", value: humanise(st.identityDocumentType) },
                 {
                   label: "Aadhaar",
                   value: secret(
@@ -281,6 +281,18 @@ export function StatutoryTab({
                 {
                   label: "PAN",
                   value: secret("pan", "PAN", "pan", st.panLast4, null, !!caps.canRevealStatutory),
+                },
+                // D105: in place of "Document given", which the Documents tab now answers.
+                {
+                  label: "Driving licence",
+                  value: secret(
+                    "driving_licence",
+                    "driving licence",
+                    "licence",
+                    st.licenceLast4,
+                    null,
+                    !!caps.canRevealStatutory,
+                  ),
                 },
                 { label: "Verified on", value: formatDate(st.verifiedOn) },
               ]}
@@ -616,8 +628,17 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
     filled: boolean,
     fields: FieldSpec[],
     save: (vals: Record<string, string | null>) => Promise<void>,
+    crossCheck?: (vals: Record<string, string>) => Record<string, string>,
   ) => (
-    <Editor id={id} title={title} filled={filled} fields={fields} save={save} onSaved={onChanged} />
+    <Editor
+      id={id}
+      title={title}
+      filled={filled}
+      fields={fields}
+      save={save}
+      onSaved={onChanged}
+      crossCheck={crossCheck}
+    />
   );
 
   return {
@@ -658,13 +679,31 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
             },
           ],
           (vals) => setStatutory(card.id, vals),
+          // D105: the same number twice is a slip. One already on record is
+          // known only by its last four here; the database checks that case.
+          (vals) => {
+            const same = (a: string, b: string) => {
+              const n = (x: string) => x.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
+              return n(a) !== "" && n(a) === n(b);
+            };
+            const found: Record<string, string> = {};
+            if (same(vals.uan ?? "", vals.oldUan ?? "")) {
+              found.oldUan =
+                "The old UAN is the same as the current one. An old UAN is a previous account.";
+            }
+            if (same(vals.esicNumber ?? "", vals.oldEsicNumber ?? "")) {
+              found.oldEsicNumber =
+                "The old ESIC number is the same as the current one. An old number is a previous one.";
+            }
+            return found;
+          },
         )
       : null,
     ids: caps.canEditStatutory
       ? editor(
           "identity-docs",
           "Identity documents",
-          has(st?.aadhaarLast4, st?.panLast4, st?.identityDocumentType, st?.verifiedOn),
+          has(st?.aadhaarLast4, st?.panLast4, st?.licenceLast4, st?.verifiedOn),
           [
             {
               key: "aadhaar",
@@ -675,11 +714,10 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
             },
             { key: "pan", label: "PAN", masked: st?.panLast4, rule: "pan" },
             {
-              key: "identityDocumentType",
-              label: "Document given",
-              kind: "select",
-              options: ["aadhaar", "pan", "passport", "voter_id", "driving_licence"],
-              current: st?.identityDocumentType,
+              key: "drivingLicence",
+              label: "Driving licence",
+              masked: st?.licenceLast4,
+              rule: "licence",
             },
             {
               key: "verifiedOn",

@@ -29,6 +29,7 @@ export type FieldRule =
   | "epf"
   | "ifsc"
   | "account"
+  | "licence"
   | "percent";
 
 const WORD_SYMBOLS = /[0-9!"#$%&()*+,/:;<=>?@^_`{|}~[\]\\]/;
@@ -205,6 +206,10 @@ export const FIELD_RULES: Record<
   account: {
     check: (v) => /^[0-9]{9,18}$/.test(norm(v)),
     message: "An account number is 9 to 18 digits.",
+  },
+  licence: {
+    check: (v) => /^[A-Z]{2}[0-9A-Z]{8,16}$/.test(norm(v)),
+    message: "A driving licence number starts with the state's two letters, like KA01 20110012345.",
   },
   percent: {
     check: (v) => /^[0-9]+(\.[0-9]{1,2})?$/.test(v) && Number(v) <= 100,

@@ -55,16 +55,16 @@ test("an invited person's card is completed, panel by panel, before they accept"
   await expect(emergency).toContainText("No emergency contact recorded yet.");
   await emergency.getByRole("button", { name: "Add emergency contact" }).click();
   const dialog = page.getByRole("dialog");
-  await dialog.getByLabel("Name").fill("Lata");
+  await dialog.getByLabel("Name", { exact: true }).fill("Lata");
   // D104: the relation is the nominee list, chosen.
   await expect(dialog.getByLabel("Relation").locator("option:checked")).toHaveText("Select");
   await dialog.getByLabel("Relation").selectOption({ label: "Sister" });
-  await dialog.getByLabel("Phone").fill("12345");
+  await dialog.getByLabel("Phone", { exact: true }).fill("12345");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toContainText(
     "A mobile number has 10 digits; this has 5.",
   );
-  await dialog.getByLabel("Phone").fill("+971 50 123 4567");
+  await dialog.getByLabel("Phone", { exact: true }).fill("+971 50 123 4567");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(emergency).toContainText("Lata");
@@ -73,14 +73,14 @@ test("an invited person's card is completed, panel by panel, before they accept"
   // An 11-digit alternate mobile is refused, by the screen.
   const contact = page.getByTestId("panel-contact");
   await contact.getByRole("button", { name: "Edit contact" }).click();
-  await dialog.getByLabel("Alternate mobile").fill("34654365465");
+  await dialog.getByLabel("Alternate mobile", { exact: true }).fill("34654365465");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toContainText("this has 11");
   // Sada's report (D104): cut to ten, it is still refused, and now says why.
-  await dialog.getByLabel("Alternate mobile").fill("3465436546");
+  await dialog.getByLabel("Alternate mobile", { exact: true }).fill("3465436546");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toContainText("starts with 6, 7, 8 or 9");
-  await dialog.getByLabel("Alternate mobile").fill("9876543211");
+  await dialog.getByLabel("Alternate mobile", { exact: true }).fill("9876543211");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog).toHaveCount(0);
   await expect(contact).toContainText("9876543211");
@@ -88,11 +88,15 @@ test("an invited person's card is completed, panel by panel, before they accept"
   // The name and the mobile, corrected before acceptance.
   await page.getByRole("tab", { name: "Personal" }).click();
   await page.getByTestId("panel-identity").getByRole("button", { name: "Edit identity" }).click();
-  await dialog.getByLabel("Full name").fill("Deepak Kumar");
-  await dialog.getByLabel("Native state").fill("Tamil Nadu1");
+  await dialog.getByLabel("Full name", { exact: true }).fill("Deepak Kumar");
+  await dialog.getByLabel("Name as printed on ID", { exact: true }).fill("Deepak 2");
   await dialog.getByRole("button", { name: "Save" }).click();
   await expect(dialog.getByRole("alert")).toContainText("Letters only");
-  await dialog.getByLabel("Native state").fill("Tamil Nadu");
+  // D105: the x clears a box in one go.
+  await dialog.getByRole("button", { name: "Clear Name as printed on ID" }).click();
+  await expect(dialog.getByLabel("Name as printed on ID", { exact: true })).toHaveValue("");
+  // D105: native state is the list of states, Karnataka already chosen.
+  await expect(dialog.getByLabel("Native state").locator("option:checked")).toHaveText("Karnataka");
   // D104: nationality is a dropdown, Indian already chosen.
   await expect(dialog.getByLabel("Nationality").locator("option:checked")).toHaveText("Indian");
   // The date of birth from the calendar: year and month are dropdowns.
