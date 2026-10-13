@@ -1,6 +1,6 @@
 # NEUVTO WOS — Coding Standards
 
-**Version:** 1.2 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 19 Aug 2026
+**Version:** 1.3 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 13 Oct 2026
 
 Two goals: consistency across every module, and **portability out of Lovable at any time**. §9 is the portability contract — treat it as non-negotiable.
 
@@ -194,6 +194,21 @@ Coverage targets are not the goal — the following must be tested regardless:
 5. Approval chain resolution when the manager is missing, is the requester, or is inactive
 
 The SQL harness in `neuvto-harness/` is part of the test suite, not a separate activity. It runs after every build step.
+
+### Mutation testing: do the tests notice a break?
+
+A passing test only proves something if it fails when the code is wrong. Stryker (`stryker.config.mjs`) checks that by breaking the TypeScript on purpose, one small change at a time: a `>` turned into `>=`, a condition forced true, a word emptied. It runs the unit tests against each break. A break no test notices **survives**, and each survivor is a rule, message or branch nothing pins.
+
+```bash
+bun run mutate src/modules/employee/format.ts
+```
+
+- **Run it on the file or folder you changed**, not the whole app: one file takes about three minutes; all of `src` takes hours. The report is at `reports/mutation/index.html` (local, not committed).
+- **Every survivor is either fixed with a test or explained.** Some can never change what a person sees. For example, `end < start` becoming `end <= start` in `describeShift` is harmless, because the database forbids a shift that starts and ends at the same time. Say so in the PR; don't chase 100%.
+- **No incremental cache.** It reported stale survivors for module-level constants after the tests that kill them were added (tried 13 Oct 2026).
+- **SQL is out of its reach.** Database guards are sabotaged through the harness, by changing the migration and watching the harness fail.
+
+First run, on `src/modules/employee/format.ts`: 80% → 97%. It found that the weekly-off wording for Monday, Tuesday and Thursday, three month names, and every family plural, `wives` included, could be blanked with no test failing. Day shifts and zero-break shifts were never checked either.
 
 ---
 

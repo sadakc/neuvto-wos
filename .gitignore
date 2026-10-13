@@ -47,3 +47,7 @@ dist-ssr
 # Supabase local scratch
 supabase/.branches
 supabase/.temp
+
+# Mutation testing (stryker.config.mjs): its sandbox and its reports are local.
+.stryker-tmp
+reports/mutation
