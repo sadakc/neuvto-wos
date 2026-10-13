@@ -1,5 +1,5 @@
 import { expect, test } from "@playwright/test";
-import { tuesdayInWeeks, addDays } from "../support/dates";
+import { addDays, dmy, tuesdayInWeeks } from "../support/dates";
 import { sql } from "../support/local";
 import { sessionFile } from "../support/people";
 
@@ -63,7 +63,9 @@ test.describe("as the Employee Admin", () => {
     await dialog
       .getByLabel("Shift", { exact: true })
       .selectOption({ label: "Gate night, 20:00 to 08:00 next day, 30 min break" });
-    await expect(dialog.getByLabel("From")).toHaveValue(today);
+    await expect(dialog.getByRole("textbox", { name: "From", exact: true })).toHaveValue(
+      dmy(today),
+    );
     await dialog.getByLabel("Reason (optional)").fill("Night post at the gate");
     await dialog.getByRole("button", { name: "Save shift" }).click();
     await expect(dialog).toHaveCount(0);
@@ -78,10 +80,12 @@ test.describe("as the Employee Admin", () => {
     await page.getByRole("button", { name: "Change shift" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Shift", { exact: true }).selectOption({ label: "Their unit's shift" });
-    await dialog.getByLabel("From").fill(addDays(today, -7));
+    await dialog.getByRole("textbox", { name: "From", exact: true }).fill(addDays(today, -7));
     await dialog.getByRole("button", { name: "Save shift" }).click();
     // The refusal sits on the date, and the dialog stays open to fix it.
-    const date = dialog.getByLabel("From").locator("xpath=ancestor::label");
+    const date = dialog
+      .getByRole("textbox", { name: "From", exact: true })
+      .locator("xpath=ancestor::label");
     await expect(date.getByRole("alert")).toBeVisible();
     await expect(dialog).toBeVisible();
   });
@@ -93,7 +97,7 @@ test.describe("as the Employee Admin", () => {
     await page.getByRole("button", { name: "Change shift" }).click();
     const dialog = page.getByRole("dialog");
     await dialog.getByLabel("Shift", { exact: true }).selectOption({ label: "Their unit's shift" });
-    await dialog.getByLabel("From").fill(ahead);
+    await dialog.getByRole("textbox", { name: "From", exact: true }).fill(ahead);
     await dialog.getByRole("button", { name: "Save shift" }).click();
     await expect(dialog).toHaveCount(0);
     // Still on Gate night today; the history shows when it ends.

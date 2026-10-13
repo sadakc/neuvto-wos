@@ -15,6 +15,8 @@
 
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
   Dialog,
@@ -104,6 +106,7 @@ export default function AddEmployee() {
       const p = found[key] ?? checkField(rule, values[key]);
       if (p) found[key] = p;
     }
+    if (values.joinedDate && !isIsoDate(values.joinedDate)) found.joinedDate = DATE_FORMAT_MESSAGE;
     return found;
   }
   function change(key: keyof typeof blank, value: string) {
@@ -336,12 +339,15 @@ export default function AddEmployee() {
           </label>
           <label className="min-w-0 text-sm">
             <span className={eyebrow}>Date of joining</span>
-            <input
-              type="date"
+            <DateField
+              label="Date of joining"
               value={v.joinedDate}
-              onChange={(e) => setV({ ...v, joinedDate: e.target.value })}
-              className={`mt-1 ${input}`}
+              onChange={(d) => change("joinedDate", d)}
+              testId="add-joined"
+              invalid={!!fieldErrors.joinedDate}
+              className="mt-1"
             />
+            {fieldError("joinedDate")}
           </label>
           <div className="min-w-0 text-sm">
             <label className="block">
@@ -779,13 +785,13 @@ export function DeactivateDialog({
               </label>
               <label className="text-sm">
                 <span className={eyebrow}>Last working day</span>
-                <input
-                  type="date"
+                <DateField
+                  label="Last working day"
                   required
-                  data-testid="deactivate-last-day"
+                  testId="deactivate-last-day"
                   value={lastDay}
-                  onChange={(e) => setLastDay(e.target.value)}
-                  className={`mt-1 ${input}`}
+                  onChange={setLastDay}
+                  className="mt-1"
                 />
               </label>
               <label className="text-sm">
@@ -806,7 +812,7 @@ export function DeactivateDialog({
               )}
               <button
                 type="submit"
-                disabled={busy || !successor || !lastDay || reason.trim().length < 3}
+                disabled={busy || !successor || !isIsoDate(lastDay) || reason.trim().length < 3}
                 data-testid="deactivate-confirm"
                 className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-45"
               >

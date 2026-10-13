@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.17 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.18 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -649,6 +649,55 @@ symbols); an employee code is letters and digits with / . \_ - between; free tex
 birth; no relative is born in the future and no previous job is dated there or ends before it
 starts; the statutory and bank numbers keep the database's existing patterns, now also said on
 screen, with Aadhaar's checksum.
+
+### Sada's second round (D104, 13 Oct 2026)
+
+Found testing the D103 build, all fixed:
+
+- **A date of birth took hundreds of clicks.** Every date in the module is typed as
+  DD/MM/YYYY (the slashes go in by themselves) or picked from a calendar whose month and year
+  are dropdowns, the way Workday takes one (`src/components/shared/date-field.tsx`). A date of
+  birth's calendar opens thirty years back and offers nothing under fourteen. Half a date is
+  never taken for no date: it is refused with "Enter the date as DD/MM/YYYY".
+- **"Fixed it to 10 digits and it still refused."** The ten digits started with a 3, and no
+  Indian mobile does, but the message only said "10 digits" again. Each way of being wrong is
+  now named: how many digits there are, a first digit other than 6–9, a leading 0, digits
+  after +91, a symbol.
+- **Nationality** is a dropdown: Indian, Nepali, Bangladeshi. A new record starts as Indian
+  (the column's default) and the form starts on Indian when nothing is recorded. A value
+  already on record that is not on the list is still shown.
+- **Total experience could not be entered.** Experience before joining is two dropdowns,
+  years and months, saved as months (`employees.prior_experience_months`, 0 to 720). When set
+  it stands in for the previous organisations' sum; service here is still added, so the total
+  keeps counting by itself. The Education and experience panel's button reads only **Add** or
+  **Edit**.
+- **Height, chest and weight** are dropdowns (100–230 cm with feet and inches, 50–150 cm,
+  30–200 kg). The database still allows its wider range, and a value outside the lists is shown
+  as it is.
+- **A new family row said Son.** It says **Select**, and a row without a relation is refused.
+  The same for a new nominee row. The emergency contact's relation is the same list.
+- **Grade was missing from Edit position.** It is shown there, read only, following the
+  designation chosen: a grade belongs to the designation (Configuration, Designations), and a
+  designation added from the field can be given one.
+- **Deploy stayed disabled with no reason.** There were no units, and the dialog did not say
+  so. It now lists every active unit, ends with **Add a unit…** (a name, and a client for a
+  client site), and says under the button what it still needs.
+- **Editing PF numbers looked like it had cleared them.** Every number on record opens as its
+  last four with **Change** beside it; only a number the Admin changes is typed and sent, and
+  **Keep** puts it back. The same for Aadhaar, PAN and the account number.
+- **The eye dropped to the next line once a number was shown.** The number and its eye stay
+  on one line; "Shown, logged" goes under them.
+- **The bank panel had no photo.** It takes the passbook's first page or a cancelled cheque,
+  filed as the Documents tab's bank proof, so opening it is logged the same way.
+- **The Personal tab's Restricted panel showed nothing.** It is a one-line note now.
+- **Documents had no Browse button.** The stylesheet's reset had taken the browser's away.
+  Every file choice in the module is a Browse button, the file's name and size, and Remove to
+  unchoose it (`src/components/shared/file-picker.tsx`). Removing a document already uploaded
+  was there for the Employee Admin; nothing could be uploaded to remove.
+- **"Add pf and insurance numbers".** Button titles keep the capitals of PF and IFSC.
+
+Leave's own date boxes are not changed in this round; the same field drops in there when
+wanted.
 
 ## 8. Acceptance criteria, module level
 

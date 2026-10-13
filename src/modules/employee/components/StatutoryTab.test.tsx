@@ -32,6 +32,9 @@ const api = vi.hoisted(() => ({
   setStatutory: vi.fn(),
   setBank: vi.fn(),
   setRestricted: vi.fn(),
+  listDocuments: vi.fn(),
+  openDocument: vi.fn(),
+  uploadDocument: vi.fn(),
 }));
 vi.mock("../handlers", () => api);
 vi.mock("@tanstack/react-router", () => ({
@@ -54,6 +57,7 @@ beforeEach(() => {
   });
   api.listCardViews.mockResolvedValue([]);
   api.getRestrictedReads.mockResolvedValue([]);
+  api.listDocuments.mockResolvedValue([]);
 });
 afterEach(() => {
   vi.useRealTimers();
@@ -210,18 +214,44 @@ describe("editing", () => {
     api.setStatutory.mockResolvedValue(undefined);
     render(<StatutoryTab card={as("admin")} onChanged={onChanged} />);
 
-    // Aadhaar shows its last four as a hint, never as a value.
-    await user.click(screen.getByTestId("edit-identity-docs"));
-    const aadhaar = within(screen.getByTestId("editor-identity-docs")).getByLabelText("Aadhaar");
-    expect(aadhaar).toHaveValue("");
-    expect(aadhaar).toHaveAttribute("placeholder", expect.stringContaining("0124"));
-    await user.click(screen.getByRole("button", { name: "Cancel" }));
+    // D104: every number opens as its last four, as the card shows it, and
+    // nothing is a box to type in until the Admin says which one changes.
+    // "PF" keeps its capitals in the button and the form's title (D104).
+    await user.click(screen.getByRole("button", { name: "Edit PF and insurance numbers" }));
+    expect(screen.getByRole("heading", { name: "Edit PF and insurance numbers" })).toBeVisible();
+    const pf = screen.getByTestId("editor-pf");
+    expect(within(pf).getByTestId("masked-uan")).toHaveTextContent("•••• 7890");
+    expect(within(pf).getByTestId("masked-epfNumber")).toHaveTextContent("•••• 0125");
+    expect(within(pf).getByTestId("masked-esicNumber")).toHaveTextContent("•••• 3456");
+    expect(within(pf).queryByLabelText("UAN")).toBeNull();
+    // Nothing on record for the old UAN: that one is simply a box.
+    expect(within(pf).getByLabelText("Old UAN")).toHaveValue("");
 
-    await user.click(screen.getByTestId("edit-pf"));
-    await user.type(within(screen.getByTestId("editor-pf")).getByLabelText("UAN"), "999988887777");
+    // Only the UAN is changed; the other two are sent as nothing at all.
+    await user.click(within(pf).getByRole("button", { name: "Change UAN" }));
+    const uan = within(pf).getByLabelText("UAN");
+    expect(uan).toHaveValue("");
+    await user.type(uan, "999988887777");
+    expect(within(pf).getByTestId("masked-epfNumber")).toBeInTheDocument();
     await user.click(screen.getByTestId("save-pf"));
     expect(api.setStatutory).toHaveBeenCalledWith(as("admin").id, { uan: "999988887777" });
     expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("puts a number back to what is on record when the Admin keeps it after all", async () => {
+    const user = userEvent.setup();
+    render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
+    await user.click(screen.getByTestId("edit-identity-docs"));
+    const ids = screen.getByTestId("editor-identity-docs");
+    expect(within(ids).getByTestId("masked-aadhaar")).toHaveTextContent("•••• 0124");
+    await user.click(within(ids).getByRole("button", { name: "Change Aadhaar" }));
+    // A whole, valid number typed and then kept after all is never sent.
+    await user.type(within(ids).getByLabelText("Aadhaar"), "234567890124");
+    await user.click(within(ids).getByRole("button", { name: "Keep •••• 0124" }));
+    expect(within(ids).getByTestId("masked-aadhaar")).toBeInTheDocument();
+    await user.click(screen.getByTestId("save-identity-docs"));
+    // Nothing changed, so nothing is sent.
+    expect(api.setStatutory).not.toHaveBeenCalled();
   });
 
   it("keeps the form open with the reason when a number is refused", async () => {
@@ -235,6 +265,7 @@ describe("editing", () => {
     );
     render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
     await user.click(screen.getByTestId("edit-identity-docs"));
+    await user.click(screen.getByRole("button", { name: "Change Aadhaar" }));
     const aadhaar = within(screen.getByTestId("editor-identity-docs")).getByLabelText("Aadhaar");
     // A number that passes the screen's checksum, refused by the server.
     await user.type(aadhaar, "234567890124");
@@ -250,6 +281,8 @@ describe("editing", () => {
     render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
     await user.click(screen.getByTestId("edit-identity-docs"));
     const editor = screen.getByTestId("editor-identity-docs");
+    await user.click(within(editor).getByRole("button", { name: "Change Aadhaar" }));
+    await user.click(within(editor).getByRole("button", { name: "Change PAN" }));
     // One digit off: the Aadhaar checksum catches it.
     await user.type(within(editor).getByLabelText("Aadhaar"), "234567890125");
     await user.type(within(editor).getByLabelText("PAN"), "ABCDE12345");

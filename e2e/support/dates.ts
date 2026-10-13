@@ -14,6 +14,12 @@ export function tuesdayInWeeks(weeks: number): string {
   return iso(d);
 }
 
+/** "2026-10-13" → "13/10/2026", as the date field shows it (D104). */
+export function dmy(day: string): string {
+  const [y, m, d] = day.split("-");
+  return `${d}/${m}/${y}`;
+}
+
 export function addDays(day: string, n: number): string {
   const d = new Date(`${day}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);

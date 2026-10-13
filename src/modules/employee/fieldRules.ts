@@ -39,6 +39,34 @@ function phone(v: string) {
   return /^(\+91[6-9][0-9]{9}|\+(9[02-9]|[1-8])[0-9]{7,13}|[6-9][0-9]{9})$/.test(digits);
 }
 
+/**
+ * Why a phone number was refused, in words (D104). "Enter a 10-digit number"
+ * under a number that has ten digits but starts with a 3 reads as the screen
+ * not noticing the fix, so each way of being wrong is named.
+ */
+function phoneProblem(v: string): string {
+  const compact = v.replace(/[\s()-]/g, "");
+  if (!/^\+?[0-9]+$/.test(compact)) {
+    return "Digits only. Spaces, dashes and brackets are fine; letters and other symbols aren't.";
+  }
+  if (compact.startsWith("+91")) {
+    const rest = compact.slice(3);
+    if (rest.length !== 10)
+      return `After +91 a mobile number has 10 digits; this has ${rest.length}.`;
+    return "An Indian mobile number starts with 6, 7, 8 or 9.";
+  }
+  if (compact.startsWith("+")) {
+    return "After + comes the country code and the number: 8 to 15 digits in all.";
+  }
+  if (compact.length === 11 && compact.startsWith("0")) {
+    return "Leave out the 0 at the start: a mobile number has 10 digits.";
+  }
+  if (compact.length !== 10) {
+    return `A mobile number has 10 digits; this has ${compact.length}.`;
+  }
+  return "An Indian mobile number starts with 6, 7, 8 or 9. For another country, start with + and its code.";
+}
+
 function words(v: string, max: number) {
   return v.length <= max && !WORD_SYMBOLS.test(v) && SOMETHING_BUT_PUNCTUATION.test(v);
 }
@@ -92,9 +120,18 @@ function isoYearsAgo(years: number, today = new Date()) {
   return d.toISOString().slice(0, 10);
 }
 
-export const FIELD_RULES: Record<FieldRule, { check: (v: string) => boolean; message: string }> = {
+export const FIELD_RULES: Record<
+  FieldRule,
+  {
+    check: (v: string) => boolean;
+    message: string;
+    /** Says what is wrong with this value in particular, where the message alone would mislead. */
+    explain?: (v: string) => string;
+  }
+> = {
   phone: {
     check: phone,
+    explain: phoneProblem,
     message:
       "Enter a 10-digit mobile number, or + and the country code. Digits only, with spaces if you like.",
   },
@@ -179,7 +216,8 @@ export const FIELD_RULES: Record<FieldRule, { check: (v: string) => boolean; mes
 export function checkField(rule: FieldRule | undefined, value: string): string | null {
   const v = value.trim();
   if (!rule || v === "") return null;
-  return FIELD_RULES[rule].check(v) ? null : FIELD_RULES[rule].message;
+  const r = FIELD_RULES[rule];
+  return r.check(v) ? null : (r.explain?.(v) ?? r.message);
 }
 
 /**

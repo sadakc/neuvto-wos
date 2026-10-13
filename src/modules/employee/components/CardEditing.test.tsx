@@ -14,7 +14,7 @@
  *   empty, and each list but employment type can be added to from the field.
  */
 
-import { fireEvent, render, screen, within } from "@testing-library/react";
+import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import type { EmployeeCard } from "../contracts";
@@ -115,7 +115,10 @@ describe("each panel's button is in its own header, and says Add or Edit", () =>
     expect(within(header(panel("panel-identity"))).getByRole("button")).toHaveTextContent(
       "Edit identity", // a name is always there
     );
-    expect(screen.getByRole("button", { name: "Add education" })).toBeInTheDocument();
+    // D104: the panel's title says what; its button says only Add or Edit.
+    expect(screen.getByRole("button", { name: "Add education and experience" })).toHaveTextContent(
+      /^Add$/,
+    );
     expect(screen.getByRole("button", { name: "Add physical record" })).toBeInTheDocument();
 
     await openTab("Family");
@@ -134,7 +137,9 @@ describe("each panel's button is in its own header, and says Add or Edit", () =>
       "Edit emergency contact",
     );
     await openTab("Personal");
-    expect(screen.getByRole("button", { name: "Edit education" })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Edit education and experience" })).toHaveTextContent(
+      /^Edit$/,
+    );
     await openTab("Family");
     expect(screen.getByRole("button", { name: "Edit family" })).toBeInTheDocument();
   });
@@ -159,8 +164,17 @@ describe("a field that breaks a rule says so under itself", () => {
     await u.click(screen.getByTestId("save-contact"));
     expect(alt).toHaveAttribute("aria-invalid", "true");
     expect(within(editor).getByRole("alert")).toHaveTextContent(
-      "Enter a 10-digit mobile number, or + and the country code.",
+      "A mobile number has 10 digits; this has 11.",
     );
+    expect(api.updateEmployee).not.toHaveBeenCalled();
+
+    // Sada's case (D104): cut to ten digits, still refused, because no Indian
+    // mobile starts with a 3. The message says that now, not "10 digits" again.
+    await u.type(alt, "{Backspace}");
+    expect(within(editor).getByRole("alert")).toHaveTextContent(
+      "An Indian mobile number starts with 6, 7, 8 or 9.",
+    );
+    await u.click(screen.getByTestId("save-contact"));
     expect(api.updateEmployee).not.toHaveBeenCalled();
 
     await u.clear(alt);
@@ -176,7 +190,22 @@ describe("a field that breaks a rule says so under itself", () => {
     await u.click(screen.getByTestId("edit-emergency"));
     const editor = screen.getByTestId("editor-emergency");
     await u.type(within(editor).getByLabelText("Name"), "Lata2");
-    await u.type(within(editor).getByLabelText("Relation"), "Sister1");
+    // D104: the relation is chosen from the nominee list, nothing typed.
+    const relation = within(editor).getByLabelText("Relation") as HTMLSelectElement;
+    expect([...relation.options].map((o) => o.textContent)).toEqual([
+      "Select",
+      "Father",
+      "Mother",
+      "Husband",
+      "Wife",
+      "Son",
+      "Daughter",
+      "Brother",
+      "Sister",
+      "Guardian",
+      "Other",
+    ]);
+    await u.selectOptions(relation, "sister");
     await u.type(within(editor).getByLabelText("Phone"), "12345");
     await u.click(screen.getByTestId("save-emergency"));
     expect(
@@ -185,8 +214,7 @@ describe("a field that breaks a rule says so under itself", () => {
         .map((a) => a.textContent),
     ).toEqual([
       "Letters only: no digits or symbols other than . ' and -.",
-      "Letters only, up to 60: no digits or symbols other than . ' and -.",
-      "Enter a 10-digit mobile number, or + and the country code. Digits only, with spaces if you like.",
+      "A mobile number has 10 digits; this has 5.",
     ]);
     expect(api.updateEmployee).not.toHaveBeenCalled();
 
@@ -206,24 +234,23 @@ describe("a field that breaks a rule says so under itself", () => {
     await openTab("Personal");
     await u.click(screen.getByTestId("edit-identity"));
     const identity = screen.getByTestId("editor-identity");
-    const young = new Date();
-    young.setFullYear(young.getFullYear() - 10);
-    // A date box takes a value, not keystrokes, in the test DOM.
-    fireEvent.change(within(identity).getByLabelText("Date of birth"), {
-      target: { value: young.toISOString().slice(0, 10) },
-    });
+    // D104: a date is typed as DD/MM/YYYY; the slashes go in by themselves.
+    const dob = within(identity).getByRole("textbox", { name: "Date of birth" });
+    const young = new Date().getFullYear() - 10;
+    expect(dob).toHaveValue("12/06/1994");
+    await u.clear(dob);
+    await u.type(dob, `0101${young}`);
+    expect(dob).toHaveValue(`01/01/${young}`);
     await u.click(screen.getByTestId("save-identity"));
     expect(within(identity).getByRole("alert")).toHaveTextContent(
       "They must be at least 14 years old.",
     );
-    await u.keyboard("{Escape}");
-
-    await u.click(screen.getByTestId("edit-physical"));
-    const physical = screen.getByTestId("editor-physical");
-    await u.type(within(physical).getByLabelText("Height (cm)"), "5ft");
-    await u.click(screen.getByTestId("save-physical"));
-    expect(within(physical).getByRole("alert")).toHaveTextContent(
-      "Height in whole centimetres, between 50 and 260.",
+    // Half a date is never taken for no date.
+    await u.clear(dob);
+    await u.type(dob, "3102");
+    await u.click(screen.getByTestId("save-identity"));
+    expect(within(identity).getByRole("alert")).toHaveTextContent(
+      "Enter the date as DD/MM/YYYY, like 05/08/1990.",
     );
     expect(api.updateEmployee).not.toHaveBeenCalled();
   });
@@ -347,10 +374,17 @@ describe("rows and addresses are checked before they are sent", () => {
     );
     await u.clear(within(editor).getByLabelText("Name, row 1"));
     await u.type(within(editor).getByLabelText("Name, row 1"), "Arjun");
-    const tomorrow = new Date(Date.now() + 2 * 86_400_000).toISOString().slice(0, 10);
-    fireEvent.change(within(editor).getByLabelText("Date of birth"), {
-      target: { value: tomorrow },
-    });
+    // D104: a new row assumes no relation; it says Select until one is chosen.
+    const relation = within(editor).getByLabelText("Relation, row 1") as HTMLSelectElement;
+    expect(relation.selectedOptions[0].textContent).toBe("Select");
+    await u.click(screen.getByTestId("family-save"));
+    expect(screen.getByTestId("family-editor-error")).toHaveTextContent(
+      "Arjun: choose a relation.",
+    );
+    await u.selectOptions(relation, "son");
+    const t = new Date(Date.now() + 2 * 86_400_000);
+    const tomorrow = `${String(t.getDate()).padStart(2, "0")}${String(t.getMonth() + 1).padStart(2, "0")}${t.getFullYear()}`;
+    await u.type(within(editor).getByRole("textbox", { name: "Date of birth, row 1" }), tomorrow);
     await u.click(screen.getByTestId("family-save"));
     expect(screen.getByTestId("family-editor-error")).toHaveTextContent(
       "Arjun: the date of birth is in the future.",
@@ -365,12 +399,8 @@ describe("rows and addresses are checked before they are sent", () => {
     await u.click(screen.getByTestId("edit-previous-orgs"));
     const editor = screen.getByTestId("previous-orgs-editor");
     await u.type(within(editor).getByLabelText("Organisation, row 1"), "G4S");
-    fireEvent.change(within(editor).getByLabelText("From, row 1"), {
-      target: { value: "2021-01-01" },
-    });
-    fireEvent.change(within(editor).getByLabelText("To, row 1"), {
-      target: { value: "2020-01-01" },
-    });
+    await u.type(within(editor).getByRole("textbox", { name: "From, row 1" }), "01012021");
+    await u.type(within(editor).getByRole("textbox", { name: "To, row 1" }), "01012020");
     await u.click(screen.getByTestId("previous-orgs-save"));
     expect(within(editor).getByRole("alert")).toHaveTextContent("G4S: To can't be before From.");
     expect(api.savePreviousOrgs).not.toHaveBeenCalled();

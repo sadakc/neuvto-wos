@@ -13,9 +13,24 @@ import {
   listManagerCandidates,
   makeManager,
   saveDesignation,
+  saveUnit,
   type Option,
 } from "./handlers";
 import type { AddChoice } from "./components/FieldEditor";
+
+/** The units a person can be deployed to are added the same way (D104). */
+export const addUnitChoice: AddChoice = {
+  kind: "name",
+  label: "Add a unit…",
+  prompt: "New unit",
+  rule: "text100",
+  second: {
+    prompt: "Client (for a client site)",
+    hint: "Leave it empty for one of your own establishments. Everything else about the unit is in Configuration.",
+  },
+  create: (name, client) =>
+    saveUnit(null, client ? { name, unitType: "client_site", clientName: client } : { name }),
+};
 
 /**
  * The four lists a position is chosen from, with an "Add …" at the foot of
@@ -47,7 +62,12 @@ export const addDesignationChoice: AddChoice = {
   label: "Add a designation…",
   prompt: "New designation",
   rule: "text100",
-  create: (name) => saveDesignation(null, { name }),
+  second: {
+    prompt: "Grade (optional)",
+    hint: "Everybody with this designation has this grade.",
+    maxLength: 30,
+  },
+  create: (name, grade) => saveDesignation(null, grade ? { name, grade } : { name }),
 };
 
 export const addDepartmentChoice: AddChoice = {

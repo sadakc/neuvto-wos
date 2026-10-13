@@ -20,6 +20,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
+import { FilePicker } from "@/components/shared/file-picker";
 import { isAppError } from "@/platform/errors";
 import {
   ADDRESS_TYPES,
@@ -29,6 +32,7 @@ import {
   EMPLOYMENT_TYPES,
   EMPLOYMENT_TYPE_LABEL,
   MARITAL_STATUSES,
+  NATIONALITIES,
   NOMINATION_SCHEMES,
   RELATIONS,
   SEXES,
@@ -45,15 +49,25 @@ import {
   updateEmployee,
   type Option,
 } from "../handlers";
-import { describeWeek, familySummary, formatDate, humanise, shareTotal, todayIso } from "../format";
+import {
+  describeWeek,
+  familySummary,
+  formatDate,
+  formatMonths,
+  humanise,
+  shareTotal,
+  todayIso,
+} from "../format";
 import { checkField } from "../fieldRules";
 import { FieldEditor, type FieldSpec } from "./FieldEditor";
 import {
   addDepartmentChoice,
   addDesignationChoice,
   addManagerChoice,
+  addUnitChoice,
   usePositionLists,
 } from "../positionLists";
+import { AddInline } from "./FieldEditor";
 
 type Changed = () => Promise<void> | void;
 
@@ -63,6 +77,33 @@ const eyebrow = "block text-eyebrow font-semibold tracking-eyebrow text-muted-fo
 function errorText(err: unknown, fallback: string) {
   return isAppError(err) ? err.message : fallback;
 }
+
+/** The same day `years` ago, ISO: where a date of birth's calendar opens, and its latest. */
+function yearsAgo(years: number) {
+  const t = new Date();
+  const d = new Date(t.getFullYear() - years, t.getMonth(), t.getDate());
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
+/**
+ * A relation as the list spells it. One typed before the list existed
+ * ("Sister") is matched to it; anything else is kept as it was, so the select
+ * still shows what is on record.
+ */
+function asRelation(v: string | null | undefined) {
+  if (!v) return v;
+  return RELATIONS.find((r) => r === v.trim().toLowerCase()) ?? v;
+}
+
+/** The dropdowns' ranges (D104). The database allows a wider range; a value outside these is still shown. */
+const range = (from: number, to: number) =>
+  Array.from({ length: to - from + 1 }, (_, i) => from + i);
+const HEIGHTS = range(100, 230).map((cm) => {
+  const inches = Math.round(cm / 2.54);
+  return [String(cm), `${cm} cm (${Math.floor(inches / 12)}′ ${inches % 12}″)`] as const;
+});
+const CHESTS = range(50, 150).map((cm) => [String(cm), `${cm} cm`] as const);
+const WEIGHTS = range(30, 200).map((kg) => [String(kg), `${kg} kg`] as const);
 
 // ═══════════════════════════════════════════════════════════ own fields
 
@@ -161,9 +202,10 @@ export function EmergencyEditor({ card, onChanged }: { card: EmployeeCard; onCha
         {
           key: "emergencyContactRelation",
           label: "Relation",
-          current: ec?.relation,
-          rule: "words",
-          maxLength: 60,
+          kind: "select",
+          options: RELATIONS,
+          current: asRelation(ec?.relation),
+          emptyLabel: "Select",
         },
         {
           key: "emergencyContactPhone",
@@ -217,6 +259,9 @@ export function IdentityEditor({ card, onChanged }: { card: EmployeeCard; onChan
           kind: "date",
           current: card.dateOfBirth,
           rule: "dateOfBirth",
+          min: "1900-01-02",
+          max: yearsAgo(14),
+          openAt: yearsAgo(30),
         },
         {
           key: "maritalStatus",
@@ -228,9 +273,10 @@ export function IdentityEditor({ card, onChanged }: { card: EmployeeCard; onChan
         {
           key: "nationality",
           label: "Nationality",
+          kind: "select",
+          labelled: NATIONALITIES.map((n) => [n, n] as const),
           current: card.nationality,
-          rule: "words",
-          maxLength: 60,
+          defaultValue: "Indian",
         },
         {
           key: "nativeState",
@@ -246,12 +292,27 @@ export function IdentityEditor({ card, onChanged }: { card: EmployeeCard; onChan
 
 export function EducationEditor({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   return (
-    <RecordFieldEditor
-      card={card}
+    <FieldEditor
       id="education"
-      title="Education"
-      filled={any(card.educationQualification, card.reasonForLeavingLastOrg)}
-      onChanged={onChanged}
+      title="Education and experience"
+      // The panel's own title says what it edits; the button says only how (D104).
+      label={
+        any(card.educationQualification, card.reasonForLeavingLastOrg, card.priorExperienceMonths)
+          ? "Edit"
+          : "Add"
+      }
+      accessibleLabel={`${
+        any(card.educationQualification, card.reasonForLeavingLastOrg, card.priorExperienceMonths)
+          ? "Edit"
+          : "Add"
+      } education and experience`}
+      filled={any(
+        card.educationQualification,
+        card.reasonForLeavingLastOrg,
+        card.priorExperienceMonths,
+      )}
+      save={(vals) => updateEmployee(card.id, vals)}
+      onSaved={onChanged}
       fields={[
         {
           key: "educationQualification",
@@ -261,13 +322,28 @@ export function EducationEditor({ card, onChanged }: { card: EmployeeCard; onCha
           maxLength: 200,
         },
         {
+          key: "priorExperienceMonths",
+          label: "Experience before joining",
+          kind: "yearsMonths",
+          current: card.priorExperienceMonths?.toString(),
+          hint: "Total experience is this plus their service here, and keeps counting by itself.",
+        },
+        {
           key: "reasonForLeavingLastOrg",
           label: "Reason for leaving last org",
           current: card.reasonForLeavingLastOrg,
           rule: "text500",
           maxLength: 500,
         },
-      ]}
+        {
+          key: "totalExperience",
+          label: "Total experience now",
+          kind: "derived",
+          derive: () =>
+            card.totalExperienceMonths != null ? formatMonths(card.totalExperienceMonths) : "—",
+          hint: "As saved. It updates when you save.",
+        },
+      ].map((f) => ({ clearable: true, ...f }) as FieldSpec)}
     />
   );
 }
@@ -288,27 +364,24 @@ export function PhysicalEditor({ card, onChanged }: { card: EmployeeCard; onChan
       fields={[
         {
           key: "heightCm",
-          label: "Height (cm)",
+          label: "Height",
+          kind: "select",
+          labelled: HEIGHTS,
           current: card.physical?.heightCm?.toString(),
-          inputMode: "numeric",
-          rule: "heightCm",
-          maxLength: 3,
         },
         {
           key: "chestCm",
-          label: "Chest (cm)",
+          label: "Chest",
+          kind: "select",
+          labelled: CHESTS,
           current: card.physical?.chestCm?.toString(),
-          inputMode: "numeric",
-          rule: "chestCm",
-          maxLength: 3,
         },
         {
           key: "weightKg",
-          label: "Weight (kg)",
+          label: "Weight",
+          kind: "select",
+          labelled: WEIGHTS,
           current: card.physical?.weightKg?.toString(),
-          inputMode: "numeric",
-          rule: "weightKg",
-          maxLength: 3,
         },
         {
           key: "bloodGroup",
@@ -380,6 +453,21 @@ export function PositionEditor({ card, onChanged }: { card: EmployeeCard; onChan
           current: current?.id,
           emptyLabel: "None",
           add: addDesignationChoice,
+        },
+        {
+          key: "grade",
+          label: "Grade",
+          kind: "derived",
+          // The grade belongs to the designation, so it follows the one chosen.
+          derive: (vals) => {
+            const id = vals.designationId;
+            if (!id) return "None";
+            if (id === current?.id && !lists.designations.some((d) => d.id === id)) {
+              return current?.grade ?? "None";
+            }
+            return lists.designations.find((d) => d.id === id)?.detail ?? "None";
+          },
+          hint: "Comes with the designation. Change it in Configuration, Designations.",
         },
         {
           key: "departmentId",
@@ -468,17 +556,22 @@ const newKey = () => `new-${++rowSeq}`;
 
 const blankRelative = (): FamilyRow => ({
   key: newKey(),
-  relation: "son",
+  // Nothing is assumed (D104): the Admin chooses.
+  relation: "",
   name: "",
   dateOfBirth: "",
   isDependent: true,
 });
 
 /** The first thing wrong with a relative's row, in words, or null. */
-function relativeProblem(name: string, dateOfBirth: string): string | null {
+function relativeProblem(name: string, dateOfBirth: string, relation: string): string | null {
   if (!name.trim()) return "Every row needs a name, or remove it.";
   const n = checkField("name", name);
   if (n) return `${name.trim()}: ${n}`;
+  if (!relation) return `${name.trim()}: choose a relation.`;
+  if (dateOfBirth && !isIsoDate(dateOfBirth)) {
+    return `${name.trim()}: ${DATE_FORMAT_MESSAGE}`;
+  }
   if (dateOfBirth && checkField("pastDate", dateOfBirth)) {
     return `${name.trim()}: the date of birth is in the future.`;
   }
@@ -505,7 +598,7 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
 
   async function save() {
     setError("");
-    const wrong = rows.map((r) => relativeProblem(r.name, r.dateOfBirth)).find(Boolean);
+    const wrong = rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean);
     if (wrong) {
       setError(wrong);
       return;
@@ -566,7 +659,7 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
                 <li
                   key={r.key}
                   data-testid="family-editor-row"
-                  className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[9rem_1fr_10rem_auto_auto] md:items-end"
+                  className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[9rem_1fr_11rem_auto_auto] md:items-end"
                 >
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Relation</span>
@@ -576,6 +669,9 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
                       onChange={(e) => set(r.key, { relation: e.target.value })}
                       className={`mt-1 ${input}`}
                     >
+                      <option value="" disabled>
+                        Select
+                      </option>
                       {RELATIONS.map((rel) => (
                         <option key={rel} value={rel}>
                           {humanise(rel)}
@@ -594,11 +690,12 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
                   </label>
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Date of birth</span>
-                    <input
-                      type="date"
+                    <DateField
                       value={r.dateOfBirth}
-                      onChange={(e) => set(r.key, { dateOfBirth: e.target.value })}
-                      className={`mt-1 ${input}`}
+                      onChange={(v) => set(r.key, { dateOfBirth: v })}
+                      max={todayIso()}
+                      label={`Date of birth, row ${i + 1}`}
+                      className="mt-1"
                     />
                   </label>
                   <label className="flex h-11 items-center gap-2 text-sm">
@@ -692,6 +789,7 @@ function previousProblem(r: PrevRow): string | null {
     return "Every row needs an organisation and both dates, or remove it.";
   }
   const who = r.organisationName.trim();
+  if (!isIsoDate(r.fromDate) || !isIsoDate(r.toDate)) return `${who}: ${DATE_FORMAT_MESSAGE}`;
   if (checkField("text200", r.organisationName)) return `${who}: keep the name to 200 characters.`;
   if (checkField("text100", r.designation))
     return `${who}: keep the designation to 100 characters.`;
@@ -778,7 +876,8 @@ export function PreviousOrgsEditor({
           <section data-testid="previous-orgs-editor">
             <DialogTitle>{title}</DialogTitle>
             <DialogDescription className="mt-1">
-              Total experience is worked out from these rows. Saving replaces the list.
+              Total experience is worked out from these rows, unless the experience before joining
+              is set on the Personal tab. Saving replaces the list.
             </DialogDescription>
             <ul className="mt-3 flex flex-col gap-3">
               {rows.map((r, i) => (
@@ -805,22 +904,22 @@ export function PreviousOrgsEditor({
                   </label>
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>From</span>
-                    <input
-                      type="date"
-                      aria-label={`From, row ${i + 1}`}
+                    <DateField
+                      label={`From, row ${i + 1}`}
                       value={r.fromDate}
-                      onChange={(e) => set(r.key, { fromDate: e.target.value })}
-                      className={`mt-1 ${input}`}
+                      onChange={(v) => set(r.key, { fromDate: v })}
+                      max={todayIso()}
+                      className="mt-1"
                     />
                   </label>
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>To</span>
-                    <input
-                      type="date"
-                      aria-label={`To, row ${i + 1}`}
+                    <DateField
+                      label={`To, row ${i + 1}`}
                       value={r.toDate}
-                      onChange={(e) => set(r.key, { toDate: e.target.value })}
-                      className={`mt-1 ${input}`}
+                      onChange={(v) => set(r.key, { toDate: v })}
+                      max={todayIso()}
+                      className="mt-1"
                     />
                   </label>
                   <label className="min-w-0 text-sm md:col-span-2">
@@ -916,7 +1015,9 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
 
   async function save() {
     setError("");
-    const wrong = rows.map((r) => relativeProblem(r.name, r.dateOfBirth)).find(Boolean);
+    const wrong =
+      (!isIsoDate(from) ? `Effective from: ${DATE_FORMAT_MESSAGE}` : null) ??
+      rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean);
     if (wrong) {
       setError(wrong);
       return;
@@ -990,11 +1091,11 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
               </label>
               <label className="min-w-0 text-sm">
                 <span className={eyebrow}>Effective from</span>
-                <input
-                  type="date"
+                <DateField
+                  label="Effective from"
                   value={from}
-                  onChange={(e) => setFrom(e.target.value)}
-                  className={`mt-1 ${input}`}
+                  onChange={setFrom}
+                  className="mt-1"
                 />
               </label>
             </div>
@@ -1003,7 +1104,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                 <li
                   key={r.key}
                   data-testid="nominee-editor-row"
-                  className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_9rem_10rem_6rem_auto] md:items-end"
+                  className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_9rem_11rem_6rem_auto] md:items-end"
                 >
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Name</span>
@@ -1021,6 +1122,9 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                       onChange={(e) => set(r.key, { relation: e.target.value })}
                       className={`mt-1 ${input}`}
                     >
+                      <option value="" disabled>
+                        Select
+                      </option>
                       {RELATIONS.map((rel) => (
                         <option key={rel} value={rel}>
                           {humanise(rel)}
@@ -1030,11 +1134,12 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                   </label>
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Date of birth</span>
-                    <input
-                      type="date"
+                    <DateField
+                      label={`Date of birth, nominee ${i + 1}`}
                       value={r.dateOfBirth}
-                      onChange={(e) => set(r.key, { dateOfBirth: e.target.value })}
-                      className={`mt-1 ${input}`}
+                      onChange={(v) => set(r.key, { dateOfBirth: v })}
+                      max={todayIso()}
+                      className="mt-1"
                     />
                   </label>
                   <label className="min-w-0 text-sm">
@@ -1063,7 +1168,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
               onClick={() =>
                 setRows((rs) => [
                   ...rs,
-                  { key: newKey(), name: "", relation: "wife", dateOfBirth: "", share: "" },
+                  { key: newKey(), name: "", relation: "", dateOfBirth: "", share: "" },
                 ])
               }
               className="mt-3 h-11 rounded-md border border-dashed border-border px-4 text-sm font-medium"
@@ -1185,7 +1290,9 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
     e.preventDefault();
     setError("");
     setDateError("");
-    const wrong = addressProblem(v);
+    const wrong = isIsoDate(v.effectiveFrom)
+      ? addressProblem(v)
+      : `Effective from: ${DATE_FORMAT_MESSAGE}`;
     if (wrong) {
       setError(wrong);
       return;
@@ -1269,16 +1376,15 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
               </select>
             </Field>
             <Field label="Effective from" error={dateError}>
-              <input
-                type="date"
+              <DateField
+                label="Effective from"
                 required
-                data-testid="address-from"
+                testId="address-from"
                 value={v.effectiveFrom}
-                onChange={(e) => {
-                  setV({ ...v, effectiveFrom: e.target.value });
+                onChange={(d) => {
+                  setV({ ...v, effectiveFrom: d });
                   setDateError("");
                 }}
-                className={input}
               />
             </Field>
             <Field label="Address">
@@ -1354,19 +1460,12 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 </span>
               </label>
             )}
-            <Field label="Proof (optional)">
-              <input
-                type="file"
-                aria-label="Proof (optional)"
-                accept="application/pdf,image/png,image/jpeg,image/webp"
-                onChange={(e) => setProof(e.target.files?.[0] ?? null)}
-                className="block w-full text-sm"
-              />
-              <span className="mt-1 block text-caption text-muted-foreground">
-                A rent agreement, a utility bill or an ID showing this address. PDF or a photo, up
-                to 10 MB.
-              </span>
-            </Field>
+            <FilePicker
+              label="Proof (optional)"
+              file={proof}
+              onChange={setProof}
+              hint="A rent agreement, a utility bill or an ID showing this address. PDF or a photo, up to 10 MB."
+            />
             {error && (
               <p role="alert" data-testid="address-error" className="text-sm text-destructive">
                 {error}
@@ -1405,6 +1504,8 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
   // D102: a person's own shift ends at the move unless the Admin keeps it.
   const ownShift = card.workPattern?.shiftSource === "person" ? card.workPattern.shift : null;
   const [keepOwnShift, setKeepOwnShift] = useState(false);
+  // D104: a unit that isn't on the list yet is added from here, like a department.
+  const [addingUnit, setAddingUnit] = useState(false);
 
   useEffect(() => {
     if (!open) return;
@@ -1413,10 +1514,21 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
       .catch(() => setUnits([]));
   }, [open]);
 
+  // What still stands between the Admin and the button, said under it.
+  const missing = [
+    !v.unitId && "a unit",
+    !v.effectiveFrom && "the date",
+    !v.orderRef.trim() && "the order reference",
+  ].filter(Boolean) as string[];
+
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setDateError("");
+    if (!isIsoDate(v.effectiveFrom)) {
+      setDateError(DATE_FORMAT_MESSAGE);
+      return;
+    }
     setBusy(true);
     try {
       await moveUnit(card.id, ownShift ? { ...v, keepOwnShift } : v);
@@ -1446,6 +1558,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
           setError("");
           setDateError("");
           setKeepOwnShift(false);
+          setAddingUnit(false);
           setOpen(true);
         }}
         className="-my-2.5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
@@ -1462,15 +1575,22 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 : "No current posting, so nothing is closed."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="grid gap-3">
-            <Field label="Move to">
+          <form onSubmit={submit} noValidate className="grid gap-3">
+            <Field label={currentUnit ? "Move to" : "Deploy to"}>
               {/* A select from the database's active units. There is no text
                   path to a unit anywhere (criterion 4). */}
               <select
                 required
                 data-testid="move-unit-select"
-                value={v.unitId}
-                onChange={(e) => setV({ ...v, unitId: e.target.value })}
+                value={addingUnit ? "__add__" : v.unitId}
+                onChange={(e) => {
+                  if (e.target.value === "__add__") {
+                    setAddingUnit(true);
+                    return;
+                  }
+                  setAddingUnit(false);
+                  setV({ ...v, unitId: e.target.value });
+                }}
                 className={input}
               >
                 <option value="">
@@ -1478,29 +1598,43 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                     ? "Loading units…"
                     : choices.length
                       ? "Choose a unit"
-                      : "No other active unit"}
+                      : "No unit yet: add one below"}
                 </option>
                 {choices.map((u) => (
                   <option key={u.id} value={u.id}>
                     {u.detail ? `${u.name} (${u.detail})` : u.name}
                   </option>
                 ))}
+                <option value="__add__">{addUnitChoice.label}</option>
               </select>
             </Field>
+            {addingUnit && (
+              <AddInline
+                choice={addUnitChoice}
+                onCancel={() => setAddingUnit(false)}
+                onAdded={(id) => {
+                  setAddingUnit(false);
+                  void listActiveUnits()
+                    .then(setUnits)
+                    .catch(() => setUnits([]));
+                  setV((c) => ({ ...c, unitId: id }));
+                }}
+              />
+            )}
             <Field label="Effective from" error={dateError}>
-              <input
-                type="date"
+              <DateField
+                label="Effective from"
                 required
-                data-testid="move-from"
+                testId="move-from"
                 value={v.effectiveFrom}
-                onChange={(e) => {
-                  setV({ ...v, effectiveFrom: e.target.value });
+                invalid={!!dateError}
+                onChange={(d) => {
+                  setV({ ...v, effectiveFrom: d });
                   setDateError("");
                 }}
-                className={input}
               />
             </Field>
-            {chosen?.calendar && v.effectiveFrom && (
+            {chosen?.calendar && isIsoDate(v.effectiveFrom) && (
               <p
                 data-testid="move-calendar-note"
                 className="rounded-lg border border-info-line bg-info-muted px-3 py-2 text-sm"
@@ -1557,12 +1691,22 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
             )}
             <button
               type="submit"
-              disabled={busy || !v.unitId}
+              disabled={busy || missing.length > 0 || addingUnit}
               data-testid="move-save"
+              aria-describedby={missing.length > 0 ? "move-missing" : undefined}
               className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
             >
               {busy ? "Saving…" : currentUnit ? "Close the current posting and move" : "Deploy"}
             </button>
+            {missing.length > 0 && (
+              <p
+                id="move-missing"
+                data-testid="move-missing"
+                className="text-caption text-muted-foreground"
+              >
+                Still needed: {missing.join(", ")}.
+              </p>
+            )}
           </form>
         </DialogContent>
       </Dialog>

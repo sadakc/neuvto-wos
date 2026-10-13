@@ -13,6 +13,7 @@
  */
 
 import { useState } from "react";
+import { FilePicker } from "@/components/shared/file-picker";
 import { isAppError } from "@/platform/errors";
 import type { Address } from "../contracts";
 import { attachAddressProof, openDocument } from "../handlers";
@@ -97,19 +98,14 @@ export function AttachProofForm({
           .finally(() => setBusy(false));
       }}
     >
-      <label className="min-w-0 flex-1 text-sm font-medium">
-        Proof of address
-        <input
-          type="file"
-          aria-label="Proof of address"
-          accept="application/pdf,image/png,image/jpeg,image/webp"
-          onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-          className="mt-2 block w-full text-sm"
+      <div className="min-w-0 flex-1">
+        <FilePicker
+          label="Proof of address"
+          file={file}
+          onChange={setFile}
+          hint="PDF or a photo, up to 10 MB. A proof already on file is replaced and stays in the record."
         />
-        <span className="mt-1 block text-xs font-normal text-muted-foreground">
-          PDF or a photo, up to 10 MB. A proof already on file is replaced and stays in the record.
-        </span>
-      </label>
+      </div>
       <button
         type="submit"
         disabled={busy || !file}

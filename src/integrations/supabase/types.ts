@@ -1799,6 +1799,7 @@ export type Database = {
           nearest_police_station: string | null
           organization_id: string
           personal_email: string | null
+          prior_experience_months: number | null
           profile_id: string | null
           re_joining_date: string | null
           reason_for_leaving_last_org: string | null
@@ -1842,6 +1843,7 @@ export type Database = {
           nearest_police_station?: string | null
           organization_id: string
           personal_email?: string | null
+          prior_experience_months?: number | null
           profile_id?: string | null
           re_joining_date?: string | null
           reason_for_leaving_last_org?: string | null
@@ -1885,6 +1887,7 @@ export type Database = {
           nearest_police_station?: string | null
           organization_id?: string
           personal_email?: string | null
+          prior_experience_months?: number | null
           profile_id?: string | null
           re_joining_date?: string | null
           reason_for_leaving_last_org?: string | null

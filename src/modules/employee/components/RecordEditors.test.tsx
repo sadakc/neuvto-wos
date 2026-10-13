@@ -105,6 +105,9 @@ describe("family", () => {
     expect(screen.getByTestId("family-editor-summary")).toHaveTextContent("2 sons, 1 daughter");
 
     await user.click(screen.getByTestId("family-add-row"));
+    // D104: a new row is nobody yet; it counts once it is said to be a son.
+    expect(screen.getByTestId("family-editor-summary")).toHaveTextContent("2 sons, 1 daughter");
+    await user.selectOptions(screen.getByLabelText("Relation, row 4"), "son");
     expect(screen.getByTestId("family-editor-summary")).toHaveTextContent("3 sons, 1 daughter");
     await user.type(screen.getByLabelText("Name, row 4"), "Vihaan");
     await user.click(screen.getByTestId("family-save"));

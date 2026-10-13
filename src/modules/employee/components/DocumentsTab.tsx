@@ -17,6 +17,9 @@
  */
 
 import { useEffect, useState } from "react";
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
+import { FilePicker } from "@/components/shared/file-picker";
 import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import { isAppError } from "@/platform/errors";
 import {
@@ -180,6 +183,10 @@ export function DocumentsTab({
           onSubmit={(e) => {
             e.preventDefault();
             if (!file) return;
+            if (expiresOn && !isIsoDate(expiresOn)) {
+              setError(`Expires on: ${DATE_FORMAT_MESSAGE}`);
+              return;
+            }
             void run(
               () =>
                 uploadDocument({
@@ -221,27 +228,20 @@ export function DocumentsTab({
           )}
           <label className="text-sm font-medium">
             Expires on (optional)
-            <input
-              type="date"
+            <DateField
+              label="Expires on (optional)"
               value={expiresOn}
-              onChange={(e) => setExpiresOn(e.target.value)}
-              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              onChange={setExpiresOn}
+              className="mt-2"
             />
           </label>
-          <label className="text-sm font-medium">
-            File
-            <input
-              type="file"
-              aria-label="File"
-              accept="application/pdf,image/png,image/jpeg,image/webp"
-              onChange={(e) => setFile(e.target.files?.[0] ?? null)}
-              className="mt-2 block w-full text-sm"
-            />
-            <span className="mt-1 block text-xs font-normal text-muted-foreground">
-              PDF or a photo, up to 10 MB. A new file for a document already on file replaces it;
-              the old one stays in the record.
-            </span>
-          </label>
+          <FilePicker
+            label="File"
+            file={file}
+            onChange={setFile}
+            testId="document-file"
+            hint="PDF or a photo, up to 10 MB. A new file for a document already on file replaces it; the old one stays in the record."
+          />
           <div className="flex gap-2 @min-[640px]/app:col-span-2">
             <button
               type="submit"

@@ -21,8 +21,28 @@ describe("each rule, the right way and the wrong ways", () => {
   it("a phone: ten digits, +91 and ten, or another country code with 8 to 15", () => {
     ok("phone", "9876543210", "+91 98765 43210", "98765-43210", "(+91) 98765 43210");
     ok("phone", "+971 50 123 4567", "+1 415 555 0100");
-    bad("phone", "34654365465", "987654321", "5876543210", "+91 5876543210");
-    bad("phone", "+91 98765 432101", "abc9876543", "98765 4321x", "+1234567", "98765.43210", "+");
+    // Every way of being wrong is named (D104), so a fix that is still wrong
+    // is never told the same thing as before.
+    const said = (v: string) => checkField("phone", v);
+    expect(said("34654365465")).toBe("A mobile number has 10 digits; this has 11.");
+    expect(said("987654321")).toBe("A mobile number has 10 digits; this has 9.");
+    expect(said("3465436546")).toBe(
+      "An Indian mobile number starts with 6, 7, 8 or 9. For another country, start with + and its code.",
+    );
+    expect(said("5876543210")).toContain("starts with 6, 7, 8 or 9");
+    expect(said("09876543210")).toBe(
+      "Leave out the 0 at the start: a mobile number has 10 digits.",
+    );
+    expect(said("+91 5876543210")).toBe("An Indian mobile number starts with 6, 7, 8 or 9.");
+    expect(said("+91 98765 432101")).toBe("After +91 a mobile number has 10 digits; this has 11.");
+    for (const v of ["abc9876543", "98765 4321x", "98765.43210", "+"]) {
+      expect(said(v), v).toBe(
+        "Digits only. Spaces, dashes and brackets are fine; letters and other symbols aren't.",
+      );
+    }
+    expect(said("+1234567")).toBe(
+      "After + comes the country code and the number: 8 to 15 digits in all.",
+    );
   });
 
   it("a name: letters in any script, spaces and . ' -", () => {

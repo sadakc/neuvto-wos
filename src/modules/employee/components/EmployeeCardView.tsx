@@ -452,11 +452,19 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
         <Panel
           title="Education and experience"
           aside={edit(card) && <EducationEditor card={card} onChanged={onChanged} />}
-          footer="Total experience is the previous organisations on the History tab plus service here. Nobody types it."
+          footer="Total experience is the experience before joining plus service here, and keeps counting by itself. Without the first, it is the previous organisations on the History tab."
         >
           <Fields
             items={[
               { label: "Qualification", value: card.educationQualification },
+              ...(card.priorExperienceMonths != null
+                ? [
+                    {
+                      label: "Experience before joining",
+                      value: formatMonths(card.priorExperienceMonths),
+                    },
+                  ]
+                : []),
               {
                 label: "Total experience",
                 value:
@@ -493,15 +501,12 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
             ]}
           />
         </Panel>
-
-        <Panel title="Restricted" testId="panel-restricted">
-          <p className="text-sm text-foreground-secondary">
-            Religion, caste category and disability status are held separately, on the Statutory and
-            bank tab. Only the Statutory role and the person themselves can see them, and every look
-            is logged.
-          </p>
-        </Panel>
       </Grid>
+      {/* A note, not a panel (D104): nothing restricted is ever shown here. */}
+      <p data-testid="restricted-note" className="text-caption text-muted-foreground">
+        Religion, caste category and disability status are kept apart from this tab, on Statutory
+        and bank, where only those allowed can see them. Every look is logged.
+      </p>
     </div>
   );
 }

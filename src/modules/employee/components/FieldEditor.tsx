@@ -10,6 +10,10 @@
  * Each field can name a rule (fieldRules.ts). A broken rule is said under the
  * field, in words, before anything is sent; the database checks the same rule
  * again for every other way in.
+ *
+ * A number held encrypted (D104) shows its last four, as the card does, with
+ * Change beside it: nothing is cleared on opening, and only a number the Admin
+ * chose to change is typed and sent.
  */
 
 import { useEffect, useId, useState, type ReactNode } from "react";
@@ -20,6 +24,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { isAppError } from "@/platform/errors";
 import { checkField, type FieldRule } from "../fieldRules";
 import { humanise } from "../format";
@@ -36,8 +42,10 @@ export type AddChoice =
       /** The new name's field label, like "New department". */
       prompt: string;
       rule?: FieldRule;
+      /** A second, optional box: a designation's grade, a client site's client. */
+      second?: { prompt: string; hint?: string; maxLength?: number };
       /** Creates it and returns the select value it should take. */
-      create: (name: string) => Promise<string>;
+      create: (name: string, second: string) => Promise<string>;
     }
   | {
       kind: "pick";
@@ -53,7 +61,11 @@ export type AddChoice =
 export type FieldSpec = {
   key: string;
   label: string;
-  kind?: "text" | "date" | "select";
+  /**
+   * "yearsMonths" is two dropdowns whose value is the whole months; "derived"
+   * is shown, never edited (see `derive`).
+   */
+  kind?: "text" | "date" | "select" | "yearsMonths" | "derived";
   options?: readonly string[];
   /** What is on record, for a prefilled field. Numbers are never prefilled. */
   current?: string | null;
@@ -71,9 +83,24 @@ export type FieldSpec = {
   /** A select's empty choice. "Not recorded" unless it says otherwise. */
   emptyLabel?: string;
   add?: AddChoice;
+  /** The last four of a number on record: shown in place of the field until Change. */
+  masked?: string | null;
+  /** What the form starts on when nothing is recorded (Indian, for a nationality). Saved if kept. */
+  defaultValue?: string;
+  /** A date's earliest and latest, and where its calendar opens when empty. ISO. */
+  min?: string;
+  max?: string;
+  openAt?: string;
+  /** For "derived": what to show, from the form's current values. */
+  derive?: (vals: Record<string, string>) => ReactNode;
+  /** A line under the field. */
+  hint?: string;
 };
 
 const ADD = "__add__";
+
+/** "Emergency contact" → "emergency contact", leaving "PF" and "IFSC" as they are. */
+const lower = (title: string) => title.replace(/\b[A-Z][a-z]+/g, (w) => w.toLowerCase());
 
 export function FieldEditor({
   id,
@@ -82,6 +109,7 @@ export function FieldEditor({
   save,
   onSaved,
   label,
+  accessibleLabel,
   filled = true,
   description,
 }: {
@@ -92,11 +120,14 @@ export function FieldEditor({
   onSaved: () => Promise<void> | void;
   /** The button's text. Defaults to "Add <title>" or "Edit <title>". */
   label?: string;
+  /** The button's name for a screen reader, when its text alone ("Edit") is too short. */
+  accessibleLabel?: string;
   /** Whether the panel holds anything yet: "Edit" if so, "Add" if not. */
   filled?: boolean;
   description?: ReactNode;
 }) {
-  const initial = () => Object.fromEntries(fields.map((f) => [f.key, f.current ?? ""]));
+  const initial = () =>
+    Object.fromEntries(fields.map((f) => [f.key, f.current || f.defaultValue || ""]));
   const [open, setOpen] = useState(false);
   const [vals, setVals] = useState<Record<string, string>>(initial);
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -105,13 +136,16 @@ export function FieldEditor({
   const [adding, setAdding] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // The masked numbers the Admin has chosen to change.
+  const [changing, setChanging] = useState<Record<string, boolean>>({});
   const formId = useId();
 
   const verb = filled ? "Edit" : "Add";
-  const buttonText = label ?? `${verb} ${title.toLowerCase()}`;
+  const buttonText = label ?? `${verb} ${lower(title)}`;
 
   function problem(f: FieldSpec, value: string): string | null {
     if (f.required && value.trim() === "") return `${f.label} can't be empty.`;
+    if (f.kind === "date" && value !== "" && !isIsoDate(value)) return DATE_FORMAT_MESSAGE;
     return checkField(f.rule, value);
   }
 
@@ -138,6 +172,7 @@ export function FieldEditor({
     const changed: Record<string, string | null> = {};
     const found: Record<string, string> = {};
     for (const f of fields) {
+      if (f.kind === "derived") continue;
       const now = vals[f.key].trim();
       const before = (f.current ?? "").trim();
       if (now === before) continue;
@@ -178,8 +213,10 @@ export function FieldEditor({
           setAdded({});
           setAdding(null);
           setError("");
+          setChanging({});
           setOpen(true);
         }}
+        aria-label={accessibleLabel}
         className="-my-2.5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
       >
         {buttonText}
@@ -188,10 +225,13 @@ export function FieldEditor({
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {verb} {title.toLowerCase()}
+              {verb} {lower(title)}
             </DialogTitle>
             <DialogDescription>
-              {description ?? "Only what you change is saved. Empty a field to clear it."}
+              {description ??
+                (fields.some((f) => f.masked)
+                  ? "Only what you change is saved. A number on record stays as it is unless you choose Change."
+                  : "Only what you change is saved. Empty a field to clear it.")}
             </DialogDescription>
           </DialogHeader>
           <form
@@ -203,16 +243,94 @@ export function FieldEditor({
             {fields.map((f) => {
               const errId = `${formId}-${f.key}-error`;
               const bad = errors[f.key];
-              const options = [
+              const options: (readonly [string, string])[] = [
                 ...(f.labelled ?? (f.options ?? []).map((o) => [o, humanise(o)] as const)),
                 ...(added[f.key] ?? []),
               ];
+              // What is on record is always among the choices, so the select
+              // never shows something other than what is saved.
+              const v = vals[f.key];
+              if (f.kind === "select" && v && !options.some(([o]) => o === v)) {
+                options.unshift([v, humanise(v)]);
+              }
+              const eyebrow =
+                "block text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase";
+              if (f.kind === "derived") {
+                return (
+                  <div key={f.key} className="min-w-0 text-sm" data-testid={`derived-${f.key}`}>
+                    <span className={eyebrow}>{f.label}</span>
+                    <div className="mt-1 flex min-h-11 items-center rounded-md border border-dashed border-border px-3 text-foreground-secondary">
+                      {f.derive?.(vals) ?? "—"}
+                    </div>
+                    {f.hint && <p className="mt-1 text-caption text-muted-foreground">{f.hint}</p>}
+                  </div>
+                );
+              }
+              if (f.kind === "yearsMonths") {
+                const total = v === "" ? null : Number(v);
+                const years = total === null ? "" : String(Math.floor(total / 12));
+                const months = total === null ? "" : String(total % 12);
+                // Choosing a number in either counts the other as 0 until it
+                // is chosen; setting either back to its blank clears both.
+                const put = (y: string, m: string) =>
+                  set(f, y === "" || m === "" ? "" : String(Number(y) * 12 + Number(m)));
+                return (
+                  <fieldset key={f.key} className="min-w-0 text-sm">
+                    <legend className={eyebrow}>{f.label}</legend>
+                    <div className="mt-1 grid grid-cols-2 gap-2">
+                      <select
+                        aria-label={`${f.label}, years`}
+                        value={years}
+                        onChange={(e) => put(e.target.value, months || "0")}
+                        className="h-11 w-full rounded-md border border-input bg-background px-3"
+                      >
+                        <option value="">Years</option>
+                        {Array.from({ length: 51 }, (_, i) => (
+                          <option key={i} value={String(i)}>
+                            {i === 1 ? "1 year" : `${i} years`}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        aria-label={`${f.label}, months`}
+                        value={months}
+                        onChange={(e) => put(years || "0", e.target.value)}
+                        className="h-11 w-full rounded-md border border-input bg-background px-3"
+                      >
+                        <option value="">Months</option>
+                        {Array.from({ length: 12 }, (_, i) => (
+                          <option key={i} value={String(i)}>
+                            {i === 1 ? "1 month" : `${i} months`}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                    {f.hint && <p className="mt-1 text-caption text-muted-foreground">{f.hint}</p>}
+                  </fieldset>
+                );
+              }
+              if (f.masked && !changing[f.key]) {
+                return (
+                  <div key={f.key} className="min-w-0 text-sm" data-testid={`masked-${f.key}`}>
+                    <span className={eyebrow}>{f.label}</span>
+                    <div className="mt-1 flex h-11 items-center justify-between gap-2 rounded-md border border-input bg-muted/40 px-3">
+                      <span className="font-mono whitespace-nowrap">•••• {f.masked}</span>
+                      <button
+                        type="button"
+                        onClick={() => setChanging((c) => ({ ...c, [f.key]: true }))}
+                        aria-label={`Change ${f.label}`}
+                        className="-mr-2 inline-flex h-11 items-center px-2 text-sm font-medium text-primary hover:underline"
+                      >
+                        Change
+                      </button>
+                    </div>
+                  </div>
+                );
+              }
               return (
                 <div key={f.key} className="min-w-0 text-sm">
                   <label className="block">
-                    <span className="block text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
-                      {f.label}
-                    </span>
+                    <span className={eyebrow}>{f.label}</span>
                     {f.kind === "select" ? (
                       <select
                         value={vals[f.key]}
@@ -235,10 +353,23 @@ export function FieldEditor({
                         ))}
                         {f.add && <option value={ADD}>{f.add.label}</option>}
                       </select>
+                    ) : f.kind === "date" ? (
+                      <DateField
+                        label={f.label}
+                        value={vals[f.key]}
+                        onChange={(value) => set(f, value)}
+                        min={f.min}
+                        max={f.max}
+                        openAt={f.openAt}
+                        invalid={!!bad}
+                        describedBy={bad ? errId : undefined}
+                        className="mt-1"
+                      />
                     ) : (
                       <input
-                        type={f.kind === "date" ? "date" : "text"}
+                        type="text"
                         value={vals[f.key]}
+                        autoFocus={!!f.masked}
                         onChange={(e) => set(f, e.target.value)}
                         placeholder={f.placeholder}
                         inputMode={f.inputMode}
@@ -250,6 +381,24 @@ export function FieldEditor({
                       />
                     )}
                   </label>
+                  {f.masked && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setChanging((c) => ({ ...c, [f.key]: false }));
+                        set(f, f.current ?? "");
+                        setErrors((e) => {
+                          const next = { ...e };
+                          delete next[f.key];
+                          return next;
+                        });
+                      }}
+                      className="mt-1 inline-flex min-h-9 items-center text-sm text-primary hover:underline"
+                    >
+                      Keep •••• {f.masked}
+                    </button>
+                  )}
+                  {f.hint && <p className="mt-1 text-caption text-muted-foreground">{f.hint}</p>}
                   {bad && (
                     <p id={errId} role="alert" className="mt-1 text-sm text-destructive">
                       {bad}
@@ -314,11 +463,13 @@ export function AddInline({
   onCancel: () => void;
 }) {
   const [name, setName] = useState("");
+  const [second, setSecond] = useState("");
   const [picks, setPicks] = useState<[string, string][] | null>(null);
   const [pick, setPick] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const inputId = useId();
+  const secondId = useId();
 
   useEffect(() => {
     if (choice.kind !== "pick") return;
@@ -345,7 +496,7 @@ export function AddInline({
       if (p) return setError(p);
       setBusy(true);
       try {
-        onAdded(await choice.create(v), v);
+        onAdded(await choice.create(v, second.trim()), v);
       } catch (err) {
         setError(isAppError(err) ? err.message : "That couldn't be added.");
       } finally {
@@ -389,7 +540,25 @@ export function AddInline({
           onChange={(e) => setName(e.target.value)}
           className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
         />
-      ) : (
+      ) : null}
+      {choice.kind === "name" && choice.second && (
+        <>
+          <label htmlFor={secondId} className="mt-2 block text-sm font-medium">
+            {choice.second.prompt}
+          </label>
+          <input
+            id={secondId}
+            value={second}
+            maxLength={choice.second.maxLength ?? 100}
+            onChange={(e) => setSecond(e.target.value)}
+            className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
+          />
+          {choice.second.hint && (
+            <p className="mt-1 text-caption text-muted-foreground">{choice.second.hint}</p>
+          )}
+        </>
+      )}
+      {choice.kind === "pick" ? (
         <select
           id={inputId}
           value={pick}
@@ -403,7 +572,7 @@ export function AddInline({
             </option>
           ))}
         </select>
-      )}
+      ) : null}
       {choice.kind === "pick" && choice.note && (
         <p className="mt-1 text-caption text-muted-foreground">{choice.note}</p>
       )}

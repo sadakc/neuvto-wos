@@ -144,8 +144,9 @@ describe("shift and calendar on the card", () => {
     await screen.findByRole("option", { name: /General/ });
     expect(within(select).queryByRole("option", { name: /Retired one/ })).toBeNull();
     await user.selectOptions(select, "s-gen");
-    await user.clear(screen.getByLabelText("From"));
-    await user.type(screen.getByLabelText("From"), "2026-12-01");
+    const from = screen.getByRole("textbox", { name: "From" });
+    await user.clear(from);
+    await user.type(from, "01122026");
     await user.type(screen.getByLabelText("Reason (optional)"), "Back to days");
     await user.click(screen.getByRole("button", { name: "Save shift" }));
     expect(api.setShift).toHaveBeenCalledWith(card.id, {
@@ -171,7 +172,7 @@ describe("shift and calendar on the card", () => {
     await user.selectOptions(screen.getByLabelText("Shift"), "");
     await user.click(screen.getByRole("button", { name: "Save shift" }));
     expect(api.setShift).toHaveBeenCalledWith(card.id, expect.objectContaining({ shiftId: null }));
-    const date = screen.getByLabelText("From").closest("label")!;
+    const date = screen.getByRole("textbox", { name: "From" }).closest("label")!;
     expect(await within(date).findByRole("alert")).toHaveTextContent("That date clashes.");
   });
 });
@@ -187,7 +188,7 @@ describe("moving somebody with their own shift", () => {
     await screen.findByRole("option", { name: "Acme HQ, Bengaluru" });
     await user.selectOptions(screen.getByTestId("move-unit-select"), "u-hq");
     await user.clear(screen.getByTestId("move-from"));
-    await user.type(screen.getByTestId("move-from"), "2026-12-01");
+    await user.type(screen.getByTestId("move-from"), "01122026");
     expect(screen.getByTestId("move-calendar-note")).toHaveTextContent(
       "From 01 Dec 2026 their leave is counted on Company calendar: Saturday and Sunday off.",
     );

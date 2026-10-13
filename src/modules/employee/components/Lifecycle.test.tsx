@@ -162,7 +162,7 @@ describe("Add Employee, Sada's first round (D103)", () => {
     expect(screen.getAllByRole("alert").map((a) => a.textContent)).toEqual([
       "Letters only: no digits or symbols other than . ' and -.",
       "Enter an email address, like name@example.com.",
-      "Enter a 10-digit mobile number, or + and the country code. Digits only, with spaces if you like.",
+      "A mobile number has 10 digits; this has 11.",
       "Letters and digits, up to 30, with / . _ or - between them. No spaces.",
     ]);
     expect(api.createDraft).not.toHaveBeenCalled();
@@ -238,7 +238,7 @@ describe("on the card", () => {
     await user.selectOptions(screen.getByTestId("deactivate-successor"), "p-mark");
     const last = screen.getByTestId("deactivate-last-day");
     await user.clear(last);
-    await user.type(last, "2026-10-10");
+    await user.type(last, "10102026");
     expect(confirm).toBeDisabled();
     await user.type(screen.getByTestId("deactivate-reason"), "Resigned");
     await user.click(confirm);

@@ -152,6 +152,8 @@ export interface EmployeeCard {
 
   // ── the work record: self, admin, payroll, statutory, approver
   totalExperienceMonths?: number;
+  /** D104: typed by an Admin as years and months; when set, it stands in for the previous organisations' sum. */
+  priorExperienceMonths?: number | null;
   employmentType?: string | null;
   confirmedOn?: string | null;
 
@@ -320,6 +322,8 @@ export const ADDRESS_TYPES = ["present", "permanent", "while_deployed", "emergen
 export const NOMINATION_SCHEMES = ["pf_and_gratuity", "esic", "insurance"] as const;
 export const SEXES = ["male", "female", "other", "undisclosed"] as const;
 export const MARITAL_STATUSES = ["single", "married", "widowed", "divorced", "separated"] as const;
+/** D104: Indian first and the default, then the neighbours a workforce most often comes from. */
+export const NATIONALITIES = ["Indian", "Nepali", "Bangladeshi"] as const;
 export const BLOOD_GROUPS = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"] as const;
 export const EMPLOYMENT_TYPES = [
   "full_time",

@@ -79,13 +79,28 @@ describe("the documents on a record", () => {
     ).toBeInTheDocument();
   });
 
+  it("has a Browse button, and takes back a file chosen by mistake (D104)", async () => {
+    const user = userEvent.setup();
+    render(<DocumentsTab employeeId="e1" isAdmin={false} isSelf />);
+    await user.click(await screen.findByRole("button", { name: "Upload a document" }));
+    expect(screen.getByRole("button", { name: "Browse…" })).toBeVisible();
+    const upload = screen.getByRole("button", { name: "Upload" });
+    expect(upload).toBeDisabled();
+    const file = new File(["%PDF-1.4"], "wrong.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("File"), file);
+    expect(upload).toBeEnabled();
+    await user.click(screen.getByRole("button", { name: "Remove wrong.pdf" }));
+    expect(upload).toBeDisabled();
+    expect(screen.getByText("No file chosen")).toBeInTheDocument();
+  });
+
   it("uploads exactly the document, its name, its expiry and the file", async () => {
     const user = userEvent.setup();
     render(<DocumentsTab employeeId="e1" isAdmin={false} isSelf />);
     await user.click(await screen.findByRole("button", { name: "Upload a document" }));
     await user.selectOptions(screen.getByLabelText("Document"), "relieving_letter");
     await user.type(screen.getByLabelText("Which employer"), "Securitas");
-    await user.type(screen.getByLabelText("Expires on (optional)"), "2030-01-01");
+    await user.type(screen.getByRole("textbox", { name: "Expires on (optional)" }), "01012030");
     const file = new File(["%PDF-1.4"], "letter.pdf", { type: "application/pdf" });
     await user.upload(screen.getByLabelText("File"), file);
     await user.click(screen.getByRole("button", { name: "Upload" }));

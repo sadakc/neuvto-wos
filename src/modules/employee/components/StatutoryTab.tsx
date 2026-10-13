@@ -21,6 +21,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, EyeOff, Lock } from "lucide-react";
+import { FilePicker } from "@/components/shared/file-picker";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { isAppError } from "@/platform/errors";
 import {
@@ -28,16 +29,20 @@ import {
   CHECK_STATUSES,
   DISABILITY_STATUSES,
   type EmployeeCard,
+  type EmployeeDocument,
   type RestrictedRead,
   type RevealField,
   type Revealed,
 } from "../contracts";
 import {
   getRestrictedReads,
+  listDocuments,
+  openDocument,
   revealRestricted,
   setBank,
   setRestricted,
   setStatutory,
+  uploadDocument,
 } from "../handlers";
 import { formatDate, humanise } from "../format";
 import { FieldEditor as Editor, type FieldSpec } from "./FieldEditor";
@@ -307,6 +312,7 @@ export function StatutoryTab({
                 { label: "Penny drop", value: humanise(card.bank.pennyDropStatus) },
               ]}
             />
+            {caps.canEditBank && <BankProof employeeId={card.id} />}
           </Panel>
         )}
 
@@ -423,6 +429,103 @@ export function StatutoryTab({
   );
 }
 
+/**
+ * The passbook's first page or a cancelled cheque (D104), on the bank panel
+ * where it is checked against. It is the Documents tab's "bank_proof": the
+ * same storage, the same logged opening, and a new photo replaces the old one,
+ * which stays in the record.
+ */
+function BankProof({ employeeId }: { employeeId: string }) {
+  const [doc, setDoc] = useState<EmployeeDocument | null | undefined>(undefined);
+  const [file, setFile] = useState<File | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+
+  const load = useCallback(
+    () =>
+      listDocuments(employeeId)
+        .then((docs) => setDoc(docs.find((d) => d.docType === "bank_proof") ?? null))
+        .catch(() => setDoc(null)),
+    [employeeId],
+  );
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  async function upload() {
+    if (!file) return;
+    setError("");
+    setBusy(true);
+    try {
+      await uploadDocument({ employeeId, docType: "bank_proof", title: "", expiresOn: null, file });
+      setFile(null);
+      await load();
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "The image didn't upload. Try again.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function view(id: string) {
+    setError("");
+    try {
+      window.open(await openDocument(id), "_blank", "noopener");
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That couldn't be opened.");
+    }
+  }
+
+  return (
+    <div className="mt-4 border-t border-border pt-3" data-testid="bank-proof">
+      <p className="text-sm">
+        <span className="font-medium">Passbook or cancelled cheque: </span>
+        {doc === undefined ? (
+          <span className="text-muted-foreground">checking…</span>
+        ) : doc ? (
+          <>
+            <span className="text-foreground-secondary">on file</span>{" "}
+            <button
+              type="button"
+              onClick={() => void view(doc.id)}
+              className="inline-flex min-h-9 items-center text-primary underline underline-offset-4"
+            >
+              View
+            </button>
+          </>
+        ) : (
+          <span className="text-muted-foreground">not uploaded yet</span>
+        )}
+      </p>
+      <div className="mt-2 flex flex-wrap items-end gap-2">
+        <FilePicker
+          label={doc ? "Replace the image" : "Upload an image"}
+          file={file}
+          onChange={setFile}
+          testId="bank-proof-file"
+          hint="A photo or PDF of the passbook's first page or a cancelled cheque, up to 10 MB. Opening it is logged."
+        />
+        {file && (
+          <button
+            type="button"
+            onClick={() => void upload()}
+            disabled={busy}
+            data-testid="bank-proof-upload"
+            className="inline-flex h-11 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
+          >
+            {busy ? "Uploading…" : "Upload"}
+          </button>
+        )}
+      </div>
+      {error && (
+        <p role="alert" className="mt-1 text-sm text-destructive">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}
+
 /** A number: locked to its last four, or shown, with the eye between the two. */
 function Secret({
   last4,
@@ -450,22 +553,29 @@ function Secret({
   if (!last4) return <span>—</span>;
   if (value) {
     return (
-      <span className="inline-flex flex-wrap items-center gap-2" data-testid={`${testId}-value`}>
-        <span className="font-mono">{value}</span>
+      // The number and its eye stay on one line (D104); the notice that the
+      // look was logged goes under them rather than pushing the eye down.
+      <span className="inline-flex flex-col items-start gap-1" data-testid={`${testId}-value`}>
+        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+          <span className="font-mono">{value}</span>
+          <button
+            type="button"
+            onClick={onHide}
+            aria-label={`Hide ${label}`}
+            className="-my-2 inline-flex size-9 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          >
+            <EyeOff className="size-4" aria-hidden />
+          </button>
+        </span>
         <StatusBadge tone="warning">Shown, logged</StatusBadge>
-        <button
-          type="button"
-          onClick={onHide}
-          aria-label={`Hide ${label}`}
-          className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-        >
-          <EyeOff className="size-4" aria-hidden />
-        </button>
       </span>
     );
   }
   return (
-    <span className="inline-flex flex-wrap items-center gap-2">
+    <span
+      className="inline-flex items-center gap-1 whitespace-nowrap"
+      data-testid={`${testId}-locked`}
+    >
       <Lock className="size-3.5 text-muted-foreground" aria-hidden />
       <span className="font-mono" data-testid={`${testId}-masked`}>
         •••• {last4}
@@ -476,7 +586,7 @@ function Secret({
           onClick={onShow}
           disabled={busy}
           aria-label={`Show ${label}`}
-          className="inline-flex size-9 items-center justify-center rounded-md text-primary hover:bg-muted disabled:opacity-45"
+          className="-my-2 inline-flex size-9 shrink-0 items-center justify-center rounded-md text-primary hover:bg-muted disabled:opacity-45"
         >
           <Eye className="size-4" aria-hidden />
         </button>
@@ -489,17 +599,16 @@ function Secret({
 
 /**
  * One editor per panel, for the panel's header (D103): "Add …" while nothing
- * is recorded there, "Edit …" once something is. Numbers are never prefilled
- * and an empty number field keeps what is on record; each is checked on the
- * screen against the rule the database refuses with.
+ * is recorded there, "Edit …" once something is. A number on record shows its
+ * last four with Change beside it (D104); only a number the Admin changes is
+ * typed and sent, and an empty number field keeps what is on record. Each is
+ * checked on the screen against the rule the database refuses with.
  */
 function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
   const caps = card.capabilities;
   const st = card.statutory;
   const bank = card.bank;
   const v = card.verification;
-  const keep = (last4: string | null | undefined) =>
-    last4 ? `•••• ${last4} on record. Type to replace.` : undefined;
   const has = (...xs: unknown[]) => xs.some((x) => x !== null && x !== undefined && x !== "");
   const editor = (
     id: string,
@@ -521,29 +630,29 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
             {
               key: "uan",
               label: "UAN",
-              placeholder: keep(st?.uanLast4),
+              masked: st?.uanLast4,
               rule: "uan",
               inputMode: "numeric",
             },
-            { key: "epfNumber", label: "EPF number", placeholder: keep(st?.epfLast4), rule: "epf" },
+            { key: "epfNumber", label: "EPF number", masked: st?.epfLast4, rule: "epf" },
             {
               key: "esicNumber",
               label: "ESIC number",
-              placeholder: keep(st?.esicLast4),
+              masked: st?.esicLast4,
               rule: "esic",
               inputMode: "numeric",
             },
             {
               key: "oldUan",
               label: "Old UAN",
-              placeholder: keep(st?.oldUanLast4),
+              masked: st?.oldUanLast4,
               rule: "uan",
               inputMode: "numeric",
             },
             {
               key: "oldEsicNumber",
               label: "Old ESIC number",
-              placeholder: keep(st?.oldEsicLast4),
+              masked: st?.oldEsicLast4,
               rule: "esic",
               inputMode: "numeric",
             },
@@ -560,11 +669,11 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
             {
               key: "aadhaar",
               label: "Aadhaar",
-              placeholder: keep(st?.aadhaarLast4),
+              masked: st?.aadhaarLast4,
               rule: "aadhaar",
               inputMode: "numeric",
             },
-            { key: "pan", label: "PAN", placeholder: keep(st?.panLast4), rule: "pan" },
+            { key: "pan", label: "PAN", masked: st?.panLast4, rule: "pan" },
             {
               key: "identityDocumentType",
               label: "Document given",
@@ -653,7 +762,7 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
             {
               key: "account",
               label: "Account number",
-              placeholder: keep(bank?.accountLast4),
+              masked: bank?.accountLast4,
               rule: "account",
               inputMode: "numeric",
             },

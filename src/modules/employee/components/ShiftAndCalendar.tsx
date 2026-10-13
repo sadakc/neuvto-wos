@@ -16,6 +16,8 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { isAppError } from "@/platform/errors";
 import type { EmployeeCard, ShiftRow } from "../contracts";
 import { describeShift, describeWeek, formatDate, lastDay, todayIso } from "../format";
@@ -116,9 +118,13 @@ function ShiftDialog({
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
-    setBusy(true);
     setError("");
     setDateError("");
+    if (!isIsoDate(from)) {
+      setDateError(DATE_FORMAT_MESSAGE);
+      return;
+    }
+    setBusy(true);
     try {
       await setShift(card.id, { shiftId: shiftId || null, effectiveFrom: from, reason });
       setOpen(false);
@@ -180,16 +186,16 @@ function ShiftDialog({
             </label>
             <label className="text-sm font-medium">
               From
-              <input
-                type="date"
-                aria-label="From"
+              <DateField
+                label="From"
                 required
                 value={from}
-                onChange={(e) => {
-                  setFrom(e.target.value);
+                invalid={!!dateError}
+                onChange={(d) => {
+                  setFrom(d);
                   setDateError("");
                 }}
-                className={input}
+                className="mt-1"
               />
               {dateError && (
                 <span role="alert" className="mt-1 block text-sm font-normal text-destructive">
