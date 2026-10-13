@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.14 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.15 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -583,6 +583,19 @@ by `ShiftCalendar.test.tsx`, `Configuration.test.tsx`, `settings.holidays.test.t
   unit's calendar or limiting a holiday changes what new requests cost, not old ones.
 - The apply screen's preview and its "Not counted" sentence ask for the applicant's own
   calendar (`my_working_days`, `my_days_excluded`), the same rule `leave_submit` charges.
+
+### Checked at phone width (13 Oct 2026)
+
+Every screen from D95 to D102 was opened in a real browser at 390px against local data (the
+card fixture, committed locally), and again at 1440px: every card tab, the upload form, Change
+shift, Move to another unit, Configuration's calendars, shifts and onboarding sections, and
+Settings' holidays. No page scrolls sideways. Four things were wrong and are fixed: Export
+record squeezed the card header's name and tags (it now takes its own row on a phone); the
+proof column broke the file name mid-word; the onboarding checklist's item names went one word
+per line and ran into their controls (an E9 screen, found on the way); and "Calendar from:
+From …" said "from" twice (now "Set by"). Layout cannot be seen by the render tests, which
+have no layout engine, so these four were proved in the browser; the copy change is pinned by
+`ShiftCalendar.test.tsx`.
 
 ## 8. Acceptance criteria, module level
 

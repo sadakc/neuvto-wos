@@ -110,10 +110,12 @@ describe("shift and calendar on the card", () => {
     const panel = screen.getByTestId("panel-shift-calendar");
     expect(panel).toHaveTextContent("Six-day sites");
     expect(panel).toHaveTextContent("Sunday off");
-    expect(panel).toHaveTextContent("From Tata AIG, Hosur");
+    expect(panel).toHaveTextContent("Set byTheir unit, Tata AIG, Hosur");
+    // Said once: the label is "Set by", never "Calendar from: From …".
+    expect(panel).not.toHaveTextContent(/from From/i);
     expect(panel).toHaveTextContent("Night");
     expect(panel).toHaveTextContent("20:00 to 08:00 next day, 30 min break");
-    expect(panel).toHaveTextContent("Their own shift since 01 Jul 2025");
+    expect(panel).toHaveTextContent("Their own shift, since 01 Jul 2025");
     expect(screen.queryByTestId("own-shift-history")).toBeNull();
     expect(screen.queryByRole("button", { name: "Change shift" })).toBeNull();
   });

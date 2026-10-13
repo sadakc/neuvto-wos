@@ -32,10 +32,12 @@ export function ProofCell({
     return <span>{proof ? "On file" : "None"}</span>;
   }
   return (
-    <span className="flex flex-col items-start gap-1">
+    <span className="flex min-w-[10rem] flex-col items-start gap-1 whitespace-nowrap">
       {proof ? (
         <>
-          <span className="break-all">{proof.fileName}</span>
+          <span className="block max-w-[14rem] truncate" title={proof.fileName}>
+            {proof.fileName}
+          </span>
           <button
             type="button"
             onClick={() =>

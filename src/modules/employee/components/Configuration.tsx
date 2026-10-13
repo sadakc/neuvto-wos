@@ -904,7 +904,10 @@ function OnboardingRow({
   const valid = /^\d{1,3}$/.test(due) && Number(due) <= 365;
   return (
     <li data-testid="onboarding-item" className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
-      <span className="min-w-0 flex-1">{item.label}</span>
+      {/* A line of its own on a phone; beside its controls when there is room. */}
+      <span className="min-w-0 basis-full @min-[560px]/app:basis-0 @min-[560px]/app:flex-1">
+        {item.label}
+      </span>
       <label className="flex items-center gap-1.5">
         <span className="text-caption text-muted-foreground">within</span>
         <input

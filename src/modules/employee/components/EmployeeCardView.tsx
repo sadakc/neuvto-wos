@@ -198,13 +198,16 @@ export function EmployeeCardView({
               )}
             </ul>
           </div>
-          <button
-            type="button"
-            onClick={() => void downloadRecordPdf(card)}
-            className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium"
-          >
-            Export record
-          </button>
+          {/* Its own row on a phone, so the name keeps the width (seen at 390px). */}
+          <div className="w-full @min-[640px]/app:w-auto">
+            <button
+              type="button"
+              onClick={() => void downloadRecordPdf(card)}
+              className="inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium"
+            >
+              Export record
+            </button>
+          </div>
           {(card.capabilities.canSendInvite ||
             card.capabilities.canDeactivate ||
             card.capabilities.canEditDraft) && (

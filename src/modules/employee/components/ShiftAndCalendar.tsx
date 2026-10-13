@@ -35,9 +35,9 @@ export function ShiftCalendarPanel({
   if (!w) return null;
   const shiftFrom =
     w.shiftSource === "person"
-      ? `Their own shift since ${formatDate(w.ownShiftSince)}`
+      ? `Their own shift, since ${formatDate(w.ownShiftSince)}`
       : w.shiftSource === "unit"
-        ? `From ${w.unitName}`
+        ? `Their unit, ${w.unitName}`
         : null;
   return (
     <Panel
@@ -53,14 +53,15 @@ export function ShiftCalendarPanel({
           { label: "Working calendar", value: w.calendar.name },
           { label: "Days off", value: describeWeek(w.calendar.weeklyOff) },
           {
-            label: "Calendar from",
-            value: w.calendarSource === "unit" ? `From ${w.unitName}` : "The Company calendar",
+            label: "Set by",
+            value:
+              w.calendarSource === "unit" ? `Their unit, ${w.unitName}` : "The Company calendar",
           },
           {
             label: "Shift",
             value: w.shift ? `${w.shift.name}, ${describeShift(w.shift)}` : "No shift set",
           },
-          ...(shiftFrom ? [{ label: "Shift from", value: shiftFrom }] : []),
+          ...(shiftFrom ? [{ label: "Shift set by", value: shiftFrom }] : []),
         ]}
       />
       {w.ownShifts && w.ownShifts.length > 0 && (
