@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.6 · **Status:** Active · **Updated:** 16 Oct 2026
+**Version:** 1.7 · **Status:** Active · **Updated:** 13 Oct 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -24,7 +24,7 @@ predates 31 Jul 2026 and is wrong.
 | The employee record, who may make whom an admin, and the build order                      | [product/NEUVTO_EMPLOYEE_MASTER.md](product/NEUVTO_EMPLOYEE_MASTER.md)                     |
 | What the Core HR bundle's Leave chapter adds, where it conflicts, and what needs deciding | [product/LEAVE_PHASE_2_SCOPE.md](product/LEAVE_PHASE_2_SCOPE.md)                           |
 | What a screen looks like (the Core HR design)                                             | [standards/NEUVTO_DESIGN_SYSTEM.md](standards/NEUVTO_DESIGN_SYSTEM.md)                     |
-| Why something was built differently from the PRD                                          | the **D1–D82** decision table in the same file                                             |
+| Why something was built differently from the PRD                                          | the **D1–D102** decision table in the same file                                            |
 | Whether the platform itself is finished                                                   | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
 | How to run the thing on your own machine                                                  | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
 | How code and schema reach the hosted site                                                 | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
@@ -37,6 +37,8 @@ predates 31 Jul 2026 and is wrong.
 | How the production test data gets deleted, later                                          | [operations/TEST_DATA_PURGE.md](operations/TEST_DATA_PURGE.md)                             |
 | What the QA/UAT stacks are, and why hosting is moving to Cloudflare                       | [operations/ENVIRONMENTS.md](operations/ENVIRONMENTS.md)                                   |
 | How Neuvto is run without Claude Code, and who could take it over                         | [operations/CONTINUITY.md](operations/CONTINUITY.md)                                       |
+| How each kind of test is written and run (unit, SQL, browser, mutation)                   | §8 of [standards/NEUVTO_CODING_STANDARDS.md](standards/NEUVTO_CODING_STANDARDS.md)         |
+| What each script does, and which ones touch production                                    | [scripts/README.md](../scripts/README.md)                                                  |
 
 ---
 
@@ -47,7 +49,7 @@ predates 31 Jul 2026 and is wrong.
 **[NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)** — the single
 source of truth. The platform and its services, the module contract, the build
 sequence with its status column, the verification gate for every step, and the
-**D1–D82 decision table** recording every deliberate deviation from the PRD with
+**D1–D102 decision table** recording every deliberate deviation from the PRD with
 its reason. Its "Known gaps" section is the live list of launch blockers; there
 is no separate blockers file, because two lists of blockers means one of them is
 wrong.
@@ -79,7 +81,7 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 | ------------------------------ | --------------------------------------------------------------- |
 | `NEUVTO_DATA_STANDARDS.md`     | audit columns, soft delete, constraints, erasure (D16–D19, D23) |
 | `NEUVTO_SECURITY_POLICY.md`    | RLS, roles, sessions, MFA                                       |
-| `NEUVTO_CODING_STANDARDS.md`   | module boundaries, the Lovable quarantine                       |
+| `NEUVTO_CODING_STANDARDS.md`   | module boundaries, the Lovable quarantine, how code is tested   |
 | `NEUVTO_API_STANDARDS.md`      | handler and error shapes                                        |
 | `NEUVTO_DESIGN_SYSTEM.md`      | tokens, dark mode, touch targets                                |
 | `NEUVTO_ANALYTICS.md`          | the event taxonomy (D25)                                        |
@@ -125,6 +127,8 @@ requires them.
 | `.claude/agents/` | Claude Code loads agents from this exact path                   |
 | `neuvto-harness/` | referenced by `scripts/harness.sh`, `package.json` and CI       |
 | `supabase/`       | the Supabase CLI's fixed layout                                 |
+| `e2e/`            | `playwright.config.ts` and `tsconfig.json` name it              |
+| `.vscode/`        | VS Code reads its settings, tasks and extensions from this path |
 
 ---
 

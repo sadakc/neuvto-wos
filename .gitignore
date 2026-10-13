@@ -35,7 +35,11 @@ dist-ssr
 
 # Editor directories and files
 .vscode/*
+# Shared on purpose: recommended extensions, repo-wide editor settings, tasks.
+# Anything else in .vscode (launch configs, personal tweaks) stays local.
 !.vscode/extensions.json
+!.vscode/settings.json
+!.vscode/tasks.json
 .idea
 .DS_Store
 *.suo
