@@ -161,11 +161,15 @@ describe("importing", () => {
 
   it("shows what the file itself could not say, and sends nothing", async () => {
     h.readWorkbook.mockResolvedValue({
-      People: [PEOPLE_HEAD, ["E-1", "Mallappa", null, "01/11/2026"]],
+      People: [PEOPLE_HEAD, ["E-1", "Mallappa", null, "31/02/2026"]],
     });
     await upload();
     expect(await screen.findByTestId("import-problems")).toHaveTextContent(
-      "People, row 2: Date of joining: Not a date",
+      "People, row 2: Date of joining: Not a date. Write it as DD/MM/YYYY, like 05/08/1990.",
+    );
+    // D106: the page says what a date looks like before anything is uploaded.
+    expect(screen.getByTestId("import-date-format")).toHaveTextContent(
+      "DD/MM/YYYY, like 05/08/1990",
     );
     expect(h.importMaster).not.toHaveBeenCalled();
   });

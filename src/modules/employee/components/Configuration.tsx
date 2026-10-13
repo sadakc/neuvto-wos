@@ -12,6 +12,7 @@
  * enforced by employee_card(). A switch that could loosen it would be the leak.
  */
 
+import { ChevronDown, ChevronUp } from "lucide-react";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
@@ -31,6 +32,7 @@ import {
 } from "../contracts";
 import { describeShift, describeWeek, formatDate } from "../format";
 import { FIELD_CATALOGUE } from "../fieldCatalogue";
+import { HOME_STATE, STATES } from "../indiaPlaces";
 import {
   listCalendars,
   listShifts,
@@ -39,6 +41,7 @@ import {
   listOnboardingItems,
   saveOnboardingSettings,
   listUnits,
+  rankDesignations,
   saveDesignation,
   saveOnboardingItem,
   saveUnit,
@@ -336,7 +339,8 @@ function UnitDialog({
     unitType: unit?.unitType ?? "own_establishment",
     clientName: unit?.clientName ?? "",
     location: unit?.location ?? "",
-    state: unit?.state ?? "",
+    // A new unit starts in the home state (D106), like an address.
+    state: unit ? (unit.state ?? "") : HOME_STATE,
     requiresPoliceVerification: unit?.requiresPoliceVerification ?? false,
     isBillable: unit?.isBillable ?? false,
     // D102: "" is the Company calendar, or no default shift.
@@ -440,11 +444,23 @@ function UnitDialog({
             </label>
             <label className="text-sm">
               <span className="block font-medium">State</span>
-              <input
+              {/* D106: every state is chosen from the list, here as on the card. */}
+              <select
+                aria-label="State"
+                data-testid="unit-state"
                 value={v.state}
                 onChange={(e) => setV({ ...v, state: e.target.value })}
                 className={`mt-1 ${input}`}
-              />
+              >
+                <option value="">Not recorded</option>
+                {/* A state typed before the list existed stays shown as it is. */}
+                {v.state && !STATES.includes(v.state) && <option value={v.state}>{v.state}</option>}
+                {STATES.map((st) => (
+                  <option key={st} value={st}>
+                    {st}
+                  </option>
+                ))}
+              </select>
             </label>
           </div>
           <div className="grid gap-3 @min-[480px]/app:grid-cols-2">
@@ -526,6 +542,11 @@ function UnitDialog({
   );
 }
 
+/**
+ * The company's designations (D106): added, edited and retired here, and put
+ * in the company's order, most senior first. Every list a designation is
+ * chosen from reads in this order, so the dropdown is the hierarchy.
+ */
 function DesignationsPanel({
   designations,
   onChanged,
@@ -537,61 +558,180 @@ function DesignationsPanel({
   const [grade, setGrade] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState<string | null>(null);
+  const [draft, setDraft] = useState({ name: "", grade: "" });
 
-  async function add(e: React.FormEvent) {
-    e.preventDefault();
+  async function run(fn: () => Promise<unknown>, fallback: string) {
     setError("");
     setBusy(true);
     try {
-      await saveDesignation(null, { name, grade });
-      setName("");
-      setGrade("");
+      await fn();
       await onChanged();
+      return true;
     } catch (err) {
-      setError(errorText(err, "The designation couldn't be added."));
+      setError(errorText(err, fallback));
+      return false;
     } finally {
       setBusy(false);
     }
   }
 
+  async function add(e: React.FormEvent) {
+    e.preventDefault();
+    if (
+      await run(() => saveDesignation(null, { name, grade }), "The designation couldn't be added.")
+    ) {
+      setName("");
+      setGrade("");
+    }
+  }
+
+  async function saveEdit(id: string) {
+    if (!draft.name.trim()) {
+      setError("A designation needs a name.");
+      return;
+    }
+    if (
+      await run(
+        () => saveDesignation(id, { name: draft.name.trim(), grade: draft.grade.trim() }),
+        "The designation couldn't be saved.",
+      )
+    ) {
+      setEditing(null);
+    }
+  }
+
+  /** Swaps a designation with its neighbour, and sends the whole list in its new order. */
+  function move(index: number, by: -1 | 1) {
+    if (!designations) return;
+    const ids = designations.map((d) => d.id);
+    const j = index + by;
+    if (j < 0 || j >= ids.length) return;
+    [ids[index], ids[j]] = [ids[j], ids[index]];
+    void run(() => rankDesignations(ids), "The order couldn't be saved.");
+  }
+
   return (
     <Panel
       title="Designations"
-      footer="Retiring a designation keeps it on everybody who holds it and stops it being given to anybody new."
+      footer="The order here is the order in every designation list, most senior at the top. Retiring a designation keeps it on everybody who holds it and stops it being given to anybody new."
     >
       {designations === null ? (
         <div className="h-12 animate-pulse rounded bg-muted" />
       ) : (
-        <ul className="flex flex-col gap-2 text-sm" data-testid="designations">
-          {designations.map((d) => (
+        <ol className="flex flex-col gap-1 text-sm" data-testid="designations">
+          {designations.map((d, i) => (
             <li
               key={d.id}
+              data-testid="designation-row"
               className={cn(
-                "flex flex-wrap items-center gap-2",
+                "flex flex-wrap items-center gap-2 rounded-md border border-transparent px-1 py-1",
                 d.status === "retired" && "text-muted-foreground",
+                editing === d.id && "border-border bg-muted/40",
               )}
             >
-              <span className="font-medium">{d.name}</span>
-              {d.grade && <span className="text-caption">({d.grade})</span>}
-              {d.status === "retired" && <StatusBadge tone="neutral">Retired</StatusBadge>}
-              <button
-                type="button"
-                onClick={async () => {
-                  setError("");
-                  try {
-                    await setDesignationStatus(d.id, d.status === "active" ? "retired" : "active");
-                    await onChanged();
-                  } catch (err) {
-                    setError(errorText(err, "That couldn't be changed."));
-                  }
-                }}
-                className="ml-auto text-sm text-primary hover:underline"
-              >
-                {d.status === "active" ? "Retire" : "Bring back"}
-              </button>
+              <span className="w-6 shrink-0 text-right font-mono text-caption text-muted-foreground">
+                {i + 1}
+              </span>
+              {editing === d.id ? (
+                <form
+                  className="flex min-w-0 flex-1 flex-wrap items-center gap-2"
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void saveEdit(d.id);
+                  }}
+                >
+                  <input
+                    aria-label={`Name of ${d.name}`}
+                    value={draft.name}
+                    autoFocus
+                    maxLength={100}
+                    onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                    className={cn(input, "min-w-40 flex-1")}
+                  />
+                  <input
+                    aria-label={`Grade of ${d.name}`}
+                    placeholder="Grade"
+                    value={draft.grade}
+                    maxLength={30}
+                    onChange={(e) => setDraft({ ...draft, grade: e.target.value })}
+                    className={cn(input, "w-28")}
+                  />
+                  <button
+                    type="submit"
+                    disabled={busy}
+                    className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
+                  >
+                    Save
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(null)}
+                    className="h-11 rounded-md border border-border px-3 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </form>
+              ) : (
+                <>
+                  <span className="font-medium">{d.name}</span>
+                  {d.grade && <span className="text-caption">({d.grade})</span>}
+                  {d.status === "retired" && <StatusBadge tone="neutral">Retired</StatusBadge>}
+                  <span className="ml-auto flex items-center gap-1">
+                    <button
+                      type="button"
+                      aria-label={`Move ${d.name} up`}
+                      title="Move up"
+                      disabled={busy || i === 0}
+                      onClick={() => move(i, -1)}
+                      className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+                    >
+                      <ChevronUp className="size-4" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Move ${d.name} down`}
+                      title="Move down"
+                      disabled={busy || i === designations.length - 1}
+                      onClick={() => move(i, 1)}
+                      className="inline-flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground disabled:opacity-30"
+                    >
+                      <ChevronDown className="size-4" aria-hidden />
+                    </button>
+                    <button
+                      type="button"
+                      aria-label={`Edit ${d.name}`}
+                      onClick={() => {
+                        setError("");
+                        setDraft({ name: d.name, grade: d.grade ?? "" });
+                        setEditing(d.id);
+                      }}
+                      className="inline-flex min-h-9 items-center px-2 text-sm text-primary hover:underline"
+                    >
+                      Edit
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        void run(
+                          () =>
+                            setDesignationStatus(
+                              d.id,
+                              d.status === "active" ? "retired" : "active",
+                            ),
+                          "That couldn't be changed.",
+                        )
+                      }
+                      className="inline-flex min-h-9 items-center px-2 text-sm text-primary hover:underline"
+                    >
+                      {d.status === "active" ? "Retire" : "Bring back"}
+                    </button>
+                  </span>
+                </>
+              )}
             </li>
           ))}
-        </ul>
+        </ol>
       )}
       <form onSubmit={add} className="mt-4 grid gap-2 @min-[560px]/app:grid-cols-[1fr_8rem_auto]">
         <input
@@ -619,6 +759,9 @@ function DesignationsPanel({
           Add
         </button>
       </form>
+      <p className="mt-1 text-caption text-muted-foreground">
+        A new designation joins at the bottom.
+      </p>
       {error && (
         <p role="alert" data-testid="designation-error" className="mt-2 text-sm text-destructive">
           {error}

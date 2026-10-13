@@ -12,6 +12,8 @@
  * tested without one.
  */
 
+import { STATES } from "./indiaPlaces";
+
 export type ColumnKind = "text" | "date" | "number" | "choice" | "yesno";
 
 export interface TemplateColumn {
@@ -48,6 +50,12 @@ const RELATIONS = [
   ["Guardian", "guardian"],
   ["Other", "other"],
 ] as const;
+
+/** D106: a state is picked from the list, in the template as on the card. */
+const STATE_OPTIONS = STATES.map((st) => [st, st] as const);
+
+/** D106: what a date looks like, said once and used in every place that says it. */
+export const DATE_HELP = "DD/MM/YYYY, like 05/08/1990";
 
 const code: TemplateColumn = {
   header: "Employee code",
@@ -100,7 +108,7 @@ export const MASTER_TEMPLATE: readonly TemplateTab[] = [
         ],
       },
       { header: "Nationality", key: "nationality", kind: "text" },
-      { header: "Native state", key: "nativeState", kind: "text" },
+      { header: "Native state", key: "nativeState", kind: "choice", options: STATE_OPTIONS },
       {
         header: "Blood group",
         key: "bloodGroup",
@@ -153,7 +161,7 @@ export const MASTER_TEMPLATE: readonly TemplateTab[] = [
       { header: "Present address", key: "presentLine", kind: "text" },
       { header: "Present city", key: "presentCity", kind: "text" },
       { header: "Present district", key: "presentDistrict", kind: "text" },
-      { header: "Present state", key: "presentState", kind: "text" },
+      { header: "Present state", key: "presentState", kind: "choice", options: STATE_OPTIONS },
       { header: "Present pincode", key: "presentPincode", kind: "text" },
       {
         header: "Living there since",
@@ -169,7 +177,7 @@ export const MASTER_TEMPLATE: readonly TemplateTab[] = [
       { header: "Permanent address", key: "permanentLine", kind: "text" },
       { header: "Permanent city", key: "permanentCity", kind: "text" },
       { header: "Permanent district", key: "permanentDistrict", kind: "text" },
-      { header: "Permanent state", key: "permanentState", kind: "text" },
+      { header: "Permanent state", key: "permanentState", kind: "choice", options: STATE_OPTIONS },
       { header: "Permanent pincode", key: "permanentPincode", kind: "text" },
       { header: "Nearest police station", key: "nearestPoliceStation", kind: "text" },
       {
@@ -339,6 +347,15 @@ export function toIsoDate(v: Cell): string | null {
     return toIsoDate(new Date(Date.UTC(1899, 11, 30) + Math.round(v) * 86400000));
   }
   if (typeof v === "string" && /^\d{4}-\d{2}-\d{2}$/.test(v.trim())) return v.trim();
+  // D106: typed the way the card shows a date, DD/MM/YYYY, with / - or . between.
+  const dmy = typeof v === "string" ? /^(\d{1,2})[/.-](\d{1,2})[/.-](\d{4})$/.exec(v.trim()) : null;
+  if (dmy) {
+    const [d, m, y] = [Number(dmy[1]), Number(dmy[2]), Number(dmy[3])];
+    const dt = new Date(Date.UTC(y, m - 1, d));
+    if (dt.getUTCFullYear() === y && dt.getUTCMonth() === m - 1 && dt.getUTCDate() === d) {
+      return toIsoDate(dt);
+    }
+  }
   return null;
 }
 
@@ -401,7 +418,7 @@ export function readGrids(grids: Grids): { workbook: Workbook; problems: ReadPro
               tab: tab.name,
               row: sheetRow,
               column: col.header,
-              message: "Not a date. Use a date cell, or YYYY-MM-DD.",
+              message: `Not a date. Write it as ${DATE_HELP}.`,
             });
             continue;
           }

@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.19 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.20 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -738,6 +738,24 @@ wanted.
 - **Identity documents** drop "Document given" (the Documents tab answers it) for a **driving
   licence number**, encrypted and opened like PAN.
 - **The passbook or cheque photo** is the Documents tab's bank proof, so it is listed there too.
+
+### Sada's fourth round (D106, 13 Oct 2026)
+
+- **Designations are edited and ordered** in Configuration, Deployment units and designations:
+  Edit changes a name and grade in place; the arrows move one up or down. The order is the
+  company's hierarchy, most senior first (`designations.rank`, set whole by
+  `employee_rank_designations`), and every designation dropdown reads in it. A new one joins
+  at the bottom.
+- **Every state is a list.** Native state and an address's state already were; a deployment
+  unit's State now is too (a new unit starts on Karnataka), and so are the import template's
+  Native, Present and Permanent state columns. A state written before the lists existed is
+  still shown as it is.
+- **The import template says what a date looks like:** DD/MM/YYYY, like 05/08/1990, on the
+  import page, in the Instructions tab against every date column, and as a note on each date
+  column's heading. Date cells are formatted DD/MM/YYYY, and a date typed that way (with / -
+  or .) is read; one that does not exist, like 31/02, is refused with the format in words.
+- **The org chart folds.** Anybody with reports has a − that folds their team away and a + that
+  opens it again; "Fold every team" and "Open every team" do the whole chart.
 
 ## 8. Acceptance criteria, module level
 

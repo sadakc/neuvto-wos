@@ -28,6 +28,7 @@ import {
   type ImportResult,
 } from "../handlers";
 import {
+  DATE_HELP,
   forDatabase,
   headerFor,
   readGrids,
@@ -157,6 +158,14 @@ export default function ImportRecords() {
           comes in as a draft, nobody is invited until you send invitations, and nothing is written
           until you have seen what the file holds. Aadhaar, PAN and bank numbers are encrypted the
           moment they arrive.
+        </p>
+        <p
+          className="mt-2 max-w-prose text-sm text-foreground-secondary"
+          data-testid="import-date-format"
+        >
+          <span className="font-medium text-foreground">Dates:</span> write them as {DATE_HELP}:
+          day, then month, then year. The template&apos;s Instructions tab says what every column
+          expects.
         </p>
       </div>
 

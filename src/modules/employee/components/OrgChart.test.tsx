@@ -88,3 +88,39 @@ describe("OrgChart", () => {
     expect(names).toEqual(["alice", "orphan"]);
   });
 });
+
+describe("folding a team away (D106)", () => {
+  it("hides somebody's team with the minus, and shows it again with the plus", async () => {
+    const user = userEvent.setup();
+    getOrgChart.mockResolvedValue(CHAIN);
+    getUserId.mockResolvedValue("priya");
+    render(<OrgChart />);
+    // Starting from Mark: Ravi and Priya are his team.
+    expect(await screen.findByText("ravi")).toBeInTheDocument();
+    const fold = screen.getByRole("button", { name: "Hide mark's team" });
+    expect(fold).toHaveAttribute("aria-expanded", "true");
+    await user.click(fold);
+    expect(screen.queryByText("ravi")).toBeNull();
+    expect(screen.queryByText("priya")).toBeNull();
+    const open = screen.getByRole("button", { name: "Show mark's team" });
+    expect(open).toHaveAttribute("aria-expanded", "false");
+    await user.click(open);
+    expect(screen.getByText("ravi")).toBeInTheDocument();
+    // Nobody without reports has one.
+    expect(screen.queryByRole("button", { name: "Hide ravi's team" })).toBeNull();
+  });
+
+  it("folds every team at once, and opens them all again", async () => {
+    const user = userEvent.setup();
+    getOrgChart.mockResolvedValue(CHAIN);
+    getUserId.mockResolvedValue(null);
+    render(<OrgChart />);
+    expect(await screen.findByText("dan")).toBeInTheDocument();
+    await user.click(screen.getByTestId("org-fold-all"));
+    expect(screen.getByText("ceo")).toBeInTheDocument();
+    expect(screen.queryByText("dan")).toBeNull();
+    await user.click(screen.getByTestId("org-open-all"));
+    expect(screen.getByText("dan")).toBeInTheDocument();
+    expect(screen.getByText("mark")).toBeInTheDocument();
+  });
+});

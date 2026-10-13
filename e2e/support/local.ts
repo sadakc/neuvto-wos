@@ -6,12 +6,30 @@
 
 import { execFileSync } from "node:child_process";
 import { existsSync, readFileSync } from "node:fs";
+import { networkInterfaces } from "node:os";
 import type { Page } from "@playwright/test";
 
 export const DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
 export const MAIL_URL = "http://127.0.0.1:54324";
 
 const LOCAL = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/;
+
+/**
+ * `bun run dev:lan` points the app at this Mac's own Wi-Fi address so a phone
+ * can reach it. That is still the local stack: an address that belongs to one
+ * of this machine's own network interfaces, and nothing else, is accepted too.
+ */
+export function isLocalTarget(url: string) {
+  return LOCAL.test(url) || isThisMachine(url);
+}
+
+function isThisMachine(url: string) {
+  const m = /^https?:\/\/([0-9.]+)(:\d+)?(\/|$)/.exec(url);
+  if (!m) return false;
+  return Object.values(networkInterfaces())
+    .flat()
+    .some((i) => i?.family === "IPv4" && i.address === m[1]);
+}
 
 /**
  * Refuses unless the app's database is local Docker. Resolves the URL as Vite
@@ -28,7 +46,7 @@ export function assertLocalOnly() {
           .pop()
       : undefined;
   const url = read(".env.local") ?? read(".env") ?? "";
-  if (!LOCAL.test(url)) {
+  if (!isLocalTarget(url)) {
     throw new Error(
       `REFUSING TO RUN. The app would talk to ${url || "nothing"}, which is not the local stack.\n` +
         "These tests re-seed the database and change its data. Start the local stack\n" +

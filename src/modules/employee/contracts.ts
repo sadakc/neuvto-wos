@@ -477,6 +477,7 @@ export function employeeErrorMessage(code: string, detail?: string | null): stri
       "OLD_ESIC_IS_CURRENT",
       "The old ESIC number is the same as the current one. An old number is a previous one.",
     ],
+    ["ORDER_INCOMPLETE", "The list changed while you were ordering it. Reload and try again."],
     [
       "INVALID_LICENCE",
       "A driving licence number starts with the state's two letters, like KA01 20110012345.",

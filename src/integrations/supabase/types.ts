@@ -902,6 +902,7 @@ export type Database = {
           id: string
           name: string
           organization_id: string
+          rank: number | null
           status: string
           updated_at: string
           updated_by: string | null
@@ -914,6 +915,7 @@ export type Database = {
           id?: string
           name: string
           organization_id: string
+          rank?: number | null
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -926,6 +928,7 @@ export type Database = {
           id?: string
           name?: string
           organization_id?: string
+          rank?: number | null
           status?: string
           updated_at?: string
           updated_by?: string | null
@@ -4297,6 +4300,10 @@ export type Database = {
           manager_profile_id: string
           profile_id: string
         }[]
+      }
+      employee_rank_designations: {
+        Args: { _ids: string[] }
+        Returns: undefined
       }
       employee_record_joining_date: {
         Args: { _employee_record_id: string }

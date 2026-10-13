@@ -72,7 +72,9 @@ describe("the downloaded template", () => {
     for (const h of ["Aadhaar", "Bank account number", "Mobile", "Present pincode"]) {
       expect(people.getCell(2, col(h)).numFmt, h).toBe("@");
     }
-    expect(people.getCell(2, col("Date of joining")).numFmt).toBe("yyyy-mm-dd");
+    // D106: a date column reads as the card does, day first, and its heading says so.
+    expect(people.getCell(2, col("Date of joining")).numFmt).toBe("dd/mm/yyyy");
+    expect(String(people.getCell(1, col("Date of joining")).note)).toContain("DD/MM/YYYY");
     const v = people.getCell(2, col("Designation")).dataValidation;
     expect(v?.type).toBe("list");
     expect(wb.getWorksheet("Lists")!.getCell(1, 1).value).toBe("Security Guard");
@@ -143,7 +145,7 @@ describe("a filled workbook", () => {
         "Sex",
         "Date of joining",
       ]);
-      people.addRow(["E-1", "X", 123456789012345680, "Martian", "01/11/2026"]);
+      people.addRow(["E-1", "X", 123456789012345680, "Martian", "31/02/2026"]);
     });
     const { workbook, problems } = readGrids(await readWorkbook(data));
     expect(problems.map((p) => `${p.row}:${p.column}`).sort()).toEqual(
@@ -172,6 +174,47 @@ describe("a filled workbook", () => {
   it("turns an Excel serial number into a date, and nothing else", () => {
     expect(toIsoDate(33036)).toBe("1990-06-12");
     expect(toIsoDate("1990-06-12")).toBe("1990-06-12");
-    expect(toIsoDate("12/06/1990")).toBeNull();
+    // D106: typed day first, the way the card shows a date.
+    expect(toIsoDate("12/06/1990")).toBe("1990-06-12");
+    expect(toIsoDate("12-06-1990")).toBe("1990-06-12");
+    expect(toIsoDate("5.8.1990")).toBe("1990-08-05");
+    // A day that does not exist, a month that does not, and half a date are not dates.
+    expect(toIsoDate("31/02/1990")).toBeNull();
+    expect(toIsoDate("12/13/1990")).toBeNull();
+    expect(toIsoDate("12/06")).toBeNull();
+  });
+});
+
+describe("states and dates in the template (D106)", () => {
+  it("offers every state as a list, reads one in any case, and refuses one that is not a state", async () => {
+    const people = MASTER_TEMPLATE.find((t) => t.key === "people")!;
+    for (const h of ["Native state", "Present state", "Permanent state"]) {
+      const col = people.columns.find((c) => c.header === h)!;
+      expect(col.kind, h).toBe("choice");
+      expect(col.options?.[0], h).toEqual(["Karnataka", "Karnataka"]);
+    }
+    const { workbook, problems } = readGrids({
+      People: [
+        ["Employee code", "Full name", "Native state", "Present state"],
+        ["E-1", "Mallappa", "karnataka", "Bijapur"],
+      ],
+    });
+    expect(workbook.people[0].nativeState).toBe("Karnataka");
+    expect(problems.map((p) => p.column)).toEqual(["Present state"]);
+  });
+
+  it("says what a date looks like in the Instructions tab, for every date column", async () => {
+    const data = await buildTemplate(lists);
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(data);
+    const help = wb.getWorksheet("Instructions")!;
+    const lines: string[] = [];
+    help.eachRow((r) =>
+      lines.push(r.values ? String((r.values as unknown[]).slice(1).join(" | ")) : ""),
+    );
+    expect(lines[1]).toContain("Dates as DD/MM/YYYY, like 05/08/1990");
+    expect(lines.find((l) => l.startsWith("People | Date of birth"))).toContain(
+      "A date, as DD/MM/YYYY, like 05/08/1990.",
+    );
   });
 });

@@ -7,7 +7,7 @@
  * only turns it into cells and back.
  */
 
-import { MASTER_TEMPLATE, type Cell, type Grids } from "./masterTemplate";
+import { DATE_HELP, MASTER_TEMPLATE, type Cell, type Grids } from "./masterTemplate";
 
 /** The company's own lists, offered as drop-downs so a name cannot be misspelt. */
 export interface CompanyLists {
@@ -66,13 +66,13 @@ export async function buildTemplate(lists: CompanyLists): Promise<ArrayBuffer> {
     "",
     "",
     "",
-    "One person is one row on People. Children, nominees and earlier employers are rows on their own tabs, as many as there are, linked by Employee code. Dates as dates (or YYYY-MM-DD). Aadhaar, PAN, bank account, religion, caste and disability are encrypted the moment they arrive.",
+    `One person is one row on People. Children, nominees and earlier employers are rows on their own tabs, as many as there are, linked by Employee code. Dates as ${DATE_HELP}: day, then month, then year. A date Excel already shows as a date is fine too. Aadhaar, PAN, bank account, religion, caste and disability are encrypted the moment they arrive.`,
   ]);
   for (const tab of MASTER_TEMPLATE) {
     help.addRow([tab.name, "", "", tab.purpose]).font = { bold: true };
     for (const col of tab.columns) {
       const what = [
-        col.kind === "date" ? "A date." : col.kind === "yesno" ? "Yes or No." : "",
+        col.kind === "date" ? `A date, as ${DATE_HELP}.` : col.kind === "yesno" ? "Yes or No." : "",
         col.options ? `One of: ${col.options.map(([l]) => l).join(", ")}.` : "",
         col.help ?? "",
       ]
@@ -90,9 +90,13 @@ export async function buildTemplate(lists: CompanyLists): Promise<ArrayBuffer> {
       // Text, not General: a 12-digit Aadhaar or an 18-digit account typed
       // into a General cell becomes a number and loses digits.
       style:
-        c.kind === "date" ? { numFmt: "yyyy-mm-dd" } : c.kind === "number" ? {} : { numFmt: "@" },
+        c.kind === "date" ? { numFmt: "dd/mm/yyyy" } : c.kind === "number" ? {} : { numFmt: "@" },
     }));
     ws.getRow(1).font = { bold: true };
+    // D106: the format on the date column's own heading, where it is filled in.
+    tab.columns.forEach((c, i) => {
+      if (c.kind === "date") ws.getCell(1, i + 1).note = `Write the date as ${DATE_HELP}.`;
+    });
     tab.columns.forEach((c, i) => {
       const list =
         c.kind === "choice"

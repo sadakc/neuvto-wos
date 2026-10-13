@@ -30,6 +30,7 @@ const api = vi.hoisted(() => ({
   saveUnit: vi.fn(),
   setUnitStatus: vi.fn(),
   saveDesignation: vi.fn(),
+  rankDesignations: vi.fn(),
   setDesignationStatus: vi.fn(),
   listOnboardingItems: vi.fn(),
   saveOnboardingItem: vi.fn(),
@@ -372,5 +373,80 @@ describe("the field catalogue", () => {
     expect(rows).toHaveLength(FIELD_CATALOGUE.length);
     const newOnes = rows.filter((r) => within(r).queryByText("new"));
     expect(newOnes).toHaveLength(FIELD_CATALOGUE.filter((f) => f.sheet === "new").length);
+  });
+});
+
+describe("designations, in the company's order (D106)", () => {
+  const des = (id: string, name: string, grade: string | null, status = "active") => ({
+    id,
+    name,
+    grade,
+    status,
+  });
+
+  async function openDesignations() {
+    api.listAllDesignations.mockResolvedValue([
+      des("d-mgr", "Security Manager", "G5"),
+      des("d-sup", "Security Supervisor", "G3"),
+      des("d-guard", "Security Guard", "G1"),
+    ]);
+    await openUnits();
+    return screen.findAllByTestId("designation-row");
+  }
+
+  it("moves a designation up or down, sending the whole list in its new order", async () => {
+    const user = userEvent.setup();
+    api.rankDesignations.mockResolvedValue(undefined);
+    const rows = await openDesignations();
+    expect(rows.map((r) => r.textContent)).toEqual([
+      expect.stringMatching(/^1Security Manager/),
+      expect.stringMatching(/^2Security Supervisor/),
+      expect.stringMatching(/^3Security Guard/),
+    ]);
+    // The top cannot go higher, nor the bottom lower.
+    expect(screen.getByRole("button", { name: "Move Security Manager up" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "Move Security Guard down" })).toBeDisabled();
+    await user.click(screen.getByRole("button", { name: "Move Security Guard up" }));
+    expect(api.rankDesignations).toHaveBeenCalledWith(["d-mgr", "d-guard", "d-sup"]);
+    expect(api.listAllDesignations).toHaveBeenCalledTimes(2);
+  });
+
+  it("edits a designation's name and grade, and will not take a blank name", async () => {
+    const user = userEvent.setup();
+    api.saveDesignation.mockResolvedValue("d-sup");
+    await openDesignations();
+    await user.click(screen.getByRole("button", { name: "Edit Security Supervisor" }));
+    const name = screen.getByLabelText("Name of Security Supervisor");
+    const grade = screen.getByLabelText("Grade of Security Supervisor");
+    expect(name).toHaveValue("Security Supervisor");
+    expect(grade).toHaveValue("G3");
+    await user.clear(name);
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(screen.getByTestId("designation-error")).toHaveTextContent("needs a name");
+    expect(api.saveDesignation).not.toHaveBeenCalled();
+    await user.type(name, "Site Supervisor");
+    await user.clear(grade);
+    await user.type(grade, "G4");
+    await user.click(screen.getByRole("button", { name: "Save" }));
+    expect(api.saveDesignation).toHaveBeenCalledWith("d-sup", {
+      name: "Site Supervisor",
+      grade: "G4",
+    });
+  });
+});
+
+describe("a unit's state (D106)", () => {
+  it("is chosen from the list, a new unit starting on Karnataka", async () => {
+    const user = userEvent.setup();
+    await openUnits();
+    await user.click(screen.getByTestId("add-unit"));
+    const state = screen.getByTestId("unit-state") as HTMLSelectElement;
+    expect(state.tagName).toBe("SELECT");
+    expect(state.selectedOptions[0].textContent).toBe("Karnataka");
+    expect([...state.options].map((o) => o.textContent).slice(0, 3)).toEqual([
+      "Not recorded",
+      "Karnataka",
+      "Maharashtra",
+    ]);
   });
 });

@@ -307,6 +307,8 @@ export async function listDesignations(): Promise<Option[]> {
     .from("designations")
     .select("id, name, grade")
     .eq("status", "active")
+    // D106: the company's order, most senior first, not the alphabet's.
+    .order("rank", { nullsFirst: false })
     .order("name");
   if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((d) => ({ id: d.id, name: d.name, detail: d.grade }));
@@ -606,9 +608,16 @@ export async function listAllDesignations(): Promise<DesignationRow[]> {
   const { data, error } = await supabase
     .from("designations")
     .select("id, name, grade, status")
+    .order("rank", { nullsFirst: false })
     .order("name");
   if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((d) => ({ ...d, status: d.status as DesignationRow["status"] }));
+}
+
+/** D106: every designation, in its new order, most senior first. */
+export async function rankDesignations(ids: string[]): Promise<void> {
+  const { error } = await supabase.rpc("employee_rank_designations", { _ids: ids });
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function saveDesignation(
