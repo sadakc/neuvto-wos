@@ -723,7 +723,11 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
               muted: a.effectiveTo !== null,
               cells: [
                 humanise(a.addressType),
-                [a.line, a.city, a.district, a.state, a.pincode].filter(Boolean).join(", "),
+                // A readable width of its own: the table scrolls sideways on a phone
+                // rather than the address going one word per line.
+                <span key="a" className="block min-w-[13rem]">
+                  {[a.line, a.city, a.district, a.state, a.pincode].filter(Boolean).join(", ")}
+                </span>,
                 formatDate(a.effectiveFrom),
                 formatDate(lastDay(a.effectiveTo)),
                 a.nearestPoliceStation ?? "—",

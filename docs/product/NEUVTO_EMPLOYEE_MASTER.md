@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.15 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.16 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -596,6 +596,24 @@ per line and ran into their controls (an E9 screen, found on the way); and "Cale
 From …" said "from" twice (now "Set by"). Layout cannot be seen by the render tests, which
 have no layout engine, so these four were proved in the browser; the copy change is pinned by
 `ShiftCalendar.test.tsx`.
+
+### Every screen, every orientation (13 Oct 2026)
+
+Every route in the app, every card sub-tab and every Configuration section, measured in a real
+browser at ten sizes: phones 360×780 and 390×844, tablets 768×1024 and 834×1194, each upright
+and sideways, and laptops 1280×800 and 1440×900. Three people: a company Admin (380
+screens), an employee (180, their own card and a colleague's) and a manager with requests
+waiting (60). Each screen is checked for the page scrolling sideways, anything off the edge
+that is not inside something meant to scroll, controls drawn over each other, text cut off
+without an ellipsis, and text squeezed to a word or two a line; the check was itself proved
+first by planting one of each fault, all five caught. Found and fixed: three table columns
+squeezed (the address on History, "Visible to" in the field catalogue, the notification
+matrix's headings) and, sideways on a phone 360px tall, confirmations that could run off the
+screen with no way to scroll, so both shared dialogs now cap their height and scroll inside
+(`dialog-height.test.tsx`). After the fixes every screen at every size passes. On a phone
+held sideways only the 45px sub-tab row stays pinned; the module bar and page header scroll
+away. Not covered: the Neuvto console (`/neuvto-hq`), which is staff-only and was not part of
+this phase.
 
 ## 8. Acceptance criteria, module level
 

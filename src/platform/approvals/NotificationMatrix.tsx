@@ -138,7 +138,7 @@ export function NotificationMatrix({
               <tr className="text-left text-xs text-muted-foreground">
                 <th className="py-2 pr-3 font-normal">When it is</th>
                 {AUDIENCES.map((a) => (
-                  <th key={a.key} className="px-2 py-2 font-normal">
+                  <th key={a.key} className="px-2 py-2 font-normal whitespace-nowrap">
                     {capital(a.label)}
                   </th>
                 ))}

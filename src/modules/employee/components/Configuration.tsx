@@ -153,7 +153,7 @@ function FieldsSection() {
                 </td>
                 <td className="px-3 py-2">{c.required}</td>
                 <td className="px-3 py-2">{c.employeeCanEdit}</td>
-                <td className="px-3 py-2">{c.visibleTo}</td>
+                <td className="px-3 py-2 whitespace-nowrap">{c.visibleTo}</td>
                 <td className="px-3 py-2">{c.inExports}</td>
                 <td className="px-3 py-2 whitespace-nowrap">
                   {c.home === "Card header" ? c.home : `${c.home.tab} › ${c.home.panel}`}
