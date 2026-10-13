@@ -25,3 +25,8 @@ neuvto-harness/
 **/invoke-tool/**
 **/oauth-protected-resource.ts
 src/routes/mcp.ts
+
+# Its token block is written from src/platform/design/tokens.ts by
+# `bun run tokens`, and `bun run tokens --check` in CI compares it byte for
+# byte. Formatting it would only make that check fail.
+src/styles.css

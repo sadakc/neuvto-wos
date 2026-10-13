@@ -115,7 +115,7 @@ D80 says this data does not reach production until all of these hold. Tick each 
       Super Admin, not by default.
 - [ ] The purge order in `TEST_DATA_PURGE.md` includes the restricted tables (it does,
       from version 1.3).
-- [ ] The reveal log's three-year retention job is registered: `select active from cron.job
-  where jobname = 'neuvto-employee-reveal-retention'` returns `true`.
+- [ ] The reveal log's three-year retention job is registered. This returns `true`:
+      `select active from cron.job where jobname = 'neuvto-employee-reveal-retention'`
 - [ ] The legal position on collecting Aadhaar (D59's original concern) is settled. The
       software is ready; whether to collect is not a software question.
