@@ -51,3 +51,7 @@ supabase/.temp
 # Mutation testing (stryker.config.mjs): its sandbox and its reports are local.
 .stryker-tmp
 reports/mutation
+
+# Browser tests (playwright.config.ts): saved sign-ins and their reports.
+e2e/.auth
+reports/e2e

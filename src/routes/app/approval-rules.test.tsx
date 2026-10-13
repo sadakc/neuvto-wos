@@ -212,6 +212,23 @@ describe("Approval rules — which roles may approve", () => {
   });
 });
 
+describe("Approval rules — a level that applies only to longer requests", () => {
+  it("names the threshold box, so it can be found without seeing the words around it", async () => {
+    await renderRules();
+    const level2 = screen.getAllByTestId("approval-level")[1];
+    // Found by its name alone, as a screen reader or a browser test finds it.
+    expect(
+      within(level2).getByRole("spinbutton", {
+        name: "Level 2 applies when the request is longer than this many working days",
+      }),
+    ).toBe(within(level2).getByTestId("threshold"));
+    // Level 1 always applies, so it has no such box.
+    expect(
+      within(screen.getAllByTestId("approval-level")[0]).queryByTestId("threshold"),
+    ).toBeNull();
+  });
+});
+
 describe("Approval rules — moving up (D87)", () => {
   it("names the target as the point a request moves up, and says to whom", async () => {
     await renderRules();

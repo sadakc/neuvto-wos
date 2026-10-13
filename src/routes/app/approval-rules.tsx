@@ -265,6 +265,7 @@ function ApprovalRulesPage() {
                         conditionValue: e.target.value === "" ? null : Number(e.target.value),
                       })
                     }
+                    aria-label={`Level ${l.level} applies when the request is longer than this many working days`}
                     data-testid="threshold"
                     className="h-12 w-20 rounded-md border border-border bg-background px-3 text-sm tabular-nums"
                   />
