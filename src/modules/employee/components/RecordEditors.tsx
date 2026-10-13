@@ -61,6 +61,7 @@ import {
   todayIso,
 } from "../format";
 import { checkField } from "../fieldRules";
+import { canWrite, fieldsFor, isRequired, relationField } from "../fieldSettings";
 import { FieldEditor, type FieldSpec } from "./FieldEditor";
 import {
   addDepartmentChoice,
@@ -135,7 +136,10 @@ function RecordFieldEditor({
       id={id}
       title={title}
       filled={filled}
-      fields={fields.map((f) => ({ clearable: true, ...f }))}
+      fields={fieldsFor(
+        card,
+        fields.map((f) => ({ clearable: true, ...f })),
+      )}
       save={(vals) => updateEmployee(card.id, vals)}
       onSaved={onChanged}
     />
@@ -318,37 +322,41 @@ export function EducationEditor({ card, onChanged }: { card: EmployeeCard; onCha
       )}
       save={(vals) => updateEmployee(card.id, vals)}
       onSaved={onChanged}
-      fields={[
-        {
-          key: "educationQualification",
-          label: "Qualification",
-          current: card.educationQualification,
-          rule: "text200",
-          maxLength: 200,
-        },
-        {
-          key: "priorExperienceMonths",
-          label: "Experience before joining",
-          kind: "yearsMonths",
-          current: card.priorExperienceMonths?.toString(),
-          hint: "Total experience is this plus their service here, and keeps counting by itself.",
-        },
-        {
-          key: "reasonForLeavingLastOrg",
-          label: "Reason for leaving last org",
-          current: card.reasonForLeavingLastOrg,
-          rule: "text500",
-          maxLength: 500,
-        },
-        {
-          key: "totalExperience",
-          label: "Total experience now",
-          kind: "derived",
-          derive: () =>
-            card.totalExperienceMonths != null ? formatMonths(card.totalExperienceMonths) : "—",
-          hint: "As saved. It updates when you save.",
-        },
-      ].map((f) => ({ clearable: true, ...f }) as FieldSpec)}
+      // D107: the person sees only what is theirs to change.
+      fields={fieldsFor(
+        card,
+        [
+          {
+            key: "educationQualification",
+            label: "Qualification",
+            current: card.educationQualification,
+            rule: "text200",
+            maxLength: 200,
+          },
+          {
+            key: "priorExperienceMonths",
+            label: "Experience before joining",
+            kind: "yearsMonths",
+            current: card.priorExperienceMonths?.toString(),
+            hint: "Total experience is this plus their service here, and keeps counting by itself.",
+          },
+          {
+            key: "reasonForLeavingLastOrg",
+            label: "Reason for leaving last org",
+            current: card.reasonForLeavingLastOrg,
+            rule: "text500",
+            maxLength: 500,
+          },
+          {
+            key: "totalExperience",
+            label: "Total experience now",
+            kind: "derived",
+            derive: () =>
+              card.totalExperienceMonths != null ? formatMonths(card.totalExperienceMonths) : "—",
+            hint: "As saved. It updates when you save.",
+          },
+        ].map((f) => ({ clearable: true, ...f }) as FieldSpec),
+      )}
     />
   );
 }
@@ -597,6 +605,12 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
   const [rows, setRows] = useState<FamilyRow[]>(fromCard);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  // D107: the person changes only the relatives their company lets them; the
+  // rest are shown, sent back as they are, and cannot be edited or removed.
+  const mayRelation = (relation: string) => canWrite(card, relationField(relation));
+  const onRecord = new Map((card.familyMembers ?? []).map((f) => [f.id, f.relation]));
+  const locked = (r: FamilyRow) => r.id !== undefined && !mayRelation(onRecord.get(r.id) ?? "");
+  const relations = RELATIONS.filter(mayRelation);
 
   const set = (key: string, patch: Partial<FamilyRow>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
@@ -663,7 +677,7 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
               {rows.map((r, i) => (
                 <li
                   key={r.key}
-                  data-testid="family-editor-row"
+                  data-testid={locked(r) ? "family-row-locked" : "family-editor-row"}
                   className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[9rem_1fr_11rem_auto_auto] md:items-end"
                 >
                   <label className="min-w-0 text-sm">
@@ -671,13 +685,14 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
                     <select
                       aria-label={`Relation, row ${i + 1}`}
                       value={r.relation}
+                      disabled={locked(r)}
                       onChange={(e) => set(r.key, { relation: e.target.value })}
                       className={`mt-1 ${input}`}
                     >
                       <option value="" disabled>
                         Select
                       </option>
-                      {RELATIONS.map((rel) => (
+                      {(locked(r) ? [r.relation] : relations).map((rel) => (
                         <option key={rel} value={rel}>
                           {humanise(rel)}
                         </option>
@@ -689,37 +704,51 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
                     <input
                       aria-label={`Name, row ${i + 1}`}
                       value={r.name}
+                      disabled={locked(r)}
                       onChange={(e) => set(r.key, { name: e.target.value })}
                       className={`mt-1 ${input}`}
                     />
                   </label>
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Date of birth</span>
-                    <DateField
-                      value={r.dateOfBirth}
-                      onChange={(v) => set(r.key, { dateOfBirth: v })}
-                      max={todayIso()}
-                      label={`Date of birth, row ${i + 1}`}
-                      className="mt-1"
-                    />
+                    {locked(r) ? (
+                      <span className={`mt-1 flex items-center ${input} bg-muted/40`}>
+                        {formatDate(r.dateOfBirth || null) ?? "—"}
+                      </span>
+                    ) : (
+                      <DateField
+                        value={r.dateOfBirth}
+                        onChange={(v) => set(r.key, { dateOfBirth: v })}
+                        max={todayIso()}
+                        label={`Date of birth, row ${i + 1}`}
+                        className="mt-1"
+                      />
+                    )}
                   </label>
                   <label className="flex h-11 items-center gap-2 text-sm">
                     <input
                       type="checkbox"
                       checked={r.isDependent}
+                      disabled={locked(r)}
                       onChange={(e) => set(r.key, { isDependent: e.target.checked })}
                       className="size-4"
                     />
                     Dependent
                   </label>
-                  <button
-                    type="button"
-                    onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
-                    aria-label={`Remove row ${i + 1}`}
-                    className="h-11 rounded-md border border-border px-3 text-sm"
-                  >
-                    Remove
-                  </button>
+                  {locked(r) ? (
+                    <span className="text-caption text-muted-foreground md:max-w-[9rem]">
+                      Your company keeps this one. Ask with Request a change.
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                      aria-label={`Remove row ${i + 1}`}
+                      className="h-11 rounded-md border border-border px-3 text-sm"
+                    >
+                      Remove
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -1021,7 +1050,10 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
     setError("");
     const wrong =
       (!isIsoDate(from) ? `Effective from: ${DATE_FORMAT_MESSAGE}` : null) ??
-      rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean);
+      rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean) ??
+      (isRequired(card, "nomineeDob") && rows.some((r) => !r.dateOfBirth)
+        ? "Your company requires every nominee's date of birth."
+        : null);
     if (wrong) {
       setError(wrong);
       return;
@@ -1259,10 +1291,20 @@ function addressProblem(v: {
   return null;
 }
 
+/** The field the company sets for an address type; the other types are the Employee Admin's. */
+const ADDRESS_FIELD: Record<string, string> = {
+  present: "presentAddress",
+  permanent: "permanentAddress",
+};
+
 export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const [open, setOpen] = useState(false);
+  // D107: the person adds only the types their company lets them.
+  const types = ADDRESS_TYPES.filter(
+    (t) => card.capabilities.canEdit || (ADDRESS_FIELD[t] && canWrite(card, ADDRESS_FIELD[t])),
+  );
   const blank = {
-    addressType: "present",
+    addressType: (types[0] ?? "present") as string,
     effectiveFrom: todayIso(),
     line: "",
     city: "",
@@ -1368,7 +1410,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 onChange={(e) => setV({ ...v, addressType: e.target.value })}
                 className={input}
               >
-                {ADDRESS_TYPES.map((t) => (
+                {types.map((t) => (
                   <option key={t} value={t}>
                     {humanise(t)}
                   </option>
@@ -1477,7 +1519,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 className={input}
               />
             </Field>
-            {v.addressType === "present" && (
+            {v.addressType === "present" && canWrite(card, "permanentAddress") && (
               <label className="flex items-start gap-2 text-sm">
                 <input
                   type="checkbox"

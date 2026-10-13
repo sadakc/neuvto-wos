@@ -1432,6 +1432,47 @@ export type Database = {
           },
         ]
       }
+      employee_field_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_can_update: boolean | null
+          field_key: string
+          organization_id: string
+          required: boolean | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_can_update?: boolean | null
+          field_key: string
+          organization_id: string
+          required?: boolean | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_can_update?: boolean | null
+          field_key?: string
+          organization_id?: string
+          required?: boolean | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_field_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       employee_onboarding_items: {
         Row: {
           created_at: string
@@ -4234,6 +4275,56 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: number
       }
+      employee_family_fields_touched: {
+        Args: { _employee_id: string; _rows: Json }
+        Returns: string[]
+      }
+      employee_field_defaults: {
+        Args: never
+        Returns: {
+          employee_can_update: boolean
+          field_key: string
+          follows: string
+          label: string
+          payload: string[]
+          required: boolean
+          required_lock: string
+          sort: number
+          update_lock: string
+        }[]
+      }
+      employee_field_keys: { Args: { _values: Json }; Returns: string[] }
+      employee_field_required: {
+        Args: { _employee_id: string; _field_key: string }
+        Returns: boolean
+      }
+      employee_field_rules: {
+        Args: { _org: string }
+        Returns: {
+          customised: boolean
+          employee_can_update: boolean
+          field_key: string
+          label: string
+          payload: string[]
+          required: boolean
+          required_lock: string
+          sort: number
+          update_lock: string
+        }[]
+      }
+      employee_field_settings: {
+        Args: never
+        Returns: {
+          can_change: boolean
+          customised: boolean
+          employee_can_update: boolean
+          field_key: string
+          label: string
+          required: boolean
+          required_lock: string
+          update_lock: string
+        }[]
+      }
       employee_import_keys: { Args: { _tab: string }; Returns: string[] }
       employee_import_master: {
         Args: { _commit: boolean; _only_clean?: boolean; _workbook: Json }
@@ -4309,6 +4400,7 @@ export type Database = {
         Args: { _employee_record_id: string }
         Returns: string
       }
+      employee_relation_field: { Args: { _relation: string }; Returns: string }
       employee_relationship: {
         Args: { _employee_id: string }
         Returns: string[]
@@ -4322,6 +4414,14 @@ export type Database = {
         Returns: undefined
       }
       employee_require_config_admin: { Args: never; Returns: string }
+      employee_require_filled: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_require_writer: {
+        Args: { _employee_id: string; _fields: string[] }
+        Returns: undefined
+      }
       employee_resolve_change: {
         Args: { _note?: string; _outcome: string; _request_id: string }
         Returns: undefined
@@ -4349,6 +4449,10 @@ export type Database = {
       }
       employee_save_family: {
         Args: { _employee_id: string; _rows: Json }
+        Returns: undefined
+      }
+      employee_save_field_setting: {
+        Args: { _field_key: string; _setting: string; _value: boolean }
         Returns: undefined
       }
       employee_save_nomination: {

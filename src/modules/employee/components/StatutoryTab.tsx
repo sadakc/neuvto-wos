@@ -46,6 +46,7 @@ import {
 } from "../handlers";
 import { formatDate, humanise } from "../format";
 import { FieldEditor as Editor, type FieldSpec } from "./FieldEditor";
+import { withRequired } from "../fieldSettings";
 import { Fields, Panel } from "./parts";
 
 export const REVEAL_LIFETIME_MS = 2 * 60 * 1000;
@@ -634,7 +635,8 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
       id={id}
       title={title}
       filled={filled}
-      fields={fields}
+      // D107: the company's Required holds here too.
+      fields={withRequired(card, fields)}
       save={save}
       onSaved={onChanged}
       crossCheck={crossCheck}

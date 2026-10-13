@@ -10,6 +10,12 @@
  * `visibleTo` here is descriptive. Who sees what is enforced by
  * employee_card() (§5 of NEUVTO_EMPLOYEE_MASTER) and cannot be loosened from a
  * settings screen; a setting that could would be the leak.
+ *
+ * `required` and `employeeCanEdit` are Neuvto's answers, as words. Since D107
+ * a company's Super Admin sets both, per field, and Fields and visibility
+ * shows the company's answers from employee_field_settings(); `key` is the
+ * field's name there. The words stay for what a Yes or No cannot say: Derived,
+ * Auto.
  */
 
 export type CardTab =
@@ -21,6 +27,8 @@ export type CardTab =
   | "History";
 
 export interface CatalogueField {
+  /** The field in employee_field_settings() (D107). */
+  key: string;
   group: string;
   field: string;
   /** The master sheet's own column names, or `new` for fields the sheet lacked. */
@@ -42,7 +50,7 @@ const f = (
   visibleTo: string,
   inExports: string,
   home: CatalogueField["home"],
-): CatalogueField => ({
+): Omit<CatalogueField, "key"> => ({
   group,
   field,
   sheet,
@@ -55,7 +63,7 @@ const f = (
 
 const at = (tab: CardTab, panel: string) => ({ tab, panel });
 
-export const FIELD_CATALOGUE: readonly CatalogueField[] = [
+const ROWS: readonly Omit<CatalogueField, "key">[] = [
   f(
     "Identity",
     "Employee ID",
@@ -390,6 +398,16 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     at("Family", "Family"),
   ),
   f(
+    "Family",
+    "Brothers, sisters, a guardian or others",
+    "new",
+    "No",
+    "Yes",
+    "People Ops",
+    "Statutory only",
+    at("Family", "Family"),
+  ),
+  f(
     "Nominee",
     "Nominee name and relation",
     ["NOMINEE NAME", "RELATION WITH MEMBER"],
@@ -403,7 +421,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "Nominee",
     "Nominee date of birth",
     ["DATE OF BIRTH OF NOMINEE"],
-    "Yes",
+    "No",
     "Yes",
     "People Ops, Payroll",
     "Statutory only",
@@ -471,9 +489,9 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
   ),
   f(
     "Statutory",
-    "Type of document given",
+    "Driving licence number",
     ["Type of Documents"],
-    "Yes",
+    "No",
     "No",
     "People Ops",
     "No",
@@ -504,7 +522,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "Bank account number",
     ["BANK ACCOUNT NO"],
     "Yes",
-    "Until cut-off",
+    "No",
     "Payroll only",
     "Never",
     at("Statutory and bank", "Bank"),
@@ -514,7 +532,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "IFSC code",
     ["IFSC Code"],
     "Yes",
-    "Until cut-off",
+    "No",
     "Payroll only",
     "Never",
     at("Statutory and bank", "Bank"),
@@ -554,7 +572,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "Religion",
     ["RELIGION"],
     "No",
-    "Yes",
+    "No",
     "Statutory role only",
     "Statutory only",
     at("Statutory and bank", "Restricted"),
@@ -564,7 +582,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "Caste category",
     ["CASTE"],
     "No",
-    "Yes",
+    "No",
     "Statutory role only",
     "Statutory only",
     at("Statutory and bank", "Restricted"),
@@ -574,7 +592,7 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     "Physically handicapped",
     ["Physically Handicap"],
     "No",
-    "Yes",
+    "No",
     "Statutory role only",
     "Statutory only",
     at("Statutory and bank", "Restricted"),
@@ -590,6 +608,72 @@ export const FIELD_CATALOGUE: readonly CatalogueField[] = [
     at("History", "Previous organisations"),
   ),
 ];
+
+/** Each row's field in employee_field_settings(), by its words here. */
+const KEY: Record<string, string> = {
+  "Employee ID": "employeeCode",
+  "Employee name": "fullName",
+  "Name as printed on ID": "nameAsPerId",
+  Sex: "sex",
+  "Date of birth": "dateOfBirth",
+  Age: "age",
+  "Marital status": "maritalStatus",
+  Nationality: "nationality",
+  "Native state": "nativeState",
+  "Blood group": "bloodGroup",
+  "Education qualification": "educationQualification",
+  "Mobile number": "mobile",
+  "Alternate mobile number": "alternateMobile",
+  "Work email": "workEmail",
+  "Personal email": "personalEmail",
+  "Emergency contact": "emergencyContact",
+  "Nearest police station": "nearestPoliceStation",
+  "Present address": "presentAddress",
+  "Permanent address": "permanentAddress",
+  "Address history": "addressHistory",
+  Designation: "designation",
+  "Date of joining": "dateOfJoining",
+  "Re-joining date": "reJoiningDate",
+  Status: "status",
+  "Employment termination": "termination",
+  "Total experience": "totalExperience",
+  "Reason for leaving last org": "reasonForLeavingLastOrg",
+  "Reports to": "reportsTo",
+  "Deployed unit": "deployedUnit",
+  "Deployment history": "deploymentHistory",
+  "Father name and DOB": "father",
+  "Mother name and DOB": "mother",
+  "Husband name and DOB": "husband",
+  "Wife name and DOB": "wife",
+  "Sons, any number, each with date of birth": "sons",
+  "Daughters, any number, each with date of birth": "daughters",
+  "Brothers, sisters, a guardian or others": "otherRelatives",
+  "Nominee name and relation": "nomineeName",
+  "Nominee date of birth": "nomineeDob",
+  "Nominee share percentage": "nomineeShare",
+  UAN: "uan",
+  "EPF number": "epfNumber",
+  "ESIC number": "esicNumber",
+  "Old EPF UAN": "oldUan",
+  "Old ESIC number": "oldEsicNumber",
+  "Driving licence number": "drivingLicence",
+  "Aadhaar number": "aadhaar",
+  PAN: "pan",
+  "Bank account number": "bankAccount",
+  "IFSC code": "ifsc",
+  "Bank name": "bankName",
+  "Branch name": "branch",
+  "Height, chest, weight": "physical",
+  Religion: "religion",
+  "Caste category": "casteCategory",
+  "Physically handicapped": "disability",
+  "Previous organisations": "previousOrganisations",
+};
+
+export const FIELD_CATALOGUE: readonly CatalogueField[] = ROWS.map((r) => ({
+  key: KEY[r.field],
+  ...r,
+}));
 
 /** Every source column the catalogue places. */
 export const SOURCE_COLUMNS: readonly string[] = FIELD_CATALOGUE.flatMap((c) =>

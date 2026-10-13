@@ -20,7 +20,7 @@ export default async function globalSetup(config: FullConfig) {
   mkdirSync("e2e/.auth", { recursive: true });
   const baseURL = config.projects[0].use.baseURL;
   const browser = await chromium.launch({ channel: "chrome" });
-  for (const role of ["hr", "employee", "manager", "colleague"] as Role[]) {
+  for (const role of ["hr", "employee", "manager", "colleague", "superAdmin"] as Role[]) {
     const context = await browser.newContext({ baseURL });
     const page = await context.newPage();
     await signIn(page, PEOPLE[role].email);

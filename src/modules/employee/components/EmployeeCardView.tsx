@@ -38,6 +38,7 @@ import {
   monthsBetween,
   todayIso,
 } from "../format";
+import { FAMILY_FIELDS, writesAny } from "../fieldSettings";
 import { Fields, Panel, RecordTable } from "./parts";
 import { PersonLink } from "./PersonLink";
 import { StatutoryTab } from "./StatutoryTab";
@@ -336,8 +337,34 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
-/** Whether this card's panels carry their Add and Edit buttons. */
+/** Whether this card's panels carry their Add and Edit buttons: the Employee Admin's. */
 const edit = (card: EmployeeCard) => card.capabilities.canEdit;
+
+/**
+ * D107: a panel the person may change some of. The Employee Admin may change
+ * all of it; the person, the fields their company switched on for them.
+ */
+const PANEL_FIELDS = {
+  contact: ["mobile", "alternateMobile", "personalEmail"],
+  emergency: ["emergencyContactName", "emergencyContactRelation", "emergencyContactPhone"],
+  identity: [
+    "fullName",
+    "nameAsPerId",
+    "sex",
+    "dateOfBirth",
+    "maritalStatus",
+    "nationality",
+    "nativeState",
+  ],
+  education: ["educationQualification", "priorExperienceMonths", "reasonForLeavingLastOrg"],
+  physical: ["heightCm", "chestCm", "weightKg", "bloodGroup", "nearestPoliceStation"],
+  family: [...FAMILY_FIELDS],
+  nominees: ["nomineeName"],
+  addresses: ["presentAddress", "permanentAddress"],
+  previous: ["previousOrganisations"],
+} as const;
+const writes = (card: EmployeeCard, panel: keyof typeof PANEL_FIELDS) =>
+  writesAny(card, ...PANEL_FIELDS[panel]);
 
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid gap-4 @min-[800px]/app:grid-cols-2">{children}</div>;
@@ -359,7 +386,7 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
         <Panel
           title="Contact"
           testId="panel-contact"
-          aside={edit(card) && <ContactEditor card={card} onChanged={onChanged} />}
+          aside={writes(card, "contact") && <ContactEditor card={card} onChanged={onChanged} />}
         >
           <Fields
             items={[
@@ -415,7 +442,9 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
           <Panel
             title="Emergency contact"
             testId="panel-emergency"
-            aside={edit(card) && <EmergencyEditor card={card} onChanged={onChanged} />}
+            aside={
+              writes(card, "emergency") && <EmergencyEditor card={card} onChanged={onChanged} />
+            }
           >
             {card.emergencyContact &&
             (card.emergencyContact.name ||
@@ -450,7 +479,7 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
         <Panel
           title="Identity"
           testId="panel-identity"
-          aside={edit(card) && <IdentityEditor card={card} onChanged={onChanged} />}
+          aside={writes(card, "identity") && <IdentityEditor card={card} onChanged={onChanged} />}
         >
           <Fields
             items={[
@@ -468,7 +497,7 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
 
         <Panel
           title="Education and experience"
-          aside={edit(card) && <EducationEditor card={card} onChanged={onChanged} />}
+          aside={writes(card, "education") && <EducationEditor card={card} onChanged={onChanged} />}
           footer="Total experience is the experience before joining plus service here, and keeps counting by itself. Without the first, it is the previous organisations on the History tab."
         >
           <Fields
@@ -497,7 +526,7 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
 
         <Panel
           title="Physical record"
-          aside={edit(card) && <PhysicalEditor card={card} onChanged={onChanged} />}
+          aside={writes(card, "physical") && <PhysicalEditor card={card} onChanged={onChanged} />}
           footer="For uniform and safety equipment issue. It appears in no export."
         >
           <Fields
@@ -543,7 +572,7 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
         aside={
           <span className="flex items-center gap-3">
             <span data-testid="family-summary">{familySummary(family.map((f) => f.relation))}</span>
-            {edit(card) && <FamilyEditor card={card} onChanged={onChanged} />}
+            {writes(card, "family") && <FamilyEditor card={card} onChanged={onChanged} />}
           </span>
         }
         footer="There is no Son 1 and Son 2. A person has as many sons, daughters or other relatives as they actually have. Dependents flow into medical insurance and the PF nomination check."
@@ -573,7 +602,7 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
                 Shares total {total}%
               </span>
             )}
-            {edit(card) && <NominationEditor card={card} onChanged={onChanged} />}
+            {writes(card, "nominees") && <NominationEditor card={card} onChanged={onChanged} />}
           </span>
         }
         footer={`Changing a nominee archives the old nomination rather than overwriting it, because the superseded form is what a claim produces.${superseded ? ` ${superseded} earlier ${superseded === 1 ? "nomination" : "nominations"} on record.` : ""}`}
@@ -757,7 +786,9 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
       {card.addresses && (
         <Panel
           title="Address history"
-          aside={edit(card) && <AddAddressDialog card={card} onChanged={onChanged} />}
+          aside={
+            writes(card, "addresses") && <AddAddressDialog card={card} onChanged={onChanged} />
+          }
           footer="Archived rows are read only. There is no edit or delete control for them."
         >
           <RecordTable
@@ -891,7 +922,9 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
       {card.previousOrganisations && (
         <Panel
           title="Previous organisations"
-          aside={edit(card) && <PreviousOrgsEditor card={card} onChanged={onChanged} />}
+          aside={
+            writes(card, "previous") && <PreviousOrgsEditor card={card} onChanged={onChanged} />
+          }
           footer="Total experience on the Personal tab is these rows plus service here, so it is never typed by hand."
         >
           <RecordTable

@@ -224,7 +224,7 @@ begin
   raise notice 'ok: a signed-in person''s name, mobile, department and manager are corrected on the profile';
 
   perform pg_temp.fc_refused('a name cannot be removed', hema,
-    format($q$select public.employee_update(%L, '{"fullName":"  "}')$q$, e_priya), 'NAME_REQUIRED');
+    format($q$select public.employee_update(%L, '{"fullName":"  "}')$q$, e_priya), 'REQUIRED');
   perform pg_temp.fc_refused('a name with digits is refused on the card', hema,
     format($q$select public.employee_update(%L, '{"fullName":"Pr1ya"}')$q$, e_priya), 'full_name_format');
   perform pg_temp.fc_refused('an 11-digit mobile is refused on the card', hema,

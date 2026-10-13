@@ -231,6 +231,13 @@ export interface EmployeeCard {
     canSendInvite?: boolean;
     canDeactivate?: boolean;
     canEditDraft?: boolean;
+    /**
+     * D107: the fields the company requires, and those the person may change
+     * on their own card, each by field and by the keys a save takes. The
+     * second is empty for everybody but the person.
+     */
+    requiredFields?: string[];
+    ownFields?: string[];
   };
 }
 
@@ -407,6 +414,19 @@ export interface OrgChartNode {
 export function employeeErrorMessage(code: string, detail?: string | null): string {
   if (code.includes("MODULE_NOT_ENABLED")) {
     return "Employee records aren't switched on for your company.";
+  }
+  // D107: the company's own rules name the field they hold.
+  if (code.includes("FIELD_REQUIRED")) {
+    return `${detail ?? "That field"} is required. Fill it in before saving.`;
+  }
+  if (code.includes("NOT_YOURS_TO_CHANGE")) {
+    return `Your company doesn't let you change ${detail ? detail.toLowerCase() : "that"} yourself. Ask with Request a change.`;
+  }
+  if (code.includes("SUPER_ADMIN_ONLY")) {
+    return "Only a Super Admin can change which fields are required or theirs to update.";
+  }
+  if (code.includes("FIELD_LOCKED")) {
+    return `${detail ?? "That field"} is fixed. The table says why.`;
   }
   // D103: a refused value names the rule it broke, so the message can name the field.
   if (code.includes("INVALID_VALUE") && detail && RULE_MESSAGES[detail]) {

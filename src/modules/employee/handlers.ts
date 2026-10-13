@@ -32,6 +32,7 @@ import {
   type CalendarRow,
   type ShiftRow,
 } from "./contracts";
+import { fieldSettingFromRow, type FieldSetting } from "./fieldSettings";
 
 function toEmployeeError(message: string, details?: string | null): AppError {
   const code = message.replace(/^ERROR:\s*/i, "").trim() || message;
@@ -661,6 +662,27 @@ export async function listOnboardingItems(): Promise<OnboardingItem[]> {
     mandatory: i.mandatory,
     customised: i.customised,
   }));
+}
+
+/** D107: the company's Required and Employees can update, for every field. */
+export async function listFieldSettings(): Promise<FieldSetting[]> {
+  const { data, error } = await supabase.rpc("employee_field_settings");
+  if (error) throw toEmployeeError(error.message, error.details);
+  return (data ?? []).map(fieldSettingFromRow);
+}
+
+/** A Super Admin's answer for one field. */
+export async function saveFieldSetting(
+  key: string,
+  setting: "required" | "employeeCanUpdate",
+  value: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("employee_save_field_setting", {
+    _field_key: key,
+    _setting: setting,
+    _value: value,
+  });
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function saveOnboardingItem(

@@ -190,7 +190,7 @@ begin
    where employee_id = e_priya and scheme = 'esic' and effective_to is null;
   perform pg_temp.tr_do(hema, format($q$select public.employee_save_nomination(%L, jsonb_build_object(
     'scheme', 'pf_and_gratuity', 'effectiveFrom', %L,
-    'nominees', jsonb_build_array(jsonb_build_object('name', 'Ravi Kumar', 'relation', 'husband', 'sharePercent', 100))))$q$,
+    'nominees', jsonb_build_array(jsonb_build_object('name', 'Ravi Kumar', 'relation', 'husband', 'dateOfBirth', '1988-02-01', 'sharePercent', 100))))$q$,
     e_priya, today));
   select count(*) into n from public.nomination_versions where employee_id = e_priya and effective_to is null;
   if n <> 1 or (select scheme from public.nomination_versions where employee_id = e_priya and effective_to is null) <> 'all' then
@@ -200,7 +200,7 @@ begin
 
   perform pg_temp.tr_do(hema, format($q$select public.employee_save_nomination(%L, jsonb_build_object(
     'scheme', 'esic', 'effectiveFrom', %L,
-    'nominees', jsonb_build_array(jsonb_build_object('name', 'Lata Kumar', 'relation', 'mother', 'sharePercent', 100))))$q$,
+    'nominees', jsonb_build_array(jsonb_build_object('name', 'Lata Kumar', 'relation', 'mother', 'dateOfBirth', '1962-07-15', 'sharePercent', 100))))$q$,
     e_priya, today));
   select count(*) into n from public.nomination_versions where employee_id = e_priya and effective_to is null;
   seen := (select n2.name from public.nomination_versions v join public.nominees n2 on n2.version_id = v.id

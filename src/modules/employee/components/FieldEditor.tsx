@@ -14,6 +14,10 @@
  * A number held encrypted (D104) shows its last four, as the card does, with
  * Change beside it: nothing is cleared on opening, and only a number the Admin
  * chose to change is typed and sent.
+ *
+ * A required field (D107: the company says which) must be filled to save,
+ * whether or not it was touched: an empty one stops the save and says so.
+ * The dialog names the required ones up front.
  */
 
 import { X } from "lucide-react";
@@ -148,6 +152,7 @@ export function FieldEditor({
   const formId = useId();
 
   const verb = filled ? "Edit" : "Add";
+  const required = fields.filter((f) => f.required && f.kind !== "derived").map((f) => f.label);
   const buttonText = label ?? `${verb} ${lower(title)}`;
 
   function problem(f: FieldSpec, value: string): string | null {
@@ -182,6 +187,12 @@ export function FieldEditor({
       if (f.kind === "derived") continue;
       const now = vals[f.key].trim();
       const before = (f.current ?? "").trim();
+      // Required and empty stops the save even untouched. A number on record
+      // shows only its last four, so it is filled.
+      if (f.required && now === "" && !f.masked) {
+        found[f.key] = `${f.label} can't be empty.`;
+        continue;
+      }
       if (now === before) continue;
       const p = problem(f, now);
       if (p) {
@@ -242,6 +253,11 @@ export function FieldEditor({
                 (fields.some((f) => f.masked)
                   ? "Only what you change is saved. A number on record stays as it is unless you choose Change."
                   : "Only what you change is saved. The × in a box clears it.")}
+              {required.length > 0 && (
+                <span data-testid={`required-${id}`} className="mt-1 block">
+                  Required: {required.join(", ")}.
+                </span>
+              )}
             </DialogDescription>
           </DialogHeader>
           <form

@@ -170,6 +170,7 @@ run "verifying every field is checked" "$HARNESS_DIR/tests/verify_field_checks.s
 run "verifying the second round (D104)" "$HARNESS_DIR/tests/verify_second_round.sql"
 run "verifying the third round (D105)" "$HARNESS_DIR/tests/verify_third_round.sql"
 run "verifying the fourth round (D106)" "$HARNESS_DIR/tests/verify_fourth_round.sql"
+run "verifying the fields the company sets (D107)" "$HARNESS_DIR/tests/verify_field_settings.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

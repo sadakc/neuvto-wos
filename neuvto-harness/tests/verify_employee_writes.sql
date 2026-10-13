@@ -7,7 +7,8 @@
 -- The bundle's acceptance criteria 1–5, from the database side: three sons
 -- save; an address change is two rows; a posting change is two rows with an
 -- order reference; the unit is an id from this company's active list; nominee
--- shares off 100 save nothing. And every writer refuses everybody but an Admin.
+-- shares off 100 save nothing. And every writer refuses everybody but an Admin,
+-- except the person, for the fields their company lets them update (D107).
 
 begin;
 
@@ -114,7 +115,7 @@ begin
   insert into public.designations (organization_id, name) values (acme, 'Guard') returning id into dsg;
 
   -- ── 0 · only an Admin writes, and only in their own company
-  foreach who in array array[ravi, mark, pay, priya] loop
+  foreach who in array array[ravi, mark, pay] loop
     foreach sql_ in array array[
       format($q$select public.employee_update(%L, '{"bloodGroup":"O+"}')$q$, e),
       format($q$select public.employee_save_family(%L, '[]')$q$, e),
@@ -133,7 +134,15 @@ begin
       end;
     end loop;
   end loop;
-  perform pg_temp.ew_ok('a colleague, the approver, Payroll and the person themselves cannot write the record');
+  perform pg_temp.ew_ok('a colleague, the approver and Payroll cannot write the record');
+  -- D107: the person writes only what their company switched on for them.
+  perform pg_temp.ew_refused('the person cannot set a field left off for them', priya,
+    format($q$select public.employee_update(%L, '{"sex":"female"}')$q$, e), 'NOT_YOURS_TO_CHANGE');
+  perform pg_temp.ew_refused('the person cannot list their previous employers unless switched on', priya,
+    format($q$select public.employee_save_previous_orgs(%L, '[]')$q$, e), 'NOT_YOURS_TO_CHANGE');
+  perform pg_temp.ew_refused('the person cannot move themselves', priya,
+    format($q$select public.employee_move_unit(%L, jsonb_build_object('unitId', %L, 'effectiveFrom', '2025-01-01', 'orderRef', 'X'))$q$, e, hq),
+    'FORBIDDEN');
   perform pg_temp.ew_refused('another company''s Admin gets NOT_FOUND', bob,
     format($q$select public.employee_update(%L, '{"bloodGroup":"O+"}')$q$, e), 'NOT_FOUND');
 

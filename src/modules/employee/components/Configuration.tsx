@@ -10,9 +10,11 @@
  *
  * What is NOT a setting here, on purpose: who sees which field. That is §5,
  * enforced by employee_card(). A switch that could loosen it would be the leak.
+ * What IS, since D107: which fields are required, and which the person may
+ * change on their own card. Only a Super Admin sets them.
  */
 
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import {
@@ -31,7 +33,8 @@ import {
   type ShiftRow,
 } from "../contracts";
 import { describeShift, describeWeek, formatDate } from "../format";
-import { FIELD_CATALOGUE } from "../fieldCatalogue";
+import { FIELD_CATALOGUE, type CatalogueField } from "../fieldCatalogue";
+import { LOCK_REASON, type FieldSetting } from "../fieldSettings";
 import { HOME_STATE, STATES } from "../indiaPlaces";
 import {
   listCalendars,
@@ -41,7 +44,9 @@ import {
   listOnboardingItems,
   saveOnboardingSettings,
   listUnits,
+  listFieldSettings,
   rankDesignations,
+  saveFieldSetting,
   saveDesignation,
   saveOnboardingItem,
   saveUnit,
@@ -118,12 +123,51 @@ export default function Configuration() {
 // ═══════════════════════════════════════════════════════════ 01
 
 function FieldsSection() {
+  const [settings, setSettings] = useState<Map<string, FieldSetting> | null>(null);
+  const [error, setError] = useState("");
+
+  useEffect(() => {
+    listFieldSettings()
+      .then((rows) => setSettings(new Map(rows.map((r) => [r.key, r]))))
+      .catch((e) => setError(errorText(e, "The field settings didn't load.")));
+  }, []);
+
+  const canChange = settings ? [...settings.values()].some((s) => s.canChange) : false;
+
+  async function change(s: FieldSetting, which: "required" | "employeeCanUpdate", value: boolean) {
+    setError("");
+    // Shown at once; put back if the database says no.
+    setSettings((m) => new Map(m).set(s.key, { ...s, [which]: value }));
+    try {
+      await saveFieldSetting(s.key, which, value);
+    } catch (e) {
+      setSettings((m) => new Map(m).set(s.key, s));
+      setError(errorText(e, "That couldn't be saved."));
+    }
+  }
+
   return (
     <Panel
       title="Fields and visibility"
       aside={`${FIELD_CATALOGUE.length} fields`}
       footer="Fields marked new do not exist in the master sheet. They were added because the sheet works around their absence: one mobile column where two numbers are needed, a single address cell that gets overwritten, and Son 1 and Son 2 columns that cannot hold a third. Columns the sheet repeats (Father name, Husband name) are kept once. Who sees each field is enforced by the record itself and is not a setting."
     >
+      <p className="mb-3 text-sm text-foreground-secondary" data-testid="field-settings-note">
+        <strong className="font-semibold text-foreground">Required</strong> means a save that leaves
+        the field empty is refused.{" "}
+        <strong className="font-semibold text-foreground">Employees can update</strong> means the
+        person changes it on their own card, saved straight away with no approval; anything else
+        they ask for with Request a change.{" "}
+        {settings &&
+          (canChange
+            ? "Change either here; it applies to everybody in the company at once."
+            : "Only a Super Admin can change these.")}
+      </p>
+      {error && (
+        <p role="alert" className="mb-2 text-sm text-destructive">
+          {error}
+        </p>
+      )}
       <div className="-mx-4 overflow-x-auto">
         <table className="w-full min-w-[60rem] text-table-cell" data-testid="field-catalogue">
           <thead>
@@ -133,7 +177,7 @@ function FieldsSection() {
                 "Field",
                 "Master sheet column",
                 "Required",
-                "Employee can edit",
+                "Employees can update",
                 "Visible to",
                 "In exports",
                 "In Neuvto",
@@ -145,28 +189,106 @@ function FieldsSection() {
             </tr>
           </thead>
           <tbody>
-            {FIELD_CATALOGUE.map((c) => (
-              <tr key={`${c.group}-${c.field}`} className="border-b border-border last:border-0">
-                <td className="px-3 py-2 text-muted-foreground">{c.group}</td>
-                <td className={cn("px-3 py-2", c.sheet === "new" && "font-medium text-primary")}>
-                  {c.field}
-                </td>
-                <td className="px-3 py-2 font-mono text-caption">
-                  {c.sheet === "new" ? "new" : c.sheet.join(", ")}
-                </td>
-                <td className="px-3 py-2">{c.required}</td>
-                <td className="px-3 py-2">{c.employeeCanEdit}</td>
-                <td className="px-3 py-2 whitespace-nowrap">{c.visibleTo}</td>
-                <td className="px-3 py-2">{c.inExports}</td>
-                <td className="px-3 py-2 whitespace-nowrap">
-                  {c.home === "Card header" ? c.home : `${c.home.tab} › ${c.home.panel}`}
-                </td>
-              </tr>
-            ))}
+            {FIELD_CATALOGUE.map((c) => {
+              const s = settings?.get(c.key);
+              return (
+                <tr key={`${c.group}-${c.field}`} className="border-b border-border last:border-0">
+                  <td className="px-3 py-2 text-muted-foreground">{c.group}</td>
+                  <td className={cn("px-3 py-2", c.sheet === "new" && "font-medium text-primary")}>
+                    {c.field}
+                  </td>
+                  <td className="px-3 py-2 font-mono text-caption">
+                    {c.sheet === "new" ? "new" : c.sheet.join(", ")}
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <SettingCell
+                      field={c}
+                      setting={s}
+                      loaded={settings !== null}
+                      which="required"
+                      onChange={change}
+                    />
+                  </td>
+                  <td className="px-3 py-2 align-top">
+                    <SettingCell
+                      field={c}
+                      setting={s}
+                      loaded={settings !== null}
+                      which="employeeCanUpdate"
+                      onChange={change}
+                    />
+                  </td>
+                  <td className="px-3 py-2 whitespace-nowrap">{c.visibleTo}</td>
+                  <td className="px-3 py-2">{c.inExports}</td>
+                  <td className="px-3 py-2 whitespace-nowrap">
+                    {c.home === "Card header" ? c.home : `${c.home.tab} › ${c.home.panel}`}
+                  </td>
+                </tr>
+              );
+            })}
           </tbody>
         </table>
       </div>
     </Panel>
+  );
+}
+
+const WHICH_LABEL = { required: "Required", employeeCanUpdate: "Employees can update" } as const;
+
+/**
+ * One answer: a Yes/No choice for a Super Admin, the answer for anybody else,
+ * and for a fixed one the answer with why it is fixed. A worked-out field
+ * keeps its words (Derived, Auto), since a Yes or No would say nothing.
+ */
+function SettingCell({
+  field,
+  setting,
+  loaded,
+  which,
+  onChange,
+}: {
+  field: CatalogueField;
+  setting: FieldSetting | undefined;
+  loaded: boolean;
+  which: "required" | "employeeCanUpdate";
+  onChange: (s: FieldSetting, which: "required" | "employeeCanUpdate", value: boolean) => void;
+}) {
+  const words = which === "required" ? field.required : field.employeeCanEdit;
+  if (!loaded) return <span className="text-muted-foreground">{words}</span>;
+  if (!setting) {
+    return (
+      <span data-testid="setting-missing" className="text-muted-foreground">
+        —
+      </span>
+    );
+  }
+  const value = setting[which];
+  const lock = which === "required" ? setting.requiredLock : setting.updateLock;
+  if (lock) {
+    return (
+      <span className="flex flex-col gap-0.5">
+        <span className="inline-flex items-center gap-1 whitespace-nowrap">
+          {lock === "derived" && words !== "Yes" && words !== "No" ? words : value ? "Yes" : "No"}
+          <Lock aria-hidden className="size-3 text-muted-foreground" />
+        </span>
+        <span className="min-w-[10rem] text-caption text-muted-foreground">
+          {LOCK_REASON[lock]}
+        </span>
+      </span>
+    );
+  }
+  if (!setting.canChange) return <span>{value ? "Yes" : "No"}</span>;
+  return (
+    <select
+      aria-label={`${WHICH_LABEL[which]}: ${setting.label}`}
+      data-testid={`setting-${which}-${setting.key}`}
+      value={value ? "yes" : "no"}
+      onChange={(e) => onChange(setting, which, e.target.value === "yes")}
+      className="h-9 rounded-md border border-input bg-background px-2 text-sm"
+    >
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
   );
 }
 

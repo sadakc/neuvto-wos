@@ -54,8 +54,14 @@ const as = (k: keyof typeof cards) => cards[k] as unknown as EmployeeCard;
 const admin = as("admin");
 
 /** An Admin's view of somebody with nothing filled in yet: Deepak, invited. */
+/**
+ * A record with nothing in it yet, at a company that requires nothing (D107),
+ * so a form here saves whatever else is still blank. What Required does is
+ * pinned in RequiredAndOwn.test.tsx.
+ */
 const empty: EmployeeCard = {
   ...admin,
+  capabilities: { ...admin.capabilities, requiredFields: [] },
   stage: "invited",
   hasSignedIn: false,
   emergencyContact: null as never,
@@ -155,7 +161,8 @@ describe("each panel's button is in its own header, and says Add or Edit", () =>
 describe("a field that breaks a rule says so under itself", () => {
   it("refuses an 11-digit alternate mobile, then saves it fixed", async () => {
     const u = user();
-    render(<EmployeeCardView card={admin} />);
+    // With a mobile on record, which the company requires (D107).
+    render(<EmployeeCardView card={{ ...admin, mobile: "9845011100" }} />);
     await u.click(screen.getByTestId("edit-contact"));
     const editor = screen.getByTestId("editor-contact");
     const alt = within(editor).getByLabelText("Alternate mobile");

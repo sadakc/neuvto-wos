@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.20 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.21 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -489,7 +489,8 @@ template. Import records now downloads and reads one Excel workbook:
   number of rows, never numbered slots. The headers are in `src/modules/employee/masterSheet.ts`
   and `masterSheet.test.ts` fails if any column loses its field or a repeat is kept twice. Who sees each field
   is not a setting: §5 is enforced by `employee_card()`, and a switch that could loosen it
-  would be the leak.
+  would be the leak. **Required and Employees can update are settings** since D107: see
+  Sada's fifth round below.
 - **02 Deployment units and designations**: add, edit, retire and bring back. A rename
   relabels every posting, because postings point at the id. A unit somebody is posted to now
   cannot be retired. Duplicate names are refused however they are spelt or spaced, which is
@@ -756,6 +757,46 @@ wanted.
   or .) is read; one that does not exist, like 31/02, is refused with the format in words.
 - **The org chart folds.** Anybody with reports has a − that folds their team away and a + that
   opens it again; "Fold every team" and "Open every team" do the whole chart.
+
+### Sada's fifth round (D107, 13 Oct 2026)
+
+Fields and visibility listed every field with a fixed Required and "Employee can edit" that
+nobody could change, and the second one was never enforced: only an Admin could write the
+record at all. Sada: let only the Super Admin set them, with no approvals, and have Required
+trigger a validation.
+
+- **The company's Super Admin sets both, per field**, in Configuration, 01 Fields and
+  visibility: a Yes/No in each of the two columns. Anybody else, the Employee Admin included,
+  sees the answers and is told only a Super Admin can change them. Every change is in the
+  audit log. The answers live in `employee_field_settings`, one row per company per field;
+  Neuvto's answers are `employee_field_defaults()`, the same as the table showed before.
+  There are 57 fields: brothers, sisters, a guardian and other relatives are now a row of
+  their own, and Type of document given became Driving licence number (D105 replaced it).
+- **Required = Yes** means a save that leaves the field empty is refused: on the screen, every
+  form with a required field says which ones and will not save while one is empty, touched or
+  not; in the database, `FIELD_REQUIRED` names the field for any save that empties it, the
+  import included. A required number not yet on record (UAN, Aadhaar, the bank account) stops
+  its statutory form the same way. A nominee's date of birth, once required, is asked of every
+  nominee.
+- **Employees can update = Yes** means the person changes the field on their own card and it
+  is saved at once, with no approval. Their card offers Edit only on the panels holding such a
+  field, and each form holds only those fields. Relatives are by relation: a kept relative is
+  shown, sent back untouched, and cannot be edited or removed. Addresses are by type: present
+  and permanent. The nomination is one answer: the dates of birth and shares follow the names.
+  Anything left at No they ask for with Request a change. The database refuses the rest with
+  `NOT_YOURS_TO_CHANGE`, naming the field, and a save with any field that is off saves nothing.
+- **Some answers are fixed**, and the table says why under each: worked out by Neuvto (age,
+  total experience, the histories, bank name and branch); set by the company (employee ID,
+  designation, dates, status, reporting line, unit); every record has one (name, joining date,
+  status); a whole record the onboarding checklist asks for (addresses, the unit); set by the
+  roles responsible (every statutory and bank number); kept apart from the person's own card
+  (religion, caste, disability); not everybody has one (relatives, previous employers).
+- **Defaults that changed behaviour:** fields the old table said employees could edit are now
+  theirs to update: mobile, alternate mobile, personal email, emergency contact, police
+  station, native state, blood group, both addresses, every relative and the nomination.
+  Nominee date of birth is not required until switched on, since nominations without one are
+  on record already. Proved by `verify_field_settings.sql` (23 guards broken on purpose, each
+  caught) and `RequiredAndOwn.test.tsx` with `Configuration.test.tsx` (33 broken, each caught).
 
 ## 8. Acceptance criteria, module level
 

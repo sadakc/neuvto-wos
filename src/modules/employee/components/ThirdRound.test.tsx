@@ -154,7 +154,10 @@ describe("Personal and Family", () => {
 describe("a box with something in it has an x that clears it", () => {
   it("clears the alternate mobile in one go, and saves it cleared", async () => {
     const u = user();
-    render(<EmployeeCardView card={{ ...admin, alternateMobile: "9876543210" }} />);
+    // With a mobile on record, which the company requires (D107).
+    render(
+      <EmployeeCardView card={{ ...admin, mobile: "9845011100", alternateMobile: "9876543210" }} />,
+    );
     await u.click(screen.getByTestId("edit-contact"));
     const editor = screen.getByTestId("editor-contact");
     const box = within(editor).getByLabelText("Alternate mobile");

@@ -12,6 +12,8 @@ export const PEOPLE = {
   manager: { email: "mark.manager@acme.test", name: "Mark Manager" },
   /** Priya's colleague, whose card others look at. */
   colleague: { email: "ravi.emp@acme.test", name: "Ravi Employee" },
+  /** Acme's Super Admin: the one who sets which fields are required (D107). */
+  superAdmin: { email: "alice.admin@acme.test", name: "Alice Admin" },
 } as const;
 
 export type Role = keyof typeof PEOPLE;

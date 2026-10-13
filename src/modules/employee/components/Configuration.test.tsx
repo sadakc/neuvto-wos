@@ -14,7 +14,12 @@
  *   the days ticked; the Company calendar is set on Settings, not here; a
  *   night shift says it ends the next day; nothing in use can be retired;
  * - a unit picks its calendar and default shift from active ones only;
- * - the catalogue shows every field, with the new ones marked.
+ * - the catalogue shows every field, with the new ones marked;
+ * - D107: a Super Admin sets Required and Employees can update per field,
+ *   sending only the one changed; a fixed answer says why and has no control;
+ *   an Employee Admin sees the answers and is told who can change them; a
+ *   refusal is said and the answer goes back. The rows are real
+ *   employee_field_settings() output (__fixtures__/fieldSettings.json).
  */
 
 import { render, screen, within } from "@testing-library/react";
@@ -23,6 +28,8 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { AppError } from "@/platform/errors";
 import type { UnitRow } from "../handlers";
 import { FIELD_CATALOGUE } from "../fieldCatalogue";
+import { fieldSettingFromRow } from "../fieldSettings";
+import settings from "./__fixtures__/fieldSettings.json";
 
 const api = vi.hoisted(() => ({
   listUnits: vi.fn(),
@@ -42,6 +49,8 @@ const api = vi.hoisted(() => ({
   listShifts: vi.fn(),
   saveShift: vi.fn(),
   setShiftStatus: vi.fn(),
+  listFieldSettings: vi.fn(),
+  saveFieldSetting: vi.fn(),
 }));
 vi.mock("../handlers", () => api);
 
@@ -133,6 +142,8 @@ beforeEach(() => {
       people: 0,
     },
   ]);
+  api.listFieldSettings.mockResolvedValue(settings.superAdmin.map(fieldSettingFromRow));
+  api.saveFieldSetting.mockResolvedValue(undefined);
   api.getOnboardingSettings.mockResolvedValue({
     remindEveryDays: 3,
     escalateAfterDays: 7,
@@ -373,6 +384,81 @@ describe("the field catalogue", () => {
     expect(rows).toHaveLength(FIELD_CATALOGUE.length);
     const newOnes = rows.filter((r) => within(r).queryByText("new"));
     expect(newOnes).toHaveLength(FIELD_CATALOGUE.filter((f) => f.sheet === "new").length);
+  });
+});
+
+describe("Required and Employees can update (D107)", () => {
+  const row = (field: string) =>
+    within(screen.getByTestId("field-catalogue"))
+      .getAllByRole("row")
+      .find((r) => r.querySelectorAll("td")[1]?.textContent === field)!;
+
+  it("has an answer from the database for every field in the table", async () => {
+    render(<Configuration />);
+    await screen.findByRole("combobox", { name: "Required: Date of birth" });
+    expect(screen.queryAllByTestId("setting-missing")).toHaveLength(0);
+  });
+
+  it("lets a Super Admin change one answer, sending only that one", async () => {
+    const user = userEvent.setup();
+    render(<Configuration />);
+    const sex = await screen.findByRole("combobox", { name: "Employees can update: Sex" });
+    expect(sex).toHaveValue("no");
+    await user.selectOptions(sex, "yes");
+    expect(api.saveFieldSetting).toHaveBeenCalledTimes(1);
+    expect(api.saveFieldSetting).toHaveBeenCalledWith("sex", "employeeCanUpdate", true);
+    expect(sex).toHaveValue("yes");
+
+    const dob = screen.getByRole("combobox", { name: "Required: Date of birth" });
+    await user.selectOptions(dob, "no");
+    expect(api.saveFieldSetting).toHaveBeenLastCalledWith("dateOfBirth", "required", false);
+  });
+
+  it("shows a fixed answer with its reason and no control", async () => {
+    render(<Configuration />);
+    await screen.findByRole("combobox", { name: "Required: Date of birth" });
+    expect(screen.queryByRole("combobox", { name: "Employees can update: UAN" })).toBeNull();
+    expect(
+      within(row("UAN")).getByText(/Statutory, Payroll and Employee Admin roles/),
+    ).toBeTruthy();
+    expect(screen.queryByRole("combobox", { name: "Required: Age" })).toBeNull();
+    expect(within(row("Age")).getAllByText(/Worked out by Neuvto/).length).toBeGreaterThan(0);
+    // The words for what a Yes cannot say stay as they were.
+    expect(within(row("Age")).getByText("Derived")).toBeTruthy();
+  });
+
+  it("says a nominee's date of birth follows the nomination", async () => {
+    render(<Configuration />);
+    await screen.findByRole("combobox", {
+      name: "Employees can update: Nominee name and relation",
+    });
+    expect(
+      screen.queryByRole("combobox", { name: "Employees can update: Nominee date of birth" }),
+    ).toBeNull();
+    expect(within(row("Nominee date of birth")).getByText(/saved as a whole/)).toBeTruthy();
+  });
+
+  it("puts the answer back and says why when it is refused", async () => {
+    api.saveFieldSetting.mockRejectedValueOnce(
+      new AppError("FORBIDDEN", "Only a Super Admin can change which fields are required."),
+    );
+    const user = userEvent.setup();
+    render(<Configuration />);
+    const sex = await screen.findByRole("combobox", { name: "Employees can update: Sex" });
+    await user.selectOptions(sex, "yes");
+    expect((await screen.findByRole("alert")).textContent).toMatch(/Only a Super Admin/);
+    expect(sex).toHaveValue("no");
+  });
+
+  it("shows an Employee Admin the answers, with no controls, and who can change them", async () => {
+    api.listFieldSettings.mockResolvedValue(settings.employeeAdmin.map(fieldSettingFromRow));
+    render(<Configuration />);
+    expect(await screen.findByText(/Only a Super Admin can change/)).toBeTruthy();
+    expect(screen.queryAllByRole("combobox")).toHaveLength(0);
+    const answers = (field: string) =>
+      [...row(field).querySelectorAll("td")].slice(3, 5).map((td) => td.textContent);
+    expect(answers("Sex")).toEqual(["Yes", "No"]);
+    expect(answers("Mobile number")).toEqual(["Yes", "Yes"]);
   });
 });
 

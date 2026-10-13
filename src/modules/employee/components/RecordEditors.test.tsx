@@ -3,7 +3,8 @@
 /**
  * Writing the record (E7), against real employee_card() output. What it pins:
  *
- * - only an Admin's card offers any control (criterion: no dead buttons);
+ * - only an Admin's card offers every control, a colleague's none (criterion:
+ *   no dead buttons); the person's own card is RequiredAndOwn.test.tsx (D107);
  * - a third son is a third row, and the count updates as it is typed (1);
  * - the address dialog says what it will close before anything is typed, and
  *   a date clash lands on the date field (2);
@@ -78,8 +79,8 @@ async function openTab(name: string) {
 }
 
 describe("who is offered a control", () => {
-  it("offers nothing on your own card or a colleague's", async () => {
-    for (const card of [as("self"), as("colleague")]) {
+  it("offers nothing on a colleague's card", async () => {
+    for (const card of [as("colleague")]) {
       const { unmount } = render(<EmployeeCardView card={card} />);
       for (const tab of screen.getAllByRole("tab")) {
         await userEvent.setup().click(tab);
@@ -244,7 +245,9 @@ describe("the record's own fields", () => {
   it("sends a cleared field as null and leaves untouched fields out", async () => {
     const user = userEvent.setup();
     api.updateEmployee.mockResolvedValue(undefined);
-    render(<EmployeeCardView card={admin} />);
+    // A mobile on record: the company requires one (D107), so a contact with
+    // none cannot be saved until it has one.
+    render(<EmployeeCardView card={{ ...admin, mobile: "9845011100" }} />);
     await user.click(screen.getByTestId("edit-contact"));
     const editor = screen.getByTestId("editor-contact");
     const altMobile = within(editor).getByLabelText("Alternate mobile");

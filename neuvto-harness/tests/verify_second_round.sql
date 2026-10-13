@@ -131,9 +131,10 @@ begin
   perform pg_temp.sr_refused('a colleague cannot set it', ravi,
     format($q$select public.employee_update(%L, '{"priorExperienceMonths":"5"}')$q$, e_priya),
     'FORBIDDEN');
+  -- D107: experience is never one the company can switch on for them.
   perform pg_temp.sr_refused('the person cannot set their own', priya,
     format($q$select public.employee_update(%L, '{"priorExperienceMonths":"500"}')$q$, e_priya),
-    'FORBIDDEN');
+    'NOT_YOURS_TO_CHANGE');
   perform pg_temp.sr_refused('a write straight to the table is held to the range too', null,
     format('update public.employees set prior_experience_months = 1000 where id = %L', e_priya),
     'employees_prior_experience_months_check');
