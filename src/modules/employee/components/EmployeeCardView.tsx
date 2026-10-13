@@ -51,12 +51,16 @@ import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
 import { STAGE_TONE } from "../status";
 import {
   AddAddressDialog,
-  ContactEditors,
-  EmploymentEditors,
+  ContactEditor,
+  DatesEditor,
+  EducationEditor,
+  EmergencyEditor,
   FamilyEditor,
+  IdentityEditor,
   MoveUnitDialog,
   NominationEditor,
-  PersonalEditors,
+  PhysicalEditor,
+  PositionEditor,
   PreviousOrgsEditor,
 } from "./RecordEditors";
 
@@ -330,6 +334,9 @@ function Tag({ children }: { children: React.ReactNode }) {
   );
 }
 
+/** Whether this card's panels carry their Add and Edit buttons. */
+const edit = (card: EmployeeCard) => card.capabilities.canEdit;
+
 function Grid({ children }: { children: React.ReactNode }) {
   return <div className="grid gap-4 @min-[800px]/app:grid-cols-2">{children}</div>;
 }
@@ -342,7 +349,11 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
   return (
     <div className="flex flex-col gap-4">
       <Grid>
-        <Panel title="Contact" testId="panel-contact">
+        <Panel
+          title="Contact"
+          testId="panel-contact"
+          aside={edit(card) && <ContactEditor card={card} onChanged={onChanged} />}
+        >
           <Fields
             items={[
               { label: "Work email", value: card.workEmail },
@@ -382,21 +393,32 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
           />
         </Panel>
 
-        {card.emergencyContact && (
-          <Panel title="Emergency contact" testId="panel-emergency">
-            <Fields
-              items={[
-                { label: "Name", value: card.emergencyContact.name },
-                { label: "Relation", value: humanise(card.emergencyContact.relation) },
-                { label: "Phone", value: card.emergencyContact.phone, mono: true },
-              ]}
-            />
+        {/* Shown empty to whoever can fill it, with Add in its header (D103). */}
+        {(card.emergencyContact || edit(card)) && (
+          <Panel
+            title="Emergency contact"
+            testId="panel-emergency"
+            aside={edit(card) && <EmergencyEditor card={card} onChanged={onChanged} />}
+          >
+            {card.emergencyContact &&
+            (card.emergencyContact.name ||
+              card.emergencyContact.relation ||
+              card.emergencyContact.phone) ? (
+              <Fields
+                items={[
+                  { label: "Name", value: card.emergencyContact.name },
+                  { label: "Relation", value: humanise(card.emergencyContact.relation) },
+                  { label: "Phone", value: card.emergencyContact.phone, mono: true },
+                ]}
+              />
+            ) : (
+              <p className="text-sm text-muted-foreground">No emergency contact recorded yet.</p>
+            )}
           </Panel>
         )}
 
         {card.capabilities.canSeeThisYear && <ThisYearPanel employeeId={card.id} />}
       </Grid>
-      {card.capabilities.canEdit && <ContactEditors card={card} onChanged={onChanged} />}
       {card.capabilities.canSeeViews && <WhoHasLooked employeeId={card.id} />}
     </div>
   );
@@ -408,7 +430,11 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
   return (
     <div className="flex flex-col gap-4">
       <Grid>
-        <Panel title="Identity" testId="panel-identity">
+        <Panel
+          title="Identity"
+          testId="panel-identity"
+          aside={edit(card) && <IdentityEditor card={card} onChanged={onChanged} />}
+        >
           <Fields
             items={[
               { label: "Full name", value: card.fullName },
@@ -425,6 +451,7 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
 
         <Panel
           title="Education and experience"
+          aside={edit(card) && <EducationEditor card={card} onChanged={onChanged} />}
           footer="Total experience is the previous organisations on the History tab plus service here. Nobody types it."
         >
           <Fields
@@ -445,6 +472,7 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
 
         <Panel
           title="Physical record"
+          aside={edit(card) && <PhysicalEditor card={card} onChanged={onChanged} />}
           footer="For uniform and safety equipment issue. It appears in no export."
         >
           <Fields
@@ -474,7 +502,6 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
           </p>
         </Panel>
       </Grid>
-      {card.capabilities.canEdit && <PersonalEditors card={card} onChanged={onChanged} />}
     </div>
   );
 }
@@ -492,7 +519,10 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
       <Panel
         title="Family"
         aside={
-          <span data-testid="family-summary">{familySummary(family.map((f) => f.relation))}</span>
+          <span className="flex items-center gap-3">
+            <span data-testid="family-summary">{familySummary(family.map((f) => f.relation))}</span>
+            {edit(card) && <FamilyEditor card={card} onChanged={onChanged} />}
+          </span>
         }
         footer="There is no Son 1 and Son 2. A person has as many sons, daughters or other relatives as they actually have. Dependents flow into medical insurance and the PF nomination check."
       >
@@ -515,11 +545,14 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
       <Panel
         title="Nominees"
         aside={
-          current ? (
-            <span className={total === 100 ? "text-success" : "text-destructive"}>
-              Shares total {total}%
-            </span>
-          ) : null
+          <span className="flex items-center gap-3">
+            {current && (
+              <span className={total === 100 ? "text-success" : "text-destructive"}>
+                Shares total {total}%
+              </span>
+            )}
+            {edit(card) && <NominationEditor card={card} onChanged={onChanged} />}
+          </span>
         }
         footer={`Changing a nominee archives the old nomination rather than overwriting it, because the superseded form is what a claim produces.${superseded ? ` ${superseded} earlier ${superseded === 1 ? "nomination" : "nominations"} on record.` : ""}`}
       >
@@ -543,12 +576,6 @@ function Family({ card, onChanged }: { card: EmployeeCard; onChanged: Changed })
           <p className="text-sm text-muted-foreground">No nomination recorded yet.</p>
         )}
       </Panel>
-      {card.capabilities.canEdit && (
-        <div className="flex flex-wrap gap-2">
-          <FamilyEditor card={card} onChanged={onChanged} />
-          <NominationEditor card={card} onChanged={onChanged} />
-        </div>
-      )}
     </div>
   );
 }
@@ -568,7 +595,11 @@ function Employment({
   return (
     <div className="flex flex-col gap-4">
       <Grid>
-        <Panel title="Position">
+        <Panel
+          title="Position"
+          testId="panel-position"
+          aside={edit(card) && <PositionEditor card={card} onChanged={onChanged} />}
+        >
           <Fields
             items={[
               { label: "Employee code", value: card.employeeCode, mono: true },
@@ -605,6 +636,7 @@ function Employment({
 
         <Panel
           title="Dates and status"
+          aside={edit(card) && <DatesEditor card={card} onChanged={onChanged} />}
           footer={
             "reJoiningDate" in card
               ? "Re-joining keeps the original joining date. Continuity is worked out from both."
@@ -634,15 +666,18 @@ function Employment({
         <Panel
           title="Deployment"
           aside={
-            onSeeHistory ? (
-              <button
-                type="button"
-                onClick={onSeeHistory}
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                See history
-              </button>
-            ) : null
+            <span className="flex items-center gap-3">
+              {onSeeHistory && (
+                <button
+                  type="button"
+                  onClick={onSeeHistory}
+                  className="-my-2.5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+                >
+                  See history
+                </button>
+              )}
+              {edit(card) && <MoveUnitDialog card={card} onChanged={onChanged} />}
+            </span>
           }
         >
           <Fields
@@ -658,12 +693,6 @@ function Employment({
 
         <ShiftCalendarPanel card={card} onChanged={onChanged} />
       </Grid>
-      {card.capabilities.canEdit && (
-        <div className="flex flex-wrap gap-2">
-          <EmploymentEditors card={card} onChanged={onChanged} />
-          <MoveUnitDialog card={card} onChanged={onChanged} />
-        </div>
-      )}
     </div>
   );
 }
@@ -693,16 +722,10 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
         statutory notice or a claim will ask about.
       </p>
 
-      {card.capabilities.canEdit && (
-        <div className="flex flex-wrap gap-2">
-          <AddAddressDialog card={card} onChanged={onChanged} />
-          <MoveUnitDialog card={card} onChanged={onChanged} />
-        </div>
-      )}
-
       {card.addresses && (
         <Panel
           title="Address history"
+          aside={edit(card) && <AddAddressDialog card={card} onChanged={onChanged} />}
           footer="Archived rows are read only. There is no edit or delete control for them."
         >
           <RecordTable
@@ -773,6 +796,7 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
       {card.deployments && (
         <Panel
           title="Deployment history"
+          aside={edit(card) && <MoveUnitDialog card={card} onChanged={onChanged} />}
           footer="Attendance, the muster roll and the client invoice each read whichever unit was current on the day, not the one current now."
         >
           <RecordTable
@@ -801,6 +825,7 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
       {card.previousOrganisations && (
         <Panel
           title="Previous organisations"
+          aside={edit(card) && <PreviousOrgsEditor card={card} onChanged={onChanged} />}
           footer="Total experience on the Personal tab is these rows plus service here, so it is never typed by hand."
         >
           <RecordTable
@@ -820,9 +845,6 @@ function History({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }
             }))}
           />
         </Panel>
-      )}
-      {card.capabilities.canEdit && "previousOrganisations" in card && (
-        <PreviousOrgsEditor card={card} onChanged={onChanged} />
       )}
     </div>
   );

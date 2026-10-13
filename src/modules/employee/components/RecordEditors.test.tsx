@@ -241,7 +241,7 @@ describe("the record's own fields", () => {
     render(<EmployeeCardView card={admin} />);
     await user.click(screen.getByTestId("edit-contact"));
     const editor = screen.getByTestId("editor-contact");
-    const [altMobile] = within(editor).getAllByRole("textbox");
+    const altMobile = within(editor).getByLabelText("Alternate mobile");
     expect(altMobile).toHaveValue("+91 98450 11122");
     await user.clear(altMobile);
     await user.click(screen.getByTestId("save-contact"));

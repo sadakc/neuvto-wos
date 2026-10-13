@@ -33,7 +33,7 @@ import {
   type ShiftRow,
 } from "./contracts";
 
-function toEmployeeError(message: string): AppError {
+function toEmployeeError(message: string, details?: string | null): AppError {
   const code = message.replace(/^ERROR:\s*/i, "").trim() || message;
   const kind = code.includes("NOT_FOUND")
     ? "NOT_FOUND"
@@ -43,8 +43,9 @@ function toEmployeeError(message: string): AppError {
         ? "FORBIDDEN"
         : "VALIDATION_FAILED";
   const status = kind === "NOT_FOUND" ? 404 : kind === "FORBIDDEN" ? 403 : 400;
-  return new AppError(kind, employeeErrorMessage(code), status, {
+  return new AppError(kind, employeeErrorMessage(code, details), status, {
     code,
+    ...(details ? { rule: details } : {}),
   });
 }
 
@@ -54,7 +55,7 @@ export async function getEmployeeCard(employeeId?: string): Promise<EmployeeCard
     "employee_card",
     employeeId ? { _employee_id: employeeId } : {},
   );
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as unknown as EmployeeCard;
 }
 
@@ -63,7 +64,7 @@ export async function getDirectory(query?: string): Promise<DirectoryRow[]> {
   const { data, error } = await supabase.rpc("employee_directory", {
     _q: query?.trim() || undefined,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
     id: r.id,
     employeeCode: r.employee_code,
@@ -86,7 +87,7 @@ export async function getDirectory(query?: string): Promise<DirectoryRow[]> {
 /** Who reports to whom, for active people who have signed in. */
 export async function getOrgChart(): Promise<OrgChartNode[]> {
   const { data, error } = await supabase.rpc("employee_org_chart");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
     id: r.id,
     profileId: r.profile_id,
@@ -107,7 +108,7 @@ export async function setStatutory(employeeId: string, values: Values): Promise<
     _employee_id: employeeId,
     _values: values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function setBank(employeeId: string, values: Values): Promise<void> {
@@ -115,7 +116,7 @@ export async function setBank(employeeId: string, values: Values): Promise<void>
     _employee_id: employeeId,
     _values: values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function setRestricted(employeeId: string, values: Values): Promise<void> {
@@ -123,7 +124,7 @@ export async function setRestricted(employeeId: string, values: Values): Promise
     _employee_id: employeeId,
     _values: values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 /**
@@ -144,7 +145,7 @@ export async function revealRestricted(
     _fields: fields,
     ...(reason ? { _reason: reason } : {}),
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? {}) as Revealed;
 }
 
@@ -153,7 +154,7 @@ export async function getRestrictedReads(employeeId: string): Promise<Restricted
   const { data, error } = await supabase.rpc("employee_restricted_reads", {
     _employee_id: employeeId,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
     readAt: r.read_at,
     readerName: r.reader_name,
@@ -170,7 +171,7 @@ export async function updateEmployee(employeeId: string, values: Values): Promis
     _employee_id: employeeId,
     _values: values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface AddressInput {
@@ -198,7 +199,7 @@ export async function addAddress(
     _employee_id: employeeId,
     _values: input as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return ((data as { added?: { id: string; addressType: string }[] } | null)?.added ?? []).map(
     (a) => ({ id: a.id, addressType: a.addressType }),
   );
@@ -220,7 +221,7 @@ export async function moveUnit(employeeId: string, input: MoveInput): Promise<vo
     _employee_id: employeeId,
     _values: input as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface FamilyRowInput {
@@ -237,7 +238,7 @@ export async function saveFamily(employeeId: string, rows: FamilyRowInput[]): Pr
     _employee_id: employeeId,
     _rows: rows as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface PreviousOrgInput {
@@ -257,7 +258,7 @@ export async function savePreviousOrgs(
     _employee_id: employeeId,
     _rows: rows as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface NominationInput {
@@ -272,7 +273,7 @@ export async function saveNomination(employeeId: string, input: NominationInput)
     _employee_id: employeeId,
     _values: input as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface Option {
@@ -290,7 +291,7 @@ export async function listDesignations(): Promise<Option[]> {
     .select("id, name, grade")
     .eq("status", "active")
     .order("name");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((d) => ({ id: d.id, name: d.name, detail: d.grade }));
 }
 
@@ -308,7 +309,7 @@ export async function listActiveUnits(): Promise<Option[]> {
       .order("name"),
     supabase.from("working_calendars").select("id, name, weekly_off, is_default"),
   ]);
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   if (calErr) throw toEmployeeError(calErr.message);
   const company = (cals ?? []).find((c) => c.is_default);
   return (data ?? []).map((u) => {
@@ -335,7 +336,7 @@ export async function requestChange(
     _section: section,
     _details: details,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 /** An Admin gets the company's; anybody else gets their own. `null` for every status. */
@@ -345,7 +346,7 @@ export async function listChangeRequests(
   const { data, error } = await supabase.rpc("employee_change_requests", {
     _status: status ?? undefined,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
     id: r.id,
     employeeId: r.employee_id,
@@ -370,7 +371,7 @@ export async function resolveChange(
     _outcome: outcome,
     _note: note?.trim() || undefined,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 // ═══════════════════════════════════════════════════════════ adding and letting go (E8)
@@ -389,7 +390,7 @@ export async function createDraft(values: DraftInput): Promise<string> {
   const { data, error } = await supabase.rpc("employee_create_draft", {
     _values: values as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
@@ -398,26 +399,50 @@ export async function updateDraft(employeeId: string, values: DraftInput): Promi
     _employee_id: employeeId,
     _values: values as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 /** Invites a draft. An incomplete record can be invited; its gaps stay on the list. */
 export async function sendInvite(employeeId: string): Promise<void> {
   const { error } = await supabase.rpc("employee_send_invite", { _employee_id: employeeId });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function getAdminOverview(): Promise<AdminOverview> {
   const { data, error } = await supabase.rpc("employee_admin_overview");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as unknown as AdminOverview;
+}
+
+/**
+ * Adds a department to the company's one list (the same rows Organisation and
+ * the leave reports read) and returns its id. A department already there under
+ * the same name, in any case, is returned rather than duplicated (D103).
+ */
+export async function addDepartment(name: string): Promise<string> {
+  const { data, error } = await supabase.rpc("employee_add_department", { _name: name });
+  if (error) throw toEmployeeError(error.message, error.details);
+  return data as string;
+}
+
+/** People who have signed in and cannot approve yet: who "Make a Manager" offers. */
+export async function listManagerCandidates(): Promise<{ profileId: string; fullName: string }[]> {
+  const { data, error } = await supabase.rpc("employee_manager_candidates");
+  if (error) throw toEmployeeError(error.message, error.details);
+  return (data ?? []).map((r) => ({ profileId: r.profile_id, fullName: r.full_name }));
+}
+
+/** Adds Manager to the roles somebody holds, so they can be reported to (D57). */
+export async function makeManager(profileId: string): Promise<void> {
+  const { error } = await supabase.rpc("employee_make_manager", { _profile_id: profileId });
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function getDeactivationPreview(employeeId: string): Promise<DeactivationPreview> {
   const { data, error } = await supabase.rpc("employee_deactivation_preview", {
     _employee_id: employeeId,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as unknown as DeactivationPreview;
 }
 
@@ -433,7 +458,7 @@ export async function deactivateEmployee(
     _last_working_day: lastWorkingDay,
     _reason: reason,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as unknown as DeactivationResult;
 }
 
@@ -488,7 +513,7 @@ export async function importMaster(
         409,
       );
     }
-    throw toEmployeeError(error.message);
+    throw toEmployeeError(error.message, error.details);
   }
   return data as unknown as ImportResult;
 }
@@ -515,7 +540,7 @@ export interface UnitRow {
 
 export async function listUnits(): Promise<UnitRow[]> {
   const { data, error } = await supabase.rpc("employee_units");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((u) => ({
     id: u.id,
     name: u.name,
@@ -540,7 +565,7 @@ export async function saveUnit(unitId: string | null, values: Values): Promise<s
     _unit_id: unitId as string,
     _values: values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
@@ -549,7 +574,7 @@ export async function setUnitStatus(unitId: string, status: "active" | "retired"
     _unit_id: unitId,
     _status: status,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface DesignationRow {
@@ -565,7 +590,7 @@ export async function listAllDesignations(): Promise<DesignationRow[]> {
     .from("designations")
     .select("id, name, grade, status")
     .order("name");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((d) => ({ ...d, status: d.status as DesignationRow["status"] }));
 }
 
@@ -577,7 +602,7 @@ export async function saveDesignation(
     _designation_id: designationId as string,
     _values: values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
@@ -589,7 +614,7 @@ export async function setDesignationStatus(
     _designation_id: designationId,
     _status: status,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export interface OnboardingItem {
@@ -602,7 +627,7 @@ export interface OnboardingItem {
 
 export async function listOnboardingItems(): Promise<OnboardingItem[]> {
   const { data, error } = await supabase.rpc("employee_onboarding_items");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((i) => ({
     key: i.item_key,
     label: i.label,
@@ -622,7 +647,7 @@ export async function saveOnboardingItem(
     _due_within_days: dueWithinDays,
     _mandatory: mandatory,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 // ═══════════════════════════════════════════════ documents (D95)
@@ -635,7 +660,7 @@ export async function listDocuments(employeeId: string): Promise<EmployeeDocumen
   const { data, error } = await supabase.rpc("employee_documents_list", {
     _employee_id: employeeId,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
     id: r.id,
     docType: r.doc_type as DocumentType,
@@ -689,13 +714,13 @@ export async function uploadDocument(input: {
     _size_bytes: input.file.size,
     _expires_on: input.expiresOn ?? undefined,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
 export async function verifyDocument(documentId: string): Promise<void> {
   const { error } = await supabase.rpc("employee_document_verify", { _document_id: documentId });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function removeDocument(documentId: string, reason: string): Promise<void> {
@@ -703,7 +728,7 @@ export async function removeDocument(documentId: string, reason: string): Promis
     _document_id: documentId,
     _reason: reason,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 /**
@@ -714,7 +739,7 @@ export async function openDocument(documentId: string): Promise<string> {
   const { data: path, error } = await supabase.rpc("employee_document_open", {
     _document_id: documentId,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   const { data, error: signErr } = await supabase.storage
     .from(DOCUMENT_BUCKET)
     .createSignedUrl(path as string, 300);
@@ -726,7 +751,7 @@ export async function listDocumentViews(employeeId: string): Promise<DocumentVie
   const { data, error } = await supabase.rpc("employee_document_views_list", {
     _employee_id: employeeId,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
     documentId: r.document_id,
     docType: r.doc_type as DocumentType,
@@ -752,14 +777,14 @@ export async function attachAddressProof(input: {
     _mime_type: input.file.type,
     _size_bytes: input.file.size,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
 /** D97: leave left and what the person is waiting on, this year. */
 export async function getThisYear(employeeId: string): Promise<ThisYear> {
   const { data, error } = await supabase.rpc("employee_this_year", { _employee_id: employeeId });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   const raw = data as unknown as ThisYear;
   return {
     leaveYear: raw.leaveYear ?? null,
@@ -782,14 +807,14 @@ export async function listCardViews(employeeId: string): Promise<CardView[]> {
   const { data, error } = await supabase.rpc("employee_card_views_list", {
     _employee_id: employeeId,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({ viewerName: r.viewer_name, viewedAt: r.viewed_at }));
 }
 
 /** D99: the company's onboarding reminder settings, and the last of each sent. */
 export async function getOnboardingSettings(): Promise<OnboardingSettings> {
   const { data, error } = await supabase.rpc("employee_onboarding_settings");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as unknown as OnboardingSettings;
 }
 
@@ -801,14 +826,14 @@ export async function saveOnboardingSettings(
     _remind_every_days: remindEveryDays,
     _escalate_after_days: escalateAfterDays,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 // ═══════════════════════════════════════════════ shift and calendar (D102)
 
 export async function listCalendars(): Promise<CalendarRow[]> {
   const { data, error } = await supabase.rpc("employee_calendars");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((c) => ({
     id: c.id,
     name: c.name,
@@ -828,7 +853,7 @@ export async function saveCalendar(
     _calendar_id: calendarId as string,
     _values: values as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
@@ -837,12 +862,12 @@ export async function setCalendarStatus(id: string, status: "active" | "retired"
     _calendar_id: id,
     _status: status,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 export async function listShifts(): Promise<ShiftRow[]> {
   const { data, error } = await supabase.rpc("employee_shifts");
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((s) => ({
     id: s.id,
     name: s.name,
@@ -863,7 +888,7 @@ export async function saveShift(
     _shift_id: shiftId as string,
     _values: values as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
   return data as string;
 }
 
@@ -872,7 +897,7 @@ export async function setShiftStatus(id: string, status: "active" | "retired"): 
     _shift_id: id,
     _status: status,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }
 
 /** A person's own shift from a date; shiftId null returns them to their unit's. */
@@ -884,5 +909,5 @@ export async function setShift(
     _employee_id: employeeId,
     _values: input as unknown as Values,
   });
-  if (error) throw toEmployeeError(error.message);
+  if (error) throw toEmployeeError(error.message, error.details);
 }

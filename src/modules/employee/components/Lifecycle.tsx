@@ -46,10 +46,15 @@ import {
   type Option,
 } from "../handlers";
 import { formatDate, todayIso } from "../format";
-import { FieldEditor } from "./FieldEditor";
+import { AddInline, FieldEditor, type AddChoice } from "./FieldEditor";
+import { checkField, type FieldRule } from "../fieldRules";
+import { addDepartmentChoice, addDesignationChoice, addManagerChoice } from "../positionLists";
 import { PersonLink } from "./PersonLink";
 
-const input = "h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm";
+const input =
+  "h-11 w-full min-w-0 rounded-md border border-input bg-background px-3 text-sm aria-invalid:border-destructive";
+/** A select's "Add …" choice. */
+const ADD = "__add__";
 const eyebrow = "block text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase";
 
 function errorText(err: unknown, fallback: string) {
@@ -79,6 +84,74 @@ export default function AddEmployee() {
   const [error, setError] = useState("");
   const [inviting, setInviting] = useState<string | null>(null);
   const [rowError, setRowError] = useState<{ id: string; message: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
+  // Which select's "Add …" form is open, and what has been added while here.
+  const [adding, setAdding] = useState<"designationId" | "departmentId" | "managerId" | null>(null);
+  const [addedDepartments, setAddedDepartments] = useState<{ id: string; name: string }[]>([]);
+  const [addedManagers, setAddedManagers] = useState<{ profileId: string; fullName: string }[]>([]);
+
+  // D103: each typed field against its rule, said under the field.
+  const RULES: [keyof typeof blank, FieldRule][] = [
+    ["fullName", "name"],
+    ["email", "email"],
+    ["phone", "phone"],
+    ["employeeCode", "employeeCode"],
+  ];
+  function problems(values: typeof blank) {
+    const found: Record<string, string> = {};
+    if (!values.fullName.trim()) found.fullName = "A name is required.";
+    for (const [key, rule] of RULES) {
+      const p = found[key] ?? checkField(rule, values[key]);
+      if (p) found[key] = p;
+    }
+    return found;
+  }
+  function change(key: keyof typeof blank, value: string) {
+    const next = { ...v, [key]: value };
+    setV(next);
+    if (fieldErrors[key] !== undefined) {
+      const p = problems(next)[key];
+      setFieldErrors((e) => {
+        const n = { ...e };
+        if (p) n[key] = p;
+        else delete n[key];
+        return n;
+      });
+    }
+  }
+  const fieldError = (key: string) =>
+    fieldErrors[key] ? (
+      <span role="alert" id={`add-${key}-error`} className="mt-1 block text-sm text-destructive">
+        {fieldErrors[key]}
+      </span>
+    ) : null;
+  const invalid = (key: string) =>
+    fieldErrors[key]
+      ? { "aria-invalid": true as const, "aria-describedby": `add-${key}-error` }
+      : {};
+  function pick(key: "designationId" | "departmentId" | "managerId", value: string) {
+    if (value === ADD) setAdding(key);
+    else {
+      setAdding(null);
+      change(key, value);
+    }
+  }
+  function addedInline(choice: AddChoice, key: "designationId" | "departmentId" | "managerId") {
+    return (
+      <AddInline
+        choice={choice}
+        onCancel={() => setAdding(null)}
+        onAdded={(value, text) => {
+          if (key === "designationId") setDesignations((d) => [...d, { id: value, name: text }]);
+          if (key === "departmentId") setAddedDepartments((d) => [...d, { id: value, name: text }]);
+          if (key === "managerId")
+            setAddedManagers((m) => [...m, { profileId: value, fullName: text }]);
+          setAdding(null);
+          change(key, value);
+        }}
+      />
+    );
+  }
 
   async function load() {
     try {
@@ -96,6 +169,9 @@ export default function AddEmployee() {
 
   async function save(andInvite: boolean) {
     setError("");
+    const found = problems(v);
+    setFieldErrors(found);
+    if (Object.keys(found).length > 0) return;
     setBusy(andInvite ? "invite" : "draft");
     let id: string | null = null;
     try {
@@ -188,6 +264,7 @@ export default function AddEmployee() {
       )}
 
       <form
+        noValidate
         onSubmit={(e) => {
           e.preventDefault();
           void save(false);
@@ -204,20 +281,26 @@ export default function AddEmployee() {
             <input
               required
               data-testid="add-name"
+              maxLength={100}
               value={v.fullName}
-              onChange={(e) => setV({ ...v, fullName: e.target.value })}
+              onChange={(e) => change("fullName", e.target.value)}
+              {...invalid("fullName")}
               className={`mt-1 ${input}`}
             />
+            {fieldError("fullName")}
           </label>
           <label className="min-w-0 text-sm">
             <span className={eyebrow}>Work email</span>
             <input
               type="email"
               data-testid="add-email"
+              maxLength={200}
               value={v.email}
-              onChange={(e) => setV({ ...v, email: e.target.value })}
+              onChange={(e) => change("email", e.target.value)}
+              {...invalid("email")}
               className={`mt-1 ${input}`}
             />
+            {fieldError("email")}
             <span className="mt-1 block text-caption text-muted-foreground">
               Where the invitation goes. Can be added later.
             </span>
@@ -226,10 +309,14 @@ export default function AddEmployee() {
             <span className={eyebrow}>Mobile</span>
             <input
               type="tel"
+              data-testid="add-phone"
+              maxLength={20}
               value={v.phone}
-              onChange={(e) => setV({ ...v, phone: e.target.value })}
+              onChange={(e) => change("phone", e.target.value)}
+              {...invalid("phone")}
               className={`mt-1 ${input}`}
             />
+            {fieldError("phone")}
           </label>
         </div>
 
@@ -238,10 +325,14 @@ export default function AddEmployee() {
           <label className="min-w-0 text-sm">
             <span className={eyebrow}>Employee ID</span>
             <input
+              data-testid="add-code"
+              maxLength={30}
               value={v.employeeCode}
-              onChange={(e) => setV({ ...v, employeeCode: e.target.value })}
+              onChange={(e) => change("employeeCode", e.target.value)}
+              {...invalid("employeeCode")}
               className={`mt-1 ${input} font-mono`}
             />
+            {fieldError("employeeCode")}
           </label>
           <label className="min-w-0 text-sm">
             <span className={eyebrow}>Date of joining</span>
@@ -252,60 +343,79 @@ export default function AddEmployee() {
               className={`mt-1 ${input}`}
             />
           </label>
-          <label className="min-w-0 text-sm">
-            <span className={eyebrow}>Designation</span>
-            <select
-              value={v.designationId}
-              onChange={(e) => setV({ ...v, designationId: e.target.value })}
-              className={`mt-1 ${input}`}
-            >
-              <option value="">Not yet</option>
-              {designations.map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.detail ? `${d.name} (${d.detail})` : d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-0 text-sm">
-            <span className={eyebrow}>Department</span>
-            <select
-              value={v.departmentId}
-              onChange={(e) => setV({ ...v, departmentId: e.target.value })}
-              className={`mt-1 ${input}`}
-            >
-              <option value="">Not yet</option>
-              {(overview?.departments ?? []).map((d) => (
-                <option key={d.id} value={d.id}>
-                  {d.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="min-w-0 text-sm">
-            <span className={eyebrow}>Reports to</span>
-            <select
-              data-testid="add-manager"
-              value={v.managerId}
-              onChange={(e) => setV({ ...v, managerId: e.target.value })}
-              className={`mt-1 ${input}`}
-            >
-              <option value="">Not yet</option>
-              {(overview?.managers ?? []).map((m) => (
-                <option key={m.profileId} value={m.profileId}>
-                  {m.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
+          <div className="min-w-0 text-sm">
+            <label className="block">
+              <span className={eyebrow}>Designation</span>
+              <select
+                data-testid="add-designation"
+                value={v.designationId}
+                onChange={(e) => pick("designationId", e.target.value)}
+                className={`mt-1 ${input}`}
+              >
+                <option value="">None</option>
+                {designations.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.detail ? `${d.name} (${d.detail})` : d.name}
+                  </option>
+                ))}
+                <option value={ADD}>{addDesignationChoice.label}</option>
+              </select>
+            </label>
+            {adding === "designationId" && addedInline(addDesignationChoice, "designationId")}
+          </div>
+          <div className="min-w-0 text-sm">
+            <label className="block">
+              <span className={eyebrow}>Department</span>
+              <select
+                data-testid="add-department"
+                value={v.departmentId}
+                onChange={(e) => pick("departmentId", e.target.value)}
+                className={`mt-1 ${input}`}
+              >
+                <option value="">None</option>
+                {[...(overview?.departments ?? []), ...addedDepartments]
+                  .filter((d, i, all) => all.findIndex((x) => x.id === d.id) === i)
+                  .map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name}
+                    </option>
+                  ))}
+                <option value={ADD}>{addDepartmentChoice.label}</option>
+              </select>
+            </label>
+            {adding === "departmentId" && addedInline(addDepartmentChoice, "departmentId")}
+          </div>
+          <div className="min-w-0 text-sm">
+            <label className="block">
+              <span className={eyebrow}>Reports to</span>
+              <select
+                data-testid="add-manager"
+                value={v.managerId}
+                onChange={(e) => pick("managerId", e.target.value)}
+                className={`mt-1 ${input}`}
+              >
+                <option value="">None</option>
+                {[...(overview?.managers ?? []), ...addedManagers]
+                  .filter((m, i, all) => all.findIndex((x) => x.profileId === m.profileId) === i)
+                  .map((m) => (
+                    <option key={m.profileId} value={m.profileId}>
+                      {m.fullName}
+                    </option>
+                  ))}
+                <option value={ADD}>{addManagerChoice.label}</option>
+              </select>
+            </label>
+            {adding === "managerId" && addedInline(addManagerChoice, "managerId")}
+          </div>
           <label className="min-w-0 text-sm">
             <span className={eyebrow}>Employment type</span>
             <select
+              data-testid="add-employment-type"
               value={v.employmentType}
-              onChange={(e) => setV({ ...v, employmentType: e.target.value })}
+              onChange={(e) => change("employmentType", e.target.value)}
               className={`mt-1 ${input}`}
             >
-              <option value="">Not yet</option>
+              <option value="">None</option>
               {EMPLOYMENT_TYPES.map((t) => (
                 <option key={t} value={t}>
                   {EMPLOYMENT_TYPE_LABEL[t]}
@@ -424,15 +534,32 @@ export function DraftEditor({
       onSaved={onChanged}
       save={(vals) => updateDraft(card.id, vals as Record<string, string | null>)}
       fields={[
-        { key: "fullName", label: "Full name", current: card.fullName },
+        {
+          key: "fullName",
+          label: "Full name",
+          current: card.fullName,
+          required: true,
+          rule: "name",
+          maxLength: 100,
+        },
         {
           key: "email",
           label: "Work email",
           current: card.workEmail,
           clearable: true,
           inputMode: "email",
+          rule: "email",
+          maxLength: 200,
         },
-        { key: "phone", label: "Mobile", current: card.mobile, clearable: true, inputMode: "tel" },
+        {
+          key: "phone",
+          label: "Mobile",
+          current: card.mobile,
+          clearable: true,
+          inputMode: "tel",
+          rule: "phone",
+          maxLength: 20,
+        },
         {
           key: "joinedDate",
           label: "Date of joining",
@@ -447,6 +574,8 @@ export function DraftEditor({
           clearable: true,
           current: card.department?.id,
           labelled: (overview?.departments ?? []).map((d) => [d.id, d.name] as const),
+          emptyLabel: "None",
+          add: addDepartmentChoice,
         },
       ]}
     />

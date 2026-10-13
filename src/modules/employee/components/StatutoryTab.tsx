@@ -70,6 +70,7 @@ export function StatutoryTab({
   onChanged: () => Promise<void> | void;
 }) {
   const caps = card.capabilities;
+  const editors = useEditors(card, onChanged);
   const [revealed, setRevealed] = useState<Revealed>({});
   const [opening, setOpening] = useState<RevealField | null>(null);
   const [error, setError] = useState("");
@@ -191,6 +192,7 @@ export function StatutoryTab({
           <Panel
             title="Provident fund and insurance"
             testId="panel-pf"
+            aside={editors.pf}
             footer="Old numbers matter at joining. If someone arrives with a previous UAN, the balance is transferred instead of a second account being opened."
           >
             <Fields
@@ -256,7 +258,7 @@ export function StatutoryTab({
         )}
 
         {st && (
-          <Panel title="Identity documents" testId="panel-identity-docs">
+          <Panel title="Identity documents" testId="panel-identity-docs" aside={editors.ids}>
             <Fields
               items={[
                 { label: "Document given", value: humanise(st.identityDocumentType) },
@@ -282,7 +284,7 @@ export function StatutoryTab({
         )}
 
         {card.bank && (
-          <Panel title="Bank" testId="panel-bank">
+          <Panel title="Bank" testId="panel-bank" aside={editors.bank}>
             <Fields
               items={[
                 { label: "Bank", value: card.bank.bankName },
@@ -309,7 +311,7 @@ export function StatutoryTab({
         )}
 
         {card.verification && (
-          <Panel title="Verification" testId="panel-verification">
+          <Panel title="Verification" testId="panel-verification" aside={editors.verification}>
             <Fields
               items={[
                 {
@@ -335,7 +337,7 @@ export function StatutoryTab({
         )}
 
         {card.restricted && (
-          <Panel title="Restricted" testId="panel-restricted-values">
+          <Panel title="Restricted" testId="panel-restricted-values" aside={editors.restricted}>
             <p className="text-sm text-foreground-secondary">
               Religion, caste category and disability status. Optional, entered by an administrator,
               and every look is logged.
@@ -391,8 +393,6 @@ export function StatutoryTab({
           </Panel>
         )}
       </div>
-
-      <Editors card={card} onChanged={onChanged} />
 
       {caps.canSeeReveals && (
         <Panel title="Who has looked" testId="panel-reads">
@@ -487,148 +487,230 @@ function Secret({
 
 // ═══════════════════════════════════════════════════════════════ editors
 
-function Editors({
-  card,
-  onChanged,
-}: {
-  card: EmployeeCard;
-  onChanged: () => Promise<void> | void;
-}) {
+/**
+ * One editor per panel, for the panel's header (D103): "Add …" while nothing
+ * is recorded there, "Edit …" once something is. Numbers are never prefilled
+ * and an empty number field keeps what is on record; each is checked on the
+ * screen against the rule the database refuses with.
+ */
+function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
   const caps = card.capabilities;
   const st = card.statutory;
   const bank = card.bank;
   const v = card.verification;
   const keep = (last4: string | null | undefined) =>
     last4 ? `•••• ${last4} on record. Type to replace.` : undefined;
-
-  const editors: {
-    id: string;
-    title: string;
-    fields: FieldSpec[];
-    save: (vals: Record<string, string | null>) => Promise<void>;
-  }[] = [];
-
-  if (caps.canEditStatutory) {
-    editors.push({
-      id: "statutory",
-      title: "Statutory numbers",
-      fields: [
-        { key: "aadhaar", label: "Aadhaar", placeholder: keep(st?.aadhaarLast4) },
-        { key: "pan", label: "PAN", placeholder: keep(st?.panLast4) },
-        { key: "uan", label: "UAN", placeholder: keep(st?.uanLast4) },
-        { key: "epfNumber", label: "EPF number", placeholder: keep(st?.epfLast4) },
-        { key: "esicNumber", label: "ESIC number", placeholder: keep(st?.esicLast4) },
-        { key: "oldUan", label: "Old UAN", placeholder: keep(st?.oldUanLast4) },
-        { key: "oldEsicNumber", label: "Old ESIC number", placeholder: keep(st?.oldEsicLast4) },
-        {
-          key: "identityDocumentType",
-          label: "Document given",
-          kind: "select",
-          options: ["aadhaar", "pan", "passport", "voter_id", "driving_licence"],
-          current: st?.identityDocumentType,
-        },
-        { key: "verifiedOn", label: "Verified on", kind: "date", current: st?.verifiedOn },
-      ],
-      save: (vals) => setStatutory(card.id, vals),
-    });
-  }
-  if (caps.canEditVerification) {
-    editors.push({
-      id: "verification",
-      title: "Verification",
-      fields: [
-        {
-          key: "policeVerification",
-          label: "Police verification",
-          kind: "select",
-          options: CHECK_STATUSES.filter((s) => s !== "not_applicable"),
-          current: v?.policeVerification,
-        },
-        {
-          key: "policeVerifiedOn",
-          label: "Police verified on",
-          kind: "date",
-          current: v?.policeVerifiedOn,
-        },
-        {
-          key: "previousEmployerCheck",
-          label: "Previous employer check",
-          kind: "select",
-          options: CHECK_STATUSES,
-          current: v?.previousEmployerCheck,
-        },
-        {
-          key: "educationCheck",
-          label: "Education check",
-          kind: "select",
-          options: CHECK_STATUSES.filter((s) => s !== "not_applicable"),
-          current: v?.educationCheck,
-        },
-        {
-          key: "reverificationDue",
-          label: "Re-verification due",
-          kind: "date",
-          current: v?.reverificationDue,
-        },
-      ],
-      save: (vals) => setStatutory(card.id, vals),
-    });
-  }
-  if (caps.canEditBank) {
-    editors.push({
-      id: "bank",
-      title: "Bank",
-      fields: [
-        { key: "bankName", label: "Bank", current: bank?.bankName },
-        { key: "branch", label: "Branch", current: bank?.branch },
-        { key: "account", label: "Account number", placeholder: keep(bank?.accountLast4) },
-        { key: "ifsc", label: "IFSC", current: bank?.ifsc },
-        { key: "accountHolder", label: "Account holder", current: bank?.accountHolder },
-        {
-          key: "pennyDropStatus",
-          label: "Penny drop",
-          kind: "select",
-          options: ["not_checked", "verified", "failed"],
-          current: bank?.pennyDropStatus,
-        },
-      ],
-      save: (vals) => setBank(card.id, vals),
-    });
-  }
-  if (caps.canEditRestricted) {
-    editors.push({
-      id: "restricted",
-      title: "Restricted data",
-      fields: [
-        {
-          key: "religion",
-          label: "Religion",
-          placeholder: "Leave blank to keep what is on record",
-        },
-        {
-          key: "casteCategory",
-          label: "Caste category",
-          kind: "select",
-          options: CASTE_CATEGORIES,
-        },
-        {
-          key: "disabilityStatus",
-          label: "Disability",
-          kind: "select",
-          options: DISABILITY_STATUSES,
-        },
-        { key: "disabilityPercent", label: "Disability percent", placeholder: "0 to 100" },
-      ],
-      save: (vals) => setRestricted(card.id, vals),
-    });
-  }
-
-  if (editors.length === 0) return null;
-  return (
-    <div className="flex flex-col gap-2">
-      {editors.map((ed) => (
-        <Editor key={ed.id} {...ed} onSaved={onChanged} />
-      ))}
-    </div>
+  const has = (...xs: unknown[]) => xs.some((x) => x !== null && x !== undefined && x !== "");
+  const editor = (
+    id: string,
+    title: string,
+    filled: boolean,
+    fields: FieldSpec[],
+    save: (vals: Record<string, string | null>) => Promise<void>,
+  ) => (
+    <Editor id={id} title={title} filled={filled} fields={fields} save={save} onSaved={onChanged} />
   );
+
+  return {
+    pf: caps.canEditStatutory
+      ? editor(
+          "pf",
+          "PF and insurance numbers",
+          has(st?.uanLast4, st?.epfLast4, st?.esicLast4, st?.oldUanLast4, st?.oldEsicLast4),
+          [
+            {
+              key: "uan",
+              label: "UAN",
+              placeholder: keep(st?.uanLast4),
+              rule: "uan",
+              inputMode: "numeric",
+            },
+            { key: "epfNumber", label: "EPF number", placeholder: keep(st?.epfLast4), rule: "epf" },
+            {
+              key: "esicNumber",
+              label: "ESIC number",
+              placeholder: keep(st?.esicLast4),
+              rule: "esic",
+              inputMode: "numeric",
+            },
+            {
+              key: "oldUan",
+              label: "Old UAN",
+              placeholder: keep(st?.oldUanLast4),
+              rule: "uan",
+              inputMode: "numeric",
+            },
+            {
+              key: "oldEsicNumber",
+              label: "Old ESIC number",
+              placeholder: keep(st?.oldEsicLast4),
+              rule: "esic",
+              inputMode: "numeric",
+            },
+          ],
+          (vals) => setStatutory(card.id, vals),
+        )
+      : null,
+    ids: caps.canEditStatutory
+      ? editor(
+          "identity-docs",
+          "Identity documents",
+          has(st?.aadhaarLast4, st?.panLast4, st?.identityDocumentType, st?.verifiedOn),
+          [
+            {
+              key: "aadhaar",
+              label: "Aadhaar",
+              placeholder: keep(st?.aadhaarLast4),
+              rule: "aadhaar",
+              inputMode: "numeric",
+            },
+            { key: "pan", label: "PAN", placeholder: keep(st?.panLast4), rule: "pan" },
+            {
+              key: "identityDocumentType",
+              label: "Document given",
+              kind: "select",
+              options: ["aadhaar", "pan", "passport", "voter_id", "driving_licence"],
+              current: st?.identityDocumentType,
+            },
+            {
+              key: "verifiedOn",
+              label: "Verified on",
+              kind: "date",
+              current: st?.verifiedOn,
+              rule: "pastDate",
+            },
+          ],
+          (vals) => setStatutory(card.id, vals),
+        )
+      : null,
+    verification: caps.canEditVerification
+      ? editor(
+          "verification",
+          "Verification",
+          has(v?.policeVerifiedOn, v?.reverificationDue) ||
+            [v?.policeVerification, v?.previousEmployerCheck, v?.educationCheck].some(
+              (x) => x && x !== "not_started",
+            ),
+          [
+            {
+              key: "policeVerification",
+              label: "Police verification",
+              kind: "select",
+              options: CHECK_STATUSES.filter((s) => s !== "not_applicable"),
+              current: v?.policeVerification,
+            },
+            {
+              key: "policeVerifiedOn",
+              label: "Police verified on",
+              kind: "date",
+              current: v?.policeVerifiedOn,
+              rule: "pastDate",
+            },
+            {
+              key: "previousEmployerCheck",
+              label: "Previous employer check",
+              kind: "select",
+              options: CHECK_STATUSES,
+              current: v?.previousEmployerCheck,
+            },
+            {
+              key: "educationCheck",
+              label: "Education check",
+              kind: "select",
+              options: CHECK_STATUSES.filter((s) => s !== "not_applicable"),
+              current: v?.educationCheck,
+            },
+            {
+              key: "reverificationDue",
+              label: "Re-verification due",
+              kind: "date",
+              current: v?.reverificationDue,
+            },
+          ],
+          (vals) => setStatutory(card.id, vals),
+        )
+      : null,
+    bank: caps.canEditBank
+      ? editor(
+          "bank",
+          "Bank",
+          has(bank?.bankName, bank?.branch, bank?.accountLast4, bank?.ifsc, bank?.accountHolder),
+          [
+            {
+              key: "bankName",
+              label: "Bank",
+              current: bank?.bankName,
+              rule: "text100",
+              maxLength: 100,
+            },
+            {
+              key: "branch",
+              label: "Branch",
+              current: bank?.branch,
+              rule: "text100",
+              maxLength: 100,
+            },
+            {
+              key: "account",
+              label: "Account number",
+              placeholder: keep(bank?.accountLast4),
+              rule: "account",
+              inputMode: "numeric",
+            },
+            { key: "ifsc", label: "IFSC", current: bank?.ifsc, rule: "ifsc", maxLength: 11 },
+            {
+              key: "accountHolder",
+              label: "Account holder",
+              current: bank?.accountHolder,
+              rule: "name",
+              maxLength: 100,
+            },
+            {
+              key: "pennyDropStatus",
+              label: "Penny drop",
+              kind: "select",
+              options: ["not_checked", "verified", "failed"],
+              current: bank?.pennyDropStatus,
+            },
+          ],
+          (vals) => setBank(card.id, vals),
+        )
+      : null,
+    restricted: caps.canEditRestricted
+      ? editor(
+          "restricted",
+          "Restricted data",
+          !!card.restricted?.recorded,
+          [
+            {
+              key: "religion",
+              label: "Religion",
+              placeholder: "Leave blank to keep what is on record",
+              rule: "words",
+              maxLength: 60,
+            },
+            {
+              key: "casteCategory",
+              label: "Caste category",
+              kind: "select",
+              options: CASTE_CATEGORIES,
+            },
+            {
+              key: "disabilityStatus",
+              label: "Disability",
+              kind: "select",
+              options: DISABILITY_STATUSES,
+            },
+            {
+              key: "disabilityPercent",
+              label: "Disability percent",
+              placeholder: "0 to 100",
+              rule: "percent",
+              inputMode: "numeric",
+            },
+          ],
+          (vals) => setRestricted(card.id, vals),
+        )
+      : null,
+  };
 }

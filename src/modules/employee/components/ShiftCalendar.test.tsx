@@ -32,6 +32,7 @@ const api = vi.hoisted(() => ({
   moveUnit: vi.fn(),
   listShifts: vi.fn(),
   setShift: vi.fn(),
+  getAdminOverview: vi.fn(),
 }));
 vi.mock("../handlers", () => api);
 vi.mock("../recordExport", () => ({ downloadRecordPdf: vi.fn() }));
@@ -57,6 +58,7 @@ beforeEach(() => {
   });
   api.listCardViews.mockResolvedValue([]);
   api.listDesignations.mockResolvedValue([]);
+  api.getAdminOverview.mockResolvedValue({ departments: [], managers: [] });
   api.listShifts.mockResolvedValue([
     {
       id: "s-gen",

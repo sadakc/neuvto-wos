@@ -88,7 +88,11 @@ describe("Statutory and bank, per role", () => {
       }
       expect(screen.getByTestId("panel-bank")).toBeInTheDocument();
       expect(screen.getByTestId("reveal-restricted")).toBeInTheDocument();
-      expect(screen.getByTestId("edit-statutory")).toBeInTheDocument();
+      // D103: one editor per panel, in its header.
+      expect(within(screen.getByTestId("panel-pf")).getByTestId("edit-pf")).toBeInTheDocument();
+      expect(
+        within(screen.getByTestId("panel-identity-docs")).getByTestId("edit-identity-docs"),
+      ).toBeInTheDocument();
       expect(screen.getByTestId("edit-bank")).toBeInTheDocument();
       expect(screen.getByTestId("edit-restricted")).toBeInTheDocument();
     },
@@ -206,15 +210,16 @@ describe("editing", () => {
     api.setStatutory.mockResolvedValue(undefined);
     render(<StatutoryTab card={as("admin")} onChanged={onChanged} />);
 
-    await user.click(screen.getByTestId("edit-statutory"));
-    const editor = screen.getByTestId("editor-statutory");
-    const inputs = within(editor).getAllByRole("textbox");
-    // Aadhaar is the first field. It shows its last four as a hint, not a value.
-    expect(inputs[0]).toHaveValue("");
-    expect(inputs[0]).toHaveAttribute("placeholder", expect.stringContaining("0124"));
-    await user.type(inputs[2], "999988887777"); // UAN
+    // Aadhaar shows its last four as a hint, never as a value.
+    await user.click(screen.getByTestId("edit-identity-docs"));
+    const aadhaar = within(screen.getByTestId("editor-identity-docs")).getByLabelText("Aadhaar");
+    expect(aadhaar).toHaveValue("");
+    expect(aadhaar).toHaveAttribute("placeholder", expect.stringContaining("0124"));
+    await user.click(screen.getByRole("button", { name: "Cancel" }));
 
-    await user.click(screen.getByTestId("save-statutory"));
+    await user.click(screen.getByTestId("edit-pf"));
+    await user.type(within(screen.getByTestId("editor-pf")).getByLabelText("UAN"), "999988887777");
+    await user.click(screen.getByTestId("save-pf"));
     expect(api.setStatutory).toHaveBeenCalledWith(as("admin").id, { uan: "999988887777" });
     expect(onChanged).toHaveBeenCalled();
   });
@@ -229,11 +234,31 @@ describe("editing", () => {
       ),
     );
     render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
-    await user.click(screen.getByTestId("edit-statutory"));
-    const inputs = within(screen.getByTestId("editor-statutory")).getAllByRole("textbox");
-    await user.type(inputs[0], "234567890125");
-    await user.click(screen.getByTestId("save-statutory"));
-    expect(await screen.findByTestId("editor-statutory-error")).toHaveTextContent("valid Aadhaar");
-    expect(inputs[0]).toHaveValue("234567890125");
+    await user.click(screen.getByTestId("edit-identity-docs"));
+    const aadhaar = within(screen.getByTestId("editor-identity-docs")).getByLabelText("Aadhaar");
+    // A number that passes the screen's checksum, refused by the server.
+    await user.type(aadhaar, "234567890124");
+    await user.click(screen.getByTestId("save-identity-docs"));
+    expect(await screen.findByTestId("editor-identity-docs-error")).toHaveTextContent(
+      "valid Aadhaar",
+    );
+    expect(aadhaar).toHaveValue("234567890124");
+  });
+
+  it("says what is wrong under the field, and sends nothing, for a number that cannot be right", async () => {
+    const user = userEvent.setup();
+    render(<StatutoryTab card={as("admin")} onChanged={() => {}} />);
+    await user.click(screen.getByTestId("edit-identity-docs"));
+    const editor = screen.getByTestId("editor-identity-docs");
+    // One digit off: the Aadhaar checksum catches it.
+    await user.type(within(editor).getByLabelText("Aadhaar"), "234567890125");
+    await user.type(within(editor).getByLabelText("PAN"), "ABCDE12345");
+    await user.click(screen.getByTestId("save-identity-docs"));
+    const alerts = within(editor).getAllByRole("alert");
+    expect(alerts.map((a) => a.textContent)).toEqual([
+      "That isn't a valid Aadhaar number. Check the 12 digits.",
+      "A PAN is five letters, four digits and a letter, like ABCDE1234F.",
+    ]);
+    expect(api.setStatutory).not.toHaveBeenCalled();
   });
 });

@@ -4012,6 +4012,7 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: Json
       }
+      employee_add_department: { Args: { _name: string }; Returns: string }
       employee_address_attach_proof: {
         Args: {
           _address_id: string
@@ -4179,6 +4180,17 @@ export type Database = {
         Returns: Json
       }
       employee_import_pick: { Args: { _map: Json; _r: Json }; Returns: Json }
+      employee_make_manager: {
+        Args: { _profile_id: string }
+        Returns: undefined
+      }
+      employee_manager_candidates: {
+        Args: never
+        Returns: {
+          full_name: string
+          profile_id: string
+        }[]
+      }
       employee_move_unit: {
         Args: { _employee_id: string; _values: Json }
         Returns: Json
@@ -4416,6 +4428,7 @@ export type Database = {
       }
       ensure_system_notification_templates: { Args: never; Returns: undefined }
       escape_html: { Args: { _text: string }; Returns: string }
+      field_check: { Args: { _ok: boolean; _rule: string }; Returns: undefined }
       financial_year_start: {
         Args: { _fy: string; _org_id: string }
         Returns: string
@@ -5077,6 +5090,10 @@ export type Database = {
       statutory_key: { Args: never; Returns: string }
       statutory_normalise: { Args: { _v: string }; Returns: string }
       statutory_rotate_key: { Args: never; Returns: Json }
+      valid_code: { Args: { _t: string }; Returns: boolean }
+      valid_phone: { Args: { _p: string }; Returns: boolean }
+      valid_text: { Args: { _max: number; _t: string }; Returns: boolean }
+      valid_words: { Args: { _max: number; _t: string }; Returns: boolean }
       working_calendar_default_id: {
         Args: { _org_id: string }
         Returns: string

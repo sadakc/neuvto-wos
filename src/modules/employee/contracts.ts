@@ -9,6 +9,8 @@
  * to drift from the database's.
  */
 
+import { RULE_MESSAGES } from "./fieldRules";
+
 /** `removed`: the person's account was deleted; the record is history. */
 export type Stage = "draft" | "invited" | "active" | "deactivated" | "removed";
 
@@ -137,7 +139,8 @@ export interface EmployeeCard {
   dateOfJoining: string | null;
   designation: { id: string; name: string; grade: string | null } | null;
   department: { id: string; name: string } | null;
-  reportsTo: { id: string | null; fullName: string | null } | null;
+  /** `profileId` is whom "Reports to" names; `id` is their record, for the link. */
+  reportsTo: { id: string | null; fullName: string | null; profileId?: string | null } | null;
   directReportCount: number;
   currentDeployment: {
     unitId: string;
@@ -383,10 +386,22 @@ export interface OrgChartNode {
 }
 
 /** What a refusal from this module's functions means to the person reading it. */
-export function employeeErrorMessage(code: string): string {
+export function employeeErrorMessage(code: string, detail?: string | null): string {
   if (code.includes("MODULE_NOT_ENABLED")) {
     return "Employee records aren't switched on for your company.";
   }
+  // D103: a refused value names the rule it broke, so the message can name the field.
+  if (code.includes("INVALID_VALUE") && detail && RULE_MESSAGES[detail]) {
+    return RULE_MESSAGES[detail];
+  }
+  const specific: [string, string][] = [
+    ["DEPARTMENT_NOT_FOUND", "That department isn't on your company's list any more."],
+    [
+      "MANAGER_NOT_FOUND",
+      "Nobody in Neuvto has that email yet. They must be a member to be reported to.",
+    ],
+  ];
+  for (const [needle, message] of specific) if (code.includes(needle)) return message;
   if (code.includes("NOT_FOUND")) {
     return "There's nobody with that record in your company.";
   }
@@ -463,7 +478,13 @@ export function employeeErrorMessage(code: string): string {
       "MANAGER_NOT_FOUND",
       "Nobody in Neuvto has that email yet. They must be a member to be reported to.",
     ],
-    ["MANAGER_CANNOT_APPROVE", "That person can't approve. Give them an approver role first."],
+    ["MANAGER_CANNOT_APPROVE", "That person can't approve. Make them a Manager first."],
+    ["SELF_MANAGED", "Nobody reports to themselves."],
+    ["REPORTING_CYCLE", "That would make a loop: that person already reports up to them."],
+    ["MOBILE_TAKEN", "Somebody in your company already has that mobile number."],
+    ["DESIGNATION_NAME_TAKEN", "There's already a designation with that name."],
+    ["CANNOT_CHANGE_OWN_ROLES", "You can't change your own roles. Ask another Super Admin."],
+    ["ROLE_NOT_YOURS_TO_GRANT", "Only a Super Admin can make somebody a Manager."],
     ["NAME_REQUIRED", "A name is required."],
     ["REQUIRED", "Required."],
     ["ALREADY_A_DRAFT", "This email already belongs to a draft."],

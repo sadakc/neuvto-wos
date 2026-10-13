@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.16 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.17 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -614,6 +614,41 @@ screen with no way to scroll, so both shared dialogs now cap their height and sc
 held sideways only the 45px sub-tab row stays pinned; the module bar and page header scroll
 away. Not covered: the Neuvto console (`/neuvto-hq`), which is staff-only and was not part of
 this phase.
+
+### Sada's first round (D103, 13 Oct 2026)
+
+Found testing PR 95 on the local build, all fixed:
+
+- **An 11-digit alternate mobile was saved without a word.** Every field now has a rule, said
+  under the field as it is typed (`fieldRules.ts`) and enforced again by a trigger per table
+  (`20261023100000_fields_are_checked.sql`), so the import and any later caller are held too.
+  The trigger checks only what a write changes: a bad value already on record is still shown,
+  and still refused if it is saved again, but never blocks an edit to another field. A
+  refusal names its rule, and the screen turns the rule into the field's own words.
+- **An invited person's details could not all be completed.** Everything could be saved, but
+  the buttons sat below the panels and the name and mobile had no form at all. The card's
+  writer now also corrects the full name, mobile, department and reports to, wherever they
+  live: the profile after sign-in, the invitation before it, the draft before that.
+- **"Edit emergency contact" when there was none.** Each panel carries its own button in its
+  header: **Add …** while it is empty, **Edit …** once anything is in it. An empty emergency
+  contact is shown to whoever can fill it. The same on every tab, Statutory and bank
+  included (its one editor split into one per panel).
+- **Adding to a list meant leaving the form.** Designation and Department end with "Add a
+  designation…" / "Add a department…": the name is added to the company's one list (the
+  rows Configuration, Organisation and the leave reports read) and selected. A department
+  already there under the same name is the same department. Reports to ends with "Make
+  somebody a Manager…": only somebody who can approve has reports (D57), so this gives them
+  the Manager role through `member_set_roles`, where D78 still decides who may.
+- **"Not yet"** is **None** for designation, department, employment type and reports to.
+
+The rules, in full: a phone is 10 digits starting 6–9, the same after +91, or another country
+code with 8 to 15 digits (spaces, dashes and brackets allowed); a name, relation, nationality,
+state, city or district is letters in any script with spaces and . ' - (no digits or other
+symbols); an employee code is letters and digits with / . \_ - between; free text has a length
+(qualification 200, reasons 500, police station 100); somebody is at least 14 on their date of
+birth; no relative is born in the future and no previous job is dated there or ends before it
+starts; the statutory and bank numbers keep the database's existing patterns, now also said on
+screen, with Aadhaar's checksum.
 
 ## 8. Acceptance criteria, module level
 

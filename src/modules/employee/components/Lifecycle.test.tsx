@@ -32,6 +32,10 @@ const api = vi.hoisted(() => ({
   updateEmployee: vi.fn(),
   listChangeRequests: vi.fn(),
   getRestrictedReads: vi.fn(),
+  addDepartment: vi.fn(),
+  saveDesignation: vi.fn(),
+  listManagerCandidates: vi.fn(),
+  makeManager: vi.fn(),
 }));
 const navigate = vi.hoisted(() => vi.fn());
 vi.mock("../handlers", () => api);
@@ -132,6 +136,58 @@ describe("Add Employee", () => {
     const row = await screen.findByTestId("added-row");
     expect(row).toHaveTextContent("Missing: email, statutory");
     expect(within(row).getByTestId("added-invite")).toBeDisabled();
+  });
+});
+
+describe("Add Employee, Sada's first round (D103)", () => {
+  it("reads None, not 'Not yet', for an empty designation, department, manager and type", async () => {
+    render(<AddEmployee />);
+    await screen.findByText("Mark Manager");
+    for (const id of ["add-designation", "add-department", "add-manager", "add-employment-type"]) {
+      const select = screen.getByTestId(id) as HTMLSelectElement;
+      expect(select.options[0].textContent).toBe("None");
+    }
+    expect(screen.queryByText("Not yet")).toBeNull();
+  });
+
+  it("says what is wrong under each field, and saves nothing", async () => {
+    const user = userEvent.setup();
+    render(<AddEmployee />);
+    await user.type(await screen.findByTestId("add-name"), "Nisha 2");
+    await user.type(screen.getByTestId("add-email"), "nisha.acme.test");
+    await user.type(screen.getByTestId("add-phone"), "34654365465");
+    await user.type(screen.getByTestId("add-code"), "EMP 1");
+    await user.click(screen.getByTestId("add-save-draft"));
+    expect(screen.getByTestId("add-name")).toHaveAttribute("aria-invalid", "true");
+    expect(screen.getAllByRole("alert").map((a) => a.textContent)).toEqual([
+      "Letters only: no digits or symbols other than . ' and -.",
+      "Enter an email address, like name@example.com.",
+      "Enter a 10-digit mobile number, or + and the country code. Digits only, with spaces if you like.",
+      "Letters and digits, up to 30, with / . _ or - between them. No spaces.",
+    ]);
+    expect(api.createDraft).not.toHaveBeenCalled();
+
+    // Fixing one clears its message as it is typed.
+    await user.clear(screen.getByTestId("add-phone"));
+    await user.type(screen.getByTestId("add-phone"), "+971 50 123 4567");
+    expect(screen.getAllByRole("alert")).toHaveLength(3);
+  });
+
+  it("adds a department from the form and saves the person into it", async () => {
+    const user = userEvent.setup();
+    api.addDepartment.mockResolvedValue("d-sec");
+    api.createDraft.mockResolvedValue("e-new");
+    render(<AddEmployee />);
+    await user.type(await screen.findByTestId("add-name"), "Nisha Rao");
+    await user.selectOptions(screen.getByTestId("add-department"), "Add a department…");
+    await user.type(screen.getByLabelText("New department"), "Security");
+    await user.click(within(screen.getByTestId("add-inline")).getByRole("button", { name: "Add" }));
+    expect(api.addDepartment).toHaveBeenCalledWith("Security");
+    expect(screen.getByTestId("add-department")).toHaveValue("d-sec");
+    await user.click(screen.getByTestId("add-save-draft"));
+    expect(api.createDraft).toHaveBeenCalledWith(
+      expect.objectContaining({ fullName: "Nisha Rao", departmentId: "d-sec" }),
+    );
   });
 });
 
