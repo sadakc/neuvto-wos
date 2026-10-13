@@ -486,8 +486,20 @@ export default function AddEmployee() {
                     <StatusBadge tone={STAGE_TONE[r.stage]}>{STAGE_LABEL[r.stage]}</StatusBadge>
                   </div>
                   <p className="mt-0.5 text-caption text-muted-foreground">
-                    {r.gaps.length === 0 ? "Complete" : `Missing: ${r.gaps.join(", ")}`} · added{" "}
-                    {formatDate(r.createdAt)}
+                    {r.gaps.length === 0 ? (
+                      "Complete"
+                    ) : (
+                      <>
+                        Missing: {r.gaps.map((g) => g.label).join(", ")}
+                        {r.gaps.some((g) => g.overdue) && (
+                          <span className="font-medium text-destructive">
+                            {" "}
+                            · {r.gaps.filter((g) => g.overdue).length} overdue
+                          </span>
+                        )}
+                      </>
+                    )}{" "}
+                    · added {formatDate(r.createdAt)}
                   </p>
                   {rowError?.id === r.id && (
                     <p role="alert" className="mt-1 text-sm text-destructive">

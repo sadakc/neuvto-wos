@@ -64,7 +64,12 @@ const OVERVIEW: AdminOverview = {
       email: null,
       stage: "draft",
       createdAt: "2026-10-14T00:00:00Z",
-      gaps: ["email", "statutory"],
+      // The shape employee_onboarding_gaps() returns since D99, not names:
+      // a made-up list of strings here is what hid "[object Object]".
+      gaps: [
+        { key: "designation", label: "Designation", dueOn: "2026-10-01", overdue: true },
+        { key: "uan", label: "UAN", dueOn: "2026-11-01", overdue: false },
+      ],
     },
   ],
 };
@@ -134,7 +139,8 @@ describe("Add Employee", () => {
   it("lists what each record is missing, and will not invite one with no email", async () => {
     render(<AddEmployee />);
     const row = await screen.findByTestId("added-row");
-    expect(row).toHaveTextContent("Missing: email, statutory");
+    expect(row).toHaveTextContent("Missing: Designation, UAN · 1 overdue");
+    expect(row).not.toHaveTextContent("[object");
     expect(within(row).getByTestId("added-invite")).toBeDisabled();
   });
 });

@@ -554,7 +554,8 @@ export interface AdminOverview {
     email: string | null;
     stage: Stage;
     createdAt: string;
-    gaps: string[];
+    /** employee_onboarding_gaps(): what is still missing, each with when it was due. */
+    gaps: { key: string; label: string; dueOn: string | null; overdue: boolean }[];
   }[];
 }
 
