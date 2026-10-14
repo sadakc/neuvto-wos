@@ -64,7 +64,7 @@ beforeEach(() => {
       2,
     ),
     notice("n2", "approval.submitted", "Priya Employee has asked for leave", null, 30),
-    notice("n3", "approval.decided", "Your leave was approved", "2026-10-13T10:00:00Z", 600),
+    notice("n3", "approval.completed", "Your leave was approved", "2026-10-13T10:00:00Z", 600),
   ]);
 });
 

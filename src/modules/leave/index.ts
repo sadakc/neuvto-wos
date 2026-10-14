@@ -198,10 +198,10 @@ export const leave: ModuleDefinition = {
   eventKeys: ["approval.submitted", "approval.decided", "approval.completed"],
 
   // D111. Where this module's notices open from the bell. A request waiting
-  // on you opens Leave approvals (the platform's answer); your own request's
-  // outcome opens My Leave; a summary opens the reports.
+  // on you opens Leave approvals (the platform's answer); your own request,
+  // sent (D112) or decided, opens My Leave; a summary opens the reports.
   notificationLinks: {
-    "approval.decided": () => "/app/leave",
+    "approval.sent": () => "/app/leave",
     "approval.completed": () => "/app/leave",
     "leave_summary.weekly": () => "/app/reports?m=leave",
     "leave_summary.monthly": () => "/app/reports?m=leave",

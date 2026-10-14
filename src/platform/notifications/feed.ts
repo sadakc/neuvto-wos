@@ -58,6 +58,8 @@ export interface LinkContext {
 /** Approval events that mean "this is waiting on you". */
 const WAITING = new Set([
   "approval.submitted",
+  // A level decided with more to come: the engine tells the next approver.
+  "approval.decided",
   "approval.escalated",
   "approval.delegated",
   "approval.escalation_stuck",

@@ -17,7 +17,7 @@ const ctx: LinkContext = {
   ]),
   moduleOfEntity: new Map([["leave_request", "leave"]]),
   linksByModule: new Map([
-    ["leave", { "approval.decided": () => "/app/leave", "approval.completed": () => "/app/leave" }],
+    ["leave", { "approval.sent": () => "/app/leave", "approval.completed": () => "/app/leave" }],
   ]),
 };
 const link = (eventKey: string, payload: Record<string, unknown> = {}) =>
@@ -32,13 +32,21 @@ describe("where a notice opens", () => {
   });
 
   it("opens the module's approvals for a request waiting on you", () => {
-    for (const e of ["approval.submitted", "approval.escalated", "approval.delegated"]) {
+    // A level decided with more to come is the next approver's turn (the engine
+    // sends approval.decided to them, never to the person who asked).
+    for (const e of [
+      "approval.submitted",
+      "approval.decided",
+      "approval.escalated",
+      "approval.delegated",
+    ]) {
       expect(link(e, { entity_type: "leave_request" })).toBe("/app/approvals?m=leave");
     }
   });
 
-  it("opens the module's own screen for a decision about your request", () => {
-    expect(link("approval.decided", { entity_type: "leave_request" })).toBe("/app/leave");
+  it("opens the module's own screen for your own request, sent or decided", () => {
+    expect(link("approval.sent", { entity_type: "leave_request" })).toBe("/app/leave");
+    expect(link("approval.completed", { entity_type: "leave_request" })).toBe("/app/leave");
     expect(link("approval.completed_fyi", { entity_type: "leave_request" })).toBe("/app/leave");
   });
 

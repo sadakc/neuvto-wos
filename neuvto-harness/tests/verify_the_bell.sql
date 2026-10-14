@@ -11,7 +11,11 @@
 --                is not;
 --   own changes  a person changing their own record tells the Employee
 --                Admins, in the bell and never by email; an Admin's edit, a
---                refused save and a save that changes nothing tell nobody.
+--                refused save and a save that changes nothing tell nobody;
+--   everybody    (D112) somebody who neither approves nor administers hears
+--                of their own: what they raised is waiting for somebody, and
+--                what their own record still needs that is theirs to give,
+--                once a reminder period, never the company's own items.
 
 begin;
 
@@ -150,6 +154,58 @@ begin
     pg_temp.nb_val(hema, 'select public.notifications_unread()::text'), '0');
   perform pg_temp.nb_check('Alice''s are still unread',
     pg_temp.nb_val(alice, 'select (public.notifications_unread() > 0)::text'), 'true');
+
+  -- ── D112 · everybody's own
+  if to_regprocedure('public.employee_remind_people(uuid,integer)') is not null then
+    delete from public.notifications where organization_id = acme;
+    declare
+      v_day date := public.org_today(acme) + 40;
+    begin
+      while extract(isodow from v_day) > 5 loop v_day := v_day + 1; end loop;
+      perform pg_temp.nb_val(ravi, format(
+        $q$select public.leave_submit('00000000-0000-0000-0000-0000000000c1', %L, %L, 'Family visit')::text$q$,
+        v_day, v_day));
+    end;
+    perform pg_temp.nb_check('what you raised is in your own bell, with who it waits for',
+      pg_temp.nb_val(ravi, $q$select subject from public.notifications_feed(10) where event_key = 'approval.sent'$q$),
+      'Your leave request is waiting for Mark Manager');
+    perform pg_temp.nb_check('in the bell only',
+      (select string_agg(distinct channel::text || '/' || status::text, ',') from public.notifications
+        where event_key = 'approval.sent'), 'in_app/sent');
+    perform pg_temp.nb_check('the approver is told it needs them, not that it was sent',
+      pg_temp.nb_val('00000000-0000-0000-0000-00000000a004',
+        $q$select string_agg(event_key, ',') from public.notifications_feed(10)$q$), 'approval.submitted');
+    perform pg_temp.nb_check('and a colleague hears nothing of it',
+      pg_temp.nb_val(priya, 'select count(*)::text from public.notifications_feed(100)'), '0');
+
+    update public.employees set date_of_birth = null, emergency_contact_name = null,
+           emergency_contact_relation = null, emergency_contact_phone = null, designation_id = null
+     where id = e_ravi;
+    perform public.employee_remind_people(acme, 3);
+    perform pg_temp.nb_check('what your own record needs is in your bell',
+      pg_temp.nb_val(ravi, $q$select count(*)::text from public.notifications_feed(10) where event_key = 'employee.your_record_needs'$q$), '1');
+    perform pg_temp.nb_check('the things that are yours to give',
+      pg_temp.nb_val(ravi, $q$select (subject like '%date of birth%' and subject like '%emergency contact%')::text
+                               from public.notifications_feed(10) where event_key = 'employee.your_record_needs'$q$), 'true');
+    perform pg_temp.nb_check('never the company''s own items',
+      pg_temp.nb_val(ravi, $q$select (subject like '%designation%')::text
+                               from public.notifications_feed(10) where event_key = 'employee.your_record_needs'$q$), 'false');
+    perform public.employee_remind_people(acme, 3);
+    perform pg_temp.nb_check('once a reminder period, not every run',
+      pg_temp.nb_val(ravi, $q$select count(*)::text from public.notifications_feed(10) where event_key = 'employee.your_record_needs'$q$), '1');
+    -- And it comes from the daily onboarding run, on the company's cadence.
+    delete from public.notifications where event_key = 'employee.your_record_needs';
+    delete from public.employee_onboarding_reminders where organization_id = acme;
+    perform public.employee_onboarding_remind_due();
+    perform pg_temp.nb_check('the daily onboarding run tells the person',
+      pg_temp.nb_val(ravi, $q$select count(*)::text from public.notifications_feed(10) where event_key = 'employee.your_record_needs'$q$), '1');
+    perform pg_temp.nb_check('only to the person themselves',
+      (select count(*)::text from public.notifications
+        where event_key = 'employee.your_record_needs' and payload ->> 'employee_id' = e_ravi::text
+          and recipient_id <> ravi), '0');
+  else
+    raise notice 'skip: no reminders for people yet';
+  end if;
 end $$;
 
 rollback;

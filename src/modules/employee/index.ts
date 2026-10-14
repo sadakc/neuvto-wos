@@ -86,6 +86,7 @@ export const employee: ModuleDefinition = {
     "employee.change_requested",
     "employee.change_resolved",
     "employee.changed_own_record",
+    "employee.your_record_needs",
   ],
 
   // D111. Where each of this module's notices opens from the bell.
@@ -98,6 +99,7 @@ export const employee: ModuleDefinition = {
         : "/app/employee/change-requests",
     "employee.onboarding_overdue": () => "/app/employee/add",
     "employee.onboarding_escalated": () => "/app/employee/add",
+    "employee.your_record_needs": () => "/app/employee",
   },
 
   // D111. Change requests wait on the Employee Admins on Home's Approvals too.

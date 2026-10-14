@@ -17,6 +17,8 @@ describe("the Employee Card's notices", () => {
       "/app/employee/directory/person?id=e1",
     );
     expect(link("employee.onboarding_overdue")).toBe("/app/employee/add");
+    // D112: what your own record still needs opens your own card.
+    expect(link("employee.your_record_needs")).toBe("/app/employee");
   });
 
   it("claim every event the module emits", () => {
