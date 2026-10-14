@@ -13,6 +13,7 @@ import { getEnabledModules, type ModuleDefinition } from "@/platform/modules";
 import { AppFrame, buildShell } from "@/platform/shell";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { NotificationBell } from "@/platform/notifications";
+import { leavingFor, rememberShellUser } from "@/platform/auth/return-to";
 import { Building2, House } from "lucide-react";
 
 export const Route = createFileRoute("/app")({
@@ -69,10 +70,13 @@ function AppShell() {
         if (cancelled) return;
         if (!u) {
           // Signed out. Preserve where they were headed so they land there.
+          // Only theirs: somebody else signing in starts at Home (return-to.ts).
+          leavingFor(window.location.pathname);
           const next = encodeURIComponent(window.location.pathname);
           window.location.href = `/auth?next=${next}`;
           return;
         }
+        rememberShellUser(u.id);
         setUser(u);
         setState("ready");
 

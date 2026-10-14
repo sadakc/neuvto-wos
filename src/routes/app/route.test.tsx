@@ -10,7 +10,8 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
+import { leavingFor, rememberShellUser, returnFor } from "@/platform/auth/return-to";
 import { z } from "zod";
 import type { ComponentType } from "react";
 import type { AppRole, CurrentUser } from "@/platform/auth";
@@ -129,5 +130,23 @@ describe("the shell, per role, on a Leave page", () => {
     expect(screen.getByTestId("rail-organisation")).toHaveAttribute("href", "/app/members");
     // D105: the Company tabs are in the row, after their divider.
     expect(screen.getByTestId("company-divider")).toBeInTheDocument();
+  });
+});
+
+describe("whose page a sign-in returns to", () => {
+  it("remembers who the shell loaded for, so a page left behind is theirs alone", async () => {
+    localStorage.clear();
+    await shellFor(["employee"]);
+    leavingFor("/app/leave");
+    expect(returnFor("/app/leave", "somebody-else")).toBe("/app");
+  });
+
+  it("notes the page when the session is gone", async () => {
+    localStorage.clear();
+    rememberShellUser("alice");
+    getCurrentUser.mockResolvedValue(null);
+    render(<AppShell />);
+    await waitFor(() => expect(localStorage.getItem("neuvto.returnTo")).not.toBeNull());
+    expect(returnFor(window.location.pathname, "mark")).toBe("/app");
   });
 });

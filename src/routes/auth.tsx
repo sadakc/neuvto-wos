@@ -18,6 +18,7 @@ import { deviceSupportsPasskeys, signInWithFaceOrFingerprint } from "@/platform/
 import { Fingerprint } from "lucide-react";
 import { isAppError } from "@/platform/errors";
 import { hardNavigate } from "@/platform/navigate";
+import { returnFor } from "@/platform/auth/return-to";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -325,8 +326,9 @@ function AuthPage() {
             setChecking(false);
             return;
           }
-          // `next` was given: they asked for a page and are entitled to it.
-          hardNavigate(safeNext(next));
+          // `next` was given: they asked for a page and are entitled to it,
+          // unless it was left behind by somebody else (return-to.ts).
+          hardNavigate(safeNext(returnFor(next, user.id)));
           return;
         }
         setChecking(false);
@@ -446,7 +448,8 @@ function AuthPage() {
         showSignedIn(user.email, "invite", safeNext(next));
         return;
       }
-      hardNavigate(safeNext(next));
+      // Not the page somebody else was signed out on (return-to.ts).
+      hardNavigate(safeNext(returnFor(next, user.id)));
       return;
     }
     // Signed in, but in no workspace yet — redeem the invitation, send staff
