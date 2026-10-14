@@ -229,7 +229,7 @@ export default function ChangeRequestsScreen() {
   );
 }
 
-function ChangeRequestRow({
+export function ChangeRequestRow({
   request: r,
   onResolved,
 }: {

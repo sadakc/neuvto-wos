@@ -21,6 +21,7 @@ import {
   type ModuleReport,
   type ModuleDashboardCard,
   type ModuleNavItem,
+  type ModuleHomeQueue,
 } from "./contract";
 
 let installed: readonly ModuleDefinition[] = [];
@@ -221,4 +222,43 @@ export async function resolveModuleRoute(path: string) {
     if (match) return { module: m, route: match };
   }
   return undefined;
+}
+
+/**
+ * D111. Where each kind of notice opens: every enabled module's own links,
+ * and which module owns each approval entity type, for the platform's own
+ * approval events.
+ */
+export async function getNotificationLinks(): Promise<{
+  links: Map<string, (payload: Record<string, unknown>) => string | null>;
+  moduleOfEntity: Map<string, string>;
+  linksByModule: Map<string, Record<string, (payload: Record<string, unknown>) => string | null>>;
+}> {
+  const enabled = await getEnabledModules();
+  const links = new Map<string, (payload: Record<string, unknown>) => string | null>();
+  const moduleOfEntity = new Map<string, string>();
+  const linksByModule = new Map<
+    string,
+    Record<string, (payload: Record<string, unknown>) => string | null>
+  >();
+  for (const m of enabled) {
+    for (const t of m.approvalEntityTypes) moduleOfEntity.set(t, m.key);
+    linksByModule.set(m.key, m.notificationLinks ?? {});
+    for (const [event, fn] of Object.entries(m.notificationLinks ?? {})) {
+      // Approval events are shared by every module that raises approvals, so
+      // they are answered per entity, never by whichever module came last.
+      if (!event.startsWith("approval.")) links.set(event, fn);
+    }
+  }
+  return { links, moduleOfEntity, linksByModule };
+}
+
+/** D111. The lists each module puts on Home's Approvals, for its own admins. */
+export async function getHomeQueues(
+  user: CurrentUser | null,
+): Promise<(ModuleHomeQueue & { moduleKey: string })[]> {
+  const enabled = await getEnabledModules();
+  return enabled
+    .filter((m) => isModuleAdmin(user, m.key))
+    .flatMap((m) => (m.homeQueues?.() ?? []).map((q) => ({ ...q, moduleKey: m.key })));
 }

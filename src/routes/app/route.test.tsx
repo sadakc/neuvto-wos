@@ -62,6 +62,8 @@ vi.mock("@/platform/organization", () => ({
 }));
 
 vi.mock("@/components/shared/theme-toggle", () => ({ ThemeToggle: () => null }));
+// The bell asks the database for its count; it has its own tests.
+vi.mock("@/platform/notifications", () => ({ NotificationBell: () => null }));
 
 const leave: ModuleDefinition = {
   key: "leave",

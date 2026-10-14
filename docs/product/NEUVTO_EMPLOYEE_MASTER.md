@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.23 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.24 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -779,7 +779,9 @@ trigger a validation.
   its statutory form the same way. A nominee's date of birth, once required, is asked of every
   nominee.
 - **Employees can update = Yes** means the person changes the field on their own card and it
-  is saved at once, with no approval. Their card offers Edit only on the panels holding such a
+  is saved at once, with no approval. Every such change is in the audit log (before and after,
+  who and when), and since D111 the Employee Admins are told in the bell, which opens the
+  person's card. Their card offers Edit only on the panels holding such a
   field, and each form holds only those fields. Relatives are by relation: a kept relative is
   shown, sent back untouched, and cannot be edited or removed. Addresses are by type: present
   and permanent. The nomination is one answer: the dates of birth and shares follow the names.

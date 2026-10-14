@@ -197,6 +197,16 @@ export const leave: ModuleDefinition = {
   // Emitted through the platform. This module never sends an email.
   eventKeys: ["approval.submitted", "approval.decided", "approval.completed"],
 
+  // D111. Where this module's notices open from the bell. A request waiting
+  // on you opens Leave approvals (the platform's answer); your own request's
+  // outcome opens My Leave; a summary opens the reports.
+  notificationLinks: {
+    "approval.decided": () => "/app/leave",
+    "approval.completed": () => "/app/leave",
+    "leave_summary.weekly": () => "/app/reports?m=leave",
+    "leave_summary.monthly": () => "/app/reports?m=leave",
+  },
+
   settingsSchema: LeaveSettings,
 
   ownedTables: [

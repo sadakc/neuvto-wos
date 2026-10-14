@@ -5017,6 +5017,19 @@ export type Database = {
         }
         Returns: undefined
       }
+      notifications_feed: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          event_key: string
+          id: string
+          payload: Json
+          read_at: string
+          subject: string
+        }[]
+      }
+      notifications_mark_read: { Args: { _ids?: string[] }; Returns: number }
+      notifications_unread: { Args: never; Returns: number }
       notify: {
         Args: { _event_key: string; _payload: Json; _recipient_id: string }
         Returns: string

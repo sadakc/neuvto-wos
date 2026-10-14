@@ -57,6 +57,14 @@ vi.mock("@/platform/modules", () => ({
       : key === "employee"
         ? { key, name: "Employee Card" }
         : undefined,
+  getHomeQueues: async () => [
+    {
+      id: "change-requests",
+      moduleKey: "employee",
+      title: "Change requests",
+      component: () => <p data-testid="queue-body">Ravi asked for a change</p>,
+    },
+  ],
 }));
 vi.mock("@/platform/approvals/Delegations", () => ({
   Delegations: ({ modules, isAdmin }: { modules: { name: string }[]; isAdmin: boolean }) => (
@@ -194,5 +202,22 @@ describe("whose approvals (Sada, 14 Oct 2026)", () => {
     expect(await screen.findByRole("heading", { name: "Approvals" })).toBeInTheDocument();
     expect(await screen.findByText("Zara Changed")).toBeInTheDocument();
     expect(screen.getByText("Ravi Employee")).toBeInTheDocument();
+  });
+});
+
+describe("Home's own lists (D111)", () => {
+  it("puts what modules wait on their admins for, change requests, on Home's Approvals", async () => {
+    render(<Page />);
+    expect(await screen.findByTestId("home-queue-change-requests")).toHaveTextContent(
+      "Change requests",
+    );
+    expect(screen.getByTestId("queue-body")).toHaveTextContent("Ravi asked for a change");
+  });
+
+  it("not on a module's own approvals", async () => {
+    h.search = { m: "leave" };
+    render(<Page />);
+    await screen.findByRole("heading", { name: "Leave approvals" });
+    expect(screen.queryByTestId("home-queue-change-requests")).toBeNull();
   });
 });

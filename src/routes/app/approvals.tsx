@@ -10,7 +10,13 @@ import {
   type ApprovalQueueItem,
   type BulkOutcome,
 } from "@/platform/approvals";
-import { getApprovalViews, moduleByKey, type ModuleApprovalView } from "@/platform/modules";
+import {
+  getApprovalViews,
+  getHomeQueues,
+  moduleByKey,
+  type ModuleApprovalView,
+  type ModuleHomeQueue,
+} from "@/platform/modules";
 
 export const Route = createFileRoute("/app/approvals")({
   ssr: false,
@@ -41,6 +47,8 @@ function ApprovalsPage() {
   const title = scoped ? `${scoped.shortName ?? scoped.name} approvals` : "Approvals";
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [allItems, setItems] = useState<ApprovalQueueItem[]>([]);
+  /** D111. Lists a module puts on Home for its admins: change requests. */
+  const [queues, setQueues] = useState<(ModuleHomeQueue & { moduleKey: string })[]>([]);
   const [views, setViews] = useState<Map<string, ModuleApprovalView & { moduleKey: string }>>(
     new Map(),
   );
@@ -93,6 +101,11 @@ function ApprovalsPage() {
         if (cancelled) return;
         setUser(u);
         await load(u);
+        if (!moduleKey) {
+          getHomeQueues(u)
+            .then((q) => !cancelled && setQueues(q))
+            .catch(() => {});
+        }
         if (!cancelled) setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -103,7 +116,8 @@ function ApprovalsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+    // Opening it from another module's tab is a new page.
+  }, [moduleKey]);
 
   if (state === "loading") {
     return (
@@ -178,6 +192,17 @@ function ApprovalsPage() {
           </button>
         </div>
       )}
+
+      {queues.map((q) => {
+        const Queue = q.component;
+        return (
+          <Panel key={`${q.moduleKey}:${q.id}`} title={q.title} testId={`home-queue-${q.id}`}>
+            <Suspense fallback={<div className="h-20 animate-pulse rounded bg-muted" />}>
+              <Queue />
+            </Suspense>
+          </Panel>
+        );
+      })}
 
       <Panel
         title="Waiting on you"

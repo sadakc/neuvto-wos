@@ -16,6 +16,8 @@ export {
   getAdminSections,
   getModuleReports,
   getApprovalViews,
+  getNotificationLinks,
+  getHomeQueues,
 } from "./registry";
 
 export {
@@ -29,6 +31,7 @@ export {
   type ModuleReport,
   type ModuleApprovalView,
   type ModuleApprovalViewProps,
+  type ModuleHomeQueue,
 } from "./contract";
 
 export { ModuleLink } from "./ModuleLink";

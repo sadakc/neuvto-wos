@@ -82,7 +82,32 @@ export const employee: ModuleDefinition = {
   // Change requests go to admins directly, not through approval chains: an
   // Admin acts on them, nobody signs them off.
   approvalEntityTypes: [],
-  eventKeys: ["employee.change_requested", "employee.change_resolved"],
+  eventKeys: [
+    "employee.change_requested",
+    "employee.change_resolved",
+    "employee.changed_own_record",
+  ],
+
+  // D111. Where each of this module's notices opens from the bell.
+  notificationLinks: {
+    "employee.change_requested": () => "/app/employee/change-requests",
+    "employee.change_resolved": () => "/app/employee",
+    "employee.changed_own_record": (p) =>
+      typeof p.employee_id === "string"
+        ? `/app/employee/directory/person?id=${p.employee_id}`
+        : "/app/employee/change-requests",
+    "employee.onboarding_overdue": () => "/app/employee/add",
+    "employee.onboarding_escalated": () => "/app/employee/add",
+  },
+
+  // D111. Change requests wait on the Employee Admins on Home's Approvals too.
+  homeQueues: () => [
+    {
+      id: "change-requests",
+      title: "Change requests",
+      component: lazy(() => import("./components/ChangeRequestsQueue")),
+    },
+  ],
   settingsSchema: z.object({}),
 
   ownedTables: [

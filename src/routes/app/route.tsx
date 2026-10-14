@@ -12,6 +12,7 @@ import { isAppError } from "@/platform/errors";
 import { getEnabledModules, type ModuleDefinition } from "@/platform/modules";
 import { AppFrame, buildShell } from "@/platform/shell";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { NotificationBell } from "@/platform/notifications";
 import { Building2, House } from "lucide-react";
 
 export const Route = createFileRoute("/app")({
@@ -189,6 +190,8 @@ function AppShell() {
       }
       actions={
         <>
+          {/* D111: what has happened for you, newest first. */}
+          <NotificationBell />
           <ThemeToggle />
           <button
             onClick={async () => {

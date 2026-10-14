@@ -59,6 +59,13 @@ export interface ModuleNavItem {
   placement?: "organisation";
 }
 
+/** D111. A list on Home's Approvals, contributed by a module for its admins. */
+export interface ModuleHomeQueue {
+  id: string;
+  title: string;
+  component: ComponentType | LazyExoticComponent<ComponentType>;
+}
+
 /** The rail groups modules under these, once there are more than six. */
 export type ModuleSection = "Time" | "People" | "Money" | "Company";
 
@@ -265,6 +272,21 @@ export interface ModuleDefinition {
   eventKeys: readonly string[];
 
   /**
+   * D111. Where a notice in the bell opens, by event key, from the notice's
+   * payload. A module names the screens its own notices are about; the
+   * platform answers for its own events (an approval waiting goes to the
+   * module's approvals) and for any event a module leaves out.
+   */
+  notificationLinks?: Record<string, (payload: Record<string, unknown>) => string | null>;
+
+  /**
+   * D111. Lists of things waiting on this module's admins that are not
+   * approvals in the engine's sense, shown on Home's Approvals: the Employee
+   * Card's change requests. Only this module's admins see them.
+   */
+  homeQueues?: () => ModuleHomeQueue[];
+
+  /**
    * Per-organisation configuration, persisted through `module_settings` (D7).
    * Customers configure modules even though they never write them.
    */
@@ -309,6 +331,8 @@ export const ModuleDefinitionSchema = z.object({
   approvalViews: z.function().optional(),
   approvalEntityTypes: z.array(z.string().regex(/^[a-z_]+$/)).readonly(),
   eventKeys: z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/)).readonly(),
+  notificationLinks: z.record(z.string(), z.function()).optional(),
+  homeQueues: z.function().optional(),
   settingsSchema: z.any(),
   ownedTables: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).readonly(),
 });
