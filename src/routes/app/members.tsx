@@ -22,7 +22,6 @@ import {
   type Member,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
-import { InviteTeam } from "@/platform/auth/InviteTeam";
 import { AccessEditor, type AdministrableModule } from "@/platform/auth/AccessEditor";
 import { getEnabledModules } from "@/platform/modules";
 import { listDepartments, setDepartment, type Department } from "@/platform/organization";
@@ -36,15 +35,10 @@ export const Route = createFileRoute("/app/members")({
 /**
  * The people in this workspace, and the ones who have been asked to join.
  *
- * Inviting is the only way in (D39). The form asks for email, role and phone —
- * phone because Sada wants one human rather than one email address, though it
- * is not verified and so is not an identity key yet (D41); the uniqueness it
- * buys is real but only within this organisation.
- *
- * What this screen deliberately never says: whether an address is already in
- * use in somebody else's workspace. That answer would make the box below a
- * staff-directory oracle (D40). Such an invitation is simply created and never
- * accepted; the person is told when they arrive, about their own address.
+ * Inviting is the only way in (D39), and since 14 Oct 2026 it is done from
+ * the person's record (Add Employee), not here: one way in, so every module
+ * sees the same person. This screen keeps who is waiting to join (copy the
+ * link, withdraw), who is in, their access, and who reports to whom.
  */
 /** Exported for the render tests in members.test.tsx. Not used elsewhere. */
 export function MembersPage() {
@@ -317,27 +311,13 @@ export function MembersPage() {
         Everyone in {user?.organizationName ?? "this workspace"}, and anyone waiting to join.
       </p>
 
-      {/* ─────────────────────────────────────────────── invite */}
-      <section className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="text-card-title font-semibold tracking-card-title">Invite somebody</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          They&apos;ll get an email with a link. Following it, they confirm their address with a
-          six-digit code and land straight in this workspace.
-        </p>
-
-        <div className="mt-4">
-          <InviteTeam onInvited={() => void load()} canGrantAdmin={isSuperAdmin(user)} />
-        </div>
-
-        <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
-          Bringing a whole team across?{" "}
-          <a href="/app/import" className="text-foreground underline underline-offset-4">
-            Import them from a spreadsheet
-          </a>{" "}
-          — with the start dates they actually joined on, which is what their leave for the year is
-          worked out from.
-        </p>
-      </section>
+      {/* Inviting is done from the person's record in the Employee module, so
+          every module sees one person (Sada, 14 Oct 2026). People keeps who is
+          waiting to join, who is in, and who reports to whom. */}
+      <p className="mt-4 max-w-prose text-sm text-muted-foreground" data-testid="people-how-to-add">
+        To bring somebody in, start their record and invite them from it. Once they accept, they are
+        here and in every module.
+      </p>
 
       {error && (
         <p role="alert" data-testid="members-error" className="mt-4 text-sm text-destructive">
@@ -382,8 +362,7 @@ export function MembersPage() {
           data-testid="people-no-match"
           className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
         >
-          Nobody here matches “{query.trim()}”. Somebody who has never been invited will not appear
-          — invite them above.
+          Nobody here matches “{query.trim()}”. Somebody who has never been invited will not appear.
         </p>
       )}
 

@@ -1,8 +1,9 @@
 /**
- * Org chart (bundle §7.5). Built from the reporting line, four levels at a
- * time, starting from the person you report to so you see yourself and your
- * peers first. Deeper levels are one press away ("Start here") rather than
- * drawn all at once, and the chart scrolls inside its own box, never the page.
+ * The company's org chart, under Organisation (bundle §7.5; Sada, 14 Oct
+ * 2026): everybody, from the top, four levels at a time, with you marked.
+ * Deeper levels are one press away ("Start here") rather than drawn all at
+ * once, and the chart scrolls inside its own box, never the page. Your own
+ * line alone is MyOrgChart, on the Employee Card.
  *
  * Anybody with reports has a − beside them that folds their team away and a
  * + that opens it again (D106), and the whole chart folds or opens at once.
@@ -17,15 +18,6 @@ import { getOrgChart } from "../handlers";
 import { PersonLink } from "./PersonLink";
 
 const ORG_CHART_DEPTH = 4;
-
-/** Where the chart starts for this viewer: their manager, else the top. */
-function startingPoint(nodes: OrgChartNode[], me: string | null): string | null {
-  const mine = nodes.find((n) => n.profileId === me);
-  if (mine?.managerProfileId && nodes.some((n) => n.profileId === mine.managerProfileId)) {
-    return mine.managerProfileId;
-  }
-  return null; // the top: everybody whose manager is nobody, or not in the chart
-}
 
 export default function OrgChart() {
   const [nodes, setNodes] = useState<OrgChartNode[] | null>(null);
@@ -49,7 +41,7 @@ export default function OrgChart() {
         if (cancelled) return;
         setNodes(n);
         setMe(uid);
-        setRoot(startingPoint(n, uid));
+        setRoot(null); // the top: everybody whose manager is nobody, or not in the chart
       })
       .catch((e: unknown) => {
         if (!cancelled) setError(isAppError(e) ? e.message : "The org chart didn't load.");
@@ -116,9 +108,17 @@ export default function OrgChart() {
                     (n.profileId === me ? "border-primary bg-accent" : "border-border bg-card")
                   }
                 >
-                  <PersonLink employeeId={n.id} className="text-sm font-medium">
-                    {n.fullName ?? "Unnamed"}
-                  </PersonLink>
+                  <span
+                    className="flex items-center gap-2"
+                    data-testid={n.profileId === me ? "org-you" : undefined}
+                  >
+                    <PersonLink employeeId={n.id} className="text-sm font-medium">
+                      {n.fullName ?? "Unnamed"}
+                    </PersonLink>
+                    {n.profileId === me && (
+                      <span className="text-caption font-semibold text-primary">You</span>
+                    )}
+                  </span>
                   <span className="text-caption text-muted-foreground">
                     {n.designation ?? "No designation"} · {n.directReports}{" "}
                     {n.directReports === 1 ? "report" : "reports"}
@@ -150,8 +150,8 @@ export default function OrgChart() {
       <div>
         <h1 className="text-page-title font-semibold tracking-page-title">Org Chart</h1>
         <p className="mt-1 text-sm text-foreground-secondary">
-          Who reports to whom, {ORG_CHART_DEPTH} levels at a time. People who are deactivated, or
-          invited but not yet signed in, are not drawn.
+          Everybody in the company and who they report to, from the top, {ORG_CHART_DEPTH} levels at
+          a time. People who are deactivated, or invited but not yet signed in, are not drawn.
         </p>
       </div>
 

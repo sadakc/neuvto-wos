@@ -11,8 +11,8 @@
  *
  * Kept apart from `members.test.tsx` because that file's caller is a fixed
  * org_admin and its invite form is mocked to nothing. Here the caller varies,
- * and the REAL InviteTeam renders, so "an Admin cannot invite an Administrator"
- * is asserted on the dropdown a person would actually open.
+ * and People offers no invite form at all (Sada, 14 Oct 2026): inviting is
+ * done from the Employee Card, and InviteTeam.test.tsx pins the form itself.
  */
 
 import { describe, expect, it, vi, beforeEach } from "vitest";
@@ -124,8 +124,9 @@ import { MembersPage } from "./members";
 
 async function renderPeople(callerRoles: string[]) {
   h.callerRoles = callerRoles;
-  render(<MembersPage />);
+  const rendered = render(<MembersPage />);
   expect(await screen.findByText("In this workspace")).toBeInTheDocument();
+  return rendered;
 }
 
 /** One person's row, ignoring the names that appear in every row's dropdowns. */
@@ -142,12 +143,6 @@ function rowFor(name: string): HTMLElement {
 }
 
 /** The invite form's Role dropdown, as the values a person could pick. */
-function inviteRoleValues(): string[] {
-  const select = document.querySelector("#inv-role") as HTMLSelectElement | null;
-  if (!select) throw new Error("the invite form's Role dropdown is not on screen");
-  return [...select.options].map((o) => o.value);
-}
-
 beforeEach(() => {
   h.setMemberRoles.mockReset();
   h.setMemberRoles.mockResolvedValue(undefined);
@@ -251,19 +246,15 @@ describe("People — who may grant an administrator role", () => {
     expect(within(panel).getByTestId("role-manager")).toBeEnabled();
   });
 
-  it("does not let an Admin who is not a Super Admin invite an Administrator", async () => {
-    await renderPeople(["org_admin"]);
-
-    const values = inviteRoleValues();
-    expect(values).not.toContain("org_admin");
-    expect(values).not.toContain("super_admin");
-    expect(values).not.toContain("hr_admin");
-    expect(values).toContain("employee");
-  });
-
-  it("lets a Super Admin invite an Administrator", async () => {
-    await renderPeople(["super_admin"]);
-
-    expect(inviteRoleValues()).toContain("org_admin");
+  it("offers nobody a way to invite from People: that is the Employee Card's", async () => {
+    // Sada, 14 Oct 2026: one way in, from the person's record, so every module
+    // sees the same person. People keeps who is waiting to join.
+    for (const roles of [["org_admin"], ["super_admin"]]) {
+      const { unmount } = await renderPeople(roles);
+      expect(screen.queryByText("Invite somebody")).toBeNull();
+      expect(screen.queryByRole("button", { name: /Send invitation/ })).toBeNull();
+      expect(screen.queryByRole("link", { name: /Import them/ })).toBeNull();
+      unmount();
+    }
   });
 });

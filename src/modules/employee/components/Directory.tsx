@@ -1,7 +1,7 @@
 /**
- * Directory (bundle §7.4): everybody in the company, with what everybody may
- * see. `employee_directory()` returns no personal, family, address, statutory
- * or bank field for anybody, so there is nothing here to hide by role.
+ * Directory (bundle §7.4): everybody in the company, under Organisation, for
+ * the admins only (D108): `employee_directory()` refuses anybody else.
+ * Opening a row opens the record, where an admin edits it.
  *
  * Search is server side, 200ms after the last keystroke. A slower answer to an
  * older search is dropped, never shown under a newer one.
@@ -64,7 +64,13 @@ export default function Directory() {
           })
           .catch((e: unknown) => {
             if (ticket !== latest.current) return;
-            setError(isAppError(e) ? e.message : "The directory didn't load. Please try again.");
+            setError(
+              isAppError(e) && e.code === "FORBIDDEN"
+                ? "The directory is for administrators. Everybody's place in the company is on the org chart, under Organisation."
+                : isAppError(e)
+                  ? e.message
+                  : "The directory didn't load. Please try again.",
+            );
           });
       },
       query ? SEARCH_DEBOUNCE_MS : 0,

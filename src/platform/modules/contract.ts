@@ -50,6 +50,13 @@ export interface ModuleNavItem {
   group?: "main" | "company";
   /** One line under the label in the Company menu and the section picker. */
   description?: string;
+  /**
+   * Where the tab lives in the rail. Omitted, under the module. `organisation`
+   * puts it under Organisation instead: a view of the whole company that a
+   * module happens to supply, like the directory or the company org chart
+   * (Sada, 14 Oct 2026). The route stays the module's.
+   */
+  placement?: "organisation";
 }
 
 /** The rail groups modules under these, once there are more than six. */

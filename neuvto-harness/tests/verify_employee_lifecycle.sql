@@ -133,10 +133,9 @@ begin
   -- Drafts are the Admin's alone.
   perform pg_temp.lc_refused('a colleague cannot open a draft''s card', ravi,
     format('select public.employee_card(%L)', d), 'NOT_FOUND');
-  perform pg_temp.lc_as(ravi);
-  select count(*) into n from public.employee_directory(null) x where x.id = d;
-  perform pg_temp.lc_root();
-  if n <> 0 then raise exception 'LIFECYCLE FAIL: a colleague sees a draft in the directory'; end if;
+  -- A colleague cannot read the directory at all (D108), drafts or not.
+  perform pg_temp.lc_refused('a colleague cannot list a draft in the directory', ravi,
+    'select * from public.employee_directory(null)', 'FORBIDDEN');
   perform pg_temp.lc_as(hema);
   select count(*) into n from public.employee_directory('nisha') x where x.id = d and x.stage = 'draft';
   perform pg_temp.lc_root();

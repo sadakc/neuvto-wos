@@ -6,8 +6,13 @@
  *
  *   · Home, the platform dashboard and the one approvals queue, because the
  *     queue lists everything waiting on you whatever raised it.
- *   · Organisation, for administrators: People, Approval rules, Reports and
- *     Settings, which are true of the workspace with every module switched off.
+ *   · Organisation: People and Settings for administrators, which are true of
+ *     the workspace with every module switched off, and any tab a module
+ *     places there (`placement: "organisation"`), like the company org chart
+ *     everybody sees. It is shown to whoever has at least one tab in it.
+ *
+ * Approval rules and Reports are each module's, behind its Company menu
+ * (Sada, 14 Oct 2026): who approves leave is a Leave question.
  *
  * Each module gets its own tabs from `navigation`, and the platform adds the
  * ones every module shares in the Core HR layout when the module has something
@@ -97,6 +102,11 @@ export function buildShell(
     hiddenForRole: approver ? 0 : 1,
   };
 
+  // Tabs modules place under Organisation, and how many of those the person
+  // cannot reach.
+  const placed: ShellTab[] = [];
+  let placedHidden = 0;
+
   const modules = enabled.map((m): ShellModule => {
     const tabs: ShellTab[] = [];
     let hidden = 0;
@@ -108,10 +118,11 @@ export function buildShell(
         byRole ||
         (!!item.moduleAdmin && isModuleAdmin(user, m.key));
       if (!allowed) {
-        hidden++;
+        if (item.placement === "organisation") placedHidden++;
+        else hidden++;
         continue;
       }
-      tabs.push({
+      (item.placement === "organisation" ? placed : tabs).push({
         id: item.to ?? item.label,
         label: item.label,
         to: item.to ?? "",
@@ -135,6 +146,16 @@ export function buildShell(
     }
 
     const companyTabs: ShellTab[] = [];
+    if (m.approvalEntityTypes.length > 0 && admin) {
+      tabs.push({
+        id: "approval-rules",
+        label: "Approval rules",
+        to: "/app/approval-rules",
+        module: m.key,
+        group: "company",
+        description: `Who approves ${m.name} requests, and when a second level is needed`,
+      });
+    } else if (m.approvalEntityTypes.length > 0) hidden++;
     if (m.reports) {
       companyTabs.push({
         id: "reports",
@@ -169,39 +190,35 @@ export function buildShell(
     };
   });
 
-  const organisation: ShellModule | null = admin
-    ? {
-        key: ORG_KEY,
-        name: "Organisation",
-        short: "Organisation",
-        section: "Company",
-        icon: icons.organisation,
-        tabs: [
-          { id: "people", label: "People", to: "/app/members", group: "main" },
-          {
-            id: "approval-rules",
-            label: "Approval rules",
-            to: "/app/approval-rules",
-            group: "main",
-          },
-          {
-            id: "reports",
-            label: "Reports",
-            to: "/app/reports",
-            group: "company",
-            description: "Every report from every module, in one place",
-          },
+  const orgTabs: ShellTab[] = [
+    ...(admin
+      ? [{ id: "people", label: "People", to: "/app/members", group: "main" as const }]
+      : []),
+    ...placed,
+    ...(admin
+      ? [
           {
             id: "settings",
             label: "Settings",
             to: "/app/settings",
-            group: "company",
+            group: "company" as const,
             description: "Company identity, departments, holidays, modules",
           },
-        ],
-        hiddenForRole: 0,
-      }
-    : null;
+        ]
+      : []),
+  ];
+  const organisation: ShellModule | null =
+    orgTabs.length > 0
+      ? {
+          key: ORG_KEY,
+          name: "Organisation",
+          short: "Organisation",
+          section: "Company",
+          icon: icons.organisation,
+          tabs: orgTabs,
+          hiddenForRole: placedHidden + (admin ? 0 : 2),
+        }
+      : null;
 
   return [home, ...modules, ...(organisation ? [organisation] : [])];
 }

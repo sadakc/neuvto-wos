@@ -70,8 +70,9 @@ describe("row mode", () => {
     expect(screen.queryByTestId("tab-company")).toBeNull();
     expect(screen.queryByTestId("tab-approvals")).toBeNull();
     expect(screen.getByTestId("tab-/app/leave")).toHaveAttribute("aria-current", "page");
-    // Three were left out, and the note says so.
-    expect(screen.getByTestId("role-note")).toHaveTextContent("3 tabs hidden for this role");
+    // Four were left out (Approvals, Approval rules, Reports, Configuration),
+    // and the note says so.
+    expect(screen.getByTestId("role-note")).toHaveTextContent("4 tabs hidden for this role");
   });
 
   it("an administrator gets the Company tabs in the row, after a divider (D105)", () => {
@@ -90,9 +91,13 @@ describe("row mode", () => {
       "href",
       "/app/settings?m=leave",
     );
+    expect(screen.getByTestId("tab-approval-rules")).toHaveAttribute(
+      "href",
+      "/app/approval-rules?m=leave",
+    );
     // The divider sits immediately before the first of them.
     const divider = screen.getByTestId("company-divider");
-    expect(divider.nextElementSibling).toHaveTextContent(/^Reports/);
+    expect(divider.nextElementSibling).toHaveTextContent(/^Approval rules/);
     expect(screen.queryByTestId("role-note")).toBeNull();
   });
 
@@ -145,7 +150,7 @@ describe("pick mode, below 540px", () => {
     await userEvent.click(screen.getByTestId("tab-picker"));
     const menu = screen.getByRole("menu");
     expect(within(menu).getAllByRole("group")).toHaveLength(1);
-    expect(menu).toHaveTextContent("3 tabs hidden for this role");
+    expect(menu).toHaveTextContent("4 tabs hidden for this role");
   });
 });
 

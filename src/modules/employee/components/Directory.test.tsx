@@ -13,6 +13,7 @@
 import { act, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { AppError } from "@/platform/errors";
 import type { DirectoryRow } from "../contracts";
 
 const getDirectory = vi.hoisted(() => vi.fn());
@@ -132,5 +133,15 @@ describe("Directory", () => {
     render(<Directory />);
     await act(() => vi.advanceTimersByTimeAsync(0));
     expect(screen.getByTestId("directory-empty")).toHaveTextContent("Nobody here yet.");
+  });
+
+  it("tells somebody who is not an admin it is the admins', and where the org chart is", async () => {
+    getDirectory.mockRejectedValue(
+      new AppError("FORBIDDEN", "Your role can't do that.", 403, { code: "FORBIDDEN" }),
+    );
+    render(<Directory />);
+    expect((await screen.findByRole("alert")).textContent).toBe(
+      "The directory is for administrators. Everybody's place in the company is on the org chart, under Organisation.",
+    );
   });
 });

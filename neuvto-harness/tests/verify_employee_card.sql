@@ -196,16 +196,20 @@ begin
   perform pg_temp.ec_refused('the relationship helper is not exposed', alice,
     format('select public.employee_relationship(%L)', e), 'permission denied');
 
-  -- ── directory and org chart: own company only
-  perform pg_temp.ec_as(ravi);
+  -- ── directory: the admins', own company only (D108); org chart: everybody's
+  perform pg_temp.ec_as(alice);
   select count(*) into n from public.employee_directory(null) d where d.id = sara_e;
   perform pg_temp.ec_root();
   if n <> 0 then raise exception 'EMPLOYEE-CARD FAIL: the directory lists another company'; end if;
-  perform pg_temp.ec_as(ravi);
+  perform pg_temp.ec_as(alice);
   select count(*) into n from public.employee_directory('priya');
   perform pg_temp.ec_root();
   if n <> 1 then raise exception 'EMPLOYEE-CARD FAIL: searching "priya" found %', n; end if;
   raise notice 'ok: the directory is the caller''s company, and it searches';
+  perform pg_temp.ec_refused('an employee cannot read the directory', ravi,
+    'select * from public.employee_directory(null)', 'FORBIDDEN');
+  perform pg_temp.ec_refused('nor can a manager', mark,
+    'select * from public.employee_directory(null)', 'FORBIDDEN');
 
   perform pg_temp.ec_as(ravi);
   select count(*) into n from public.employee_org_chart() o

@@ -75,25 +75,25 @@ describe("what each role is offered", () => {
     expect(labels(shell, "leave").includes("Approvals"), `${name}: leave Approvals`).toBe(approver);
 
     // Company tabs and the Organisation entry for administrators only. Not
-    // disabled for everyone else: absent.
+    // disabled for everyone else: absent. Approval rules and Reports belong
+    // to the module whose requests they are (Sada, 14 Oct 2026), not to
+    // Organisation.
     expect(labels(shell, "leave").includes("Configuration"), `${name}: Configuration`).toBe(admin);
     expect(labels(shell, "leave").includes("Reports"), `${name}: Reports`).toBe(admin);
+    expect(labels(shell, "leave").includes("Approval rules"), `${name}: Approval rules`).toBe(
+      admin,
+    );
     expect(
       shell.some((m) => m.key === "organisation"),
       `${name}: Organisation`,
     ).toBe(admin);
     if (admin) {
-      expect(labels(shell, "organisation")).toEqual([
-        "People",
-        "Approval rules",
-        "Reports",
-        "Settings",
-      ]);
+      expect(labels(shell, "organisation")).toEqual(["People", "Settings"]);
     }
 
     // The count behind "N tabs hidden for this role" matches what was left out.
     const leave = shell.find((m) => m.key === "leave")!;
-    expect(leave.hiddenForRole, name).toBe((approver ? 0 : 1) + (admin ? 0 : 2));
+    expect(leave.hiddenForRole, name).toBe((approver ? 0 : 1) + (admin ? 0 : 3));
   });
 
   it("an administrator reaches every destination at every width", () => {
@@ -158,6 +158,52 @@ describe("what each role is offered", () => {
   });
 });
 
+describe("a module's tabs placed under Organisation (Sada, 14 Oct 2026)", () => {
+  const withCompanyViews: ModuleDefinition = {
+    ...leaveLike,
+    key: "employee",
+    name: "Employee Card",
+    section: "People",
+    navigation: () => [
+      { label: "My Card", to: "/app/employee" },
+      { label: "Org Chart", to: "/app/employee/my-org-chart" },
+      {
+        label: "Directory",
+        to: "/app/employee/directory",
+        placement: "organisation",
+        moduleAdmin: true,
+      },
+      { label: "Org Chart", to: "/app/employee/org-chart", placement: "organisation" },
+    ],
+    approvalEntityTypes: [],
+    reports: undefined,
+    adminSections: undefined,
+  };
+
+  it("gives everybody Organisation with the whole org chart, and no more", () => {
+    const shell = buildShell(user(["employee"]), [withCompanyViews]);
+    expect(labels(shell, "organisation")).toEqual(["Org Chart"]);
+    expect(labels(shell, "employee")).toEqual(["My Card", "Org Chart"]);
+    // The directory, People and Settings.
+    expect(shell.find((m) => m.key === "organisation")!.hiddenForRole).toBe(3);
+  });
+
+  it("gives an administrator the directory there too, between People and Settings", () => {
+    const shell = buildShell(user(["employee", "hr_admin"]), [withCompanyViews]);
+    expect(labels(shell, "organisation")).toEqual(["People", "Directory", "Org Chart", "Settings"]);
+    expect(labels(shell, "employee")).not.toContain("Directory");
+  });
+
+  it("lights Organisation for the company's chart and the module for the person's own", () => {
+    const shell = buildShell(user(["employee", "hr_admin"]), [withCompanyViews]);
+    expect(locate(shell, { pathname: "/app/employee/org-chart" }).module.key).toBe("organisation");
+    expect(locate(shell, { pathname: "/app/employee/directory/person" }).module.key).toBe(
+      "organisation",
+    );
+    expect(locate(shell, { pathname: "/app/employee/my-org-chart" }).module.key).toBe("employee");
+  });
+});
+
 describe("an admin for each module (D84)", () => {
   const employeeLike: ModuleDefinition = {
     ...leaveLike,
@@ -213,7 +259,13 @@ describe("locate", () => {
 
   it("without ?m= a shared screen belongs to the platform", () => {
     expect(locate(shell, { pathname: "/app/approvals" }).module.key).toBe("home");
-    expect(locate(shell, { pathname: "/app/reports" }).module.key).toBe("organisation");
+    expect(locate(shell, { pathname: "/app/settings" }).module.key).toBe("organisation");
+  });
+
+  it("opens Approval rules as the module's own", () => {
+    const { module, tab } = locate(shell, { pathname: "/app/approval-rules", module: "leave" });
+    expect(module.key).toBe("leave");
+    expect(tab?.label).toBe("Approval rules");
   });
 
   it("falls back to Home rather than to nothing", () => {

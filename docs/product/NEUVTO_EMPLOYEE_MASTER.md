@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.21 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.22 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -797,6 +797,32 @@ trigger a validation.
   Nominee date of birth is not required until switched on, since nominations without one are
   on record already. Proved by `verify_field_settings.sql` (23 guards broken on purpose, each
   caught) and `RequiredAndOwn.test.tsx` with `Configuration.test.tsx` (33 broken, each caught).
+
+### Organisation holds the views of the whole company (D108, 14 Oct 2026)
+
+Sada: invite only from the Employee Card; Organisation keeps who is waiting to join and who
+reports to whom; the directory moves to Organisation for the admins; two org charts, the
+company's for everybody and the person's own line on the card; approval rules and reports
+belong to Leave.
+
+- **One way in.** People no longer has an invite form, nor the link to the old spreadsheet
+  import. A person is invited from their record (Add Employee), and once they accept they
+  are in every module. People keeps Waiting to join (copy the link, withdraw), who is in,
+  their access, deactivation, and the reporting line.
+- **Organisation is everybody's now**, holding what the modules place there
+  (`placement: "organisation"` on a navigation item): everybody gets the company **Org
+  Chart**, from the top, with themselves marked; the admins also get People, the
+  **Directory** and Settings. The directory is the admins' in the database too:
+  `employee_directory()` refuses anybody who does not administer the Employee module
+  (`20261028100000_the_directory_is_for_admins.sql`). A row opens the record, where the
+  admin edits it.
+- **The Employee Card's Org Chart is the person's own line**: everybody above them to the top
+  of the company, then the people who report to them. Not their peers.
+- **Approval rules and Reports are Leave's**, behind its Company tabs. The platform adds
+  Approval rules to any module that raises approvals, for administrators.
+- Proved by `model.test.ts`, `OrgChart.test.tsx`, `Directory.test.tsx`,
+  `members.access.test.tsx` and `verify_employee_card.sql` (11 screen guards and the
+  database guard broken on purpose, each caught); `organisation.spec.ts` written.
 
 ## 8. Acceptance criteria, module level
 
