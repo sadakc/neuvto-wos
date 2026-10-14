@@ -135,6 +135,12 @@ begin
   if seen is distinct from 'R3 Charlie' then
     raise exception 'ROUND3 FAIL: the card does not say where they go next (%)', seen;
   end if;
+  -- D113. With its unit type, so a first posting still to come shows in full.
+  seen := pg_temp.tr_val(hema, format($q$select public.employee_card(%L) -> 'nextDeployment' ->> 'unitType'$q$, e_priya));
+  if seen is distinct from (select unit_type::text from public.deployment_units
+                             where name = 'R3 Charlie' order by created_at desc limit 1) or seen is null then
+    raise exception 'ROUND3 FAIL: the coming posting has no unit type (%)', seen;
+  end if;
   seen := pg_temp.tr_val(hema, $q$select deployed_unit from public.employee_directory(null) where full_name = 'Priya Employee'$q$);
   if seen is distinct from 'R3 Bravo' then
     raise exception 'ROUND3 FAIL: the directory says the deployed unit is %', seen;

@@ -14,6 +14,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
+import { LabelText } from "@/components/shared/required";
 import { isAppError } from "@/platform/errors";
 import {
   CHANGE_SECTIONS,
@@ -29,7 +30,7 @@ import { PersonLink } from "./PersonLink";
 const SECTION_LABEL: Record<string, string> = Object.fromEntries(CHANGE_SECTIONS);
 const STATUS: Record<ChangeRequestStatus, [string, StatusTone]> = {
   open: ["Waiting", "warning"],
-  done: ["Made", "success"],
+  done: ["Approved", "success"],
   declined: ["Declined", "neutral"],
 };
 
@@ -46,6 +47,11 @@ export function RequestChangeButton({ card, onSent }: { card: EmployeeCard; onSe
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    // Said, not greyed out (D113).
+    if (details.trim().length < 3) {
+      setError("Say what it should say, in a few words.");
+      return;
+    }
     setBusy(true);
     try {
       await requestChange(card.id, section, details);
@@ -82,7 +88,7 @@ export function RequestChangeButton({ card, onSent }: { card: EmployeeCard; onSe
               change, and you&apos;ll hear when they have.
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="grid gap-3">
+          <form onSubmit={submit} noValidate className="grid gap-3">
             <label className="text-sm">
               <span className="block font-medium">What is it about?</span>
               <select
@@ -99,7 +105,9 @@ export function RequestChangeButton({ card, onSent }: { card: EmployeeCard; onSe
               </select>
             </label>
             <label className="text-sm">
-              <span className="block font-medium">What should it say, and from when?</span>
+              <span className="block font-medium">
+                <LabelText required>What should it say, and from when?</LabelText>
+              </span>
               <textarea
                 data-testid="request-details"
                 required
@@ -121,7 +129,7 @@ export function RequestChangeButton({ card, onSent }: { card: EmployeeCard; onSe
             )}
             <button
               type="submit"
-              disabled={busy || details.trim().length < 3}
+              disabled={busy}
               data-testid="request-send"
               className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
             >
@@ -154,11 +162,7 @@ export function MyChangeRequests({ refreshKey }: { refreshKey: number }) {
               <span className="text-caption text-muted-foreground">{formatDate(r.createdAt)}</span>
             </div>
             <p className="mt-0.5 text-foreground-secondary">{r.details}</p>
-            {r.resolutionNote && (
-              <p className="mt-0.5 text-caption text-muted-foreground">
-                {r.resolvedByName ?? "HR"}: {r.resolutionNote}
-              </p>
-            )}
+            {r.resolutionNote && <Resolution request={r} who={r.resolvedByName ?? "HR"} />}
           </li>
         ))}
       </ul>
@@ -190,7 +194,7 @@ export default function ChangeRequestsScreen() {
         <h1 className="text-page-title font-semibold tracking-page-title">Change requests</h1>
         <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
           What people have asked to be corrected on their own record. Make the change on their card,
-          then mark it made here so they hear.
+          then approve it here so they hear.
         </p>
       </div>
       <div role="tablist" aria-label="Status" className="flex gap-1 border-b border-border">
@@ -203,7 +207,7 @@ export default function ChangeRequestsScreen() {
             onClick={() => setStatus(s)}
             className={`-mb-px h-11 border-b-2 px-3 text-sm ${status === s ? "border-primary font-semibold" : "border-transparent text-muted-foreground"}`}
           >
-            {s === "open" ? "Waiting" : s === "done" ? "Made" : "Declined"}
+            {s === "open" ? "Waiting" : s === "done" ? "Approved" : "Declined"}
           </button>
         ))}
       </div>
@@ -229,6 +233,17 @@ export default function ChangeRequestsScreen() {
   );
 }
 
+/** What HR said back: a decline's reason, or an approval's note, labelled as such. */
+function Resolution({ request: r, who }: { request: ChangeRequest; who: string }) {
+  return (
+    <p data-testid="resolution" className="mt-1 text-sm">
+      <span className="font-medium">{r.status === "declined" ? "Reason" : "Note"}:</span>{" "}
+      <span className="text-foreground-secondary">{r.resolutionNote}</span>
+      <span className="block text-caption text-muted-foreground">{who}</span>
+    </p>
+  );
+}
+
 export function ChangeRequestRow({
   request: r,
   onResolved,
@@ -244,6 +259,11 @@ export function ChangeRequestRow({
   async function resolve() {
     if (!deciding) return;
     setError("");
+    // A decline says why; said on pressing it, not by greying it out (D113).
+    if (deciding === "declined" && note.trim().length < 3) {
+      setError("Give the reason, in a few words. They'll see it.");
+      return;
+    }
     setBusy(true);
     try {
       await resolveChange(r.id, deciding, note);
@@ -274,16 +294,21 @@ export function ChangeRequestRow({
       </div>
       <p className="mt-2 text-sm whitespace-pre-wrap">{r.details}</p>
       {r.resolutionNote && (
-        <p className="mt-2 text-caption text-muted-foreground">
-          {r.resolvedByName ?? "An admin"}, {formatDate(r.resolvedAt)}: {r.resolutionNote}
-        </p>
+        <Resolution
+          request={r}
+          who={`${r.resolvedByName ?? "An admin"}, ${formatDate(r.resolvedAt)}`}
+        />
       )}
       {r.status === "open" &&
         (deciding ? (
           <div className="mt-3 grid gap-2">
             <label className="text-sm">
               <span className="block font-medium">
-                {deciding === "done" ? "A note for them (optional)" : "Why not? They'll see this."}
+                {deciding === "done" ? (
+                  "A note for them (optional)"
+                ) : (
+                  <LabelText required>Reason. They&apos;ll see it.</LabelText>
+                )}
               </span>
               <input
                 data-testid="resolve-note"
@@ -301,11 +326,11 @@ export function ChangeRequestRow({
               <button
                 type="button"
                 onClick={() => void resolve()}
-                disabled={busy || (deciding === "declined" && note.trim().length < 3)}
+                disabled={busy}
                 data-testid="resolve-confirm"
                 className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
               >
-                {busy ? "Saving…" : deciding === "done" ? "Mark as made" : "Decline"}
+                {busy ? "Saving…" : deciding === "done" ? "Approve" : "Decline"}
               </button>
               <button
                 type="button"
@@ -327,7 +352,7 @@ export function ChangeRequestRow({
               }}
               className="h-11 rounded-md border border-border px-4 text-sm font-medium"
             >
-              Made the change
+              Approve
             </button>
             <button
               type="button"

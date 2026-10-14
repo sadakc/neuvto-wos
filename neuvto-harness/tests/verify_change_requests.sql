@@ -124,9 +124,38 @@ begin
   select count(*) into n from public.notifications
    where event_key = 'employee.change_resolved' and recipient_id = priya and status <> 'failed';
   if n <> 1 then raise exception 'CHANGE-REQUESTS FAIL: the person was told % times', n; end if;
+  -- D113. Approved, not "made"; and an approval carries no reason.
+  if (select subject from public.notifications
+       where event_key = 'employee.change_resolved' and recipient_id = priya) is distinct from 'Your change request was approved' then
+    raise exception 'CHANGE-REQUESTS FAIL: an approval is not called one';
+  end if;
+  if (select payload ->> 'reason' is not null from public.notifications
+       where event_key = 'employee.change_resolved' and recipient_id = priya) then
+    raise exception 'CHANGE-REQUESTS FAIL: an approval carries a reason';
+  end if;
   perform pg_temp.cr_refused('it cannot be closed twice', alice,
     format($q$select public.employee_resolve_change(%L, 'declined', 'Changed my mind')$q$, req), 'ALREADY_RESOLVED');
   raise notice 'ok: an Admin closes it once, and the person is told';
+
+  -- ── 4b · D113: a decline tells the person why, in the bell too
+  perform pg_temp.cr_as(priya);
+  req := public.employee_request_change(e, 'other', 'Please change my name');
+  perform pg_temp.cr_as(hema);
+  perform public.employee_resolve_change(req, 'declined', '  Updated, I don''t like  ');
+  perform pg_temp.cr_root();
+  -- Both notices are written in this one transaction, at one now(): picked by
+  -- what they are about, never by time.
+  if (select payload ->> 'reason' from public.notifications
+       where event_key = 'employee.change_resolved' and recipient_id = priya
+         and payload ->> 'section' = 'other') is distinct from 'Updated, I don''t like' then
+    raise exception 'CHANGE-REQUESTS FAIL: a decline does not carry its reason to the bell';
+  end if;
+  if (select subject from public.notifications
+       where event_key = 'employee.change_resolved' and recipient_id = priya
+         and payload ->> 'section' = 'other') is distinct from 'Your change request was declined' then
+    raise exception 'CHANGE-REQUESTS FAIL: a decline is not called one';
+  end if;
+  raise notice 'ok: a decline tells the person why, and an approval is called one';
 
   -- ── 5 · a stuck button cannot flood the admins
   perform pg_temp.cr_as(priya);

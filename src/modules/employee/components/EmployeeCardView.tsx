@@ -139,13 +139,25 @@ export function EmployeeCardView({
   const where = [
     card.designation?.name,
     card.department?.name,
-    card.currentDeployment ? `deployed to ${card.currentDeployment.unitName}` : null,
+    card.currentDeployment
+      ? `deployed to ${card.currentDeployment.unitName}`
+      : card.nextDeployment
+        ? `deployed to ${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`
+        : null,
   ]
     .filter(Boolean)
     .join(", ");
 
   const strip: { label: string; value: React.ReactNode }[] = [
-    { label: "Deployed unit", value: card.currentDeployment?.unitName },
+    // Before the first posting starts, the one that is coming (Kavya, 14 Oct 2026).
+    {
+      label: "Deployed unit",
+      value:
+        card.currentDeployment?.unitName ??
+        (card.nextDeployment
+          ? `${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`
+          : null),
+    },
     {
       label: "Reports to",
       value: card.reportsTo?.fullName ? (
@@ -363,6 +375,8 @@ const PANEL_FIELDS = {
   addresses: ["presentAddress", "permanentAddress"],
   previous: ["previousOrganisations"],
 } as const;
+const unitTypeText = (t: string | undefined) => (t ? (UNIT_TYPE_LABEL[t] ?? humanise(t)) : null);
+
 const writes = (card: EmployeeCard, panel: keyof typeof PANEL_FIELDS) =>
   writesAny(card, ...PANEL_FIELDS[panel]);
 
@@ -409,16 +423,18 @@ function Overview({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
         >
           <Fields
             items={[
-              { label: "Unit", value: card.currentDeployment?.unitName },
+              { label: "Unit", value: (card.currentDeployment ?? card.nextDeployment)?.unitName },
               {
                 label: "Type",
-                value: card.currentDeployment
-                  ? (UNIT_TYPE_LABEL[card.currentDeployment.unitType] ??
-                    humanise(card.currentDeployment.unitType))
-                  : null,
+                value: unitTypeText((card.currentDeployment ?? card.nextDeployment)?.unitType),
               },
-              { label: "Effective from", value: formatDate(card.currentDeployment?.effectiveFrom) },
-              ...(card.nextDeployment
+              {
+                // Not started yet, it says so (Kavya, 14 Oct 2026).
+                label:
+                  card.currentDeployment || !card.nextDeployment ? "Effective from" : "Starts on",
+                value: formatDate((card.currentDeployment ?? card.nextDeployment)?.effectiveFrom),
+              },
+              ...(card.currentDeployment && card.nextDeployment
                 ? [
                     {
                       label: "Moving to",
@@ -544,6 +560,8 @@ function Personal({ card, onChanged }: { card: EmployeeCard; onChanged: Changed 
                 value: card.physical?.weightKg ? `${card.physical.weightKg} kg` : null,
               },
               { label: "Blood group", value: card.bloodGroup },
+              // Its editor is this panel's, so it is shown here too (Sada, 14 Oct 2026).
+              { label: "Nearest police station", value: card.nearestPoliceStation },
             ]}
           />
         </Panel>
@@ -740,7 +758,7 @@ function Employment({
               ...(card.nextDeployment
                 ? [
                     {
-                      label: "Moving to",
+                      label: card.currentDeployment ? "Moving to" : "Starting at",
                       value: `${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`,
                     },
                   ]

@@ -187,7 +187,12 @@ export interface EmployeeCard {
   nominations?: Nomination[];
   deployments?: Deployment[];
   /** D105: the posting that starts after today, if a move is dated ahead. */
-  nextDeployment?: { unitName: string; effectiveFrom: string } | null;
+  nextDeployment?: {
+    unitName: string;
+    effectiveFrom: string;
+    /** From the D113 migration on; absent from an older database. */
+    unitType?: string;
+  } | null;
   /** D105: postings an Admin took back, with why. The Admin's card only. */
   withdrawnPostings?: {
     unitName: string;
@@ -657,7 +662,10 @@ export interface ThisYear {
         kind: "paid" | "earned";
         entitled: number;
         used: number;
+        /** Sent and not yet decided. */
         pending: number;
+        /** D113: approved and still ahead; absent from an older database. */
+        booked?: number;
         available: number;
       }[]
     | null;

@@ -25,6 +25,12 @@ import {
 
 const EVERY_MINUTE = 60_000;
 
+/** A notice that carries a reason (a decline, D113) shows it under its subject. */
+function reasonOf(n: Notice): string | null {
+  const r = n.payload?.reason;
+  return typeof r === "string" && r.trim() ? r.trim() : null;
+}
+
 export function NotificationBell() {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
@@ -149,6 +155,14 @@ export function NotificationBell() {
                     >
                       {n.subject}
                     </span>
+                    {reasonOf(n) && (
+                      <span
+                        data-testid="notice-reason"
+                        className="mt-0.5 block text-sm text-foreground-secondary"
+                      >
+                        <span className="font-medium">Reason:</span> {reasonOf(n)}
+                      </span>
+                    )}
                     <span className="mt-0.5 block text-caption text-muted-foreground">
                       {whenText(n.createdAt)}
                     </span>

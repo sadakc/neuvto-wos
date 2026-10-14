@@ -20,6 +20,7 @@
  * The dialog names the required ones up front.
  */
 
+import { LabelText } from "@/components/shared/required";
 import { X } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
 import {
@@ -118,6 +119,7 @@ export function FieldEditor({
   filled = true,
   description,
   crossCheck,
+  variant = "link",
 }: {
   id: string;
   title: string;
@@ -130,6 +132,8 @@ export function FieldEditor({
   accessibleLabel?: string;
   /** Whether the panel holds anything yet: "Edit" if so, "Add" if not. */
   filled?: boolean;
+  /** "link" in a panel's header; "button" among a page's own buttons. */
+  variant?: "link" | "button";
   description?: ReactNode;
   /**
    * Rules between fields (D105: an old UAN is not the current one), as
@@ -238,7 +242,11 @@ export function FieldEditor({
           setOpen(true);
         }}
         aria-label={accessibleLabel}
-        className="-my-2.5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+        className={
+          variant === "button"
+            ? "inline-flex h-11 items-center rounded-md border border-border px-4 text-sm font-medium"
+            : "-my-2.5 inline-flex min-h-11 items-center text-sm font-medium text-primary hover:underline"
+        }
       >
         {buttonText}
       </button>
@@ -302,7 +310,9 @@ export function FieldEditor({
                   set(f, y === "" || m === "" ? "" : String(Number(y) * 12 + Number(m)));
                 return (
                   <fieldset key={f.key} className="min-w-0 text-sm">
-                    <legend className={eyebrow}>{f.label}</legend>
+                    <legend className={eyebrow}>
+                      <LabelText required={f.required}>{f.label}</LabelText>
+                    </legend>
                     <div className="mt-1 grid grid-cols-2 gap-2">
                       <select
                         aria-label={`${f.label}, years`}
@@ -338,7 +348,9 @@ export function FieldEditor({
               if (f.masked && !changing[f.key]) {
                 return (
                   <div key={f.key} className="min-w-0 text-sm" data-testid={`masked-${f.key}`}>
-                    <span className={eyebrow}>{f.label}</span>
+                    <span className={eyebrow}>
+                      <LabelText required={f.required}>{f.label}</LabelText>
+                    </span>
                     <div className="mt-1 flex h-11 items-center justify-between gap-2 rounded-md border border-input bg-muted/40 px-3">
                       <span className="font-mono whitespace-nowrap">•••• {f.masked}</span>
                       <button
@@ -357,7 +369,9 @@ export function FieldEditor({
                 <div key={f.key} className="min-w-0 text-sm">
                   <div className="relative">
                     <label className="block">
-                      <span className={eyebrow}>{f.label}</span>
+                      <span className={eyebrow}>
+                        <LabelText required={f.required}>{f.label}</LabelText>
+                      </span>
                       {f.kind === "select" ? (
                         <select
                           value={vals[f.key]}
@@ -369,6 +383,7 @@ export function FieldEditor({
                             }
                           }}
                           aria-invalid={bad ? true : undefined}
+                          aria-required={f.required || undefined}
                           aria-describedby={bad ? errId : undefined}
                           className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
                         >
@@ -391,6 +406,7 @@ export function FieldEditor({
                           invalid={!!bad}
                           describedBy={bad ? errId : undefined}
                           clearable={f.clearable}
+                          required={f.required}
                           className="mt-1"
                         />
                       ) : (
@@ -408,6 +424,7 @@ export function FieldEditor({
                             maxLength={f.maxLength}
                             autoComplete="off"
                             aria-invalid={bad ? true : undefined}
+                            aria-required={f.required || undefined}
                             aria-describedby={bad ? errId : undefined}
                             className={`h-11 w-full rounded-md border border-input bg-background pl-3 font-mono aria-invalid:border-destructive ${f.clearable ? "pr-11" : "pr-3"}`}
                           />

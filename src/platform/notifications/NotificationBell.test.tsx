@@ -140,3 +140,23 @@ describe("the bell", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("a reason, when the notice carries one (D113)", () => {
+  it("is shown under the subject, labelled, and only there", async () => {
+    h.listNotices.mockResolvedValue([
+      {
+        ...notice("n1", "employee.change_resolved", "Your change request was declined", null, 1),
+        payload: { reason: "I don't like it" },
+      },
+      notice("n2", "employee.change_resolved", "Your change request was approved", null, 2),
+    ]);
+    const user = userEvent.setup();
+    render(<NotificationBell />);
+    await user.click(await screen.findByRole("button", { name: /Notifications/ }));
+    const [declined, approved] = await screen.findAllByTestId("notice");
+    expect(within(declined).getByTestId("notice-reason")).toHaveTextContent(
+      "Reason: I don't like it",
+    );
+    expect(within(approved).queryByTestId("notice-reason")).toBeNull();
+  });
+});

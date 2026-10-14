@@ -78,7 +78,11 @@ describe("asking", () => {
     api.requestChange.mockResolvedValue(undefined);
     render(<EmployeeCardView card={as("self")} />);
     await user.click(screen.getByTestId("request-change"));
-    expect(screen.getByTestId("request-send")).toBeDisabled();
+    // Not greyed out: pressing it says what is missing, and nothing is sent (D113).
+    expect(screen.getByTestId("request-send")).toBeEnabled();
+    await user.click(screen.getByTestId("request-send"));
+    expect(screen.getByTestId("request-error")).toHaveTextContent("Say what it should say");
+    expect(api.requestChange).not.toHaveBeenCalled();
 
     await user.selectOptions(screen.getByTestId("request-section"), "address");
     await user.type(screen.getByTestId("request-details"), "I moved to Hosur on 1 June.");
@@ -102,7 +106,10 @@ describe("an Admin closing them", () => {
     api.resolveChange.mockResolvedValue(undefined);
     render(<ChangeRequestsScreen />);
     await user.click(await screen.findByTestId("resolve-decline"));
-    expect(screen.getByTestId("resolve-confirm")).toBeDisabled();
+    expect(screen.getByTestId("resolve-confirm")).toBeEnabled();
+    await user.click(screen.getByTestId("resolve-confirm"));
+    expect(screen.getByTestId("resolve-error")).toHaveTextContent("Give the reason");
+    expect(api.resolveChange).not.toHaveBeenCalled();
     await user.type(screen.getByTestId("resolve-note"), "No proof of address yet");
     await user.click(screen.getByTestId("resolve-confirm"));
     expect(api.resolveChange).toHaveBeenCalledWith("r-1", "declined", "No proof of address yet");
@@ -132,5 +139,50 @@ describe("an Admin closing them", () => {
     await user.click(within(second).getByTestId("resolve-confirm"));
     expect(await within(second).findByTestId("resolve-error")).toHaveTextContent("already dealt");
     expect(within(first).queryByTestId("resolve-error")).toBeNull();
+  });
+});
+
+describe("approving, and the reason for a decline (D113)", () => {
+  it("says Approve, not Made the change", async () => {
+    const user = userEvent.setup();
+    api.listChangeRequests.mockResolvedValue([request("r-1")]);
+    render(<ChangeRequestsScreen />);
+    expect(await screen.findByTestId("resolve-done")).toHaveTextContent(/^Approve$/);
+    await user.click(screen.getByTestId("resolve-done"));
+    expect(screen.getByTestId("resolve-confirm")).toHaveTextContent(/^Approve$/);
+  });
+
+  it("labels a decline's reason for HR", async () => {
+    api.listChangeRequests.mockResolvedValue([
+      {
+        ...request("r-1", "declined"),
+        resolutionNote: "Updated, I don't like",
+        resolvedByName: "Hema HR",
+      },
+    ]);
+    render(<ChangeRequestsScreen />);
+    expect(await screen.findByTestId("resolution")).toHaveTextContent(
+      /^Reason: Updated, I don't like/,
+    );
+  });
+
+  it("shows the person why theirs was declined", async () => {
+    api.listChangeRequests.mockResolvedValue([
+      { ...request("r-1", "declined"), resolutionNote: "No proof yet", resolvedByName: "Hema HR" },
+    ]);
+    render(<EmployeeCardView card={as("self")} />);
+    const mine = await screen.findByTestId("my-change-request");
+    expect(mine).toHaveTextContent("Declined");
+    expect(within(mine).getByTestId("resolution")).toHaveTextContent(/^Reason: No proof yet/);
+  });
+
+  it("calls an approval's note a note", async () => {
+    api.listChangeRequests.mockResolvedValue([
+      { ...request("r-1", "done"), resolutionNote: "Done today", resolvedByName: "Hema HR" },
+    ]);
+    render(<EmployeeCardView card={as("self")} />);
+    const mine = await screen.findByTestId("my-change-request");
+    expect(mine).toHaveTextContent("Approved");
+    expect(within(mine).getByTestId("resolution")).toHaveTextContent(/^Note: Done today/);
   });
 });

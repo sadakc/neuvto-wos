@@ -548,7 +548,8 @@ export function DraftEditor({
     <FieldEditor
       id="draft"
       title="Who they are"
-      label="Edit name and email"
+      label="Edit details"
+      variant="button"
       onSaved={onChanged}
       save={(vals) => updateDraft(card.id, vals as Record<string, string | null>)}
       fields={[

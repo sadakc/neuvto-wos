@@ -186,10 +186,10 @@ test("deploying to a unit that is added from the dialog", async ({ page }) => {
   await page.getByTestId("move-unit").click();
   const dialog = page.getByRole("dialog");
   const deploy = dialog.getByTestId("move-save");
-  await expect(deploy).toBeDisabled();
-  await expect(dialog.getByTestId("move-missing")).toHaveText(
-    "Still needed: a unit, the order reference.",
-  );
+  // D113: pressing it says what is missing, under each field.
+  await deploy.click();
+  await expect(dialog.getByText("Deploy to can't be empty.")).toBeVisible();
+  await expect(dialog.getByText("Deployment order reference can't be empty.")).toBeVisible();
   await dialog.getByTestId("move-unit-select").selectOption({ label: "Add a unit…" });
   await dialog.getByLabel("New unit").fill("Tata AIG, Hosur");
   await dialog.getByLabel("Client (for a client site)").fill("Tata AIG");

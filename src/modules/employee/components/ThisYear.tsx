@@ -59,6 +59,8 @@ export function ThisYearPanel({ employeeId }: { employeeId: string }) {
                   <span className="font-medium">{l.name}</span>
                   <span className="text-foreground-secondary">
                     {l.available} of {days(l.entitled)} left
+                    {/* D113: approved is approved, even before the day comes. */}
+                    {(l.booked ?? 0) > 0 ? ` · ${l.booked} approved, still to come` : ""}
                     {l.pending > 0 ? ` · ${l.pending} awaiting a decision` : ""}
                   </span>
                 </li>

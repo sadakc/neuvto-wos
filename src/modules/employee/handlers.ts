@@ -363,8 +363,11 @@ export async function requestChange(
 export async function listChangeRequests(
   status: ChangeRequestStatus | null,
 ): Promise<ChangeRequest[]> {
+  // Null is sent as null: left out, the database's default is 'open', and a
+  // person's own list lost every request once HR had answered it, the reason
+  // for a decline with it (Sada, D113). The generated type does not know null.
   const { data, error } = await supabase.rpc("employee_change_requests", {
-    _status: status ?? undefined,
+    _status: status as string,
   });
   if (error) throw toEmployeeError(error.message, error.details);
   return (data ?? []).map((r) => ({
@@ -842,6 +845,7 @@ export async function getThisYear(employeeId: string): Promise<ThisYear> {
           entitled: Number(l.entitled),
           used: Number(l.used),
           pending: Number(l.pending),
+          booked: Number(l.booked ?? 0),
           available: Number(l.available),
         }))
       : null,

@@ -230,8 +230,17 @@ describe("history", () => {
       within(dialog).queryByRole("textbox", { name: /^(unit|move to|deploy to)$/i }),
     ).toBeNull();
 
-    expect(screen.getByTestId("move-save")).toBeDisabled();
+    // D113: pressing it with nothing chosen says what is missing, under each field.
+    await user.click(screen.getByTestId("move-save"));
+    expect(api.moveUnit).not.toHaveBeenCalled();
+    expect(within(select.closest("label")!).getByRole("alert")).toHaveTextContent(
+      "Move to can't be empty.",
+    );
+    expect(
+      within(screen.getByTestId("move-order-ref").closest("label")!).getByRole("alert"),
+    ).toHaveTextContent("Deployment order reference can't be empty.");
     await user.selectOptions(select, "u-hq");
+    expect(within(select.closest("label")!).queryByRole("alert")).toBeNull();
     await user.type(screen.getByTestId("move-order-ref"), "DO-2026-0007");
     await user.click(screen.getByTestId("move-save"));
     expect(api.moveUnit).toHaveBeenCalledWith(

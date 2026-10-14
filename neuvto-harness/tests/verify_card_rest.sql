@@ -297,6 +297,18 @@ begin
     raise exception 'CARD FAIL: fixture — Ravi has no leave types, so the comparison proved nothing';
   end if;
   perform pg_temp.cr_ok('this year shows the balances My Leave shows');
+  -- D113. Sada's case: a leave Mark approved still read "awaiting a decision".
+  -- Sent and undecided is reserved; approved and still ahead is pending.
+  update public.leave_balances set reserved_days = 1, pending_days = 2
+   where employee_id = ravi and fy_label = j ->> 'leaveYear' and leave_type_id = (
+     select (x ->> 'leaveTypeId')::uuid from jsonb_array_elements(j -> 'leave') x limit 1);
+  j := pg_temp.cr_val(ravi, format('select public.employee_this_year(%L)::text', e_ravi))::jsonb;
+  select x into k from jsonb_array_elements(j -> 'leave') x
+   where (x ->> 'leaveTypeId')::uuid = (select b.leave_type_id from public.leave_balances b
+            where b.employee_id = ravi and b.fy_label = j ->> 'leaveYear' and b.reserved_days = 1 limit 1);
+  perform pg_temp.cr_check('awaiting a decision is what was sent and not yet decided',
+    k ->> 'pending', '1');
+  perform pg_temp.cr_check('approved and still ahead is said apart', k ->> 'booked', '2');
   perform pg_temp.cr_check('an unpaid type is not listed',
     (select count(*)::text from jsonb_array_elements(j -> 'leave') x where x ->> 'kind' = 'unpaid'), '0');
   perform pg_temp.cr_check('open requests by kind, his and pending only',

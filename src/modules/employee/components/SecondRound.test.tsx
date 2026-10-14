@@ -232,9 +232,16 @@ describe("deploying to a unit", () => {
     const select = screen.getByTestId("move-unit-select");
     await within(select).findByRole("option", { name: "No unit yet: add one below" });
     const deploy = screen.getByTestId("move-save");
-    expect(deploy).toBeDisabled();
-    expect(screen.getByTestId("move-missing")).toHaveTextContent(
-      "Still needed: a unit, the order reference.",
+    // D113: never greyed out; pressing it says what is missing.
+    expect(deploy).toBeEnabled();
+    await u.click(deploy);
+    expect(api.moveUnit).not.toHaveBeenCalled();
+    const refBox = screen.getByTestId("move-order-ref").closest("label")!;
+    expect(within(select.closest("label")!).getByRole("alert")).toHaveTextContent(
+      "Deploy to can't be empty.",
+    );
+    expect(within(refBox).getByRole("alert")).toHaveTextContent(
+      "Deployment order reference can't be empty.",
     );
 
     await u.selectOptions(select, "Add a unit…");
@@ -249,13 +256,10 @@ describe("deploying to a unit", () => {
     });
     await within(select).findByRole("option", { name: "Tata AIG, Hosur (Tata AIG)" });
     expect(shown(select)).toBe("Tata AIG, Hosur (Tata AIG)");
-    expect(screen.getByTestId("move-missing")).toHaveTextContent(
-      "Still needed: the order reference.",
-    );
+    expect(within(select.closest("label")!).queryByRole("alert")).toBeNull();
 
     await u.type(screen.getByTestId("move-order-ref"), "DO/2026/114");
-    expect(screen.queryByTestId("move-missing")).toBeNull();
-    expect(deploy).toBeEnabled();
+    expect(within(refBox).queryByRole("alert")).toBeNull();
     await u.click(deploy);
     expect(api.moveUnit).toHaveBeenCalledWith(
       card.id,

@@ -12,6 +12,8 @@
  *     anything is typed.
  */
 
+import { LabelText } from "@/components/shared/required";
+import { emptyMessage } from "@/lib/required";
 import { useEffect, useState } from "react";
 import {
   Dialog,
@@ -1237,14 +1239,19 @@ function Field({
   label,
   children,
   error,
+  required,
 }: {
   label: string;
   children: React.ReactNode;
   error?: string;
+  /** A red asterisk on the label (D113). */
+  required?: boolean;
 }) {
   return (
     <label className="min-w-0 text-sm">
-      <span className={eyebrow}>{label}</span>
+      <span className={eyebrow}>
+        <LabelText required={required}>{label}</LabelText>
+      </span>
       <span className="mt-1 block">{children}</span>
       {error && (
         <span role="alert" className="mt-1 block text-sm text-destructive">
@@ -1598,18 +1605,29 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
       .catch(() => setUnits([]));
   }, [open]);
 
-  // What still stands between the Admin and the button, said under it.
-  const missing = [
-    !v.unitId && "a unit",
-    !v.effectiveFrom && "the date",
-    !v.orderRef.trim() && "the order reference",
-  ].filter(Boolean) as string[];
+  // D113: what is missing is said on pressing the button, under each field,
+  // never by greying the button out.
+  const [unitError, setUnitError] = useState("");
+  const [refError, setRefError] = useState("");
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setDateError("");
     setEndError("");
+    const noUnit = addingUnit
+      ? "Add the unit first, or choose one."
+      : !v.unitId
+        ? emptyMessage(currentUnit ? "Move to" : "Deploy to")
+        : "";
+    const noRef = v.orderRef.trim() ? "" : emptyMessage("Deployment order reference");
+    const noDate = v.effectiveFrom
+      ? ""
+      : emptyMessage(currentUnit ? "The start" : "Effective from");
+    setUnitError(noUnit);
+    setRefError(noRef);
+    if (noDate) setDateError(noDate);
+    if (noUnit || noRef || noDate) return;
     if (v.endsOn && !isIsoDate(v.endsOn)) {
       setEndError(DATE_FORMAT_MESSAGE);
       return;
@@ -1664,6 +1682,8 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
           setError("");
           setDateError("");
           setEndError("");
+          setUnitError("");
+          setRefError("");
           setStartChosen(false);
           setKeepOwnShift(false);
           setAddingUnit(false);
@@ -1684,7 +1704,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={submit} noValidate className="grid gap-3">
-            <Field label={currentUnit ? "Move to" : "Deploy to"}>
+            <Field label={currentUnit ? "Move to" : "Deploy to"} required error={unitError}>
               {/* A select from the database's active units. There is no text
                   path to a unit anywhere (criterion 4). */}
               <select
@@ -1698,7 +1718,9 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                   }
                   setAddingUnit(false);
                   setV({ ...v, unitId: e.target.value });
+                  setUnitError("");
                 }}
+                aria-invalid={unitError ? true : undefined}
                 className={input}
               >
                 <option value="">
@@ -1722,6 +1744,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 onCancel={() => setAddingUnit(false)}
                 onAdded={(id) => {
                   setAddingUnit(false);
+                  setUnitError("");
                   void listActiveUnits()
                     .then(setUnits)
                     .catch(() => setUnits([]));
@@ -1758,6 +1781,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
             <Field
               label={currentUnit ? "Starts at the new unit on" : "Effective from"}
               error={dateError}
+              required
             >
               <DateField
                 label={currentUnit ? "Starts at the new unit on" : "Effective from"}
@@ -1798,12 +1822,16 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 </span>
               </label>
             )}
-            <Field label="Deployment order reference">
+            <Field label="Deployment order reference" required error={refError}>
               <input
                 required
                 data-testid="move-order-ref"
                 value={v.orderRef}
-                onChange={(e) => setV({ ...v, orderRef: e.target.value })}
+                aria-invalid={refError ? true : undefined}
+                onChange={(e) => {
+                  setV({ ...v, orderRef: e.target.value });
+                  setRefError("");
+                }}
                 className={`${input} font-mono`}
               />
             </Field>
@@ -1852,22 +1880,12 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
             )}
             <button
               type="submit"
-              disabled={busy || missing.length > 0 || addingUnit}
+              disabled={busy}
               data-testid="move-save"
-              aria-describedby={missing.length > 0 ? "move-missing" : undefined}
               className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
             >
               {busy ? "Saving…" : currentUnit ? "Close the current posting and move" : "Deploy"}
             </button>
-            {missing.length > 0 && (
-              <p
-                id="move-missing"
-                data-testid="move-missing"
-                className="text-caption text-muted-foreground"
-              >
-                Still needed: {missing.join(", ")}.
-              </p>
-            )}
           </form>
         </DialogContent>
       </Dialog>

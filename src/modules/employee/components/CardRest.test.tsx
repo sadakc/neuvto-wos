@@ -56,6 +56,7 @@ const YEAR = {
       entitled: 12,
       used: 2,
       pending: 1.5,
+      booked: 0,
       available: 10,
     },
     {
@@ -65,6 +66,7 @@ const YEAR = {
       entitled: 1,
       used: 0,
       pending: 0,
+      booked: 1,
       available: 1,
     },
   ],
@@ -100,7 +102,10 @@ describe("this year", () => {
     expect(await within(panel).findByText("Casual")).toBeInTheDocument();
     expect(panel).toHaveTextContent("10 of 12 days left");
     expect(panel).toHaveTextContent("1.5 awaiting a decision");
-    expect(panel).toHaveTextContent("1 of 1 day left");
+    expect(panel).toHaveTextContent("1 of 1 day left · 1 approved, still to come");
+    // Approved days are never called undecided (Sada, D113).
+    expect(panel).not.toHaveTextContent("1 awaiting a decision");
+    expect(panel).not.toHaveTextContent("0 approved");
     expect(panel).toHaveTextContent("Leave request: 2");
     expect(panel).toHaveTextContent("Compensatory off claim: 1");
     expect(panel).toHaveTextContent("Record corrections: 1");
