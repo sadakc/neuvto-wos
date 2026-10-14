@@ -194,6 +194,22 @@ begin
   perform pg_temp.ma_root();
   perform pg_temp.ma_ok('a Leave Admin schedules a Leave report');
 
+  -- The Reports page lists them with plain selects, so the table grant is load-
+  -- bearing: without it the panel fails with 42501 before RLS is consulted.
+  perform pg_temp.ma_allowed('and reads the report it can schedule', mark,
+    $q$select 1 from public.report_definitions where report_key = 'leave.summary'$q$);
+  perform pg_temp.ma_allowed('and reads the schedule back', mark,
+    'select 1 from public.report_schedules');
+  n := pg_temp.ma_count(mark, format('select count(*) from public.report_schedules where id = %L', sched));
+  if n <> 1 then raise exception 'MODULE ADMINS FAIL: a Leave Admin sees % of their own schedule', n; end if;
+  -- Recipients are addresses outside the product, the CEO's among them.
+  n := pg_temp.ma_count(ravi, 'select count(*) from public.report_schedules');
+  if n <> 0 then raise exception 'MODULE ADMINS FAIL: an employee reads % report schedules', n; end if;
+  perform pg_temp.ma_ok('an employee reads no schedules');
+  n := pg_temp.ma_count(dan, format('select count(*) from public.report_schedules where id = %L', sched));
+  if n <> 0 then raise exception 'MODULE ADMINS FAIL: an Employee Admin reads a Leave schedule'; end if;
+  perform pg_temp.ma_ok('nor does an Employee Admin read a Leave one');
+
   insert into public.report_definitions (report_key, module_key, title)
   values ('employee.headcount', 'employee', 'Headcount');
   perform pg_temp.ma_refused('but not another module''s report', mark,
