@@ -621,7 +621,8 @@ export type DocumentType = (typeof DOCUMENT_TYPES)[number]["key"];
 
 export interface EmployeeDocument {
   id: string;
-  docType: DocumentType;
+  /** employee_documents_list() returns address proofs (D98) with the twelve. */
+  docType: DocumentType | "address_proof";
   /** The employer of a relieving letter; what an "other" is. */
   title: string | null;
   fileName: string;
