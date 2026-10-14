@@ -93,7 +93,8 @@ begin
     pg_temp.nb_val(alice, own), '1');
   perform pg_temp.nb_check('in words that say who and what',
     pg_temp.nb_val(hema, $q$select subject from public.notifications_feed(1)$q$),
-    'Ravi Employee changed their alternate mobile number');
+    -- His name as it is now: an earlier suite in the harness renames him.
+    (select full_name from public.profiles where id = ravi) || ' changed their alternate mobile number');
   perform pg_temp.nb_check('with the record it is about, to open',
     pg_temp.nb_val(hema, $q$select payload ->> 'employee_id' from public.notifications_feed(1)$q$), e_ravi::text);
   perform pg_temp.nb_check('the person is not told of their own change',
@@ -168,7 +169,8 @@ begin
     end;
     perform pg_temp.nb_check('what you raised is in your own bell, with who it waits for',
       pg_temp.nb_val(ravi, $q$select subject from public.notifications_feed(10) where event_key = 'approval.sent'$q$),
-      'Your leave request is waiting for Mark Manager');
+      'Your leave request is waiting for '
+        || (select full_name from public.profiles where id = '00000000-0000-0000-0000-00000000a004'));
     perform pg_temp.nb_check('in the bell only',
       (select string_agg(distinct channel::text || '/' || status::text, ',') from public.notifications
         where event_key = 'approval.sent'), 'in_app/sent');
