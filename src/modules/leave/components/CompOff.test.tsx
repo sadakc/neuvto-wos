@@ -96,9 +96,9 @@ describe("claiming compensatory off", () => {
     const user = userEvent.setup();
     render(<CompOff />);
     const day1 = await screen.findByLabelText("Day worked 1");
-    await user.type(day1, "2026-10-04");
+    await user.type(day1, "04/10/2026");
     await user.click(screen.getByRole("button", { name: "Add another day" }));
-    await user.type(screen.getByLabelText("Day worked 2"), "2026-10-05");
+    await user.type(screen.getByLabelText("Day worked 2"), "05/10/2026");
     await user.selectOptions(screen.getByLabelText("How much of day 2"), "0.5");
     await user.type(screen.getByLabelText("Note for day 2"), "Stock count");
     await user.type(screen.getByLabelText("Why you're owed this"), "Weekend stock count");
@@ -118,12 +118,22 @@ describe("claiming compensatory off", () => {
     );
   });
 
+  it("asks for a whole date and sends nothing while one is half typed", async () => {
+    const user = userEvent.setup();
+    render(<CompOff />);
+    await user.type(await screen.findByLabelText("Day worked 1"), "04/10/2026");
+    await user.click(screen.getByRole("button", { name: "Add another day" }));
+    await user.type(screen.getByLabelText("Day worked 2"), "05/1");
+    expect(screen.getByTestId("comp-off-date-problem")).toHaveTextContent("DD/MM/YYYY");
+    expect(screen.getByRole("button", { name: "Send for approval" })).toBeDisabled();
+  });
+
   it("removes a listed day", async () => {
     const user = userEvent.setup();
     render(<CompOff />);
-    await user.type(await screen.findByLabelText("Day worked 1"), "2026-10-04");
+    await user.type(await screen.findByLabelText("Day worked 1"), "04/10/2026");
     await user.click(screen.getByRole("button", { name: "Add another day" }));
-    await user.type(screen.getByLabelText("Day worked 2"), "2026-10-05");
+    await user.type(screen.getByLabelText("Day worked 2"), "05/10/2026");
     await user.click(screen.getByRole("button", { name: "Remove day 1" }));
     await user.type(screen.getByLabelText("Why you're owed this"), "Weekend");
     await user.click(screen.getByRole("button", { name: "Send for approval" }));
@@ -147,7 +157,7 @@ describe("claiming compensatory off", () => {
       new AppError("VALIDATION_FAILED", "You've already claimed one of those days.", 400),
     );
     render(<CompOff />);
-    await user.type(await screen.findByLabelText("Day worked 1"), "2026-10-04");
+    await user.type(await screen.findByLabelText("Day worked 1"), "04/10/2026");
     await user.type(screen.getByLabelText("Why you're owed this"), "Weekend");
     await user.click(screen.getByRole("button", { name: "Send for approval" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(

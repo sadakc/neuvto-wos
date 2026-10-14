@@ -27,6 +27,8 @@ import { ModuleLink } from "@/platform/modules";
 import { BalanceCard } from "./BalanceCard";
 import type { ApprovalStep, LeaveBalance, LeaveRequest } from "../contracts";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Panel } from "@/components/shared/panel";
+import { formatRange } from "@/lib/dates";
 import { LEAVE_STATUS_LABEL, LEAVE_STATUS_TONE } from "../status";
 
 const FILTERS = [
@@ -146,14 +148,20 @@ export default function MyLeave() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="flex min-w-0 flex-col gap-4">
       <section>
         <div className="flex flex-wrap items-baseline justify-between gap-2">
-          <h1 className="text-page-title font-semibold tracking-page-title">My leave</h1>
+          <div>
+            <h1 className="text-page-title font-semibold tracking-page-title">My leave</h1>
+            <p className="mt-1 text-sm text-foreground-secondary">
+              What you have left this year, and every request you have made. Open one to see who
+              decided it.
+            </p>
+          </div>
           {hasEarned && (
             <ModuleLink
               path="leave/comp-off"
-              className="text-sm font-medium underline underline-offset-4"
+              className="text-sm font-medium text-primary hover:underline"
             >
               Claim compensatory off
             </ModuleLink>
@@ -178,36 +186,38 @@ export default function MyLeave() {
         )}
       </section>
 
-      <section>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-card-title font-semibold tracking-card-title">History</h2>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter requests">
+      <Panel
+        title="History"
+        testId="panel-history"
+        aside={
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter requests">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
                 aria-pressed={filter === f.key}
                 data-testid={`filter-${f.key}`}
-                className={`inline-flex h-12 items-center rounded-md border px-3 text-sm ${
+                className={`inline-flex min-h-9 items-center rounded-md border px-3 text-sm ${
                   filter === f.key
-                    ? "border-foreground bg-secondary font-medium"
-                    : "border-border text-muted-foreground"
+                    ? "border-primary bg-accent font-medium text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {f.label}
               </button>
             ))}
           </div>
-        </div>
-
+        }
+        footer="Cancelling gives the days straight back. Whether a request can still be cancelled is decided when you press the button."
+      >
         {visible.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {requests.length === 0
               ? "You haven't requested any leave yet."
               : "Nothing matches that filter."}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-border">
+          <ul className="-my-3 divide-y divide-border">
             {visible.map((r) => {
               const open = openId === r.id;
               return (
@@ -220,8 +230,8 @@ export default function MyLeave() {
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{r.leaveTypeName}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {r.fromDate} to {r.toDate} · {r.workingDays}{" "}
+                      <span className="block text-caption text-muted-foreground">
+                        {formatRange(r.fromDate, r.toDate)} · {r.workingDays}{" "}
                         {r.workingDays === 1 ? "day" : "days"}
                       </span>
                     </span>
@@ -233,11 +243,11 @@ export default function MyLeave() {
                   {open && (
                     <div
                       data-testid="request-detail"
-                      className="mt-3 rounded-md bg-secondary/40 p-4"
+                      className="mt-3 rounded-lg border border-border bg-secondary/40 p-4"
                     >
                       {r.reason && <p className="text-sm">{r.reason}</p>}
 
-                      <h3 className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
+                      <h3 className="mt-3 text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
                         Approval
                       </h3>
                       {timeline.length === 0 ? (
@@ -316,7 +326,7 @@ export default function MyLeave() {
             })}
           </ul>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }

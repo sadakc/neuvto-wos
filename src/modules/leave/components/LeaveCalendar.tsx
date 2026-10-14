@@ -7,6 +7,8 @@
  * file (D15).
  */
 
+import { Panel } from "@/components/shared/panel";
+import { formatRange } from "@/lib/dates";
 import { useEffect, useMemo, useState } from "react";
 import { getMyRequests } from "../handlers";
 import type { LeaveRequest } from "../contracts";
@@ -87,107 +89,121 @@ export default function LeaveCalendar() {
   }
 
   return (
-    <div className="mx-auto max-w-2xl">
-      {/* Reached from here rather than from the navigation bar: it is a view of
-          this calendar, and the mobile bar has room for five destinations. It
-          renders for everyone — a person with no reports sees a short, honest
-          "nobody reports to you yet" rather than a link that is missing for
-          reasons they cannot see. */}
-      <div className="mb-4">
-        <a
-          href="/app/leave/team"
-          className="text-sm text-muted-foreground underline underline-offset-4"
-        >
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-page-title font-semibold tracking-page-title">Calendar</h1>
+          <p className="mt-1 text-sm text-foreground-secondary">
+            Your leave, month by month. Press a day to see the request.
+          </p>
+        </div>
+        {/* Reached from here rather than from the navigation bar: it is a view of
+            this calendar, and the mobile bar has room for five destinations. It
+            renders for everyone — a person with no reports sees a short, honest
+            "nobody reports to you yet" rather than a link that is missing for
+            reasons they cannot see. */}
+        <a href="/app/leave/team" className="text-sm font-medium text-primary hover:underline">
           See my team&apos;s calendar
         </a>
       </div>
 
-      <div className="flex items-center justify-between">
-        <h1 className="text-page-title font-semibold tracking-page-title">
-          {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
-        </h1>
-        <div className="flex gap-2">
-          <button
-            aria-label="Previous month"
-            // Functional update: two quick taps must advance two months. Reading
-            // `month` from the closure made the second tap reuse the first's
-            // value, so rapid navigation silently lost clicks.
-            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-border"
-          >
-            ‹
-          </button>
-          <button
-            aria-label="Next month"
-            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-border"
-          >
-            ›
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
-        {WEEKDAYS.map((d) => (
-          <div key={d} className="py-1">
-            {d}
+      <div className="grid gap-4 @min-[900px]/app:grid-cols-[minmax(0,2fr)_minmax(0,1fr)] @min-[900px]/app:items-start">
+        <Panel
+          title={month.toLocaleString(undefined, { month: "long", year: "numeric" })}
+          testId="panel-month"
+          aside={
+            <span className="flex gap-2">
+              <button
+                aria-label="Previous month"
+                // Functional update: two quick taps must advance two months. Reading
+                // `month` from the closure made the second tap reuse the first's
+                // value, so rapid navigation silently lost clicks.
+                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+                className="-my-1.5 inline-flex size-9 items-center justify-center rounded-md border border-border text-foreground"
+              >
+                ‹
+              </button>
+              <button
+                aria-label="Next month"
+                onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+                className="-my-1.5 inline-flex size-9 items-center justify-center rounded-md border border-border text-foreground"
+              >
+                ›
+              </button>
+            </span>
+          }
+          footer={
+            <span className="flex flex-wrap gap-4">
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm bg-info" /> Approved
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm bg-warning" /> Awaiting approval
+              </span>
+              <span className="flex items-center gap-2">
+                <span className="h-3 w-3 rounded-sm border border-foreground" /> Today
+              </span>
+            </span>
+          }
+        >
+          <div className="mt-4 grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+            {WEEKDAYS.map((d) => (
+              <div key={d} className="py-1">
+                {d}
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
 
-      <div className="mt-1 grid grid-cols-7 gap-1">
-        {cells.map((d, i) => {
-          if (!d) return <div key={`pad-${i}`} />;
-          const key = iso(d);
-          const req = byDay.get(key);
-          const isToday = key === today;
+          <div className="mt-1 grid grid-cols-7 gap-1">
+            {cells.map((d, i) => {
+              if (!d) return <div key={`pad-${i}`} />;
+              const key = iso(d);
+              const req = byDay.get(key);
+              const isToday = key === today;
 
-          const tone = !req
-            ? "bg-background"
-            : req.status === "approved"
-              ? "bg-info-muted text-foreground"
-              : "bg-warning-muted text-foreground";
+              const tone = !req
+                ? "bg-background"
+                : req.status === "approved"
+                  ? "bg-info-muted text-foreground"
+                  : "bg-warning-muted text-foreground";
 
-          return (
-            <button
-              key={key}
-              data-testid={req ? `day-${req.status}` : "day-free"}
-              onClick={() => setSelected(req ? key : null)}
-              className={`flex h-12 items-center justify-center rounded-md border text-sm tabular-nums ${tone} ${
-                isToday ? "border-foreground font-semibold" : "border-border"
-              } ${selected === key ? "ring-2 ring-ring" : ""}`}
-            >
-              {d.getDate()}
-            </button>
-          );
-        })}
-      </div>
+              return (
+                <button
+                  key={key}
+                  data-testid={req ? `day-${req.status}` : "day-free"}
+                  onClick={() => setSelected(req ? key : null)}
+                  className={`flex h-12 items-center justify-center rounded-md border text-sm tabular-nums ${tone} ${
+                    isToday ? "border-foreground font-semibold" : "border-border"
+                  } ${selected === key ? "ring-2 ring-ring" : ""}`}
+                >
+                  {d.getDate()}
+                </button>
+              );
+            })}
+          </div>
+        </Panel>
 
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-info" /> Approved
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-warning" /> Awaiting approval
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm border border-foreground" /> Today
-        </span>
-      </div>
-
-      {selectedRequest && (
-        <div data-testid="day-detail" className="mt-4 rounded-lg border border-border bg-card p-4">
-          <p className="text-sm font-medium">{selectedRequest.leaveTypeName}</p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            {selectedRequest.fromDate} to {selectedRequest.toDate} · {selectedRequest.workingDays}{" "}
-            {selectedRequest.workingDays === 1 ? "day" : "days"} ·{" "}
-            {selectedRequest.status === "approved" ? "Approved" : "Awaiting approval"}
-          </p>
-          {selectedRequest.reason && (
-            <p className="mt-2 text-sm text-muted-foreground">{selectedRequest.reason}</p>
+        <Panel title="The day you chose" testId="panel-day">
+          {!selectedRequest && (
+            <p className="text-sm text-muted-foreground">
+              Press a coloured day to see its request.
+            </p>
           )}
-        </div>
-      )}
+          {selectedRequest && (
+            <div data-testid="day-detail">
+              <p className="text-sm font-medium">{selectedRequest.leaveTypeName}</p>
+              <p className="mt-1 text-xs text-muted-foreground">
+                {formatRange(selectedRequest.fromDate, selectedRequest.toDate)} ·{" "}
+                {selectedRequest.workingDays} {selectedRequest.workingDays === 1 ? "day" : "days"} ·{" "}
+                {selectedRequest.status === "approved" ? "Approved" : "Awaiting approval"}
+              </p>
+              {selectedRequest.reason && (
+                <p className="mt-2 text-sm text-muted-foreground">{selectedRequest.reason}</p>
+              )}
+            </div>
+          )}
+        </Panel>
+      </div>
     </div>
   );
 }

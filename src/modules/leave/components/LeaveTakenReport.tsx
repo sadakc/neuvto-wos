@@ -14,6 +14,8 @@
  * why nothing renders until the organisation's day is known.
  */
 
+import { DateField } from "@/components/shared/date-field";
+import { isIsoDate } from "@/components/shared/date-rules";
 import { useEffect, useMemo, useState } from "react";
 import {
   ReportView,
@@ -127,29 +129,19 @@ export default function LeaveTakenReport() {
       }
       filters={
         <>
-          <label className="text-xs text-muted-foreground">
-            From
-            <input
-              type="date"
-              value={range?.from ?? ""}
-              disabled={!range}
-              onChange={(e) => setRange((r) => (r ? { ...r, from: e.target.value } : r))}
-              data-testid="taken-from"
-              className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm @min-[640px]/app:w-44"
-            />
-          </label>
-
-          <label className="text-xs text-muted-foreground">
-            To
-            <input
-              type="date"
-              value={range?.to ?? ""}
-              disabled={!range}
-              onChange={(e) => setRange((r) => (r ? { ...r, to: e.target.value } : r))}
-              data-testid="taken-to"
-              className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm @min-[640px]/app:w-44"
-            />
-          </label>
+          {(["from", "to"] as const).map((k) => (
+            <div key={k} className="text-xs text-muted-foreground @min-[640px]/app:w-48">
+              <span aria-hidden>{k === "from" ? "From" : "To"}</span>
+              {/* The report reads whole dates only; half of one is left in the box. */}
+              <DateField
+                label={k === "from" ? "From" : "To"}
+                testId={`taken-${k}`}
+                value={range?.[k] ?? ""}
+                onChange={(v) => isIsoDate(v) && setRange((r) => (r ? { ...r, [k]: v } : r))}
+                className="mt-1"
+              />
+            </div>
+          ))}
         </>
       }
     />

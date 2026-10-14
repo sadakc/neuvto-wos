@@ -1,4 +1,5 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { Panel } from "@/components/shared/panel";
 import { Suspense, useEffect, useState } from "react";
 import {
   administersAnyModule,
@@ -29,6 +30,9 @@ export const Route = createFileRoute("/app/reports")({
  * unambiguous subject.
  */
 function ReportsPage() {
+  // Opened from a module's Reports tab (?m=), that module's reports alone.
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const moduleKey = typeof search.m === "string" ? search.m : undefined;
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
   const [reports, setReports] = useState<(ModuleReport & { moduleKey: string })[]>([]);
   const [activeId, setActiveId] = useState("");
@@ -52,8 +56,11 @@ function ReportsPage() {
 
         const list = await getModuleReports(u);
         if (cancelled) return;
-        setReports(list.filter((r) => isModuleAdmin(u, r.moduleKey)));
-        setActiveId(list[0]?.id ?? "");
+        const theirs = list.filter(
+          (r) => isModuleAdmin(u, r.moduleKey) && (!moduleKey || r.moduleKey === moduleKey),
+        );
+        setReports(theirs);
+        setActiveId(theirs[0]?.id ?? "");
         setState("ready");
       } catch (e) {
         if (cancelled) return;
@@ -64,7 +71,7 @@ function ReportsPage() {
     return () => {
       cancelled = true;
     };
-  }, []);
+  }, [moduleKey]);
 
   if (state === "loading") return <div className="h-64 animate-pulse rounded-lg bg-muted" />;
 
@@ -107,13 +114,19 @@ function ReportsPage() {
   const Active = active.component;
 
   return (
-    <div className="mx-auto max-w-6xl">
-      <h1 className="text-page-title font-semibold tracking-page-title">Reports</h1>
+    <div className="flex min-w-0 flex-col gap-4 pb-16">
+      <div>
+        <h1 className="text-page-title font-semibold tracking-page-title">Reports</h1>
+        <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
+          One report at a time, every person or every request in the company. Export any of them, or
+          have it emailed on a schedule.
+        </p>
+      </div>
 
       <div
         role="tablist"
         aria-label="Reports"
-        className="mt-4 flex flex-wrap gap-2 border-b border-border"
+        className="flex flex-wrap gap-1 border-b border-border"
       >
         {reports.map((r) => (
           <button
@@ -122,10 +135,10 @@ function ReportsPage() {
             aria-selected={r.id === active.id}
             data-testid={`report-tab-${r.id}`}
             onClick={() => setActiveId(r.id)}
-            className={`min-h-12 rounded-t-md px-4 py-2 text-sm ${
+            className={`-mb-px min-h-11 border-b-2 px-3 py-2 text-sm ${
               r.id === active.id
-                ? "border-b-2 border-foreground font-medium text-foreground"
-                : "text-muted-foreground"
+                ? "border-primary font-semibold text-foreground"
+                : "border-transparent text-muted-foreground hover:text-foreground"
             }`}
           >
             {r.title}
@@ -133,15 +146,11 @@ function ReportsPage() {
         ))}
       </div>
 
-      {active.description && (
-        <p className="mt-4 max-w-prose text-sm text-muted-foreground">{active.description}</p>
-      )}
-
-      <div className="mt-6">
+      <Panel title={active.title} testId="report-panel" footer={active.description}>
         <Suspense fallback={<div className="h-64 animate-pulse rounded-lg bg-muted" />}>
           <Active />
         </Suspense>
-      </div>
+      </Panel>
 
       {/* ─────────────────────────────────────────── scheduled delivery
           Below the reports rather than beside them: this is not a fourth
@@ -149,18 +158,13 @@ function ReportsPage() {
           signing in to fetch it. Names no module — a schedule points at a
           report_key some module registered, and this file still knows nothing
           about leave (D30). */}
-      <section className="mt-12 border-t border-border pt-8">
-        <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
-          Scheduled reports
-        </h2>
-        <p className="mt-1 max-w-prose text-sm text-muted-foreground">
+      <Panel title="Scheduled reports" testId="scheduled-reports">
+        <p className="mb-4 max-w-prose text-sm text-muted-foreground">
           Have a report emailed on a day you choose, to anybody you name — they do not need a Neuvto
           account. Everything is timed by your workspace&apos;s own calendar and timezone.
         </p>
-        <div className="mt-4">
-          <ScheduledReports />
-        </div>
-      </section>
+        <ScheduledReports />
+      </Panel>
     </div>
   );
 }

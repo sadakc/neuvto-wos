@@ -22,6 +22,8 @@ import {
   type Member,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
+import { DateField } from "@/components/shared/date-field";
+import { isIsoDate } from "@/components/shared/date-rules";
 import { AccessEditor, type AdministrableModule } from "@/platform/auth/AccessEditor";
 import { getEnabledModules } from "@/platform/modules";
 import { listDepartments, setDepartment, type Department } from "@/platform/organization";
@@ -490,17 +492,10 @@ export function MembersPage() {
                   >
                     Started
                   </label>
-                  <input
+                  <JoinedDate
                     id={`joined-${m.id}`}
-                    type="date"
-                    data-testid="joined-date"
-                    defaultValue={m.joinedDate}
-                    onBlur={(e) => {
-                      if (e.target.value && e.target.value !== m.joinedDate) {
-                        void onSetJoinedDate(m.id, e.target.value);
-                      }
-                    }}
-                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                    saved={m.joinedDate}
+                    onSave={(d) => void onSetJoinedDate(m.id, d)}
                   />
                 </div>
 
@@ -680,5 +675,38 @@ export function MembersPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * A start date, typed DD/MM/YYYY or picked (the shared date picker). Saved
+ * once it is a whole date different from the one on record, as the old box
+ * saved when it lost focus; half a date is never sent.
+ */
+function JoinedDate({
+  id,
+  saved,
+  onSave,
+}: {
+  id: string;
+  saved: string;
+  onSave: (date: string) => void;
+}) {
+  const [value, setValue] = useState(saved);
+  useEffect(() => setValue(saved), [saved]);
+  return (
+    <DateField
+      id={id}
+      testId="joined-date"
+      value={value}
+      max={`${new Date().getFullYear() + 1}-12-31`}
+      openAt={saved || undefined}
+      invalid={value !== "" && !isIsoDate(value)}
+      onChange={(v) => {
+        setValue(v);
+        if (isIsoDate(v) && v !== saved) onSave(v);
+      }}
+      className="flex-1"
+    />
   );
 }

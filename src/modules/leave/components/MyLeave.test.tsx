@@ -147,3 +147,13 @@ describe("decided on somebody's behalf (D92)", () => {
     expect(await screen.findAllByText(/Decided by Hema HR on their behalf/)).toHaveLength(1);
   });
 });
+
+describe("the history, in the Core HR design (14 Oct 2026)", () => {
+  it("sits in a History panel and writes its dates as the Employee Card does", async () => {
+    render(<MyLeave />);
+    const row = await screen.findByTestId("request-row");
+    expect(screen.getByTestId("panel-history")).toContainElement(row);
+    expect(row).toHaveTextContent("05 Jan 2099 to 09 Jan 2099");
+    expect(row).not.toHaveTextContent("2099-01-05");
+  });
+});

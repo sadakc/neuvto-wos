@@ -5,6 +5,8 @@
  * followed it.
  */
 
+import { DateField } from "@/components/shared/date-field";
+import { isIsoDate } from "@/components/shared/date-rules";
 import { useEffect, useState } from "react";
 import { ReportView, monthBounds, useOrgClock, type ReportColumn } from "@/platform/reports";
 import { isAppError } from "@/platform/errors";
@@ -78,16 +80,16 @@ export function WindowedReport<T>({
         filters={
           <>
             {(["from", "to"] as const).map((k) => (
-              <label key={k} className="text-xs text-muted-foreground">
-                {k === "from" ? "From" : "To"}
-                <input
-                  type="date"
+              <div key={k} className="text-xs text-muted-foreground @min-[640px]/app:w-48">
+                <span aria-hidden>{k === "from" ? "From" : "To"}</span>
+                {/* The report reads whole dates only; half of one is left in the box. */}
+                <DateField
+                  label={k === "from" ? "From" : "To"}
                   value={range?.[k] ?? ""}
-                  disabled={!range}
-                  onChange={(e) => setRange((r) => (r ? { ...r, [k]: e.target.value } : r))}
-                  className="mt-1 block h-12 w-full rounded-md border border-border bg-background px-3 text-sm @min-[640px]/app:w-44"
+                  onChange={(v) => isIsoDate(v) && setRange((r) => (r ? { ...r, [k]: v } : r))}
+                  className="mt-1"
                 />
-              </label>
+              </div>
             ))}
           </>
         }

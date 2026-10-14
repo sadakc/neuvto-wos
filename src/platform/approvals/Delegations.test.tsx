@@ -95,8 +95,8 @@ describe("handing approvals over", () => {
     const user = userEvent.setup();
     render(<Delegations isAdmin={false} modules={MODULES} />);
     await user.selectOptions(await screen.findByLabelText("Hand them to"), "dan");
-    await user.type(screen.getByLabelText("From"), "2026-11-02");
-    await user.type(screen.getByLabelText("To"), "2026-11-06");
+    await user.type(screen.getByLabelText("From"), "02/11/2026");
+    await user.type(screen.getByLabelText("To"), "06/11/2026");
     await user.selectOptions(screen.getByLabelText("Which approvals"), "leave");
     await user.type(screen.getByLabelText("Reason (optional)"), "Travelling");
     expect(screen.queryByLabelText("Whose approvals")).toBeNull();
@@ -119,8 +119,8 @@ describe("handing approvals over", () => {
     render(<Delegations isAdmin modules={MODULES} />);
     await user.selectOptions(await screen.findByLabelText("Whose approvals"), "hema");
     await user.selectOptions(screen.getByLabelText("Hand them to"), "dan");
-    await user.type(screen.getByLabelText("From"), "2026-11-02");
-    await user.type(screen.getByLabelText("To"), "2026-11-03");
+    await user.type(screen.getByLabelText("From"), "02/11/2026");
+    await user.type(screen.getByLabelText("To"), "03/11/2026");
     await user.click(screen.getByRole("button", { name: "Hand over" }));
     expect(h.delegateApprovals).toHaveBeenCalledWith(
       expect.objectContaining({ delegatorId: "hema", delegateId: "dan", moduleKey: null }),
@@ -138,8 +138,8 @@ describe("handing approvals over", () => {
     );
     render(<Delegations isAdmin={false} modules={MODULES} />);
     await user.selectOptions(await screen.findByLabelText("Hand them to"), "dan");
-    await user.type(screen.getByLabelText("From"), "2026-11-02");
-    await user.type(screen.getByLabelText("To"), "2026-11-03");
+    await user.type(screen.getByLabelText("From"), "02/11/2026");
+    await user.type(screen.getByLabelText("To"), "03/11/2026");
     await user.click(screen.getByRole("button", { name: "Hand over" }));
     expect(await screen.findByRole("alert")).toHaveTextContent(
       "Your approvals are already handed over for some of those dates.",

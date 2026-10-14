@@ -3,15 +3,8 @@
  * card, the history tables and the directory cannot disagree about any of them.
  */
 
-const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
-
-/** `2024-03-01` → `01 Mar 2024`. Read as a calendar date, never through a time zone. */
-export function formatDate(iso: string | null | undefined): string {
-  if (!iso) return "—";
-  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(iso);
-  if (!m) return "—";
-  return `${m[3]} ${MONTHS[Number(m[2]) - 1]} ${m[1]}`;
-}
+/** `2024-03-01` → `01 Mar 2024`. Shared by every module since Leave took the same design. */
+export { formatDate } from "@/lib/dates";
 
 /**
  * The last day of a closed row. The table stores an exclusive end (a row

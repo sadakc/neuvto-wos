@@ -56,13 +56,13 @@ describe("blackout periods", () => {
     render(<Blackouts />);
     await user.click(await screen.findByTestId("add-blackout"));
     await user.type(screen.getByLabelText("Name"), "Diwali rush");
-    await user.type(screen.getByLabelText("From"), "2099-11-10");
-    await user.type(screen.getByLabelText("To"), "2099-11-01");
+    await user.type(screen.getByLabelText("From"), "10/11/2099");
+    await user.type(screen.getByLabelText("To"), "01/11/2099");
     expect(screen.getByTestId("save-blackout")).toBeDisabled();
     expect(screen.getByTestId("blackout-dates-error")).toBeInTheDocument();
 
     await user.clear(screen.getByLabelText("To"));
-    await user.type(screen.getByLabelText("To"), "2099-11-14");
+    await user.type(screen.getByLabelText("To"), "14/11/2099");
     await user.click(screen.getByTestId("save-blackout"));
     expect(h.saveBlackout).toHaveBeenCalledWith(
       { name: "Diwali rush", fromDate: "2099-11-10", toDate: "2099-11-14" },
@@ -80,5 +80,16 @@ describe("blackout periods", () => {
     expect(h.removeBlackout).not.toHaveBeenCalled();
     await user.click(within(dialog).getByRole("button", { name: "Remove blackout" }));
     expect(h.removeBlackout).toHaveBeenCalledWith("b1");
+  });
+
+  it("asks for a whole date and saves nothing while one is half typed", async () => {
+    const user = userEvent.setup();
+    render(<Blackouts />);
+    await user.click(await screen.findByTestId("add-blackout"));
+    await user.type(screen.getByLabelText("Name"), "Diwali rush");
+    await user.type(screen.getByLabelText("From"), "10/11");
+    await user.type(screen.getByLabelText("To"), "14/11/2099");
+    expect(screen.getByTestId("blackout-date-problem")).toHaveTextContent("DD/MM/YYYY");
+    expect(screen.getByTestId("save-blackout")).toBeDisabled();
   });
 });

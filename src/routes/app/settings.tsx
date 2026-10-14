@@ -1,4 +1,4 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import {
   administersAnyModule,
@@ -21,6 +21,10 @@ import { getAdminSections, OrgModules, type ModuleAdminSection } from "@/platfor
 import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
 import { Departments } from "@/platform/organization/Departments";
 import { WorkingCalendar } from "@/platform/calendar/WorkingCalendar";
+import { DateField } from "@/components/shared/date-field";
+import { isIsoDate } from "@/components/shared/date-rules";
+import { SectionedPage, type PageSection } from "@/components/shared/sectioned-page";
+import { formatDate } from "@/lib/dates";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -48,6 +52,8 @@ export const Route = createFileRoute("/app/settings")({
  * lives inside the Leave module while this file still names no module at all.
  */
 function SettingsPage() {
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const moduleKey = typeof search.m === "string" ? search.m : undefined;
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied" | "error">("loading");
   const [holidays, setHolidays] = useState<Holiday[]>([]);
@@ -110,7 +116,7 @@ function SettingsPage() {
 
   async function onAddHoliday(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !holidayName.trim() || !holidayDate) return;
+    if (!user || !holidayName.trim() || !isIsoDate(holidayDate)) return;
     setError("");
     try {
       await addHoliday(user.organizationId, holidayName.trim(), holidayDate);
@@ -172,216 +178,188 @@ function SettingsPage() {
     );
   }
 
-  // D84. A module's admin sees only that module's sections below.
+  // D84. A module's admin sees only that module's sections.
   const companyWide = isAdmin(user);
 
-  return (
-    <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="text-page-title font-semibold tracking-page-title">
-        {companyWide ? "Workspace settings" : "Module settings"}
-      </h1>
-      <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-        {companyWide
-          ? "Configuration your organisation owns. Changing the working week or the financial year changes how every future request is counted."
-          : "Configuration for the modules you administer. Company settings are kept by your administrator."}
-      </p>
+  // Opened from a module's Configuration tab (?m=), the page is that module's
+  // configuration alone; from Organisation, the company's own settings
+  // (Sada, 14 Oct 2026: each module's configuration belongs to the module).
+  const mine = sections.filter((s) => (moduleKey ? s.moduleKey === moduleKey : !companyWide));
+  const company: PageSection[] =
+    companyWide && !moduleKey
+      ? [
+          {
+            id: "company",
+            label: "Your company",
+            description:
+              "What this workspace is called, and the mark your people see on every screen and in every email from it.",
+            content: <CompanyIdentity />,
+          },
+          {
+            // Shared with the setup wizard. It lived here in full until the
+            // wizard needed the same weekend picker, and a weekend whose rules
+            // exist in two files is a weekend that eventually means two things.
+            id: "calendar",
+            label: "Working calendar",
+            description:
+              "Changing the working week or the financial year changes how every future request is counted. Leave already booked is not recalculated.",
+            content: user && <WorkingCalendar organizationId={user.organizationId} />,
+          },
+          {
+            id: "departments",
+            label: "Departments",
+            description:
+              "How your workforce is grouped on reports. Somebody's department is set on their row under People, or from the department column of a spreadsheet import.",
+            content: user && <Departments organizationId={user.organizationId} />,
+          },
+          {
+            id: "holidays",
+            label: "Holidays",
+            description:
+              "Days excluded from leave when a request spans them. Shared with attendance and shift planning when those arrive.",
+            content: (
+              <>
+                <form onSubmit={onAddHoliday} className="mt-4 flex flex-col gap-3 sm:flex-row">
+                  <input
+                    aria-label="Holiday name"
+                    value={holidayName}
+                    onChange={(e) => setHolidayName(e.target.value)}
+                    placeholder="Republic Day"
+                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                  />
+                  <DateField
+                    label="Holiday date"
+                    value={holidayDate}
+                    max={`${new Date().getFullYear() + 2}-12-31`}
+                    onChange={setHolidayDate}
+                    className="sm:w-48"
+                  />
+                  <button
+                    type="submit"
+                    disabled={!holidayName.trim() || !isIsoDate(holidayDate)}
+                    data-testid="add-holiday"
+                    className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-50"
+                  >
+                    Add
+                  </button>
+                </form>
 
-      {companyWide && (
-        <>
-          {/* ─────────────────────────────────────────────── company */}
-          <section className="mt-8">
-            <h2 className="text-card-title font-semibold tracking-card-title">Your company</h2>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-              What this workspace is called, and the mark your people see on every screen and in
-              every email from it.
-            </p>
-            <div className="mt-4">
-              <CompanyIdentity />
-            </div>
-          </section>
-
-          {/* ───────────────────────────────────────── the working calendar
-          Shared with the setup wizard. It lived here in full until the wizard
-          needed the same weekend picker, and a weekend whose rules exist in two
-          files is a weekend that eventually means two things — with every
-          balance in the product counted against it. */}
-          <section className="mt-10">
-            <h2 className="text-card-title font-semibold tracking-card-title">Working calendar</h2>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-              Changing the working week or the financial year changes how every future request is
-              counted. Leave already booked is not recalculated.
-            </p>
-            <div className="mt-4">
-              {user && <WorkingCalendar organizationId={user.organizationId} />}
-            </div>
-          </section>
-
-          {/* ─────────────────────────────────────────────── departments
-          Above Holidays because it is the one people go looking for: the
-          Department column exists on every report and, until now, nothing in
-          the product could put anybody in one. */}
-          <section className="mt-12">
-            <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
-              Departments
-            </h2>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-              How your workforce is grouped on reports. Somebody&apos;s department is set on their
-              row under People, or from the department column of a spreadsheet import.
-            </p>
-            <div className="mt-4">
-              {user && <Departments organizationId={user.organizationId} />}
-            </div>
-          </section>
-
-          {/* ─────────────────────────────────────────────── holidays */}
-          <section className="mt-12">
-            <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
-              Holidays
-            </h2>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-              Days excluded from leave when a request spans them. Shared with attendance and shift
-              planning when those arrive.
-            </p>
-
-            <form onSubmit={onAddHoliday} className="mt-4 flex flex-col gap-3 sm:flex-row">
-              <input
-                aria-label="Holiday name"
-                value={holidayName}
-                onChange={(e) => setHolidayName(e.target.value)}
-                placeholder="Republic Day"
-                className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <input
-                aria-label="Holiday date"
-                type="date"
-                value={holidayDate}
-                onChange={(e) => setHolidayDate(e.target.value)}
-                className="h-12 rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <button
-                type="submit"
-                disabled={!holidayName.trim() || !holidayDate}
-                data-testid="add-holiday"
-                className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-50"
-              >
-                Add
-              </button>
-            </form>
-
-            {/* Set by both handlers below and, until now, rendered nowhere — so a
+                {/* Set by both handlers below and, until now, rendered nowhere — so a
             holiday that failed to save failed in silence and the row simply
             did not appear. Caught by lint, not by anybody using the screen. */}
-            {error && (
-              <p
-                role="alert"
-                data-testid="holidays-error"
-                className="mt-4 text-sm text-destructive"
-              >
-                {error}
-              </p>
-            )}
+                {error && (
+                  <p
+                    role="alert"
+                    data-testid="holidays-error"
+                    className="mt-4 text-sm text-destructive"
+                  >
+                    {error}
+                  </p>
+                )}
 
-            {holidays.length === 0 ? (
-              <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
-                No holidays configured yet. Until some are added, only non-working days are
-                excluded.
-              </p>
-            ) : (
-              <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
-                {holidays.map((h) => (
-                  <li key={h.id} className="flex items-center justify-between gap-4 p-4">
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">{h.name}</span>
-                      <span className="block text-xs tabular-nums text-muted-foreground">
-                        {new Date(h.holidayDate + "T00:00:00").toLocaleDateString(undefined, {
-                          weekday: "short",
-                          day: "numeric",
-                          month: "short",
-                          year: "numeric",
-                        })}
-                      </span>
-                      <HolidayCalendars
-                        holiday={h}
-                        calendars={calendars}
-                        onSaved={async () => setHolidays(await listHolidays())}
-                      />
-                    </span>
-                    <button
-                      onClick={() => setRemoving(h)}
-                      className="inline-flex h-12 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
-                    >
-                      Remove
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <AlertDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)}>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>Remove {removing?.name ?? "this holiday"}?</AlertDialogTitle>
-                  <AlertDialogDescription asChild>
-                    <div className="space-y-2 text-sm text-muted-foreground">
-                      <p>
-                        From now on that date is counted as a working day, so leave applied for over
-                        it uses one more day.
-                      </p>
-                      <p>Leave already applied for is not recounted.</p>
-                    </div>
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel onClick={() => setRemoving(null)}>Keep it</AlertDialogCancel>
-                  <AlertDialogAction onClick={() => removing && void onRemoveHoliday(removing.id)}>
-                    Remove {removing?.name ?? ""}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </section>
+                {holidays.length === 0 ? (
+                  <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+                    No holidays configured yet. Until some are added, only non-working days are
+                    excluded.
+                  </p>
+                ) : (
+                  <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+                    {holidays.map((h) => (
+                      <li key={h.id} className="flex items-center justify-between gap-4 p-4">
+                        <span className="min-w-0">
+                          <span className="block truncate text-sm font-medium">{h.name}</span>
+                          <span className="block text-xs tabular-nums text-muted-foreground">
+                            {new Date(h.holidayDate + "T00:00:00").toLocaleDateString(undefined, {
+                              weekday: "short",
+                            })}{" "}
+                            {formatDate(h.holidayDate)}
+                          </span>
+                          <HolidayCalendars
+                            holiday={h}
+                            calendars={calendars}
+                            onSaved={async () => setHolidays(await listHolidays())}
+                          />
+                        </span>
+                        <button
+                          onClick={() => setRemoving(h)}
+                          className="inline-flex h-12 shrink-0 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
+                        >
+                          Remove
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <AlertDialog open={removing !== null} onOpenChange={(o) => !o && setRemoving(null)}>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>
+                        Remove {removing?.name ?? "this holiday"}?
+                      </AlertDialogTitle>
+                      <AlertDialogDescription asChild>
+                        <div className="space-y-2 text-sm text-muted-foreground">
+                          <p>
+                            From now on that date is counted as a working day, so leave applied for
+                            over it uses one more day.
+                          </p>
+                          <p>Leave already applied for is not recounted.</p>
+                        </div>
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel onClick={() => setRemoving(null)}>
+                        Keep it
+                      </AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={() => removing && void onRemoveHoliday(removing.id)}
+                      >
+                        Remove {removing?.name ?? ""}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              </>
+            ),
+          },
+          {
+            id: "modules",
+            label: "Modules",
+            description:
+              "What this workspace has, and what is switched on. Neuvto adds modules to your workspace; switching them on and off is yours.",
+            content: <OrgModules user={user} />,
+          },
+        ]
+      : [];
 
-          {/* ─────────────────────────────────────────────── modules */}
-          <section className="mt-12">
-            <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
-              Modules
-            </h2>
-            <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-              What this workspace has, and what is switched on. Neuvto adds modules to your
-              workspace; switching them on and off is yours.
-            </p>
-            <div className="mt-4">
-              <OrgModules user={user} />
-            </div>
-          </section>
-        </>
-      )}
+  // Whatever the modules contribute. This file names none of them, the reason
+  // "configure leave types" can live inside src/modules/leave.
+  const contributed: PageSection[] = mine.map((section) => {
+    const Section = section.component;
+    return {
+      id: `${section.moduleKey}-${section.id}`,
+      label: section.title,
+      description: section.description,
+      content: (
+        <Suspense fallback={<div className="h-32 animate-pulse rounded-lg bg-muted" />}>
+          <Section />
+        </Suspense>
+      ),
+    };
+  });
 
-      {/*
-        Whatever the enabled modules contribute. This file names none of them —
-        the same rule app-nav.tsx and the dashboard follow, and the reason
-        "configure leave types" can live inside src/modules/leave where every
-        other leave decision does.
-      */}
-      {sections.map((section) => {
-        const Section = section.component;
-        return (
-          <section key={`${section.moduleKey}:${section.id}`} className="mt-12">
-            <h2 className="text-page-title font-semibold tracking-page-title tracking-tight">
-              {section.title}
-            </h2>
-            {section.description && (
-              <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-                {section.description}
-              </p>
-            )}
-            <div className="mt-4">
-              <Suspense fallback={<div className="h-32 animate-pulse rounded-lg bg-muted" />}>
-                <Section />
-              </Suspense>
-            </div>
-          </section>
-        );
-      })}
-    </div>
+  return (
+    <SectionedPage
+      title={moduleKey ? "Configuration" : companyWide ? "Workspace settings" : "Module settings"}
+      description={
+        moduleKey
+          ? "How this module works in your company. The company's own settings are under Organisation, Settings."
+          : companyWide
+            ? "Configuration your organisation owns. Each module's own configuration is in that module, under Configuration."
+            : "Configuration for the modules you administer. Company settings are kept by your administrator."
+      }
+      sections={[...company, ...contributed]}
+      testIdPrefix="settings"
+      empty="Nothing here to configure yet."
+    />
   );
 }

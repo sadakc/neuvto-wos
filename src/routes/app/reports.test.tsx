@@ -40,7 +40,12 @@ import type { ReportDefinition, ReportSchedule } from "@/platform/reports";
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: unknown) => opts,
+  useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
+    select({ location: { search: route.search } }),
 }));
+
+/** The page's ?m=, as the router holds it. */
+const route = vi.hoisted(() => ({ search: {} as Record<string, unknown> }));
 
 const getCurrentUser = vi.fn<() => Promise<CurrentUser | null>>();
 
@@ -103,6 +108,7 @@ const REPORTS: (ModuleReport & { moduleKey: string })[] = [
 
 beforeEach(() => {
   vi.resetAllMocks();
+  route.search = {};
   getModuleReports.mockResolvedValue(REPORTS);
   listReportDefinitions.mockResolvedValue([
     { key: "leave.summary", title: "Leave summary", description: null },
@@ -138,7 +144,8 @@ describe("Reports — who the page is for", () => {
     // passes by luck.
     expect(await screen.findByRole("tab", { name: "Leave balances" })).toBeInTheDocument();
 
-    const heading = screen.getByRole("heading", { name: "Scheduled reports", level: 2 });
+    const heading = // A panel title, as every Core HR panel's (h3).
+      screen.getByRole("heading", { name: "Scheduled reports", level: 3 });
 
     // Below the reports, not beside them: a schedule is how one of the reports
     // above arrives, so it reads in that order or not at all. Phrased as words
@@ -171,5 +178,26 @@ describe("Reports — who the page is for", () => {
     expect(
       await screen.findByText(/We couldn't load your scheduled reports just now/),
     ).toBeInTheDocument();
+  });
+});
+
+describe("Reports — whose reports (Sada, 14 Oct 2026)", () => {
+  it("opened from Leave's Reports tab, shows Leave's reports and no other module's", async () => {
+    getModuleReports.mockResolvedValue([
+      ...REPORTS,
+      {
+        moduleKey: "payroll",
+        id: "register",
+        title: "Pay register",
+        component: () => <p data-testid="report-body">register</p>,
+      },
+    ]);
+    getCurrentUser.mockResolvedValue(userWith(["org_admin"]));
+    route.search = { m: "leave" };
+    render(<ReportsPage />);
+    expect(await screen.findByTestId("report-tab-balances")).toBeInTheDocument();
+    expect(screen.queryByTestId("report-tab-register")).toBeNull();
+    // The report sits in a panel titled with its name.
+    expect(screen.getByTestId("report-panel")).toHaveTextContent("Leave balances");
   });
 });

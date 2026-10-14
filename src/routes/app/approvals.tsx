@@ -1,3 +1,4 @@
+import { Panel } from "@/components/shared/panel";
 import { createFileRoute } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
@@ -122,18 +123,20 @@ function ApprovalsPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="text-page-title font-semibold tracking-page-title">Approvals</h1>
-      <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-        Waiting on you. Something appears here only while it is at your level — an earlier level
-        that has not decided yet is not yours to act on.
-      </p>
+    <div className="flex min-w-0 flex-col gap-4 pb-16">
+      <div>
+        <h1 className="text-page-title font-semibold tracking-page-title">Approvals</h1>
+        <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
+          Waiting on you. Something appears here only while it is at your level — an earlier level
+          that has not decided yet is not yours to act on.
+        </p>
+      </div>
 
       {bulkResult && (
         <div
           role="status"
           data-testid="bulk-result"
-          className="mt-6 rounded-lg border border-border bg-card p-4 text-sm shadow-card"
+          className="rounded-xl border border-border bg-card p-4 text-sm shadow-card"
         >
           <p className="font-medium">
             {bulkResult.outcomes.filter((o) => o.approved).length} approved.
@@ -149,7 +152,7 @@ function ApprovalsPage() {
       )}
 
       {selected.size > 0 && (
-        <div className="sticky top-2 z-10 mt-6 flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-card">
+        <div className="sticky top-2 z-10 flex items-center justify-between gap-3 rounded-lg border border-border bg-card p-3 shadow-card">
           <span className="text-sm text-muted-foreground">
             Approving does not ask for a reason. To reject, decide each one on its own.
           </span>
@@ -165,71 +168,77 @@ function ApprovalsPage() {
         </div>
       )}
 
-      {items.length === 0 ? (
-        <p className="mt-8 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
-          Nothing is waiting on you.
-        </p>
-      ) : (
-        <ul className="mt-8 space-y-4">
-          {items.map((item) => {
-            const view = views.get(item.entityType);
-            const Renderer = view?.component;
+      <Panel
+        title="Waiting on you"
+        testId="panel-waiting"
+        aside={items.length > 0 ? `${items.length} waiting` : undefined}
+      >
+        {items.length === 0 ? (
+          <p className="py-4 text-center text-sm text-muted-foreground">
+            Nothing is waiting on you.
+          </p>
+        ) : (
+          <ul className="space-y-3">
+            {items.map((item) => {
+              const view = views.get(item.entityType);
+              const Renderer = view?.component;
 
-            return (
-              <li
-                key={item.approvalRequestId}
-                data-testid="approval-item"
-                className="rounded-lg border border-border p-4"
-              >
-                {/* The platform's own header: who, how long, which level. True of
+              return (
+                <li
+                  key={item.approvalRequestId}
+                  data-testid="approval-item"
+                  className="rounded-lg border border-border p-4"
+                >
+                  {/* The platform's own header: who, how long, which level. True of
                     anything the engine carries, so it needs no module to render. */}
-                <div className="flex flex-wrap items-baseline justify-between gap-2">
-                  <label className="flex min-h-11 items-center gap-2.5 text-sm font-medium">
-                    <input
-                      type="checkbox"
-                      checked={selected.has(item.approvalRequestId)}
-                      onChange={() =>
-                        setSelected((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(item.approvalRequestId)) next.delete(item.approvalRequestId);
-                          else next.add(item.approvalRequestId);
-                          return next;
-                        })
+                  <div className="flex flex-wrap items-baseline justify-between gap-2">
+                    <label className="flex min-h-11 items-center gap-2.5 text-sm font-medium">
+                      <input
+                        type="checkbox"
+                        checked={selected.has(item.approvalRequestId)}
+                        onChange={() =>
+                          setSelected((prev) => {
+                            const next = new Set(prev);
+                            if (next.has(item.approvalRequestId))
+                              next.delete(item.approvalRequestId);
+                            else next.add(item.approvalRequestId);
+                            return next;
+                          })
+                        }
+                        aria-label={`Select ${item.requesterName}'s request`}
+                        className="size-4 accent-primary"
+                      />
+                      {item.requesterName}
+                    </label>
+                    <span
+                      data-testid="waiting"
+                      className={
+                        overTarget(item)
+                          ? "text-xs font-medium text-destructive"
+                          : "text-xs text-muted-foreground"
                       }
-                      aria-label={`Select ${item.requesterName}'s request`}
-                      className="size-4 accent-primary"
-                    />
-                    {item.requesterName}
-                  </label>
-                  <span
-                    data-testid="waiting"
-                    className={
-                      overTarget(item)
-                        ? "text-xs font-medium text-destructive"
-                        : "text-xs text-muted-foreground"
-                    }
-                  >
-                    {waitingLine(item)}
-                  </span>
-                </div>
-                {item.onBehalfOf && (
-                  <p data-testid="on-behalf-of" className="mt-1 text-xs text-muted-foreground">
-                    {item.onBehalfOf}&apos;s approval, handed to you while they are away.
-                  </p>
-                )}
-                {item.escalatedFrom && (
-                  <p data-testid="escalated-from" className="mt-1 text-xs text-muted-foreground">
-                    Moved to you from {item.escalatedFrom}, who had it longer than the target.
-                  </p>
-                )}
+                    >
+                      {waitingLine(item)}
+                    </span>
+                  </div>
+                  {item.onBehalfOf && (
+                    <p data-testid="on-behalf-of" className="mt-1 text-xs text-muted-foreground">
+                      {item.onBehalfOf}&apos;s approval, handed to you while they are away.
+                    </p>
+                  )}
+                  {item.escalatedFrom && (
+                    <p data-testid="escalated-from" className="mt-1 text-xs text-muted-foreground">
+                      Moved to you from {item.escalatedFrom}, who had it longer than the target.
+                    </p>
+                  )}
 
-                <div className="mt-3">
-                  {Renderer ? (
-                    <Suspense fallback={<div className="h-24 animate-pulse rounded bg-muted" />}>
-                      <Renderer item={item} onDecided={() => void load(user)} />
-                    </Suspense>
-                  ) : (
-                    /*
+                  <div className="mt-3">
+                    {Renderer ? (
+                      <Suspense fallback={<div className="h-24 animate-pulse rounded bg-muted" />}>
+                        <Renderer item={item} onDecided={() => void load(user)} />
+                      </Suspense>
+                    ) : (
+                      /*
                       No module registered a view for this entity type — it was
                       switched off, or removed from the build, while a decision
                       was still in flight.
@@ -239,18 +248,19 @@ function ApprovalsPage() {
                       decided, and nobody would ever find out why. Saying so
                       plainly is worse-looking and far better.
                     */
-                    <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
-                      This was raised by something this workspace no longer has switched on, so it
-                      can&apos;t be shown in full. It is still waiting on you — ask your
-                      administrator to switch the module back on to decide it.
-                    </p>
-                  )}
-                </div>
-              </li>
-            );
-          })}
-        </ul>
-      )}
+                      <p className="rounded-md border border-dashed border-border p-4 text-sm text-muted-foreground">
+                        This was raised by something this workspace no longer has switched on, so it
+                        can&apos;t be shown in full. It is still waiting on you — ask your
+                        administrator to switch the module back on to decide it.
+                      </p>
+                    )}
+                  </div>
+                </li>
+              );
+            })}
+          </ul>
+        )}
+      </Panel>
 
       {/* D92. The modules this workspace has approvals for, named. */}
       <Delegations

@@ -85,10 +85,13 @@ async function choose(typeName: string, from: string, to: string) {
   const user = userEvent.setup();
   render(<ApplyLeave />);
   await user.selectOptions(await screen.findByLabelText("Leave type"), typeName);
-  await user.type(screen.getByLabelText("First day"), from);
-  await user.type(screen.getByLabelText("Last day"), to);
+  // Typed the way the box takes it, DD/MM/YYYY (the shared date picker).
+  await user.type(screen.getByLabelText("First day"), dmy(from));
+  await user.type(screen.getByLabelText("Last day"), dmy(to));
   return user;
 }
+
+const dmy = (iso: string) => iso.split("-").reverse().join("/");
 
 describe("unpaid leave", () => {
   it("shows no balance and no shortfall, says it is unpaid, and what was taken", async () => {
@@ -129,5 +132,38 @@ describe("blackout periods", () => {
     await choose("Loss of pay", "2099-03-30", "2099-04-03");
     await screen.findByTestId("unpaid-line");
     expect(screen.queryByTestId("blackout")).toBeNull();
+  });
+});
+
+describe("the dates, typed DD/MM/YYYY (Core HR date picker, 14 Oct 2026)", () => {
+  it("says a first day in the past can't be booked, and will not send it", async () => {
+    // Unpaid: no balance to fall short of, so the past date is the only reason.
+    await choose("Loss of pay", "2020-01-06", "2020-01-07");
+    expect(screen.getByTestId("date-problem")).toHaveTextContent(
+      "The first day can't be in the past.",
+    );
+    await screen.findByText("Requested:", { exact: false });
+    expect(screen.getByTestId("submit-leave")).toBeDisabled();
+  });
+
+  it("asks for a whole date rather than taking half of one as none", async () => {
+    const user = userEvent.setup();
+    render(<ApplyLeave />);
+    await user.selectOptions(await screen.findByLabelText("Leave type"), "Casual");
+    await user.type(screen.getByLabelText("First day"), "05/01");
+    expect(screen.getByTestId("date-problem")).toHaveTextContent("DD/MM/YYYY");
+    expect(screen.getByTestId("submit-leave")).toBeDisabled();
+  });
+
+  it("reads a typed date and sends it as a date", async () => {
+    h.submitLeave.mockResolvedValue(undefined);
+    const user = await choose("Loss of pay", "2099-01-05", "2099-01-09");
+    expect(screen.queryByTestId("date-problem")).toBeNull();
+    expect(screen.getByLabelText("First day")).toHaveValue("05/01/2099");
+    await waitFor(() => expect(screen.getByTestId("submit-leave")).toBeEnabled());
+    await user.click(screen.getByTestId("submit-leave"));
+    expect(h.submitLeave).toHaveBeenCalledWith(
+      expect.objectContaining({ fromDate: "2099-01-05", toDate: "2099-01-09" }),
+    );
   });
 });

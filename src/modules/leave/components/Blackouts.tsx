@@ -8,6 +8,8 @@
  * requests, by the blackout's name.
  */
 
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { useEffect, useState } from "react";
 import { getCurrentUser, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
@@ -28,8 +30,12 @@ export default function Blackouts() {
   const [items, setItems] = useState<Blackout[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [name, setName] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  // What is in the date boxes; a date only once it is a whole, real one.
+  const [fromRaw, setFromRaw] = useState("");
+  const [toRaw, setToRaw] = useState("");
+  const fromDate = isIsoDate(fromRaw) ? fromRaw : "";
+  const toDate = isIsoDate(toRaw) ? toRaw : "";
+  const halfTyped = (fromRaw !== "" && !fromDate) || (toRaw !== "" && !toDate);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [removing, setRemoving] = useState<Blackout | null>(null);
@@ -65,8 +71,8 @@ export default function Blackouts() {
       await load();
       setAdding(false);
       setName("");
-      setFromDate("");
-      setToDate("");
+      setFromRaw("");
+      setToRaw("");
     } catch (err) {
       setError(isAppError(err) ? err.message : "That blackout period couldn't be saved.");
     } finally {
@@ -161,28 +167,34 @@ export default function Blackouts() {
               <label htmlFor="bo-from" className="block text-sm font-medium">
                 From
               </label>
-              <input
+              <DateField
                 id="bo-from"
-                type="date"
-                value={fromDate}
-                onChange={(e) => setFromDate(e.target.value)}
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                value={fromRaw}
+                onChange={setFromRaw}
+                max={`${new Date().getFullYear() + 2}-12-31`}
+                className="mt-1"
               />
             </div>
             <div>
               <label htmlFor="bo-to" className="block text-sm font-medium">
                 To
               </label>
-              <input
+              <DateField
                 id="bo-to"
-                type="date"
-                value={toDate}
+                value={toRaw}
                 min={fromDate || undefined}
-                onChange={(e) => setToDate(e.target.value)}
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                openAt={fromDate || undefined}
+                max={`${new Date().getFullYear() + 2}-12-31`}
+                onChange={setToRaw}
+                className="mt-1"
               />
             </div>
           </div>
+          {halfTyped && (
+            <p data-testid="blackout-date-problem" className="text-sm text-destructive">
+              {DATE_FORMAT_MESSAGE}
+            </p>
+          )}
           {backwards && (
             <p data-testid="blackout-dates-error" className="text-sm text-destructive">
               The last day is before the first.

@@ -12,6 +12,10 @@
  * told first.
  */
 
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
+import { FilePicker } from "@/components/shared/file-picker";
+import { Panel } from "@/components/shared/panel";
 import { useEffect, useMemo, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -54,6 +58,8 @@ function longDate(iso: string): string {
 
 const plural = (n: number) => `${n} ${n === 1 ? "day" : "days"}`;
 
+const EYEBROW = "block text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase";
+
 export default function CompOff() {
   const [types, setTypes] = useState<EarnedTypeRules[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
@@ -89,7 +95,12 @@ export default function CompOff() {
   }, []);
 
   const type = types.find((t) => t.id === typeId) ?? null;
-  const total = useMemo(() => rows.reduce((n, r) => n + (r.date ? r.days : 0), 0), [rows]);
+  // Only whole dates count; a half-typed one is said, never sent as none.
+  const total = useMemo(
+    () => rows.reduce((n, r) => n + (isIsoDate(r.date) ? r.days : 0), 0),
+    [rows],
+  );
+  const halfTyped = rows.some((r) => r.date !== "" && !isIsoDate(r.date));
   const available = balances.filter((b) => types.some((t) => t.id === b.leaveTypeId));
   const today = new Date().toISOString().slice(0, 10);
 
@@ -105,7 +116,7 @@ export default function CompOff() {
     setBusy(true);
     try {
       const days = rows
-        .filter((r) => r.date)
+        .filter((r) => isIsoDate(r.date))
         .map((r) => ({ date: r.date, days: r.days, note: r.note.trim() }));
       await submitCompOff({ leaveTypeId: type.id, days, reason: reason.trim(), proof });
       setNotice(
@@ -143,7 +154,7 @@ export default function CompOff() {
   }
 
   return (
-    <div className="flex min-w-0 flex-col gap-6">
+    <div className="flex min-w-0 flex-col gap-4">
       <div>
         <h1 className="text-page-title font-semibold tracking-page-title">Compensatory off</h1>
         <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
@@ -168,160 +179,158 @@ export default function CompOff() {
             </p>
           )}
 
-          <form
-            onSubmit={onSubmit}
-            className="flex flex-col gap-4 rounded-xl border border-border bg-card p-4 shadow-card"
-          >
-            {types.length > 1 && (
-              <label className="text-sm font-medium">
-                Kind
-                <select
-                  value={typeId}
-                  onChange={(e) => setTypeId(e.target.value)}
-                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-                >
-                  {types.map((t) => (
-                    <option key={t.id} value={t.id}>
-                      {t.name}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            )}
-
-            {type && (
-              <p data-testid="comp-off-rules" className="text-xs text-muted-foreground">
-                {type.earnedClaimWithinDays
-                  ? `Claim within ${type.earnedClaimWithinDays} days of the day worked. `
-                  : ""}
-                {type.earnedProofRequired ? "Proof is needed. " : ""}
-                {type.earnedExpiresAfterDays
-                  ? `Credited days expire ${type.earnedExpiresAfterDays} days after approval.`
-                  : "Credited days don't expire."}
-              </p>
-            )}
-
-            <fieldset className="flex flex-col gap-3">
-              <legend className="text-sm font-medium">Days you worked</legend>
-              {rows.map((r, i) => {
-                const n = i + 1;
-                return (
-                  <div
-                    key={r.key}
-                    className="flex flex-col gap-2 @min-[640px]/app:flex-row @min-[640px]/app:items-end"
+          <Panel title="Claim the days you worked" testId="panel-claim">
+            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+              {types.length > 1 && (
+                <label className="text-sm font-medium">
+                  Kind
+                  <select
+                    value={typeId}
+                    onChange={(e) => setTypeId(e.target.value)}
+                    className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
                   >
-                    <label className="text-xs text-muted-foreground @min-[640px]/app:w-44">
-                      <span className="sr-only">Day worked {n}</span>
-                      <span aria-hidden>Date</span>
-                      <input
-                        type="date"
-                        aria-label={`Day worked ${n}`}
-                        max={today}
-                        value={r.date}
-                        onChange={(e) => edit(r.key, { date: e.target.value })}
-                        className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    <label className="text-xs text-muted-foreground @min-[640px]/app:w-36">
-                      <span aria-hidden>How much</span>
-                      <select
-                        aria-label={`How much of day ${n}`}
-                        value={String(r.days)}
-                        onChange={(e) => edit(r.key, { days: Number(e.target.value) })}
-                        className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      >
-                        <option value="1">Full day</option>
-                        <option value="0.5">Half day</option>
-                      </select>
-                    </label>
-                    <label className="flex-1 text-xs text-muted-foreground">
-                      <span aria-hidden>Note (optional)</span>
-                      <input
-                        aria-label={`Note for day ${n}`}
-                        value={r.note}
-                        maxLength={200}
-                        onChange={(e) => edit(r.key, { note: e.target.value })}
-                        className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-                      />
-                    </label>
-                    {rows.length > 1 && (
-                      <button
-                        type="button"
-                        aria-label={`Remove day ${n}`}
-                        onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
-                        className="inline-flex h-12 items-center justify-center rounded-md border border-border px-3 text-sm"
-                      >
-                        Remove
-                      </button>
-                    )}
-                  </div>
-                );
-              })}
-              <button
-                type="button"
-                disabled={rows.length >= 31}
-                onClick={() => {
-                  setRows((rs) => [...rs, { key: nextKey, date: "", days: 1, note: "" }]);
-                  setNextKey((k) => k + 1);
-                }}
-                className="self-start text-sm font-medium underline underline-offset-4 disabled:opacity-45"
-              >
-                Add another day
-              </button>
-            </fieldset>
+                    {types.map((t) => (
+                      <option key={t.id} value={t.id}>
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+              )}
 
-            <label className="text-sm font-medium">
-              Why you&apos;re owed this
-              <textarea
-                value={reason}
-                onChange={(e) => setReason(e.target.value)}
-                maxLength={500}
-                rows={2}
-                className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
-              />
-            </label>
+              {type && (
+                <p data-testid="comp-off-rules" className="text-xs text-muted-foreground">
+                  {type.earnedClaimWithinDays
+                    ? `Claim within ${type.earnedClaimWithinDays} days of the day worked. `
+                    : ""}
+                  {type.earnedProofRequired ? "Proof is needed. " : ""}
+                  {type.earnedExpiresAfterDays
+                    ? `Credited days expire ${type.earnedExpiresAfterDays} days after approval.`
+                    : "Credited days don't expire."}
+                </p>
+              )}
 
-            <label className="text-sm font-medium">
-              {type?.earnedProofRequired ? "Proof (needed)" : "Proof (optional)"}
-              <input
-                type="file"
-                aria-label={type?.earnedProofRequired ? "Proof (needed)" : "Proof (optional)"}
+              <fieldset className="flex flex-col gap-3">
+                <legend className="text-sm font-medium">Days you worked</legend>
+                {rows.map((r, i) => {
+                  const n = i + 1;
+                  return (
+                    <div
+                      key={r.key}
+                      className="flex flex-col gap-2 @min-[640px]/app:flex-row @min-[640px]/app:items-end"
+                    >
+                      <div className="text-xs text-muted-foreground @min-[640px]/app:w-48">
+                        <span aria-hidden className={EYEBROW}>
+                          Date
+                        </span>
+                        <DateField
+                          label={`Day worked ${n}`}
+                          max={today}
+                          value={r.date}
+                          invalid={r.date !== "" && !isIsoDate(r.date)}
+                          onChange={(v) => edit(r.key, { date: v })}
+                          className="mt-1"
+                        />
+                      </div>
+                      <label className="text-xs text-muted-foreground @min-[640px]/app:w-36">
+                        <span aria-hidden>How much</span>
+                        <select
+                          aria-label={`How much of day ${n}`}
+                          value={String(r.days)}
+                          onChange={(e) => edit(r.key, { days: Number(e.target.value) })}
+                          className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                        >
+                          <option value="1">Full day</option>
+                          <option value="0.5">Half day</option>
+                        </select>
+                      </label>
+                      <label className="flex-1 text-xs text-muted-foreground">
+                        <span aria-hidden>Note (optional)</span>
+                        <input
+                          aria-label={`Note for day ${n}`}
+                          value={r.note}
+                          maxLength={200}
+                          onChange={(e) => edit(r.key, { note: e.target.value })}
+                          className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                        />
+                      </label>
+                      {rows.length > 1 && (
+                        <button
+                          type="button"
+                          aria-label={`Remove day ${n}`}
+                          onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))}
+                          className="inline-flex h-12 items-center justify-center rounded-md border border-border px-3 text-sm"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  );
+                })}
+                <button
+                  type="button"
+                  disabled={rows.length >= 31}
+                  onClick={() => {
+                    setRows((rs) => [...rs, { key: nextKey, date: "", days: 1, note: "" }]);
+                    setNextKey((k) => k + 1);
+                  }}
+                  className="self-start text-sm font-medium underline underline-offset-4 disabled:opacity-45"
+                >
+                  Add another day
+                </button>
+              </fieldset>
+
+              <label className="text-sm font-medium">
+                Why you&apos;re owed this
+                <textarea
+                  value={reason}
+                  onChange={(e) => setReason(e.target.value)}
+                  maxLength={500}
+                  rows={2}
+                  className="mt-2 w-full rounded-md border border-border bg-background px-3 py-2 text-sm"
+                />
+              </label>
+
+              <FilePicker
+                label={type?.earnedProofRequired ? "Proof (needed)" : "Proof (optional)"}
+                file={proof}
+                onChange={setProof}
                 accept="application/pdf,image/png,image/jpeg,image/webp"
-                onChange={(e) => setProof(e.target.files?.[0] ?? null)}
-                className="mt-2 block w-full text-sm"
+                hint="A roster, an email, a photo of the sign-in sheet. PDF or a photo, up to 5 MB. Seen by you, your approver and the Leave Admin."
               />
-              <span className="mt-1 block text-xs font-normal text-muted-foreground">
-                A roster, an email, a photo of the sign-in sheet. PDF or a photo, up to 5 MB. Seen
-                by you, your approver and the Leave Admin.
-              </span>
-            </label>
 
-            {error && (
-              <p role="alert" className="text-sm text-destructive">
-                {error}
-              </p>
-            )}
-            {notice && (
-              <p role="status" className="text-sm text-muted-foreground">
-                {notice}
-              </p>
-            )}
+              {halfTyped && (
+                <p data-testid="comp-off-date-problem" className="text-sm text-destructive">
+                  {DATE_FORMAT_MESSAGE}
+                </p>
+              )}
 
-            <button
-              type="submit"
-              disabled={busy || total === 0}
-              className="inline-flex h-12 items-center justify-center self-start rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-45"
-            >
-              {busy ? "Sending…" : "Send for approval"}
-            </button>
-          </form>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              {notice && (
+                <p role="status" className="text-sm text-muted-foreground">
+                  {notice}
+                </p>
+              )}
+
+              <button
+                type="submit"
+                disabled={busy || total === 0 || halfTyped}
+                className="inline-flex h-12 items-center justify-center self-start rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-45"
+              >
+                {busy ? "Sending…" : "Send for approval"}
+              </button>
+            </form>
+          </Panel>
         </>
       )}
 
       {claims.length > 0 && (
-        <section>
-          <h2 className="text-card-title font-semibold tracking-card-title">Your claims</h2>
-          <ul className="mt-3 divide-y divide-border rounded-xl border border-border bg-card shadow-card">
+        <Panel title="Your claims" testId="panel-claims">
+          <ul className="-mx-4 -my-3.5 divide-y divide-border">
             {claims.map((c) => (
               <li key={c.claimId} data-testid="comp-off-claim" className="flex flex-col gap-2 p-4">
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -356,7 +365,7 @@ export default function CompOff() {
               </li>
             ))}
           </ul>
-        </section>
+        </Panel>
       )}
     </div>
   );

@@ -8,6 +8,8 @@
  * (active, able to approve, in this company) and refuses overlaps.
  */
 
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import {
@@ -37,8 +39,12 @@ export function Delegations({
   const [people, setPeople] = useState<{ id: string; fullName: string }[]>([]);
   const [delegatorId, setDelegatorId] = useState("");
   const [delegateId, setDelegateId] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  // What is in the date boxes; a date only once it is a whole, real one.
+  const [fromRaw, setFromRaw] = useState("");
+  const [toRaw, setToRaw] = useState("");
+  const fromDate = isIsoDate(fromRaw) ? fromRaw : "";
+  const toDate = isIsoDate(toRaw) ? toRaw : "";
+  const halfTyped = (fromRaw !== "" && !fromDate) || (toRaw !== "" && !toDate);
   const [moduleKey, setModuleKey] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -78,8 +84,8 @@ export function Delegations({
         `${to} will see and can decide ${whose} ${scope ? `${scope} ` : ""}approvals from ${longDate(fromDate)} to ${longDate(toDate)}. ${delegatorId ? "They" : "You"} still can too.`,
       );
       setDelegateId("");
-      setFromDate("");
-      setToDate("");
+      setFromRaw("");
+      setToRaw("");
       setReason("");
       await load();
     } catch (err) {
@@ -112,145 +118,156 @@ export function Delegations({
   };
 
   return (
-    <section className="mt-12" aria-labelledby="delegation-heading">
-      <h2 id="delegation-heading" className="text-card-title font-semibold tracking-card-title">
-        Away? Hand your approvals over
-      </h2>
-      <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-        A colleague sees and can decide what is waiting on you, for the dates you choose. You still
-        can too. Nobody can approve their own request this way.
-      </p>
+    <section
+      aria-labelledby="delegation-heading"
+      className="min-w-0 rounded-xl border border-border bg-card shadow-card"
+    >
+      <div className="border-b border-border px-4 py-3">
+        <h2 id="delegation-heading" className="text-card-title font-semibold tracking-card-title">
+          Away? Hand your approvals over
+        </h2>
+      </div>
+      <div className="px-4 py-3.5">
+        <p className="max-w-prose text-sm text-muted-foreground">
+          A colleague sees and can decide what is waiting on you, for the dates you choose. You
+          still can too. Nobody can approve their own request this way.
+        </p>
 
-      {items.length > 0 && (
-        <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-card shadow-card">
-          {items.map((d) => (
-            <li
-              key={d.id}
-              data-testid="delegation"
-              className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm"
-            >
-              <span>
-                {describe(d)}
-                {d.reason && (
-                  <span className="block text-xs text-muted-foreground">{d.reason}</span>
+        {items.length > 0 && (
+          <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+            {items.map((d) => (
+              <li
+                key={d.id}
+                data-testid="delegation"
+                className="flex flex-wrap items-center justify-between gap-2 p-4 text-sm"
+              >
+                <span>
+                  {describe(d)}
+                  {d.reason && (
+                    <span className="block text-xs text-muted-foreground">{d.reason}</span>
+                  )}
+                </span>
+                {(d.direction === "given" || isAdmin) && (
+                  <button
+                    type="button"
+                    onClick={() => void onCancel(d.id)}
+                    className="text-sm underline underline-offset-4"
+                  >
+                    Cancel
+                  </button>
                 )}
-              </span>
-              {(d.direction === "given" || isAdmin) && (
-                <button
-                  type="button"
-                  onClick={() => void onCancel(d.id)}
-                  className="text-sm underline underline-offset-4"
-                >
-                  Cancel
-                </button>
-              )}
-            </li>
-          ))}
-        </ul>
-      )}
+              </li>
+            ))}
+          </ul>
+        )}
 
-      <form
-        onSubmit={onSubmit}
-        className="mt-4 grid gap-3 rounded-xl border border-border bg-card p-4 shadow-card @min-[640px]/app:grid-cols-2"
-      >
-        {isAdmin && (
+        <form onSubmit={onSubmit} className="mt-4 grid gap-3 @min-[640px]/app:grid-cols-2">
+          {isAdmin && (
+            <label className="text-sm font-medium">
+              Whose approvals
+              <select
+                value={delegatorId}
+                onChange={(e) => setDelegatorId(e.target.value)}
+                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              >
+                <option value="">Yours</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+          )}
           <label className="text-sm font-medium">
-            Whose approvals
+            Hand them to
             <select
-              value={delegatorId}
-              onChange={(e) => setDelegatorId(e.target.value)}
+              value={delegateId}
+              onChange={(e) => setDelegateId(e.target.value)}
+              required
               className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
             >
-              <option value="">Yours</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName}
+              <option value="">Choose a colleague…</option>
+              {people
+                .filter((p) => p.id !== delegatorId)
+                .map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.fullName}
+                  </option>
+                ))}
+            </select>
+          </label>
+          <div className="text-sm font-medium">
+            <span aria-hidden>From</span>
+            <DateField
+              label="From"
+              value={fromRaw}
+              onChange={setFromRaw}
+              required
+              className="mt-2"
+            />
+          </div>
+          <div className="text-sm font-medium">
+            <span aria-hidden>To</span>
+            <DateField
+              label="To"
+              value={toRaw}
+              onChange={setToRaw}
+              min={fromDate || undefined}
+              openAt={fromDate || undefined}
+              required
+              className="mt-2"
+            />
+            {halfTyped && (
+              <span className="mt-1 block text-caption font-normal text-destructive">
+                {DATE_FORMAT_MESSAGE}
+              </span>
+            )}
+          </div>
+          <label className="text-sm font-medium">
+            Which approvals
+            <select
+              value={moduleKey}
+              onChange={(e) => setModuleKey(e.target.value)}
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+            >
+              <option value="">All of them</option>
+              {modules.map((m) => (
+                <option key={m.key} value={m.key}>
+                  {m.name} only
                 </option>
               ))}
             </select>
           </label>
-        )}
-        <label className="text-sm font-medium">
-          Hand them to
-          <select
-            value={delegateId}
-            onChange={(e) => setDelegateId(e.target.value)}
-            required
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          >
-            <option value="">Choose a colleague…</option>
-            {people
-              .filter((p) => p.id !== delegatorId)
-              .map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName}
-                </option>
-              ))}
-          </select>
-        </label>
-        <label className="text-sm font-medium">
-          From
-          <input
-            type="date"
-            value={fromDate}
-            onChange={(e) => setFromDate(e.target.value)}
-            required
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </label>
-        <label className="text-sm font-medium">
-          To
-          <input
-            type="date"
-            value={toDate}
-            onChange={(e) => setToDate(e.target.value)}
-            required
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </label>
-        <label className="text-sm font-medium">
-          Which approvals
-          <select
-            value={moduleKey}
-            onChange={(e) => setModuleKey(e.target.value)}
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          >
-            <option value="">All of them</option>
-            {modules.map((m) => (
-              <option key={m.key} value={m.key}>
-                {m.name} only
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="text-sm font-medium">
-          Reason (optional)
-          <input
-            value={reason}
-            onChange={(e) => setReason(e.target.value)}
-            maxLength={200}
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </label>
+          <label className="text-sm font-medium">
+            Reason (optional)
+            <input
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+              maxLength={200}
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+            />
+          </label>
 
-        {error && (
-          <p role="alert" className="text-sm text-destructive @min-[640px]/app:col-span-2">
-            {error}
-          </p>
-        )}
-        {notice && (
-          <p role="status" className="text-sm text-muted-foreground @min-[640px]/app:col-span-2">
-            {notice}
-          </p>
-        )}
-        <button
-          type="submit"
-          disabled={busy || !delegateId || !fromDate || !toDate}
-          className="inline-flex h-12 items-center justify-center justify-self-start rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-45"
-        >
-          {busy ? "Saving…" : "Hand over"}
-        </button>
-      </form>
+          {error && (
+            <p role="alert" className="text-sm text-destructive @min-[640px]/app:col-span-2">
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p role="status" className="text-sm text-muted-foreground @min-[640px]/app:col-span-2">
+              {notice}
+            </p>
+          )}
+          <button
+            type="submit"
+            disabled={busy || !delegateId || !fromDate || !toDate}
+            className="inline-flex h-12 items-center justify-center justify-self-start rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-45"
+          >
+            {busy ? "Saving…" : "Hand over"}
+          </button>
+        </form>
+      </div>
     </section>
   );
 }

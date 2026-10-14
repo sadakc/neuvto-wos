@@ -30,11 +30,12 @@ test("Send stays off until a type and both dates are chosen", async ({ page }) =
   await expect(send).toBeEnabled();
 });
 
-test("a past day cannot be chosen", async ({ page }) => {
+test("a past day cannot be booked", async ({ page }) => {
   await page.goto("/app/leave/apply");
-  const min = await page.getByLabel("First day").getAttribute("min");
-  expect(min).not.toBeNull();
-  expect(min! >= new Date().toISOString().slice(0, 10)).toBe(true);
+  // Typed DD/MM/YYYY into the shared date picker; its calendar offers no past day.
+  await fill(page, "Casual", "2020-01-06", "2020-01-07");
+  await expect(page.getByTestId("date-problem")).toHaveText("The first day can't be in the past.");
+  await expect(page.getByTestId("submit-leave")).toBeDisabled();
 });
 
 test("asking for more days than the balance holds is stopped before sending", async ({ page }) => {
