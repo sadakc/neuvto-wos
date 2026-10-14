@@ -220,7 +220,10 @@ describe("the onboarding checklist", () => {
     const days = within(row).getByLabelText("UAN: days");
     await user.clear(days);
     await user.type(days, "400");
-    expect(save).toBeDisabled();
+    // D113: a number that cannot be right is said on pressing Save, not greyed out.
+    await user.click(save);
+    expect(within(row).getByRole("alert")).toHaveTextContent("0 to 365");
+    expect(api.saveOnboardingItem).not.toHaveBeenCalled();
     await user.clear(days);
     await user.type(days, "30");
     await user.click(within(row).getByLabelText("UAN: mandatory"));
@@ -262,7 +265,12 @@ describe("calendars and shifts", () => {
     for (const d of ["Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"]) {
       await user.click(within(form).getByLabelText(d));
     }
-    expect(within(form).getByRole("button", { name: "Save calendar" })).toBeDisabled();
+    // D113: pressing it says why, under the days, and saves nothing.
+    await user.click(within(form).getByRole("button", { name: "Save calendar" }));
+    expect(within(form).getByRole("alert")).toHaveTextContent(
+      "A week needs at least one working day.",
+    );
+    expect(api.saveCalendar).not.toHaveBeenCalled();
   });
 
   it("sends the Company calendar to Settings and retires only what nothing uses", async () => {
@@ -345,12 +353,15 @@ describe("onboarding reminders", () => {
     const after = within(box).getByLabelText("Tell the Super Admins after (days past due)");
     await user.clear(every);
     await user.type(every, "31");
-    expect(save).toBeDisabled();
+    // D113: said on pressing Save, not greyed out.
+    await user.click(save);
+    expect(within(box).getByRole("alert")).toHaveTextContent("0 to 30 days");
     await user.clear(every);
     await user.type(every, "5");
     await user.clear(after);
     await user.type(after, "91");
-    expect(save).toBeDisabled();
+    await user.click(save);
+    expect(api.saveOnboardingSettings).not.toHaveBeenCalled();
     await user.clear(after);
     await user.type(after, "10");
     await user.click(save);
@@ -495,6 +506,18 @@ describe("designations, in the company's order (D106)", () => {
     await user.click(screen.getByRole("button", { name: "Move Security Guard up" }));
     expect(api.rankDesignations).toHaveBeenCalledWith(["d-mgr", "d-guard", "d-sup"]);
     expect(api.listAllDesignations).toHaveBeenCalledTimes(2);
+  });
+
+  it("says a new designation needs a name on pressing Add, and sends nothing (D113)", async () => {
+    const user = userEvent.setup();
+    await openDesignations();
+    const add = screen.getByTestId("designation-add");
+    expect(add).toBeEnabled();
+    await user.click(add);
+    expect(screen.getByTestId("designation-error")).toHaveTextContent(
+      "New designation can't be empty.",
+    );
+    expect(api.saveDesignation).not.toHaveBeenCalled();
   });
 
   it("edits a designation's name and grade, and will not take a blank name", async () => {

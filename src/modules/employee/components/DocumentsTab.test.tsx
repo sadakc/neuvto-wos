@@ -85,13 +85,15 @@ describe("the documents on a record", () => {
     await user.click(await screen.findByRole("button", { name: "Upload a document" }));
     expect(screen.getByRole("button", { name: "Browse…" })).toBeVisible();
     const upload = screen.getByRole("button", { name: "Upload" });
-    expect(upload).toBeDisabled();
+    // D113: never greyed out; pressing it with no file says so, and sends nothing.
+    expect(upload).toBeEnabled();
     const file = new File(["%PDF-1.4"], "wrong.pdf", { type: "application/pdf" });
     await user.upload(screen.getByLabelText("File"), file);
-    expect(upload).toBeEnabled();
     await user.click(screen.getByRole("button", { name: "Remove wrong.pdf" }));
-    expect(upload).toBeDisabled();
     expect(screen.getByText("No file chosen")).toBeInTheDocument();
+    await user.click(upload);
+    expect(screen.getByText("Choose the file to upload.")).toBeInTheDocument();
+    expect(h.uploadDocument).not.toHaveBeenCalled();
   });
 
   it("uploads exactly the document, its name, its expiry and the file", async () => {
@@ -150,5 +152,32 @@ describe("the documents on a record", () => {
     render(<DocumentsTab employeeId="e1" isAdmin isSelf />);
     const row = await rowFor("Police verification report");
     expect(within(row).queryByRole("button", { name: "Verify" })).toBeNull();
+  });
+});
+
+describe("what a document form needs (D113)", () => {
+  it("asks for the employer of a relieving letter on pressing Upload", async () => {
+    const user = userEvent.setup();
+    render(<DocumentsTab employeeId="e1" isAdmin={false} isSelf />);
+    await user.click(await screen.findByRole("button", { name: "Upload a document" }));
+    await user.selectOptions(screen.getByLabelText("Document"), "relieving_letter");
+    const file = new File(["%PDF-1.4"], "letter.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("File"), file);
+    await user.click(screen.getByRole("button", { name: "Upload" }));
+    expect(screen.getByText("Which employer can't be empty.")).toBeInTheDocument();
+    expect(h.uploadDocument).not.toHaveBeenCalled();
+  });
+
+  it("asks why on pressing Remove, and removes nothing", async () => {
+    const user = userEvent.setup();
+    render(<DocumentsTab employeeId="e1" isAdmin isSelf={false} />);
+    await user.click(
+      within(await rowFor("Police verification report")).getByRole("button", { name: "Remove" }),
+    );
+    const remove = screen.getByRole("button", { name: "Remove the document" });
+    expect(remove).toBeEnabled();
+    await user.click(remove);
+    expect(screen.getByText("Say why, in a few words.")).toBeInTheDocument();
+    expect(h.removeDocument).not.toHaveBeenCalled();
   });
 });

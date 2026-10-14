@@ -8,6 +8,8 @@
  * manager). Only an Admin is offered Change shift.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText } from "@/components/shared/required";
 import { useEffect, useRef, useState } from "react";
 import {
   Dialog,
@@ -142,6 +144,11 @@ function ShiftDialog({
     setError("");
     setDateError("");
     if (unchanged) return;
+    // D113: an empty date is said on pressing Save, never by greying it out.
+    if (!from) {
+      setDateError(emptyMessage("From"));
+      return;
+    }
     if (!isIsoDate(from)) {
       setDateError(DATE_FORMAT_MESSAGE);
       return;
@@ -190,7 +197,7 @@ function ShiftDialog({
                 : "From this date they work this shift instead of their unit's."}
             </DialogDescription>
           </DialogHeader>
-          <form onSubmit={submit} className="grid gap-3">
+          <form onSubmit={submit} noValidate className="grid gap-3">
             <label className="text-sm font-medium">
               Shift
               <select
@@ -211,7 +218,7 @@ function ShiftDialog({
               </select>
             </label>
             <label className="text-sm font-medium">
-              From
+              <LabelText required>From</LabelText>
               <DateField
                 label="From"
                 required
@@ -246,7 +253,7 @@ function ShiftDialog({
             )}
             <button
               type="submit"
-              disabled={busy || !from || unchanged}
+              disabled={busy || unchanged}
               aria-describedby={unchanged ? "shift-unchanged" : undefined}
               className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
             >

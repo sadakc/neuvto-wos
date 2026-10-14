@@ -385,7 +385,7 @@ export function FieldEditor({
                           aria-invalid={bad ? true : undefined}
                           aria-required={f.required || undefined}
                           aria-describedby={bad ? errId : undefined}
-                          className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
+                          className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 aria-invalid:border-destructive"
                         >
                           <option value="">{f.emptyLabel ?? "Not recorded"}</option>
                           {options.map(([value, text]) => (

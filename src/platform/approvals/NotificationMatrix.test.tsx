@@ -151,3 +151,17 @@ describe("who is told of what", () => {
     ).toBeInTheDocument();
   });
 });
+
+describe("naming somebody with something missing (D113)", () => {
+  it("says what is missing under each field on pressing Add, and adds nothing", async () => {
+    const user = userEvent.setup();
+    render(<NotificationMatrix moduleKey="leave" adminLabel="Leave Admins" />);
+    await screen.findByLabelText("Also tell");
+    const add = screen.getByRole("button", { name: "Add" });
+    expect(add).toBeEnabled();
+    await user.click(add);
+    expect(screen.getByText("Also tell can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("When can't be empty.")).toBeInTheDocument();
+    expect(h.addCustomRecipient).not.toHaveBeenCalled();
+  });
+});

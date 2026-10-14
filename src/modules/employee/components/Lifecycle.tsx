@@ -13,6 +13,8 @@
  * against it in "People you have added" until somebody fills it in.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { DateField } from "@/components/shared/date-field";
@@ -173,6 +175,8 @@ export default function AddEmployee() {
   async function save(andInvite: boolean) {
     setError("");
     const found = problems(v);
+    // D113: an invitation needs somewhere to go; said, not greyed out.
+    if (andInvite && !v.email.trim()) found.email ??= "An invitation needs a work email.";
     setFieldErrors(found);
     if (Object.keys(found).length > 0) return;
     setBusy(andInvite ? "invite" : "draft");
@@ -214,8 +218,13 @@ export default function AddEmployee() {
     }
   }
 
-  async function invite(id: string) {
+  async function invite(id: string, email: string | null) {
     setRowError(null);
+    // D113: said on pressing it, never by greying it out.
+    if (!email) {
+      setRowError({ id, message: "Add their work email on their card first." });
+      return;
+    }
     setInviting(id);
     try {
       await sendInvite(id);
@@ -280,7 +289,9 @@ export default function AddEmployee() {
         </h2>
         <div className="mt-3 grid gap-3 @min-[640px]/app:grid-cols-2">
           <label className="min-w-0 text-sm">
-            <span className={eyebrow}>Full name</span>
+            <span className={eyebrow}>
+              <LabelText required>Full name</LabelText>
+            </span>
             <input
               required
               data-testid="add-name"
@@ -444,7 +455,7 @@ export default function AddEmployee() {
         <div className="mt-4 flex flex-wrap gap-2">
           <button
             type="submit"
-            disabled={busy !== null || !v.fullName.trim()}
+            disabled={busy !== null}
             data-testid="add-save-draft"
             className="h-11 rounded-md border border-border px-4 text-sm font-medium disabled:opacity-45"
           >
@@ -453,7 +464,7 @@ export default function AddEmployee() {
           <button
             type="button"
             onClick={() => void save(true)}
-            disabled={busy !== null || !v.fullName.trim() || !v.email.trim()}
+            disabled={busy !== null}
             data-testid="add-send-invite"
             className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
           >
@@ -510,9 +521,8 @@ export default function AddEmployee() {
                 {r.stage === "draft" && (
                   <button
                     type="button"
-                    onClick={() => void invite(r.id)}
-                    disabled={inviting === r.id || !r.email}
-                    title={r.email ? undefined : "Add their email on the card first"}
+                    onClick={() => void invite(r.id, r.email)}
+                    disabled={inviting === r.id}
                     data-testid="added-invite"
                     className="h-10 rounded-md border border-border px-3 text-sm disabled:opacity-45"
                   >
@@ -615,10 +625,14 @@ export function SendInviteButton({
       <button
         type="button"
         data-testid="card-send-invite"
-        disabled={busy || !card.workEmail}
-        title={card.workEmail ? undefined : "Add their email first"}
+        disabled={busy}
         onClick={async () => {
           setError("");
+          // D113: said on pressing it, never by greying it out.
+          if (!card.workEmail) {
+            setError("Add their work email first, with Edit details.");
+            return;
+          }
           setBusy(true);
           try {
             await sendInvite(card.id);
@@ -663,6 +677,8 @@ export function DeactivateDialog({
   const [successor, setSuccessor] = useState("");
   const [lastDay, setLastDay] = useState(todayIso());
   const [reason, setReason] = useState("");
+  // D113: what is missing, said under each field on pressing Deactivate.
+  const [missing, setMissing] = useState({ successor: "", lastDay: "", reason: "" });
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<DeactivationResult | null>(null);
@@ -678,6 +694,17 @@ export function DeactivateDialog({
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    const m = {
+      successor: successor ? "" : emptyMessage("Who takes over"),
+      lastDay: !lastDay
+        ? emptyMessage("Last working day")
+        : isIsoDate(lastDay)
+          ? ""
+          : DATE_FORMAT_MESSAGE,
+      reason: reason.trim().length < 3 ? "Give the reason, in a few words." : "",
+    };
+    setMissing(m);
+    if (m.successor || m.lastDay || m.reason) return;
     setBusy(true);
     try {
       setDone(await deactivateEmployee(card.id, successor, lastDay, reason));
@@ -700,6 +727,7 @@ export function DeactivateDialog({
           setLastDay(todayIso());
           setReason("");
           setError("");
+          setMissing({ successor: "", lastDay: "", reason: "" });
           setDone(null);
           setOpen(true);
         }}
@@ -753,7 +781,7 @@ export function DeactivateDialog({
               </button>
             </div>
           ) : (
-            <form onSubmit={submit} className="grid gap-3">
+            <form onSubmit={submit} noValidate className="grid gap-3">
               <div
                 data-testid="deactivate-what-happens"
                 className="rounded-lg border border-warning-line bg-warning-muted px-3.5 py-2.5 text-sm"
@@ -779,45 +807,72 @@ export function DeactivateDialog({
                   </ul>
                 )}
               </div>
-              <label className="text-sm">
-                <span className={eyebrow}>Who takes over</span>
-                <select
-                  required
-                  data-testid="deactivate-successor"
-                  value={successor}
-                  onChange={(e) => setSuccessor(e.target.value)}
-                  className={`mt-1 ${input}`}
-                >
-                  <option value="">Choose a manager or admin</option>
-                  {(preview?.successors ?? []).map((s) => (
-                    <option key={s.profileId} value={s.profileId}>
-                      {s.fullName}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label className="text-sm">
-                <span className={eyebrow}>Last working day</span>
-                <DateField
-                  label="Last working day"
-                  required
-                  testId="deactivate-last-day"
-                  value={lastDay}
-                  onChange={setLastDay}
-                  className="mt-1"
-                />
-              </label>
-              <label className="text-sm">
-                <span className={eyebrow}>Reason</span>
-                <input
-                  required
-                  data-testid="deactivate-reason"
-                  value={reason}
-                  onChange={(e) => setReason(e.target.value)}
-                  placeholder="Resigned"
-                  className={`mt-1 ${input}`}
-                />
-              </label>
+              <div className="text-sm">
+                <label className="block">
+                  <span className={eyebrow}>
+                    <LabelText required>Who takes over</LabelText>
+                  </span>
+                  <select
+                    required
+                    data-testid="deactivate-successor"
+                    value={successor}
+                    aria-invalid={missing.successor ? true : undefined}
+                    onChange={(e) => {
+                      setSuccessor(e.target.value);
+                      setMissing((x) => ({ ...x, successor: "" }));
+                    }}
+                    className={`mt-1 ${input} aria-invalid:border-destructive`}
+                  >
+                    <option value="">Choose a manager or admin</option>
+                    {(preview?.successors ?? []).map((s) => (
+                      <option key={s.profileId} value={s.profileId}>
+                        {s.fullName}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <FieldError>{missing.successor}</FieldError>
+              </div>
+              <div className="text-sm">
+                <label className="block">
+                  <span className={eyebrow}>
+                    <LabelText required>Last working day</LabelText>
+                  </span>
+                  <DateField
+                    label="Last working day"
+                    required
+                    testId="deactivate-last-day"
+                    value={lastDay}
+                    invalid={!!missing.lastDay}
+                    onChange={(d) => {
+                      setLastDay(d);
+                      setMissing((x) => ({ ...x, lastDay: "" }));
+                    }}
+                    className="mt-1"
+                  />
+                </label>
+                <FieldError>{missing.lastDay}</FieldError>
+              </div>
+              <div className="text-sm">
+                <label className="block">
+                  <span className={eyebrow}>
+                    <LabelText required>Reason</LabelText>
+                  </span>
+                  <input
+                    required
+                    data-testid="deactivate-reason"
+                    value={reason}
+                    aria-invalid={missing.reason ? true : undefined}
+                    onChange={(e) => {
+                      setReason(e.target.value);
+                      setMissing((x) => ({ ...x, reason: "" }));
+                    }}
+                    placeholder="Resigned"
+                    className={`mt-1 ${input} aria-invalid:border-destructive`}
+                  />
+                </label>
+                <FieldError>{missing.reason}</FieldError>
+              </div>
               {error && (
                 <p role="alert" data-testid="deactivate-error" className="text-sm text-destructive">
                   {error}
@@ -825,7 +880,7 @@ export function DeactivateDialog({
               )}
               <button
                 type="submit"
-                disabled={busy || !successor || !isIsoDate(lastDay) || reason.trim().length < 3}
+                disabled={busy}
                 data-testid="deactivate-confirm"
                 className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-45"
               >

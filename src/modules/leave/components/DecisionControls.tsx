@@ -4,6 +4,8 @@
  * the engine's (approval_decide); this only asks for what they need.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useState } from "react";
 import type { ModuleApprovalViewProps } from "@/platform/modules";
 import { decideApproval, REJECT_REASONS, type RejectReason } from "@/platform/approvals";
@@ -16,8 +18,18 @@ export function DecisionControls({ item, onDecided }: ModuleApprovalViewProps) {
   const [reasonCode, setReasonCode] = useState<RejectReason | "">("");
   const [note, setNote] = useState("");
   const [error, setError] = useState("");
+  // D113: what is missing, said under its field on pressing Reject request.
+  const [missing, setMissing] = useState({ reason: "", note: "" });
 
   async function decide(decision: "approved" | "rejected") {
+    if (decision === "rejected") {
+      const m = {
+        reason: reasonCode ? "" : emptyMessage("The reason"),
+        note: note.trim().length < 3 ? `Write ${item.requesterName} a few words.` : "",
+      };
+      setMissing(m);
+      if (m.reason || m.note) return;
+    }
     setError("");
     setBusy(decision);
     try {
@@ -86,14 +98,19 @@ export function DecisionControls({ item, onDecided }: ModuleApprovalViewProps) {
         >
           <div>
             <label htmlFor={`r-${item.approvalRequestId}`} className="block text-sm font-medium">
-              Why are you rejecting this?
+              <LabelText required>Why are you rejecting this?</LabelText>
             </label>
             <select
               id={`r-${item.approvalRequestId}`}
               value={reasonCode}
-              onChange={(e) => setReasonCode(e.target.value as RejectReason | "")}
+              aria-required
+              aria-invalid={missing.reason ? true : undefined}
+              onChange={(e) => {
+                setReasonCode(e.target.value as RejectReason | "");
+                setMissing((m) => ({ ...m, reason: "" }));
+              }}
               data-testid="reject-reason"
-              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
             >
               <option value="">Choose a reason…</option>
               {REJECT_REASONS.map((r) => (
@@ -102,21 +119,28 @@ export function DecisionControls({ item, onDecided }: ModuleApprovalViewProps) {
                 </option>
               ))}
             </select>
+            <FieldError>{missing.reason}</FieldError>
           </div>
           <div>
             <label htmlFor={`n-${item.approvalRequestId}`} className="block text-sm font-medium">
-              A note for {item.requesterName}
+              <LabelText required>A note for {item.requesterName}</LabelText>
             </label>
             <textarea
               id={`n-${item.approvalRequestId}`}
               value={note}
-              onChange={(e) => setNote(e.target.value)}
+              aria-required
+              aria-invalid={missing.note ? true : undefined}
+              onChange={(e) => {
+                setNote(e.target.value);
+                setMissing((m) => ({ ...m, note: "" }));
+              }}
               rows={2}
               maxLength={500}
               data-testid="reject-note"
               placeholder="They read this with the reason."
-              className="mt-2 w-full rounded-md border border-border bg-background p-3 text-sm"
+              className="mt-2 w-full rounded-md border border-border bg-background p-3 text-sm aria-invalid:border-destructive"
             />
+            <FieldError>{missing.note}</FieldError>
           </div>
 
           {error && (
@@ -128,7 +152,7 @@ export function DecisionControls({ item, onDecided }: ModuleApprovalViewProps) {
           <div className="flex flex-wrap gap-2">
             <button
               onClick={() => decide("rejected")}
-              disabled={busy !== null || !reasonCode || note.trim().length < 3}
+              disabled={busy !== null}
               data-testid="confirm-reject"
               className="inline-flex h-12 items-center justify-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground disabled:opacity-50"
             >

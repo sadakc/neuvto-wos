@@ -58,8 +58,10 @@ describe("blackout periods", () => {
     await user.type(screen.getByLabelText("Name"), "Diwali rush");
     await user.type(screen.getByLabelText("From"), "10/11/2099");
     await user.type(screen.getByLabelText("To"), "01/11/2099");
-    expect(screen.getByTestId("save-blackout")).toBeDisabled();
     expect(screen.getByTestId("blackout-dates-error")).toBeInTheDocument();
+    // D113: pressing it sends nothing while the dates are backwards.
+    await user.click(screen.getByTestId("save-blackout"));
+    expect(h.saveBlackout).not.toHaveBeenCalled();
 
     await user.clear(screen.getByLabelText("To"));
     await user.type(screen.getByLabelText("To"), "14/11/2099");
@@ -90,6 +92,19 @@ describe("blackout periods", () => {
     await user.type(screen.getByLabelText("From"), "10/11");
     await user.type(screen.getByLabelText("To"), "14/11/2099");
     expect(screen.getByTestId("blackout-date-problem")).toHaveTextContent("DD/MM/YYYY");
-    expect(screen.getByTestId("save-blackout")).toBeDisabled();
+    await user.click(screen.getByTestId("save-blackout"));
+    expect(h.saveBlackout).not.toHaveBeenCalled();
+  });
+
+  it("says what is missing under each field when added empty (D113)", async () => {
+    const user = userEvent.setup();
+    render(<Blackouts />);
+    await user.click(await screen.findByTestId("add-blackout"));
+    expect(screen.getByTestId("save-blackout")).toBeEnabled();
+    await user.click(screen.getByTestId("save-blackout"));
+    expect(screen.getByText("Name can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("From can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("To can't be empty.")).toBeInTheDocument();
+    expect(h.saveBlackout).not.toHaveBeenCalled();
   });
 });

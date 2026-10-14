@@ -83,14 +83,18 @@ describe("deciding a leave request", () => {
     render(<LeaveApprovalCard item={item} onDecided={() => {}} />);
     await user.click(await screen.findByTestId("reject"));
     const confirm = screen.getByTestId("confirm-reject");
-    expect(confirm).toBeDisabled();
+    // D113: never greyed out. Pressing it says what is missing, under each field.
+    expect(confirm).toBeEnabled();
+    await user.click(confirm);
+    expect(screen.getByText("The reason can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText(/^Write .+ a few words\.$/)).toBeInTheDocument();
 
     await user.selectOptions(screen.getByTestId("reject-reason"), "business_need");
-    expect(confirm).toBeDisabled();
+    expect(screen.queryByText("The reason can't be empty.")).toBeNull();
     await user.type(screen.getByTestId("reject-note"), "ok");
-    expect(confirm).toBeDisabled();
+    await user.click(confirm);
+    expect(screen.getByText(/^Write .+ a few words\.$/)).toBeInTheDocument();
     await user.type(screen.getByTestId("reject-note"), " — the audit week");
-    expect(confirm).toBeEnabled();
     expect(h.decideApproval).not.toHaveBeenCalled();
 
     await user.click(confirm);

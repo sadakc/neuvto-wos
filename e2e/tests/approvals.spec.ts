@@ -38,16 +38,19 @@ test.describe("as the manager", () => {
     const item = items.first();
     await item.getByTestId("reject").click();
     const confirm = item.getByTestId("confirm-reject");
-    await expect(confirm).toBeDisabled();
+    // D113: pressing it says what is missing, under each field, and rejects nothing.
+    await confirm.click();
+    await expect(item.getByText("The reason can't be empty.")).toBeVisible();
+    await expect(items).toHaveCount(2);
 
     await item
       .getByTestId("reject-reason")
       .selectOption({ label: "Needed at work on those dates" });
-    await expect(confirm).toBeDisabled();
     await item.getByTestId("reject-note").fill("ok");
-    await expect(confirm).toBeDisabled();
+    await confirm.click();
+    await expect(item.getByText(/^Write .+ a few words\.$/)).toBeVisible();
+    await expect(items).toHaveCount(2);
     await item.getByTestId("reject-note").fill("Audit week, everyone is needed on site.");
-    await expect(confirm).toBeEnabled();
 
     await confirm.click();
     await expect(items).toHaveCount(1);

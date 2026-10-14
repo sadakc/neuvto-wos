@@ -1,4 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useState } from "react";
 import {
   deactivateMember,
@@ -57,6 +59,7 @@ export function MembersPage() {
   const [leaving, setLeaving] = useState<Member | null>(null);
   const [impact, setImpact] = useState<DeactivationImpact | null>(null);
   const [successor, setSuccessor] = useState("");
+  const [successorError, setSuccessorError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
@@ -197,6 +200,7 @@ export function MembersPage() {
     setNotice("");
     setLeaving(m);
     setSuccessor("");
+    setSuccessorError("");
     setImpact(null);
     try {
       setImpact(await deactivationImpact(m.id));
@@ -209,6 +213,12 @@ export function MembersPage() {
 
   async function onDeactivate(employeeId: string) {
     setError("");
+    // D113: said under the field on pressing it, never by greying it out.
+    if (!successor) {
+      setSuccessorError(emptyMessage("Hand their work to"));
+      return;
+    }
+    setSuccessorError("");
     setBusy(true);
     try {
       const moved = await deactivateMember(employeeId, successor);
@@ -583,14 +593,19 @@ export function MembersPage() {
                     </p>
 
                     <label htmlFor={`succ-${m.id}`} className="mt-3 block text-sm font-medium">
-                      Hand their work to
+                      <LabelText required>Hand their work to</LabelText>
                     </label>
                     <select
                       id={`succ-${m.id}`}
                       data-testid="successor"
                       value={successor}
-                      onChange={(e) => setSuccessor(e.target.value)}
-                      className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      aria-required
+                      aria-invalid={successorError ? true : undefined}
+                      onChange={(e) => {
+                        setSuccessor(e.target.value);
+                        setSuccessorError("");
+                      }}
+                      className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
                     >
                       <option value="">Choose somebody…</option>
                       {/* allActive too. Handing somebody's reports and approvals
@@ -605,6 +620,7 @@ export function MembersPage() {
                           </option>
                         ))}
                     </select>
+                    <FieldError>{successorError}</FieldError>
 
                     <div className="mt-3 flex gap-2">
                       {/* min-h rather than h: at 280px this label wraps to three
@@ -615,7 +631,7 @@ export function MembersPage() {
                         system asks for is preserved. */}
                       <button
                         onClick={() => onDeactivate(m.id)}
-                        disabled={!successor || busy}
+                        disabled={busy}
                         data-testid="confirm-deactivate"
                         className="inline-flex min-h-12 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                       >

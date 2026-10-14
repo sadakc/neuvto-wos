@@ -12,6 +12,7 @@
  * told first.
  */
 
+import { LabelText } from "@/components/shared/required";
 import { DateField } from "@/components/shared/date-field";
 import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { FilePicker } from "@/components/shared/file-picker";
@@ -113,6 +114,12 @@ export default function CompOff() {
     if (!type) return;
     setError("");
     setNotice("");
+    // D113: said on pressing Send, never by greying it out.
+    if (halfTyped) return;
+    if (total === 0) {
+      setError("Add the day you worked.");
+      return;
+    }
     setBusy(true);
     try {
       const days = rows
@@ -180,7 +187,7 @@ export default function CompOff() {
           )}
 
           <Panel title="Claim the days you worked" testId="panel-claim">
-            <form onSubmit={onSubmit} className="flex flex-col gap-4">
+            <form onSubmit={onSubmit} noValidate className="flex flex-col gap-4">
               {types.length > 1 && (
                 <label className="text-sm font-medium">
                   Kind
@@ -221,10 +228,11 @@ export default function CompOff() {
                     >
                       <div className="text-xs text-muted-foreground @min-[640px]/app:w-48">
                         <span aria-hidden className={EYEBROW}>
-                          Date
+                          <LabelText required={i === 0}>Date</LabelText>
                         </span>
                         <DateField
                           label={`Day worked ${n}`}
+                          required={i === 0}
                           max={today}
                           value={r.date}
                           invalid={r.date !== "" && !isIsoDate(r.date)}
@@ -318,7 +326,7 @@ export default function CompOff() {
 
               <button
                 type="submit"
-                disabled={busy || total === 0 || halfTyped}
+                disabled={busy}
                 className="inline-flex h-12 items-center justify-center self-start rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-45"
               >
                 {busy ? "Sending…" : "Send for approval"}

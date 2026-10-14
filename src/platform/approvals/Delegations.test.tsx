@@ -146,3 +146,20 @@ describe("handing approvals over", () => {
     );
   });
 });
+
+describe("handing over with something missing (D113)", () => {
+  it("says what is missing under each field on pressing Hand over, and sends nothing", async () => {
+    const user = userEvent.setup();
+    render(<Delegations isAdmin={false} modules={MODULES} />);
+    await screen.findByLabelText("Hand them to");
+    const go = screen.getByRole("button", { name: "Hand over" });
+    expect(go).toBeEnabled();
+    await user.click(go);
+    expect(screen.getByText("Hand them to can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("From can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("To can't be empty.")).toBeInTheDocument();
+    expect(h.delegateApprovals).not.toHaveBeenCalled();
+    await user.selectOptions(screen.getByLabelText("Hand them to"), "dan");
+    expect(screen.queryByText("Hand them to can't be empty.")).toBeNull();
+  });
+});

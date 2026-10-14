@@ -170,3 +170,22 @@ describe("WorkingCalendar — a cleared box is not zero", () => {
     expect(screen.queryByText(/didn't save/i)).not.toBeInTheDocument();
   });
 });
+
+describe("WorkingCalendar — a week with no working day (D113)", () => {
+  it("is said on pressing Save, not by greying it out, and nothing is saved", async () => {
+    const { default: userEvent } = await import("@testing-library/user-event");
+    const user = userEvent.setup();
+    render(<WorkingCalendar organizationId="org" />);
+    await screen.findByLabelText("Minimum notice");
+    for (const d of ["Mon", "Tue", "Wed", "Thu", "Fri"]) {
+      await user.click(screen.getByRole("button", { name: d }));
+    }
+    const save = screen.getByRole("button", { name: /save/i });
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(screen.getByTestId("settings-error")).toHaveTextContent(
+      "A working week needs at least one working day.",
+    );
+    expect(saveOrgSettings).not.toHaveBeenCalled();
+  });
+});

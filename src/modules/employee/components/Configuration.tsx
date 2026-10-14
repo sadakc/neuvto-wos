@@ -14,6 +14,7 @@
  * change on their own card. Only a Super Admin sets them.
  */
 
+import { emptyMessage } from "@/lib/required";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
@@ -700,6 +701,11 @@ function DesignationsPanel({
 
   async function add(e: React.FormEvent) {
     e.preventDefault();
+    // D113: said on pressing Add, never by greying it out.
+    if (!name.trim()) {
+      setError(emptyMessage("New designation"));
+      return;
+    }
     if (
       await run(() => saveDesignation(null, { name, grade }), "The designation couldn't be added.")
     ) {
@@ -855,14 +861,21 @@ function DesignationsPanel({
           ))}
         </ol>
       )}
-      <form onSubmit={add} className="mt-4 grid gap-2 @min-[560px]/app:grid-cols-[1fr_8rem_auto]">
+      <form
+        onSubmit={add}
+        noValidate
+        className="mt-4 grid gap-2 @min-[560px]/app:grid-cols-[1fr_8rem_auto]"
+      >
         <input
           required
           aria-label="New designation"
           placeholder="Security Supervisor"
           data-testid="designation-name"
           value={name}
-          onChange={(e) => setName(e.target.value)}
+          onChange={(e) => {
+            setName(e.target.value);
+            setError("");
+          }}
           className={input}
         />
         <input
@@ -874,7 +887,7 @@ function DesignationsPanel({
         />
         <button
           type="submit"
-          disabled={busy || !name.trim()}
+          disabled={busy}
           data-testid="designation-add"
           className="h-11 rounded-md border border-border px-4 text-sm font-medium disabled:opacity-45"
         >
@@ -1069,6 +1082,11 @@ function OnboardingReminders() {
   async function save() {
     setError("");
     setSaved(false);
+    // D113: a number that cannot be right is said on pressing Save.
+    if (!valid) {
+      setError("Remind every 0 to 30 days, and tell the Super Admins after 0 to 90 days.");
+      return;
+    }
     try {
       await saveOnboardingSettings(Number(every), Number(after));
       setSaved(true);
@@ -1119,7 +1137,7 @@ function OnboardingReminders() {
             </label>
             <button
               type="button"
-              disabled={!changed || !valid}
+              disabled={!changed}
               onClick={() => void save()}
               className="h-10 rounded-md border border-border px-3 text-sm disabled:opacity-40"
             >
@@ -1167,6 +1185,7 @@ function OnboardingRow({
   const [mandatory, setMandatory] = useState(item.mandatory);
   const changed = Number(due) !== item.dueWithinDays || mandatory !== item.mandatory;
   const valid = /^\d{1,3}$/.test(due) && Number(due) <= 365;
+  const [wrong, setWrong] = useState("");
   return (
     <li data-testid="onboarding-item" className="flex flex-wrap items-center gap-3 py-2.5 text-sm">
       {/* A line of its own on a phone; beside its controls when there is room. */}
@@ -1196,8 +1215,16 @@ function OnboardingRow({
       </label>
       <button
         type="button"
-        disabled={!changed || !valid}
-        onClick={() => void onSave(item, Number(due), mandatory)}
+        disabled={!changed}
+        onClick={() => {
+          // D113: said on pressing Save, never by greying it out.
+          if (!valid) {
+            setWrong("Days: a whole number from 0 to 365.");
+            return;
+          }
+          setWrong("");
+          void onSave(item, Number(due), mandatory);
+        }}
         className="h-10 rounded-md border border-border px-3 text-sm disabled:opacity-40"
       >
         Save
@@ -1205,6 +1232,11 @@ function OnboardingRow({
       {saved && (
         <span role="status" className="text-caption text-success">
           Saved
+        </span>
+      )}
+      {wrong && (
+        <span role="alert" className="basis-full text-sm text-destructive">
+          {wrong}
         </span>
       )}
     </li>

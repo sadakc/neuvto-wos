@@ -97,11 +97,15 @@ describe("Add Employee", () => {
     api.sendInvite.mockResolvedValue(undefined);
     render(<AddEmployee />);
     expect(await screen.findByText("Mark Manager")).toBeInTheDocument();
-    expect(screen.getByTestId("add-save-draft")).toBeDisabled();
+    // D113: never greyed out. Pressing it says what is missing, and saves nothing.
+    await user.click(screen.getByTestId("add-save-draft"));
+    expect(screen.getByTestId("add-name")).toHaveAttribute("aria-invalid", "true");
+    expect(api.createDraft).not.toHaveBeenCalled();
 
     await user.type(screen.getByTestId("add-name"), "Nisha Rao");
-    expect(screen.getByTestId("add-save-draft")).toBeEnabled();
-    expect(screen.getByTestId("add-send-invite")).toBeDisabled();
+    await user.click(screen.getByTestId("add-send-invite"));
+    expect(screen.getByText("An invitation needs a work email.")).toBeInTheDocument();
+    expect(api.createDraft).not.toHaveBeenCalled();
 
     await user.type(screen.getByTestId("add-email"), "nisha@acme.test");
     await user.selectOptions(screen.getByTestId("add-manager"), "p-mark");
@@ -137,11 +141,15 @@ describe("Add Employee", () => {
   });
 
   it("lists what each record is missing, and will not invite one with no email", async () => {
+    const user = userEvent.setup();
     render(<AddEmployee />);
     const row = await screen.findByTestId("added-row");
     expect(row).toHaveTextContent("Missing: Designation, UAN · 1 overdue");
     expect(row).not.toHaveTextContent("[object");
-    expect(within(row).getByTestId("added-invite")).toBeDisabled();
+    // D113: pressing it says why, on the row, and sends nothing.
+    await user.click(within(row).getByTestId("added-invite"));
+    expect(within(row).getByRole("alert")).toHaveTextContent("Add their work email");
+    expect(api.sendInvite).not.toHaveBeenCalled();
   });
 });
 
@@ -240,12 +248,16 @@ describe("on the card", () => {
       await screen.findByText(/posting at Tata AIG, Hosur closes on their last working day/),
     ).toBeInTheDocument();
     const confirm = screen.getByTestId("deactivate-confirm");
-    expect(confirm).toBeDisabled();
+    // D113: pressing it says what is missing, under each field, and does nothing.
+    await user.click(confirm);
+    expect(screen.getByText("Who takes over can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("Give the reason, in a few words.")).toBeInTheDocument();
+    expect(api.deactivateEmployee).not.toHaveBeenCalled();
     await user.selectOptions(screen.getByTestId("deactivate-successor"), "p-mark");
+    expect(screen.queryByText("Who takes over can't be empty.")).toBeNull();
     const last = screen.getByTestId("deactivate-last-day");
     await user.clear(last);
     await user.type(last, "10102026");
-    expect(confirm).toBeDisabled();
     await user.type(screen.getByTestId("deactivate-reason"), "Resigned");
     await user.click(confirm);
 
@@ -258,5 +270,19 @@ describe("on the card", () => {
     const done = await screen.findByTestId("deactivate-done");
     expect(done).toHaveTextContent("posting at Tata AIG, Hosur closed on 10 Oct 2026");
     expect(done).toHaveTextContent("2 waiting approvals moved to Mark Manager");
+  });
+});
+
+describe("inviting from the card with no email (D113)", () => {
+  it("is said on pressing Send invite, not by greying it out, and nothing is sent", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={{ ...as("draft"), workEmail: null }} />);
+    const send = screen.getByTestId("card-send-invite");
+    expect(send).toBeEnabled();
+    await user.click(send);
+    expect(screen.getByTestId("card-send-invite-error")).toHaveTextContent(
+      "Add their work email first",
+    );
+    expect(api.sendInvite).not.toHaveBeenCalled();
   });
 });

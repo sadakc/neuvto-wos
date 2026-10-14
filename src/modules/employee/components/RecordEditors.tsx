@@ -1044,13 +1044,16 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const total = shareTotal(rows);
-  const valid = rows.length > 0 && total === 100 && rows.every((r) => r.name.trim());
   const set = (key: string, patch: Partial<NomineeRow>) =>
     setRows((rs) => rs.map((r) => (r.key === key ? { ...r, ...patch } : r)));
 
   async function save() {
     setError("");
+    // D113: what is missing is said on pressing Save, never by greying it out.
     const wrong =
+      (rows.length === 0 ? "Add at least one nominee." : null) ??
+      (rows.some((r) => !r.name.trim()) ? "Every nominee needs a name." : null) ??
+      (total !== 100 ? `The shares total ${total}%. They must make 100%.` : null) ??
       (!isIsoDate(from) ? `Effective from: ${DATE_FORMAT_MESSAGE}` : null) ??
       rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean) ??
       (isRequired(card, "nomineeDob") && rows.some((r) => !r.dateOfBirth)
@@ -1113,10 +1116,13 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
             </div>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <label className="min-w-0 text-sm">
-                <span className={eyebrow}>Effective from</span>
+                <span className={eyebrow}>
+                  <LabelText required>Effective from</LabelText>
+                </span>
                 <DateField
                   label="Effective from"
                   value={from}
+                  required
                   onChange={setFrom}
                   className="mt-1"
                 />
@@ -1130,9 +1136,12 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                   className="grid gap-2 rounded-lg border border-border p-3 md:grid-cols-[1fr_9rem_11rem_6rem_auto] md:items-end"
                 >
                   <label className="min-w-0 text-sm">
-                    <span className={eyebrow}>Name</span>
+                    <span className={eyebrow}>
+                      <LabelText required>Name</LabelText>
+                    </span>
                     <input
                       aria-label={`Nominee name, row ${i + 1}`}
+                      aria-required
                       value={r.name}
                       onChange={(e) => set(r.key, { name: e.target.value })}
                       className={`mt-1 ${input}`}
@@ -1156,7 +1165,9 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                     </select>
                   </label>
                   <label className="min-w-0 text-sm">
-                    <span className={eyebrow}>Date of birth</span>
+                    <span className={eyebrow}>
+                      <LabelText required={isRequired(card, "nomineeDob")}>Date of birth</LabelText>
+                    </span>
                     <DateField
                       label={`Date of birth, nominee ${i + 1}`}
                       value={r.dateOfBirth}
@@ -1166,9 +1177,12 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                     />
                   </label>
                   <label className="min-w-0 text-sm">
-                    <span className={eyebrow}>Share %</span>
+                    <span className={eyebrow}>
+                      <LabelText required>Share %</LabelText>
+                    </span>
                     <input
                       aria-label={`Share, row ${i + 1}`}
+                      aria-required
                       inputMode="decimal"
                       value={r.share}
                       onChange={(e) => set(r.key, { share: e.target.value })}
@@ -1212,7 +1226,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
               <button
                 type="button"
                 onClick={() => void save()}
-                disabled={busy || !valid}
+                disabled={busy}
                 data-testid="nominee-save"
                 className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
               >
@@ -1721,7 +1735,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                   setUnitError("");
                 }}
                 aria-invalid={unitError ? true : undefined}
-                className={input}
+                className={`${input} aria-invalid:border-destructive`}
               >
                 <option value="">
                   {units === null
@@ -1832,7 +1846,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                   setV({ ...v, orderRef: e.target.value });
                   setRefError("");
                 }}
-                className={`${input} font-mono`}
+                className={`${input} font-mono aria-invalid:border-destructive`}
               />
             </Field>
             <fieldset className="min-w-0 text-sm">

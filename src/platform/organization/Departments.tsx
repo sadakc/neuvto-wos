@@ -16,6 +16,7 @@
  * one. A flat list is what makes the reports work.
  */
 
+import { emptyMessage } from "@/lib/required";
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import {
@@ -61,6 +62,11 @@ export function Departments({ organizationId }: { organizationId: string }) {
     e.preventDefault();
     setError("");
     setNotice("");
+    // D113: said on pressing Add, never by greying it out.
+    if (!name.trim()) {
+      setError(emptyMessage("Department name"));
+      return;
+    }
     setBusy(true);
     try {
       await saveDepartment(DepartmentInput.parse({ name }), organizationId);
@@ -77,6 +83,10 @@ export function Departments({ organizationId }: { organizationId: string }) {
     if (!editing) return;
     setError("");
     setNotice("");
+    if (!editing.name.trim()) {
+      setError(emptyMessage("Department name"));
+      return;
+    }
     setBusy(true);
     try {
       await saveDepartment(DepartmentInput.parse(editing), organizationId);
@@ -130,7 +140,7 @@ export function Departments({ organizationId }: { organizationId: string }) {
         </p>
       )}
 
-      <form onSubmit={onAdd} className="flex flex-col gap-3 sm:flex-row">
+      <form onSubmit={onAdd} noValidate className="flex flex-col gap-3 sm:flex-row">
         <input
           aria-label="Department name"
           value={name}
@@ -145,7 +155,7 @@ export function Departments({ organizationId }: { organizationId: string }) {
         />
         <button
           type="submit"
-          disabled={busy || !name.trim()}
+          disabled={busy}
           data-testid="add-department"
           className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-50"
         >
@@ -184,7 +194,7 @@ export function Departments({ organizationId }: { organizationId: string }) {
                   />
                   <button
                     onClick={onRename}
-                    disabled={busy || !editing.name.trim()}
+                    disabled={busy}
                     data-testid="save-department"
                     className="inline-flex h-12 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
                   >

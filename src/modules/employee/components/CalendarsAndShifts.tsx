@@ -12,6 +12,8 @@
  * their card. Nothing in use is retired.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useState } from "react";
 import { StatusBadge } from "@/components/shared/status-badge";
 import { isAppError } from "@/platform/errors";
@@ -250,7 +252,8 @@ function CalendarForm({
   const [off, setOff] = useState<number[]>(calendar?.weeklyOff ?? [0]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const valid = name.trim() !== "" && off.length < 7;
+  // D113: what is wrong, said under its field on pressing Save, never by greying it out.
+  const [wrong, setWrong] = useState({ name: "", off: "" });
 
   return (
     <form
@@ -258,6 +261,12 @@ function CalendarForm({
       className="mb-3 grid gap-3 rounded-lg border border-border p-3"
       onSubmit={(e) => {
         e.preventDefault();
+        const w = {
+          name: name.trim() ? "" : emptyMessage("Name"),
+          off: off.length === 7 ? "A week needs at least one working day." : "",
+        };
+        setWrong(w);
+        if (w.name || w.off) return;
         setBusy(true);
         setError("");
         saveCalendar(calendar?.id ?? null, {
@@ -270,14 +279,20 @@ function CalendarForm({
       }}
     >
       <label className="text-sm font-medium">
-        Name
+        <LabelText required>Name</LabelText>
         <input
           aria-label="Name"
+          aria-required
+          aria-invalid={wrong.name ? true : undefined}
           value={name}
           maxLength={80}
-          onChange={(e) => setName(e.target.value)}
-          className={input}
+          onChange={(e) => {
+            setName(e.target.value);
+            setWrong((w) => ({ ...w, name: "" }));
+          }}
+          className={`${input} aria-invalid:border-destructive`}
         />
+        <FieldError>{wrong.name}</FieldError>
       </label>
       <fieldset>
         <legend className="text-sm font-medium">Days off</legend>
@@ -288,9 +303,10 @@ function CalendarForm({
                 type="checkbox"
                 aria-label={label}
                 checked={off.includes(d)}
-                onChange={(e) =>
-                  setOff(e.target.checked ? [...off, d] : off.filter((x) => x !== d))
-                }
+                onChange={(e) => {
+                  setOff(e.target.checked ? [...off, d] : off.filter((x) => x !== d));
+                  setWrong((w) => ({ ...w, off: "" }));
+                }}
                 className="size-4"
               />
               {label}
@@ -300,6 +316,7 @@ function CalendarForm({
         <p className="mt-1 text-caption text-muted-foreground">
           {off.length === 7 ? "A week needs at least one working day." : describeWeek(off)}
         </p>
+        <FieldError>{wrong.off}</FieldError>
       </fieldset>
       {error && (
         <p role="alert" className="text-sm text-destructive">
@@ -309,7 +326,7 @@ function CalendarForm({
       <div className="flex gap-2">
         <button
           type="submit"
-          disabled={busy || !valid}
+          disabled={busy}
           className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
         >
           Save calendar
@@ -342,7 +359,9 @@ function ShiftForm({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const breakOk = /^\d{1,3}$/.test(brk) && Number(brk) <= 240;
-  const valid = name.trim() !== "" && !!start && !!end && start !== end && breakOk;
+  // D113: what is wrong, said under its field on pressing Save, never by greying it out.
+  const [wrong, setWrong] = useState({ name: "", start: "", end: "", brk: "" });
+  const clear = (k: keyof typeof wrong) => setWrong((w) => ({ ...w, [k]: "" }));
 
   return (
     <form
@@ -350,6 +369,14 @@ function ShiftForm({
       className="mb-3 grid gap-3 rounded-lg border border-border p-3 @min-[640px]/app:grid-cols-4"
       onSubmit={(e) => {
         e.preventDefault();
+        const w = {
+          name: name.trim() ? "" : emptyMessage("Name"),
+          start: start ? "" : emptyMessage("Starts"),
+          end: !end ? emptyMessage("Ends") : end === start ? "It can't end when it starts." : "",
+          brk: breakOk ? "" : "A whole number of minutes, up to 240.",
+        };
+        setWrong(w);
+        if (w.name || w.start || w.end || w.brk) return;
         setBusy(true);
         setError("");
         saveShift(shift?.id ?? null, {
@@ -364,44 +391,67 @@ function ShiftForm({
       }}
     >
       <label className="text-sm font-medium">
-        Name
+        <LabelText required>Name</LabelText>
         <input
           aria-label="Name"
+          aria-required
+          aria-invalid={wrong.name ? true : undefined}
           value={name}
           maxLength={80}
-          onChange={(e) => setName(e.target.value)}
-          className={input}
+          onChange={(e) => {
+            setName(e.target.value);
+            clear("name");
+          }}
+          className={`${input} aria-invalid:border-destructive`}
         />
+        <FieldError>{wrong.name}</FieldError>
       </label>
       <label className="text-sm font-medium">
-        Starts
+        <LabelText required>Starts</LabelText>
         <input
           type="time"
           aria-label="Starts"
+          aria-required
+          aria-invalid={wrong.start ? true : undefined}
           value={start}
-          onChange={(e) => setStart(e.target.value)}
-          className={input}
+          onChange={(e) => {
+            setStart(e.target.value);
+            clear("start");
+          }}
+          className={`${input} aria-invalid:border-destructive`}
         />
+        <FieldError>{wrong.start}</FieldError>
       </label>
       <label className="text-sm font-medium">
-        Ends
+        <LabelText required>Ends</LabelText>
         <input
           type="time"
           aria-label="Ends"
+          aria-required
+          aria-invalid={wrong.end ? true : undefined}
           value={end}
-          onChange={(e) => setEnd(e.target.value)}
-          className={input}
+          onChange={(e) => {
+            setEnd(e.target.value);
+            clear("end");
+          }}
+          className={`${input} aria-invalid:border-destructive`}
         />
+        <FieldError>{wrong.end}</FieldError>
       </label>
       <label className="text-sm font-medium">
         Unpaid break (minutes)
         <input
           aria-label="Unpaid break (minutes)"
           inputMode="numeric"
+          aria-invalid={wrong.brk ? true : undefined}
           value={brk}
-          onChange={(e) => setBrk(e.target.value)}
-          className={input}
+          onChange={(e) => {
+            setBrk(e.target.value);
+            clear("brk");
+          }}
+          className={`${input} aria-invalid:border-destructive`}
         />
+        <FieldError>{wrong.brk}</FieldError>
       </label>
       <p className="text-caption text-muted-foreground @min-[640px]/app:col-span-4">
         {start && end && start !== end
@@ -416,7 +466,7 @@ function ShiftForm({
       <div className="flex gap-2 @min-[640px]/app:col-span-4">
         <button
           type="submit"
-          disabled={busy || !valid}
+          disabled={busy}
           className="h-11 rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
         >
           Save shift

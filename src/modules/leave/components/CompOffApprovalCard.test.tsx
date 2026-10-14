@@ -106,7 +106,10 @@ describe("deciding a compensatory off claim", () => {
     const onDecided = vi.fn();
     render(<CompOffApprovalCard item={item} onDecided={onDecided} />);
     await user.click(await screen.findByTestId("reject"));
-    expect(screen.getByTestId("confirm-reject")).toBeDisabled();
+    // D113: pressing it with nothing given says what is missing, and sends nothing.
+    await user.click(screen.getByTestId("confirm-reject"));
+    expect(screen.getByText("The reason can't be empty.")).toBeInTheDocument();
+    expect(h.decideApproval).not.toHaveBeenCalled();
     await user.click(screen.getByText("Back"));
     await user.click(screen.getByTestId("approve"));
     expect(h.decideApproval).toHaveBeenCalledWith("ar-9", "approved", "", undefined);

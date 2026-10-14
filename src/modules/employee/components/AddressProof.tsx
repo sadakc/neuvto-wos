@@ -87,7 +87,11 @@ export function AttachProofForm({
       className="flex flex-wrap items-end gap-2 rounded-lg border border-border p-3"
       onSubmit={(e) => {
         e.preventDefault();
-        if (!file) return;
+        // D113: said on pressing Attach, never by greying it out.
+        if (!file) {
+          setError("Choose the proof to attach.");
+          return;
+        }
         setBusy(true);
         setError("");
         attachAddressProof({ employeeId, addressId, file })
@@ -102,13 +106,16 @@ export function AttachProofForm({
         <FilePicker
           label="Proof of address"
           file={file}
-          onChange={setFile}
+          onChange={(f) => {
+            setFile(f);
+            setError("");
+          }}
           hint="PDF or a photo, up to 10 MB. A proof already on file is replaced and stays in the record."
         />
       </div>
       <button
         type="submit"
-        disabled={busy || !file}
+        disabled={busy}
         className="inline-flex h-11 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
       >
         {busy ? "Attaching…" : "Attach"}

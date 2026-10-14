@@ -215,7 +215,6 @@ test("a document is chosen with Browse, unchosen, and uploaded", async ({ page }
   await page.getByRole("button", { name: "Upload a document" }).click();
   await expect(page.getByRole("button", { name: "Browse…" })).toBeVisible();
   const upload = page.getByRole("button", { name: "Upload", exact: true });
-  await expect(upload).toBeDisabled();
   const pdf = {
     name: "offer.pdf",
     mimeType: "application/pdf",
@@ -225,7 +224,9 @@ test("a document is chosen with Browse, unchosen, and uploaded", async ({ page }
   await expect(page.getByText("wrong.pdf")).toBeVisible();
   await page.getByRole("button", { name: "Remove wrong.pdf" }).click();
   await expect(page.getByText("No file chosen")).toBeVisible();
-  await expect(upload).toBeDisabled();
+  // D113: pressing it with no file says so, and uploads nothing.
+  await upload.click();
+  await expect(page.getByText("Choose the file to upload.")).toBeVisible();
   await page.getByLabel("File", { exact: true }).setInputFiles(pdf);
   await upload.click();
   await expect(page.getByRole("button", { name: "Browse…" })).toHaveCount(0);

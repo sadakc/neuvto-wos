@@ -596,3 +596,20 @@ describe("People — the Department dropdown", () => {
     expect(screen.queryAllByTestId("department")).toHaveLength(0);
   });
 });
+
+describe("People — handing over to nobody (D113)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("says who is missing on pressing it, not by greying it out, and does nothing", async () => {
+    vi.mocked(deactivationImpact).mockResolvedValue({ reports: 1, approvals: 0 });
+    const user = userEvent.setup();
+    await renderPeople();
+    await user.click(within(rowFor("Sunita Kapoor")).getByTestId("deactivate"));
+    const confirm = await within(rowFor("Sunita Kapoor")).findByTestId("deactivate-confirm");
+    const go = within(confirm).getByTestId("confirm-deactivate");
+    expect(go).toBeEnabled();
+    await user.click(go);
+    expect(within(confirm).getByText("Hand their work to can't be empty.")).toBeInTheDocument();
+    expect(deactivateMember).not.toHaveBeenCalled();
+  });
+});

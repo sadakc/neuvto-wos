@@ -8,6 +8,8 @@
  * requests, by the blackout's name.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { DateField } from "@/components/shared/date-field";
 import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { useEffect, useState } from "react";
@@ -59,11 +61,19 @@ export default function Blackouts() {
   }, []);
 
   const backwards = !!fromDate && !!toDate && toDate < fromDate;
-  const canSave = !!name.trim() && !!fromDate && !!toDate && !backwards && !saving;
+  // D113: what is missing, said under each field on pressing Add, never by greying it out.
+  const [missing, setMissing] = useState({ name: "", from: "", to: "" });
 
   async function onSave(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !canSave) return;
+    if (!user || saving) return;
+    const m = {
+      name: name.trim() ? "" : emptyMessage("Name"),
+      from: fromRaw ? "" : emptyMessage("From"),
+      to: toRaw ? "" : emptyMessage("To"),
+    };
+    setMissing(m);
+    if (m.name || m.from || m.to || halfTyped || backwards) return;
     setError("");
     setSaving(true);
     try {
@@ -147,37 +157,50 @@ export default function Blackouts() {
       ) : (
         <form
           onSubmit={onSave}
+          noValidate
           className="mt-4 space-y-4 rounded-xl border border-border bg-card p-4 shadow-card"
         >
           <div>
             <label htmlFor="bo-name" className="block text-sm font-medium">
-              Name
+              <LabelText required>Name</LabelText>
             </label>
             <input
               id="bo-name"
               value={name}
               maxLength={80}
-              onChange={(e) => setName(e.target.value)}
+              aria-required
+              aria-invalid={missing.name ? true : undefined}
+              onChange={(e) => {
+                setName(e.target.value);
+                setMissing((x) => ({ ...x, name: "" }));
+              }}
               placeholder="Year-end audit"
-              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
             />
+            <FieldError>{missing.name}</FieldError>
           </div>
           <div className="grid gap-4 @min-[560px]/app:grid-cols-2">
             <div>
               <label htmlFor="bo-from" className="block text-sm font-medium">
-                From
+                <LabelText required>From</LabelText>
               </label>
               <DateField
                 id="bo-from"
                 value={fromRaw}
-                onChange={setFromRaw}
+                required
+                invalid={!!missing.from}
+                onChange={(v) => {
+                  setFromRaw(v);
+                  setMissing((x) => ({ ...x, from: "" }));
+                }}
                 max={`${new Date().getFullYear() + 2}-12-31`}
                 className="mt-1"
               />
+              <FieldError>{missing.from}</FieldError>
             </div>
             <div>
               <label htmlFor="bo-to" className="block text-sm font-medium">
-                To
+                <LabelText required>To</LabelText>
               </label>
               <DateField
                 id="bo-to"
@@ -185,9 +208,15 @@ export default function Blackouts() {
                 min={fromDate || undefined}
                 openAt={fromDate || undefined}
                 max={`${new Date().getFullYear() + 2}-12-31`}
-                onChange={setToRaw}
+                required
+                invalid={!!missing.to}
+                onChange={(v) => {
+                  setToRaw(v);
+                  setMissing((x) => ({ ...x, to: "" }));
+                }}
                 className="mt-1"
               />
+              <FieldError>{missing.to}</FieldError>
             </div>
           </div>
           {halfTyped && (
@@ -207,7 +236,7 @@ export default function Blackouts() {
           <div className="flex flex-col gap-3 @min-[640px]/app:flex-row">
             <button
               type="submit"
-              disabled={!canSave}
+              disabled={saving}
               data-testid="save-blackout"
               className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >

@@ -8,6 +8,8 @@
  * (active, able to approve, in this company) and refuses overlaps.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { DateField } from "@/components/shared/date-field";
 import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { useEffect, useState } from "react";
@@ -45,6 +47,7 @@ export function Delegations({
   const fromDate = isIsoDate(fromRaw) ? fromRaw : "";
   const toDate = isIsoDate(toRaw) ? toRaw : "";
   const halfTyped = (fromRaw !== "" && !fromDate) || (toRaw !== "" && !toDate);
+  const [missing, setMissing] = useState({ delegate: "", from: "", to: "" });
   const [moduleKey, setModuleKey] = useState("");
   const [reason, setReason] = useState("");
   const [busy, setBusy] = useState(false);
@@ -65,6 +68,14 @@ export function Delegations({
     e.preventDefault();
     setError("");
     setNotice("");
+    // D113: what is missing is said under each field on pressing Hand over.
+    const missing = {
+      delegate: delegateId ? "" : emptyMessage("Hand them to"),
+      from: fromRaw === "" ? emptyMessage("From") : "",
+      to: toRaw === "" ? emptyMessage("To") : "",
+    };
+    setMissing(missing);
+    if (missing.delegate || missing.from || missing.to || halfTyped) return;
     setBusy(true);
     try {
       await delegateApprovals({
@@ -161,7 +172,11 @@ export function Delegations({
           </ul>
         )}
 
-        <form onSubmit={onSubmit} className="mt-4 grid gap-3 @min-[640px]/app:grid-cols-2">
+        <form
+          onSubmit={onSubmit}
+          noValidate
+          className="mt-4 grid gap-3 @min-[640px]/app:grid-cols-2"
+        >
           {isAdmin && (
             <label className="text-sm font-medium">
               Whose approvals
@@ -179,40 +194,60 @@ export function Delegations({
               </select>
             </label>
           )}
-          <label className="text-sm font-medium">
-            Hand them to
-            <select
-              value={delegateId}
-              onChange={(e) => setDelegateId(e.target.value)}
-              required
-              className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-            >
-              <option value="">Choose a colleague…</option>
-              {people
-                .filter((p) => p.id !== delegatorId)
-                .map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.fullName}
-                  </option>
-                ))}
-            </select>
-          </label>
+          <div>
+            <label className="block text-sm font-medium">
+              <LabelText required>Hand them to</LabelText>
+              <select
+                value={delegateId}
+                onChange={(e) => {
+                  setDelegateId(e.target.value);
+                  setMissing((m) => ({ ...m, delegate: "" }));
+                }}
+                aria-invalid={missing.delegate ? true : undefined}
+                required
+                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
+              >
+                <option value="">Choose a colleague…</option>
+                {people
+                  .filter((p) => p.id !== delegatorId)
+                  .map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.fullName}
+                    </option>
+                  ))}
+              </select>
+            </label>
+            <FieldError>{missing.delegate}</FieldError>
+          </div>
           <div className="text-sm font-medium">
-            <span aria-hidden>From</span>
+            <span aria-hidden>
+              <LabelText required>From</LabelText>
+            </span>
             <DateField
               label="From"
               value={fromRaw}
-              onChange={setFromRaw}
+              onChange={(v) => {
+                setFromRaw(v);
+                setMissing((m) => ({ ...m, from: "" }));
+              }}
+              invalid={!!missing.from}
               required
               className="mt-2"
             />
+            <FieldError>{missing.from}</FieldError>
           </div>
           <div className="text-sm font-medium">
-            <span aria-hidden>To</span>
+            <span aria-hidden>
+              <LabelText required>To</LabelText>
+            </span>
             <DateField
               label="To"
               value={toRaw}
-              onChange={setToRaw}
+              invalid={!!missing.to}
+              onChange={(v) => {
+                setToRaw(v);
+                setMissing((m) => ({ ...m, to: "" }));
+              }}
               min={fromDate || undefined}
               openAt={fromDate || undefined}
               required
@@ -223,6 +258,7 @@ export function Delegations({
                 {DATE_FORMAT_MESSAGE}
               </span>
             )}
+            <FieldError>{missing.to}</FieldError>
           </div>
           <label className="text-sm font-medium">
             Which approvals
@@ -261,7 +297,7 @@ export function Delegations({
           )}
           <button
             type="submit"
-            disabled={busy || !delegateId || !fromDate || !toDate}
+            disabled={busy}
             className="inline-flex h-12 items-center justify-center justify-self-start rounded-md bg-primary px-5 text-sm font-semibold text-primary-foreground disabled:opacity-45"
           >
             {busy ? "Saving…" : "Hand over"}

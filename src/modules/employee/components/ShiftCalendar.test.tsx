@@ -216,3 +216,21 @@ describe("moving somebody with their own shift", () => {
     expect(screen.queryByLabelText(/Keep their own shift/)).toBeNull();
   });
 });
+
+describe("changing a shift with no date (D113)", () => {
+  it("is said on pressing Save, not by greying it out, and nothing is sent", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={as("employeeAdmin")} />);
+    await openTab("Employment");
+    await user.click(screen.getByRole("button", { name: "Change shift" }));
+    const select = await screen.findByLabelText("Shift");
+    await screen.findByRole("option", { name: /General/ });
+    await user.selectOptions(select, "s-gen");
+    await user.clear(screen.getByRole("textbox", { name: "From" }));
+    const save = screen.getByRole("button", { name: "Save shift" });
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(screen.getByRole("alert")).toHaveTextContent("From can't be empty.");
+    expect(api.setShift).not.toHaveBeenCalled();
+  });
+});

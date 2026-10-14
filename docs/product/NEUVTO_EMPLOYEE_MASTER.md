@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.24 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.25 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -826,6 +826,42 @@ belong to Leave.
 - Proved by `model.test.ts`, `OrgChart.test.tsx`, `Directory.test.tsx`,
   `members.access.test.tsx` and `verify_employee_card.sql` (11 screen guards and the
   database guard broken on purpose, each caught); `organisation.spec.ts` written.
+
+### Sada's phone round (D113, 14 Oct 2026)
+
+Found testing on a phone, as Priya, Hema and Alice.
+
+- **"This year" called an approved leave undecided.** `leave_balances` keeps three buckets:
+  reserved (sent, undecided), pending (approved, still ahead) and used (taken). The card read
+  pending as "awaiting a decision". It reads reserved for that now, and says "approved, still
+  to come" for the other.
+- **A person never saw why a request was declined.** Their own list dropped every request
+  once HR had answered it: the status was left out of the call and the database's default
+  is `open`. It is sent as null now. What HR said is labelled **Reason** for a decline and
+  **Note** for an approval, on the person's card and on HR's list, and a decline's reason is
+  in the bell under the notice.
+- **A change request is approved**, not "made": HR's buttons say **Approve**, the tab says
+  Approved, and the person is told it was approved.
+- **The nearest police station** is shown in Physical record, beside the editor that holds
+  it. It was in the strip at the top only, so nobody could see where to change it.
+- **A first posting that starts later** (Kavya, deployed from 17 Oct) showed no unit at all:
+  the card showed only a posting covering today. It now shows the coming one in the panel
+  (Unit, Type, Starts on) and in the strip ("Security from 17 Oct 2026"); the strip wraps a
+  long value rather than cutting it off.
+- **A draft's Edit details** is an outlined button beside Send invite, not a link between
+  two buttons.
+- **Every form says what it is missing.** A required field's label has a red asterisk. A
+  button is never greyed out for something missing or wrong: pressing it says what, in red
+  under each field, and sends nothing. Greyed out stays for saving, for "not yours to
+  change" and for "nothing to save". Across the card's editors, Add Employee, deploy,
+  deactivate, documents, address proof, calendars and shifts, designations, the onboarding
+  checklist, Request a change and its answers, and Leave, Approvals, Delegations,
+  Notifications, Scheduled reports, Holidays, Departments and the company's name.
+- Proved by `PhoneRound.test.tsx`, `ChangeRequests.test.tsx`, `changeRequests.test.ts`,
+  `CardRest.test.tsx`, `NotificationBell.test.tsx`, the form tests beside each screen, and
+  `verify_card_rest.sql`, `verify_change_requests.sql`, `verify_third_round.sql` (each
+  database check watched failing without the migration; 46 screen guards broken on purpose,
+  each caught). The e2e specs are updated but not run locally.
 
 ## 8. Acceptance criteria, module level
 

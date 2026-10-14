@@ -17,14 +17,19 @@ async function fill(page: Page, type: string, from: string, to: string) {
 const from = tuesdayInWeeks(6);
 const to = addDays(from, 1);
 
-test("Send stays off until a type and both dates are chosen", async ({ page }) => {
+test("Send says what is missing, under each field, until a type and both dates are chosen", async ({
+  page,
+}) => {
+  // D113: never greyed out for something missing.
   await page.goto("/app/leave/apply");
   const send = page.getByTestId("submit-leave");
-  await expect(send).toBeDisabled();
+  await send.click();
+  await expect(page.getByText("Leave type can't be empty.")).toBeVisible();
+  await expect(page.getByText("First day can't be empty.")).toBeVisible();
+  await expect(page.getByText("Last day can't be empty.")).toBeVisible();
   await page.getByLabel("Leave type").selectOption({ label: "Casual" });
-  await expect(send).toBeDisabled();
+  await expect(page.getByText("Leave type can't be empty.")).toHaveCount(0);
   await page.getByLabel("First day").fill(from);
-  await expect(send).toBeDisabled();
   await page.getByLabel("Last day").fill(to);
   await expect(page.getByTestId("balance-line")).toContainText("2");
   await expect(send).toBeEnabled();
@@ -35,7 +40,9 @@ test("a past day cannot be booked", async ({ page }) => {
   // Typed DD/MM/YYYY into the shared date picker; its calendar offers no past day.
   await fill(page, "Casual", "2020-01-06", "2020-01-07");
   await expect(page.getByTestId("date-problem")).toHaveText("The first day can't be in the past.");
-  await expect(page.getByTestId("submit-leave")).toBeDisabled();
+  await page.getByTestId("submit-leave").click();
+  await expect(page).toHaveURL(/\/app\/leave\/apply/);
+  await expect(page.getByRole("heading", { name: "Request sent" })).toHaveCount(0);
 });
 
 test("asking for more days than the balance holds is stopped before sending", async ({ page }) => {
@@ -43,7 +50,9 @@ test("asking for more days than the balance holds is stopped before sending", as
   // Sick leave is 8 days a year; three weeks is far more.
   await fill(page, "Sick", from, addDays(from, 20));
   await expect(page.getByTestId("shortfall")).toBeVisible();
-  await expect(page.getByTestId("submit-leave")).toBeDisabled();
+  await page.getByTestId("submit-leave").click();
+  await expect(page.getByTestId("submit-error")).toContainText("available");
+  await expect(page.getByRole("heading", { name: "Request sent" })).toHaveCount(0);
 });
 
 test("a request is sent, and shows on My Leave as waiting", async ({ page }) => {

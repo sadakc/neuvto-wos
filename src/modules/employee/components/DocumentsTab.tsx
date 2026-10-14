@@ -16,6 +16,8 @@
  * opened. It is attached from the address, never uploaded here.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useState } from "react";
 import { DateField } from "@/components/shared/date-field";
 import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
@@ -85,6 +87,8 @@ export function DocumentsTab({
   const [file, setFile] = useState<File | null>(null);
   const [removing, setRemoving] = useState<string | null>(null);
   const [reason, setReason] = useState("");
+  // D113: what is missing, said under its field on pressing the button.
+  const [missing, setMissing] = useState({ title: "", file: "", reason: "" });
   const [views, setViews] = useState<DocumentView[] | null>(null);
 
   async function load() {
@@ -133,6 +137,7 @@ export function DocumentsTab({
     setTitle("");
     setExpiresOn("");
     setFile(null);
+    setMissing({ title: "", file: "", reason: "" });
   }
 
   if (state === "loading") return <div className="h-40 animate-pulse rounded-lg bg-muted" />;
@@ -179,10 +184,20 @@ export function DocumentsTab({
 
       {uploading && kind && (
         <form
+          noValidate
           className="grid gap-3 rounded-xl border border-border bg-card p-4 shadow-card @min-[640px]/app:grid-cols-2"
           onSubmit={(e) => {
             e.preventDefault();
-            if (!file) return;
+            const m = {
+              title:
+                "named" in kind && !title.trim()
+                  ? emptyMessage(kind.key === "relieving_letter" ? "Which employer" : "What it is")
+                  : "",
+              file: file ? "" : "Choose the file to upload.",
+              reason: "",
+            };
+            setMissing(m);
+            if (m.title || !file) return;
             if (expiresOn && !isIsoDate(expiresOn)) {
               setError(`Expires on: ${DATE_FORMAT_MESSAGE}`);
               return;
@@ -215,16 +230,25 @@ export function DocumentsTab({
             </select>
           </label>
           {"named" in kind && (
-            <label className="text-sm font-medium">
-              {kind.key === "relieving_letter" ? "Which employer" : "What it is"}
-              <input
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                maxLength={120}
-                required
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              />
-            </label>
+            <div className="text-sm font-medium">
+              <label className="block">
+                <LabelText required>
+                  {kind.key === "relieving_letter" ? "Which employer" : "What it is"}
+                </LabelText>
+                <input
+                  value={title}
+                  onChange={(e) => {
+                    setTitle(e.target.value);
+                    setMissing((m) => ({ ...m, title: "" }));
+                  }}
+                  maxLength={120}
+                  required
+                  aria-invalid={missing.title ? true : undefined}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
+                />
+              </label>
+              <FieldError>{missing.title}</FieldError>
+            </div>
           )}
           <label className="text-sm font-medium">
             Expires on (optional)
@@ -237,17 +261,23 @@ export function DocumentsTab({
               className="mt-2"
             />
           </label>
-          <FilePicker
-            label="File"
-            file={file}
-            onChange={setFile}
-            testId="document-file"
-            hint="PDF or a photo, up to 10 MB. A new file for a document already on file replaces it; the old one stays in the record."
-          />
+          <div className="min-w-0">
+            <FilePicker
+              label="File"
+              file={file}
+              onChange={(f) => {
+                setFile(f);
+                setMissing((m) => ({ ...m, file: "" }));
+              }}
+              testId="document-file"
+              hint="PDF or a photo, up to 10 MB. A new file for a document already on file replaces it; the old one stays in the record."
+            />
+            <FieldError>{missing.file}</FieldError>
+          </div>
           <div className="flex gap-2 @min-[640px]/app:col-span-2">
             <button
               type="submit"
-              disabled={busy || !file}
+              disabled={busy}
               className="inline-flex h-11 items-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45"
             >
               {busy ? "Uploading…" : "Upload"}
@@ -314,6 +344,7 @@ export function DocumentsTab({
                         type="button"
                         onClick={() => {
                           setRemoving(doc.id);
+                          setMissing((m) => ({ ...m, reason: "" }));
                           setReason("");
                         }}
                         className="text-sm underline underline-offset-4"
@@ -339,24 +370,36 @@ export function DocumentsTab({
                   className="flex w-full flex-wrap items-end gap-2"
                   onSubmit={(e) => {
                     e.preventDefault();
+                    if (reason.trim().length < 3) {
+                      setMissing((m) => ({ ...m, reason: "Say why, in a few words." }));
+                      return;
+                    }
                     void run(
                       () => removeDocument(doc.id, reason.trim()),
                       () => setRemoving(null),
                     );
                   }}
                 >
-                  <label className="flex-1 text-xs text-muted-foreground">
-                    Why is it being removed?
-                    <input
-                      value={reason}
-                      onChange={(e) => setReason(e.target.value)}
-                      maxLength={200}
-                      className="mt-1 h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
-                    />
-                  </label>
+                  <div className="flex-1 text-xs text-muted-foreground">
+                    <label className="block">
+                      <LabelText required>Why is it being removed?</LabelText>
+                      <input
+                        value={reason}
+                        onChange={(e) => {
+                          setReason(e.target.value);
+                          setMissing((m) => ({ ...m, reason: "" }));
+                        }}
+                        maxLength={200}
+                        aria-required
+                        aria-invalid={missing.reason ? true : undefined}
+                        className="mt-1 h-11 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground aria-invalid:border-destructive"
+                      />
+                    </label>
+                    <FieldError>{missing.reason}</FieldError>
+                  </div>
                   <button
                     type="submit"
-                    disabled={busy || reason.trim().length < 3}
+                    disabled={busy}
                     className="inline-flex h-11 items-center rounded-md bg-destructive px-4 text-sm font-medium text-destructive-foreground disabled:opacity-45"
                   >
                     Remove the document

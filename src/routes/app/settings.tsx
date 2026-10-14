@@ -1,4 +1,6 @@
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
+import { emptyMessage } from "@/lib/required";
+import { FieldError } from "@/components/shared/required";
 import { Suspense, useEffect, useState } from "react";
 import {
   administersAnyModule,
@@ -22,7 +24,7 @@ import { CompanyIdentity } from "@/platform/organization/CompanyIdentity";
 import { Departments } from "@/platform/organization/Departments";
 import { WorkingCalendar } from "@/platform/calendar/WorkingCalendar";
 import { DateField } from "@/components/shared/date-field";
-import { isIsoDate } from "@/components/shared/date-rules";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { SectionedPage, type PageSection } from "@/components/shared/sectioned-page";
 import { formatDate } from "@/lib/dates";
 import {
@@ -63,6 +65,8 @@ function SettingsPage() {
 
   const [message, setMessage] = useState("");
   const [error, setError] = useState("");
+  // D113: said under each field on pressing Add, never by greying it out.
+  const [holidayMissing, setHolidayMissing] = useState({ name: "", date: "" });
 
   const [holidayName, setHolidayName] = useState("");
   /** The holiday about to be removed: removing changes future counts, so it asks. */
@@ -116,7 +120,17 @@ function SettingsPage() {
 
   async function onAddHoliday(e: React.FormEvent) {
     e.preventDefault();
-    if (!user || !holidayName.trim() || !isIsoDate(holidayDate)) return;
+    if (!user) return;
+    const m = {
+      name: holidayName.trim() ? "" : emptyMessage("Holiday name"),
+      date: !holidayDate
+        ? emptyMessage("Holiday date")
+        : isIsoDate(holidayDate)
+          ? ""
+          : DATE_FORMAT_MESSAGE,
+    };
+    setHolidayMissing(m);
+    if (m.name || m.date) return;
     setError("");
     try {
       await addHoliday(user.organizationId, holidayName.trim(), holidayDate);
@@ -219,24 +233,42 @@ function SettingsPage() {
               "Days excluded from leave when a request spans them. Shared with attendance and shift planning when those arrive.",
             content: (
               <>
-                <form onSubmit={onAddHoliday} className="mt-4 flex flex-col gap-3 sm:flex-row">
-                  <input
-                    aria-label="Holiday name"
-                    value={holidayName}
-                    onChange={(e) => setHolidayName(e.target.value)}
-                    placeholder="Republic Day"
-                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
-                  />
-                  <DateField
-                    label="Holiday date"
-                    value={holidayDate}
-                    max={`${new Date().getFullYear() + 2}-12-31`}
-                    onChange={setHolidayDate}
-                    className="sm:w-48"
-                  />
+                <form
+                  onSubmit={onAddHoliday}
+                  noValidate
+                  className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start"
+                >
+                  <div className="min-w-0 flex-1">
+                    <input
+                      aria-label="Holiday name"
+                      aria-required
+                      aria-invalid={holidayMissing.name ? true : undefined}
+                      value={holidayName}
+                      onChange={(e) => {
+                        setHolidayName(e.target.value);
+                        setHolidayMissing((x) => ({ ...x, name: "" }));
+                      }}
+                      placeholder="Republic Day"
+                      className="h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
+                    />
+                    <FieldError>{holidayMissing.name}</FieldError>
+                  </div>
+                  <div className="sm:w-48">
+                    <DateField
+                      label="Holiday date"
+                      value={holidayDate}
+                      required
+                      invalid={!!holidayMissing.date}
+                      max={`${new Date().getFullYear() + 2}-12-31`}
+                      onChange={(v) => {
+                        setHolidayDate(v);
+                        setHolidayMissing((x) => ({ ...x, date: "" }));
+                      }}
+                    />
+                    <FieldError>{holidayMissing.date}</FieldError>
+                  </div>
                   <button
                     type="submit"
-                    disabled={!holidayName.trim() || !isIsoDate(holidayDate)}
                     data-testid="add-holiday"
                     className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-50"
                   >

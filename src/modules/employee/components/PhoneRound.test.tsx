@@ -126,6 +126,9 @@ describe("a first posting still to come (Kavya)", () => {
     render(<EmployeeCardView card={kavya} />);
     const strip = screen.getByText("Deployed unit").parentElement!;
     expect(strip).toHaveTextContent("Security from 17 Oct 2026");
+    // Wrapped, never cut to "Security from 17 Oc…" on a phone.
+    const value = within(strip).getByText("Security from 17 Oct 2026");
+    expect(value.className).not.toContain("truncate");
   });
 
   it("still reads as a move when there is a posting now", () => {

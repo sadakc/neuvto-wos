@@ -142,6 +142,11 @@ export function WorkingCalendar({
   async function onSave() {
     if (!settings) return;
     setError("");
+    // D113: said on pressing Save, never by greying it out.
+    if (DAYS.filter((_, i) => !settings.weekendDays.includes(i)).length === 0) {
+      setError("A working week needs at least one working day.");
+      return;
+    }
     setSaving(true);
     try {
       await saveOrgSettings(organizationId, settings);
@@ -382,7 +387,7 @@ export function WorkingCalendar({
       <div className="flex items-center gap-4">
         <button
           onClick={onSave}
-          disabled={saving || workingDays === 0}
+          disabled={saving}
           data-testid="save-settings"
           className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >

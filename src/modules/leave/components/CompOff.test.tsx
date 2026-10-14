@@ -125,7 +125,18 @@ describe("claiming compensatory off", () => {
     await user.click(screen.getByRole("button", { name: "Add another day" }));
     await user.type(screen.getByLabelText("Day worked 2"), "05/1");
     expect(screen.getByTestId("comp-off-date-problem")).toHaveTextContent("DD/MM/YYYY");
-    expect(screen.getByRole("button", { name: "Send for approval" })).toBeDisabled();
+    // D113: pressing it sends nothing while a date is half typed.
+    await user.click(screen.getByRole("button", { name: "Send for approval" }));
+    expect(h.submitCompOff).not.toHaveBeenCalled();
+  });
+
+  it("says a day is needed when sent with none (D113)", async () => {
+    const user = userEvent.setup();
+    render(<CompOff />);
+    await screen.findByLabelText("Day worked 1");
+    await user.click(screen.getByRole("button", { name: "Send for approval" }));
+    expect(screen.getByRole("alert")).toHaveTextContent("Add the day you worked.");
+    expect(h.submitCompOff).not.toHaveBeenCalled();
   });
 
   it("removes a listed day", async () => {

@@ -266,7 +266,8 @@ export function EmployeeCardView({
               <dt className="text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
                 {c.label}
               </dt>
-              <dd className="mt-0.5 truncate text-sm">{c.value || "—"}</dd>
+              {/* Wrapped, not cut: "Security from 17 Oct 2026" was "Security from 17 Oc…" on a phone. */}
+              <dd className="mt-0.5 text-sm break-words">{c.value || "—"}</dd>
             </div>
           ))}
         </dl>

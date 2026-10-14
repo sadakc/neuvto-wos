@@ -15,6 +15,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const h = vi.hoisted(() => ({
   listHolidays: vi.fn(),
   removeHoliday: vi.fn(),
+  addHoliday: vi.fn(),
   listCalendars: vi.fn(),
   setHolidayCalendars: vi.fn(),
   getAdminSections: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock("@/platform/auth", async () => {
 vi.mock("@/platform/calendar", () => ({
   listHolidays: h.listHolidays,
   removeHoliday: h.removeHoliday,
-  addHoliday: vi.fn(),
+  addHoliday: h.addHoliday,
   listCalendars: h.listCalendars,
   setHolidayCalendars: h.setHolidayCalendars,
 }));
@@ -164,5 +165,17 @@ describe("whose settings these are (Sada, 14 Oct 2026)", () => {
     expect(screen.queryByTestId("settings-holidays")).toBeNull();
     expect(screen.queryByTestId("settings-payroll-pay-heads")).toBeNull();
     expect(screen.getByText("The leave types")).toBeInTheDocument();
+  });
+});
+
+describe("adding a holiday with something missing (D113)", () => {
+  it("says what is missing under each field on pressing Add, and adds nothing", async () => {
+    const user = await openHolidays();
+    const add = await screen.findByTestId("add-holiday");
+    expect(add).toBeEnabled();
+    await user.click(add);
+    expect(screen.getByText("Holiday name can't be empty.")).toBeInTheDocument();
+    expect(screen.getByText("Holiday date can't be empty.")).toBeInTheDocument();
+    expect(h.addHoliday).not.toHaveBeenCalled();
   });
 });

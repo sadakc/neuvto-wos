@@ -10,6 +10,8 @@
  * a request the server then refuses.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
@@ -179,21 +181,37 @@ export default function ApplyLeave() {
         : fromDate && toDate && toDate < fromDate
           ? "The last day can't be before the first."
           : "";
-  const canSubmit =
-    !dateProblem &&
-    !!typeId &&
-    !!fromDate &&
-    !!toDate &&
-    toDate >= fromDate &&
-    !!workingDays &&
-    !shortfall &&
-    !blackout &&
-    !countingDays &&
-    !submitting;
+  // D113: the button is never greyed out for something missing. Pressing it
+  // says what is missing under each field, or what stands in the way.
+  const [missing, setMissing] = useState({ type: "", from: "", to: "" });
+  useEffect(() => {
+    setMissing((m) => ({
+      type: typeId ? "" : m.type,
+      from: fromRaw ? "" : m.from,
+      to: toRaw ? "" : m.to,
+    }));
+  }, [typeId, fromRaw, toRaw]);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
+    if (countingDays || submitting) return;
+    const m = {
+      type: typeId ? "" : emptyMessage("Leave type"),
+      from: fromRaw ? "" : emptyMessage("First day"),
+      to: toRaw ? "" : emptyMessage("Last day"),
+    };
+    setMissing(m);
+    if (m.type || m.from || m.to || dateProblem) return;
+    const blocker = blackout
+      ? `Those dates fall in a blackout period (${blackout.name}). Choose dates outside it.`
+      : noWorkingDays
+        ? "Those dates are all weekend or holiday. There's nothing to book."
+        : shortfall;
+    if (blocker) {
+      setError(blocker);
+      return;
+    }
     setSubmitting(true);
     try {
       await submitLeave({ leaveTypeId: typeId, fromDate, toDate, reason: reason || undefined });
@@ -276,7 +294,7 @@ export default function ApplyLeave() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="flex min-w-0 flex-col gap-4">
+    <form onSubmit={onSubmit} noValidate className="flex min-w-0 flex-col gap-4">
       <div>
         <h1 className="text-page-title font-semibold tracking-page-title">Apply for leave</h1>
         <p className="mt-1 text-sm text-foreground-secondary">
@@ -290,13 +308,15 @@ export default function ApplyLeave() {
           <div className="grid gap-4">
             <div>
               <label htmlFor="leave-type" className={EYEBROW}>
-                Leave type
+                <LabelText required>Leave type</LabelText>
               </label>
               <select
                 id="leave-type"
                 value={typeId}
+                aria-required
+                aria-invalid={missing.type ? true : undefined}
                 onChange={(e) => setTypeId(e.target.value)}
-                className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+                className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm aria-invalid:border-destructive"
               >
                 <option value="">Choose…</option>
                 {types.map((t) => (
@@ -305,20 +325,23 @@ export default function ApplyLeave() {
                   </option>
                 ))}
               </select>
+              <FieldError>{missing.type}</FieldError>
             </div>
 
             {/* AC1 — the calendar offers no past day; a typed one is said at once. */}
             <div className="grid grid-cols-1 gap-4 @min-[560px]/app:grid-cols-2">
               <div>
                 <label htmlFor="from-date" className={EYEBROW}>
-                  First day
+                  <LabelText required>First day</LabelText>
                 </label>
                 <DateField
                   id="from-date"
                   value={fromRaw}
                   min={minDate}
+                  required
                   invalid={
-                    !!dateProblem && dateProblem !== "The last day can't be before the first."
+                    !!missing.from ||
+                    (!!dateProblem && dateProblem !== "The last day can't be before the first.")
                   }
                   describedBy={dateProblem ? "date-problem" : undefined}
                   onChange={(v) => {
@@ -327,21 +350,26 @@ export default function ApplyLeave() {
                   }}
                   className="mt-1"
                 />
+                <FieldError>{missing.from}</FieldError>
               </div>
               <div>
                 <label htmlFor="to-date" className={EYEBROW}>
-                  Last day
+                  <LabelText required>Last day</LabelText>
                 </label>
                 <DateField
                   id="to-date"
                   value={toRaw}
                   min={fromDate || minDate}
                   openAt={fromDate || undefined}
-                  invalid={dateProblem === "The last day can't be before the first."}
+                  required
+                  invalid={
+                    !!missing.to || dateProblem === "The last day can't be before the first."
+                  }
                   describedBy={dateProblem ? "date-problem" : undefined}
                   onChange={setToRaw}
                   className="mt-1"
                 />
+                <FieldError>{missing.to}</FieldError>
               </div>
             </div>
             {dateProblem && (
@@ -377,7 +405,7 @@ export default function ApplyLeave() {
 
             <button
               type="submit"
-              disabled={!canSubmit}
+              disabled={submitting || countingDays}
               data-testid="submit-leave"
               className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45 @min-[640px]/app:w-auto @min-[640px]/app:justify-self-start"
             >

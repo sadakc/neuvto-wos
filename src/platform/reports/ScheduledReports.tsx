@@ -11,6 +11,7 @@
  * until the wrong week's email lands.
  */
 
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import {
@@ -70,6 +71,7 @@ export function ScheduledReports() {
 
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [recipientsError, setRecipientsError] = useState("");
   const [notice, setNotice] = useState("");
 
   useEffect(() => {
@@ -95,6 +97,12 @@ export function ScheduledReports() {
     if (!draft) return;
     setError("");
     setNotice("");
+    // D113: said under the field on pressing Save, never by greying it out.
+    if (parseRecipients(draft.recipients).length === 0) {
+      setRecipientsError("Add at least one email address to send it to.");
+      return;
+    }
+    setRecipientsError("");
     setBusy(true);
     try {
       const parsed = ScheduleInput.parse({
@@ -358,23 +366,30 @@ export function ScheduledReports() {
               </label>
             )}
 
-            <label className="block text-sm sm:col-span-2">
-              <span className="mb-1 block font-medium">Send to</span>
+            <div className="block text-sm sm:col-span-2">
+<label className="block">
+              <span className="mb-1 block font-medium">
+                <LabelText required>Send to</LabelText>
+              </span>
               <textarea
                 value={draft.recipients}
+                aria-invalid={recipientsError ? true : undefined}
                 onChange={(e) => {
                   setDraft({ ...draft, recipients: e.target.value });
                   setError("");
+                  setRecipientsError("");
                 }}
                 rows={3}
                 placeholder={"ceo@yourcompany.com\nhr@yourcompany.com"}
                 data-testid="schedule-recipients"
-                className="w-full rounded-md border border-border bg-background p-3 text-sm"
+                className="w-full rounded-md border border-border bg-background p-3 text-sm aria-invalid:border-destructive"
               />
               <span className="mt-1 block text-xs text-muted-foreground">
                 One address per line, up to {MAX_RECIPIENTS}. They do not need a Neuvto account.
               </span>
-            </label>
+              </label>
+<FieldError>{recipientsError}</FieldError>
+</div>
 
             <label className="flex items-center gap-2 text-sm sm:col-span-2">
               <input
@@ -401,7 +416,7 @@ export function ScheduledReports() {
           <div className="mt-4 flex gap-2">
             <button
               onClick={onSave}
-              disabled={busy || parseRecipients(draft.recipients).length === 0}
+              disabled={busy}
               data-testid="save-schedule"
               className="inline-flex h-12 items-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
             >

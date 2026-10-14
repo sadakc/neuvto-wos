@@ -13,6 +13,8 @@
  * key, so every module's approvals are configured the same way.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { Fragment, useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import { listDepartments } from "@/platform/organization";
@@ -54,6 +56,7 @@ export function NotificationMatrix({
   const [busy, setBusy] = useState(false);
   const [who, setWho] = useState("");
   const [when, setWhen] = useState("");
+  const [missing, setMissing] = useState({ who: "", when: "" });
   const [dept, setDept] = useState("");
 
   const AUDIENCES: { key: NotificationAudience; label: string }[] = [
@@ -211,9 +214,17 @@ export function NotificationMatrix({
         )}
 
         <form
-          className="mt-3 grid gap-3 @min-[640px]/app:grid-cols-4 @min-[640px]/app:items-end"
+          noValidate
+          className="mt-3 grid gap-3 @min-[640px]/app:grid-cols-4 @min-[640px]/app:items-start"
           onSubmit={(e) => {
             e.preventDefault();
+            // D113: said under each field on pressing Add, never by greying it out.
+            const m = {
+              who: who ? "" : emptyMessage("Also tell"),
+              when: when ? "" : emptyMessage("When"),
+            };
+            setMissing(m);
+            if (m.who || m.when) return;
             const [entityType, eventKey] = when.split("|");
             void run(async () => {
               await addCustomRecipient(
@@ -226,40 +237,54 @@ export function NotificationMatrix({
             });
           }}
         >
-          <label className="text-xs text-muted-foreground">
-            Also tell
-            <select
-              value={who}
-              onChange={(e) => setWho(e.target.value)}
-              className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
-            >
-              <option value="">Choose somebody…</option>
-              {people.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.fullName}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label className="text-xs text-muted-foreground">
-            When
-            <select
-              value={when}
-              onChange={(e) => setWhen(e.target.value)}
-              className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground"
-            >
-              <option value="">Choose when…</option>
-              {entities.map(([entityType, label]) => (
-                <Fragment key={entityType}>
-                  {EVENTS.map((e) => (
-                    <option key={e.key} value={`${entityType}|${e.key}`}>
-                      A {label} {e.sentence}
-                    </option>
-                  ))}
-                </Fragment>
-              ))}
-            </select>
-          </label>
+          <div>
+            <label className="block text-xs text-muted-foreground">
+              <LabelText required>Also tell</LabelText>
+              <select
+                value={who}
+                aria-invalid={missing.who ? true : undefined}
+                onChange={(e) => {
+                  setWho(e.target.value);
+                  setMissing((m) => ({ ...m, who: "" }));
+                }}
+                className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground aria-invalid:border-destructive"
+              >
+                <option value="">Choose somebody…</option>
+                {people.map((p) => (
+                  <option key={p.id} value={p.id}>
+                    {p.fullName}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <FieldError>{missing.who}</FieldError>
+          </div>
+          <div>
+            <label className="block text-xs text-muted-foreground">
+              <LabelText required>When</LabelText>
+              <select
+                value={when}
+                aria-invalid={missing.when ? true : undefined}
+                onChange={(e) => {
+                  setWhen(e.target.value);
+                  setMissing((m) => ({ ...m, when: "" }));
+                }}
+                className="mt-1 h-12 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground aria-invalid:border-destructive"
+              >
+                <option value="">Choose when…</option>
+                {entities.map(([entityType, label]) => (
+                  <Fragment key={entityType}>
+                    {EVENTS.map((e) => (
+                      <option key={e.key} value={`${entityType}|${e.key}`}>
+                        A {label} {e.sentence}
+                      </option>
+                    ))}
+                  </Fragment>
+                ))}
+              </select>
+            </label>
+            <FieldError>{missing.when}</FieldError>
+          </div>
           <label className="text-xs text-muted-foreground">
             For
             <select
@@ -277,7 +302,7 @@ export function NotificationMatrix({
           </label>
           <button
             type="submit"
-            disabled={busy || !who || !when}
+            disabled={busy}
             className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-45"
           >
             Add

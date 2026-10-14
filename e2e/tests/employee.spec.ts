@@ -26,17 +26,20 @@ test.describe("as the Employee Admin", () => {
     const form = page.getByTestId("shift-form");
     const save = form.getByRole("button", { name: "Save shift" });
 
+    // D113: each is said under its field on pressing Save, never by greying it out.
     await form.getByLabel("Starts").fill("09:00");
     await form.getByLabel("Ends").fill("09:00");
-    await expect(save).toBeDisabled(); // no name, and no length
+    await save.click();
+    await expect(form.getByText("Name can't be empty.")).toBeVisible();
+    await expect(form.getByText("It can't end when it starts.")).toBeVisible();
     await form.getByLabel("Name").fill("Gate night");
-    await expect(save).toBeDisabled(); // still no length
     await form.getByLabel("Ends").fill("07:00");
     await form.getByLabel("Unpaid break (minutes)").fill("half an hour");
-    await expect(save).toBeDisabled();
+    await save.click();
+    await expect(form.getByText("A whole number of minutes, up to 240.")).toBeVisible();
     await form.getByLabel("Unpaid break (minutes)").fill("30");
     await expect(form).toContainText("09:00 to 07:00 next day, 30 min break");
-    await expect(save).toBeEnabled();
+    await expect(form.getByRole("alert")).toHaveCount(0);
   });
 
   test("a night shift is saved and listed", async ({ page }) => {

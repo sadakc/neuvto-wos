@@ -134,7 +134,7 @@ describe("family", () => {
 });
 
 describe("nominees", () => {
-  it("keeps Save off until the shares make exactly 100, with the total in view", async () => {
+  it("will not save until the shares make exactly 100, with the total in view", async () => {
     const user = userEvent.setup();
     api.saveNomination.mockResolvedValue(undefined);
     render(<EmployeeCardView card={admin} />);
@@ -146,11 +146,15 @@ describe("nominees", () => {
     await user.clear(share);
     await user.type(share, "60");
     expect(screen.getByTestId("nominee-total")).toHaveTextContent("Shares total 90%, must be 100");
-    expect(screen.getByTestId("nominee-save")).toBeDisabled();
+    // D113: pressing Save says why, and sends nothing.
+    await user.click(screen.getByTestId("nominee-save"));
+    expect(screen.getByTestId("nominee-error")).toHaveTextContent(
+      "The shares total 90%. They must make 100%.",
+    );
+    expect(api.saveNomination).not.toHaveBeenCalled();
 
     await user.clear(share);
     await user.type(share, "70");
-    expect(screen.getByTestId("nominee-save")).toBeEnabled();
     await user.click(screen.getByTestId("nominee-save"));
     expect(api.saveNomination).toHaveBeenCalledWith(
       admin.id,
