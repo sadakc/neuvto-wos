@@ -17,7 +17,10 @@
     "harness": "bash scripts/harness.sh",
     "format:check": "find . -type f \\( -name '*.ts' -o -name '*.tsx' -o -name '*.mjs' -o -name '*.css' -o -name '*.json' -o -name '*.md' \\) -not -path './node_modules/*' -not -path './.git/*' -print0 | xargs -0 prettier --check --ignore-unknown",
     "dev:lan": "bash scripts/dev-lan.sh",
-    "tokens": "bun scripts/generate-tokens.ts"
+    "tokens": "bun scripts/generate-tokens.ts",
+    "mutate": "stryker run --mutate",
+    "e2e": "playwright test",
+    "e2e:ui": "playwright test --ui"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.2.2",
@@ -60,7 +63,10 @@
     "cmdk": "^1.1.1",
     "date-fns": "^4.1.0",
     "embla-carousel-react": "^8.6.0",
+    "exceljs": "4.4.0",
     "input-otp": "^1.4.2",
+    "jspdf": "4.2.1",
+    "jspdf-autotable": "5.0.8",
     "lucide-react": "^0.575.0",
     "react": "^19.2.0",
     "react-day-picker": "^9.14.0",
@@ -79,6 +85,9 @@
   "devDependencies": {
     "@eslint/js": "^9.32.0",
     "@lovable.dev/vite-tanstack-config": "2.8.1",
+    "@playwright/test": "1.63.0",
+    "@stryker-mutator/core": "10.0.0",
+    "@stryker-mutator/vitest-runner": "10.0.0",
     "@testing-library/jest-dom": "^7.0.0",
     "@testing-library/react": "^16.3.2",
     "@testing-library/user-event": "^14.6.1",

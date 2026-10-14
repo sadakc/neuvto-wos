@@ -1,30 +1,25 @@
 /**
  * Platform · Design · Which theme a surface renders in
  *
- * Nocturne is the employee app's default and the console is always light. That
- * is one decision with two halves, and each half has its own reason.
+ * Two rules (D77, 11 Oct 2026, replacing Nocturne's dark-by-default).
  *
- * ── the employee app is dark by default
+ * ── everywhere a person works follows their device
  *
- * Because of when it is used. Leave gets checked late at night, in bed, on a
- * phone — a white screen at that moment is unpleasant in a way no amount of
- * good layout fixes. Defaulting to dark rather than following the OS is a
- * deliberate override: plenty of people never change the system setting they
- * were shipped, and the default is the design.
- *
- * It is a DEFAULT, not a lock. `setPreference` writes an explicit choice that
- * wins from then on. Dark mode is harder to read for people with astigmatism —
- * imposing it would trade one group's comfort for another's, which is not a
- * trade worth making when a toggle costs a button.
+ * Unless they have chosen. The Core HR design follows `prefers-color-scheme`
+ * and puts a toggle in the header; an explicit choice wins from then on, in
+ * both directions. Nocturne defaulted the employee app to dark whatever the OS
+ * said. That default is gone: the Core HR palette was designed light-first and
+ * proven in both themes, and a person whose phone is dark at night already
+ * gets dark.
  *
  * ── the console is light, and not overridable
  *
- * This one is not aesthetic. A platform admin (D42) provisions workspaces and
- * must never read tenant data; the console and a tenant workspace are different
- * places with different rules, and the cheapest way to never confuse them is
- * for them not to look alike. Making the console's light theme a preference
- * would let someone switch off the signal that tells them which system they are
- * in, so it is not a preference.
+ * This one is not aesthetic and D77 keeps it. A platform admin (D42) provisions
+ * workspaces and must never read tenant data; the console and a tenant
+ * workspace are different places with different rules, and the cheapest way
+ * to never confuse them is for them not to look alike. Making the console's
+ * light theme a preference would let someone switch off the signal that tells
+ * them which system they are in, so it is not a preference.
  */
 
 import type { ThemeName } from "./tokens";
@@ -66,12 +61,7 @@ export function resolveTheme(
 
   if (stored === "light" || stored === "dark") return stored;
 
-  // Nocturne. The app defaults to dark whatever the OS says.
-  if (pathname === "/app" || pathname.startsWith("/app/")) return "dark";
-
-  // Everything else — the landing page, sign-in, invitation acceptance. These
-  // are the first thing a stranger sees, and a stranger's OS preference is the
-  // only signal available about what they want.
+  // Everywhere else, the app included: the device decides (D77).
   return prefersDark ? "dark" : "light";
 }
 

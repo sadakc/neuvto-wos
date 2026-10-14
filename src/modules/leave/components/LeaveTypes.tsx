@@ -17,8 +17,9 @@ import { useEffect, useState } from "react";
 import { getCurrentUser, type CurrentUser } from "@/platform/auth";
 import { getOrgSettings } from "@/platform/calendar";
 import { isAppError } from "@/platform/errors";
-import { listLeaveTypes, saveLeaveType, setLeaveTypeStatus } from "../handlers";
-import { LeaveTypeInput, type LeaveType } from "../contracts";
+import { leaveTypeImpact, listLeaveTypes, saveLeaveType, setLeaveTypeStatus } from "../handlers";
+import { LeaveTypeInput, type LeaveKind, type LeaveType, type LeaveTypeImpact } from "../contracts";
+import { ConfirmRemoval } from "./ConfirmRemoval";
 
 /** The form's own shape: numbers are strings until they parse. */
 type Draft = {
@@ -29,6 +30,15 @@ type Draft = {
   minNoticeDays: string;
   maxPerRequest: string;
   approvalRequired: boolean;
+  kind: LeaveKind;
+  /** D89, earned only. Blank means never and any time. */
+  earnedExpiresAfterDays: string;
+  earnedClaimWithinDays: string;
+  earnedProofRequired: boolean;
+  /** D90. */
+  accrual: "upfront" | "monthly";
+  /** D91. Blank: nothing carried. */
+  carryForwardMax: string;
 };
 
 /**
@@ -56,6 +66,12 @@ const EMPTY: Draft = {
   minNoticeDays: "",
   approvalRequired: true,
   maxPerRequest: "",
+  kind: "paid",
+  earnedExpiresAfterDays: "",
+  earnedClaimWithinDays: "",
+  earnedProofRequired: false,
+  accrual: "upfront",
+  carryForwardMax: "",
 };
 
 const toDraft = (t: LeaveType): Draft => ({
@@ -66,6 +82,13 @@ const toDraft = (t: LeaveType): Draft => ({
   minNoticeDays: t.minNoticeDays === null ? "" : String(t.minNoticeDays),
   maxPerRequest: t.maxPerRequest === null ? "" : String(t.maxPerRequest),
   approvalRequired: t.approvalRequired,
+  kind: t.kind,
+  earnedExpiresAfterDays: t.earnedExpiresAfterDays ? String(t.earnedExpiresAfterDays) : "",
+  earnedClaimWithinDays: t.earnedClaimWithinDays ? String(t.earnedClaimWithinDays) : "",
+  earnedProofRequired: t.earnedProofRequired ?? false,
+  accrual: t.accrual ?? "upfront",
+  carryForwardMax:
+    t.carryForwardMax === null || t.carryForwardMax === undefined ? "" : String(t.carryForwardMax),
 });
 
 /** Blank means "no limit", which is not the same as zero — hence null, not 0. */
@@ -85,6 +108,11 @@ export default function LeaveTypes() {
   const [draft, setDraft] = useState<Draft | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  /** Leave phase 2: the type about to be archived, and what that leaves behind. */
+  const [archiving, setArchiving] = useState<{
+    type: LeaveType;
+    impact: LeaveTypeImpact | null;
+  } | null>(null);
 
   async function load() {
     setTypes(await listLeaveTypes());
@@ -123,10 +151,16 @@ export default function LeaveTypes() {
         id: draft.id,
         name: draft.name,
         description: draft.description || undefined,
-        maxDaysPerYear: Number(draft.maxDaysPerYear),
+        maxDaysPerYear: draft.kind === "paid" ? Number(draft.maxDaysPerYear) : 0,
         minNoticeDays: optionalNumber(draft.minNoticeDays),
         maxPerRequest: optionalNumber(draft.maxPerRequest),
         approvalRequired: draft.approvalRequired,
+        kind: draft.kind,
+        earnedExpiresAfterDays: optionalNumber(draft.earnedExpiresAfterDays),
+        earnedClaimWithinDays: optionalNumber(draft.earnedClaimWithinDays),
+        earnedProofRequired: draft.earnedProofRequired,
+        accrual: draft.kind === "paid" ? draft.accrual : "upfront",
+        carryForwardMax: draft.kind === "paid" ? optionalNumber(draft.carryForwardMax) : null,
       });
       await saveLeaveType(parsed, user.organizationId);
       await load();
@@ -148,6 +182,19 @@ export default function LeaveTypes() {
 
   async function onToggleStatus(t: LeaveType) {
     setError("");
+    // Archiving says what it leaves behind first. Restoring loses nothing.
+    if (t.status === "active") {
+      setArchiving({ type: t, impact: null });
+      leaveTypeImpact(t.id)
+        .then((impact) => setArchiving((a) => (a?.type.id === t.id ? { type: t, impact } : a)))
+        .catch(() => {});
+      return;
+    }
+    await setStatus(t);
+  }
+
+  async function setStatus(t: LeaveType) {
+    setArchiving(null);
     try {
       await setLeaveTypeStatus(t.id, t.status === "active" ? "archived" : "active");
       await load();
@@ -174,18 +221,18 @@ export default function LeaveTypes() {
   return (
     <div>
       {types.length === 0 && !draft && (
-        <p className="mb-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+        <p className="mb-4 rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
           No leave types yet. Until you add one, nobody in this workspace can apply for leave.
         </p>
       )}
 
       {types.length > 0 && (
-        <ul className="divide-y divide-border rounded-lg border border-border">
+        <ul className="divide-y divide-border rounded-xl border border-border bg-card shadow-card">
           {[...active, ...archived].map((t) => (
             <li
               key={t.id}
               data-testid="leave-type-row"
-              className="flex flex-col gap-3 p-4 sm:flex-row sm:items-start sm:justify-between"
+              className="flex flex-col gap-3 p-4 @min-[640px]/app:flex-row @min-[640px]/app:items-start @min-[640px]/app:justify-between"
             >
               <div className="min-w-0">
                 <p className="text-sm font-medium">
@@ -202,7 +249,19 @@ export default function LeaveTypes() {
                     neither said which. That is the display half of the same
                     confusion the blank default fixes. */}
                 <p className="mt-0.5 text-xs text-muted-foreground">
-                  {t.maxDaysPerYear} {t.maxDaysPerYear === 1 ? "day" : "days"} a year
+                  {t.kind === "unpaid"
+                    ? "Unpaid · no allowance"
+                    : t.kind === "earned"
+                      ? earnedSummary(t)
+                      : `${t.maxDaysPerYear} ${t.maxDaysPerYear === 1 ? "day" : "days"} a year${
+                          t.accrual === "monthly"
+                            ? `, credited monthly (${Math.round((t.maxDaysPerYear / 12) * 100) / 100} a month)`
+                            : ""
+                        }${
+                          t.carryForwardMax
+                            ? ` · carries up to ${t.carryForwardMax} ${t.carryForwardMax === 1 ? "day" : "days"} into next year`
+                            : ""
+                        }`}
                   {t.minNoticeDays === null
                     ? defaultNotice === null
                       ? " · notice: the workspace default"
@@ -260,7 +319,7 @@ export default function LeaveTypes() {
         <form
           onSubmit={onSave}
           data-testid="leave-type-form"
-          className="mt-4 space-y-4 rounded-lg border border-border p-4"
+          className="mt-4 space-y-4 rounded-xl border border-border bg-card p-4 shadow-card"
         >
           <div>
             <label htmlFor="lt-name" className="block text-sm font-medium">
@@ -288,28 +347,188 @@ export default function LeaveTypes() {
             />
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div>
-              <label htmlFor="lt-days" className="block text-sm font-medium">
-                Days a year
+          {/* Chosen once: the database refuses switching a saved type's kind,
+              because balances would be stranded. */}
+          {!draft.id && (
+            <fieldset>
+              <legend className="block text-sm font-medium">Kind</legend>
+              <div className="mt-2 grid gap-2 @min-[640px]/app:grid-cols-3">
+                {(
+                  [
+                    ["paid", "Paid", "Has a yearly allowance and a balance"],
+                    [
+                      "unpaid",
+                      "Unpaid (loss of pay)",
+                      "No allowance and no balance. Days taken are counted, not paid",
+                    ],
+                    [
+                      "earned",
+                      "Earned (compensatory off)",
+                      "No allowance. Credited for days worked, once a manager approves the claim",
+                    ],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <label
+                    key={value}
+                    className="flex min-h-12 cursor-pointer items-start gap-2.5 rounded-md border border-border px-3 py-2.5 hover:bg-muted"
+                  >
+                    <input
+                      type="radio"
+                      name="lt-kind"
+                      value={value}
+                      checked={draft.kind === value}
+                      onChange={() => setDraft({ ...draft, kind: value })}
+                      aria-label={label}
+                      className="mt-0.5 size-4 shrink-0 accent-primary"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          {draft.kind === "earned" && (
+            <div className="grid gap-4 @min-[640px]/app:grid-cols-3">
+              <div>
+                <label htmlFor="lt-expires" className="block text-sm font-medium">
+                  Expires after
+                </label>
+                <input
+                  id="lt-expires"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={730}
+                  value={draft.earnedExpiresAfterDays}
+                  onChange={(e) => setDraft({ ...draft, earnedExpiresAfterDays: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Days after approval. Blank: it never expires. Days already booked never expire
+                </p>
+              </div>
+              <div>
+                <label htmlFor="lt-within" className="block text-sm font-medium">
+                  Claim within
+                </label>
+                <input
+                  id="lt-within"
+                  type="number"
+                  inputMode="numeric"
+                  min={1}
+                  max={365}
+                  value={draft.earnedClaimWithinDays}
+                  onChange={(e) => setDraft({ ...draft, earnedClaimWithinDays: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Days after the day worked. Blank: any time
+                </p>
+              </div>
+              <label className="flex min-h-12 cursor-pointer items-start gap-2.5 self-end rounded-md border border-border px-3 py-2.5">
+                <input
+                  type="checkbox"
+                  checked={draft.earnedProofRequired}
+                  onChange={(e) => setDraft({ ...draft, earnedProofRequired: e.target.checked })}
+                  aria-label="Proof needed with every claim"
+                  className="mt-0.5 size-4 shrink-0 accent-primary"
+                />
+                <span className="text-sm">Proof needed with every claim</span>
               </label>
-              <input
-                id="lt-days"
-                type="number"
-                inputMode="decimal"
-                min={0}
-                max={365}
-                // Whole days or halves. Entitlement is pro-rated onto the same
-                // grid, so a type set to 12.4 could never be honoured exactly.
-                step={0.5}
-                value={draft.maxDaysPerYear}
-                onChange={(e) => setDraft({ ...draft, maxDaysPerYear: e.target.value })}
-                className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-              />
-              <p className="mt-1 text-xs text-muted-foreground">
-                Whole days or halves. Pro-rated for anyone who joins part-way through the year
-              </p>
             </div>
+          )}
+
+          {draft.kind === "paid" && (
+            <fieldset>
+              <legend className="block text-sm font-medium">How it&apos;s credited</legend>
+              <div className="mt-2 grid gap-2 @min-[640px]/app:grid-cols-2">
+                {(
+                  [
+                    [
+                      "upfront",
+                      "All at the start of the year",
+                      "The year's days at once, pro-rated for anyone who joins part-way",
+                    ],
+                    [
+                      "monthly",
+                      "A twelfth each month",
+                      "Credited at the start of each month worked, rounded down to the half day",
+                    ],
+                  ] as const
+                ).map(([value, label, hint]) => (
+                  <label
+                    key={value}
+                    className="flex min-h-12 cursor-pointer items-start gap-2.5 rounded-md border border-border px-3 py-2.5 hover:bg-muted"
+                  >
+                    <input
+                      type="radio"
+                      name="lt-accrual"
+                      value={value}
+                      checked={draft.accrual === value}
+                      onChange={() => setDraft({ ...draft, accrual: value })}
+                      aria-label={label}
+                      className="mt-0.5 size-4 shrink-0 accent-primary"
+                    />
+                    <span>
+                      <span className="block text-sm font-medium">{label}</span>
+                      <span className="block text-xs text-muted-foreground">{hint}</span>
+                    </span>
+                  </label>
+                ))}
+              </div>
+            </fieldset>
+          )}
+
+          <div className="grid gap-4 @min-[640px]/app:grid-cols-3">
+            {draft.kind === "paid" && (
+              <div>
+                <label htmlFor="lt-days" className="block text-sm font-medium">
+                  Days a year
+                </label>
+                <input
+                  id="lt-days"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={365}
+                  // Whole days or halves. Entitlement is pro-rated onto the same
+                  // grid, so a type set to 12.4 could never be honoured exactly.
+                  step={0.5}
+                  value={draft.maxDaysPerYear}
+                  onChange={(e) => setDraft({ ...draft, maxDaysPerYear: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Whole days or halves. Pro-rated for anyone who joins part-way through the year
+                </p>
+              </div>
+            )}
+
+            {draft.kind === "paid" && (
+              <div>
+                <label htmlFor="lt-carry" className="block text-sm font-medium">
+                  Carry over up to
+                </label>
+                <input
+                  id="lt-carry"
+                  type="number"
+                  inputMode="decimal"
+                  min={0}
+                  max={365}
+                  step={0.5}
+                  value={draft.carryForwardMax}
+                  onChange={(e) => setDraft({ ...draft, carryForwardMax: e.target.value })}
+                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Days into next year, applied when the year&apos;s review is locked. Blank: none
+                </p>
+              </div>
+            )}
 
             <div>
               <label htmlFor="lt-notice" className="block text-sm font-medium">
@@ -385,7 +604,7 @@ export default function LeaveTypes() {
             </p>
           )}
 
-          <div className="flex flex-col gap-3 sm:flex-row">
+          <div className="flex flex-col gap-3 @min-[640px]/app:flex-row">
             <button
               type="submit"
               disabled={saving}
@@ -407,6 +626,49 @@ export default function LeaveTypes() {
           </div>
         </form>
       )}
+
+      <ConfirmRemoval
+        open={archiving !== null}
+        title={`Archive ${archiving?.type.name ?? "this leave type"}?`}
+        action={`Archive ${archiving?.type.name ?? ""}`.trim()}
+        onCancel={() => setArchiving(null)}
+        onConfirm={() => archiving && void setStatus(archiving.type)}
+      >
+        <p>Nobody will be able to apply for it from now on. Its history stays.</p>
+        {archiving?.impact ? (
+          <ul className="list-disc space-y-1 pl-5" data-testid="archive-impact">
+            <li>
+              {archiving.impact.pendingRequests}{" "}
+              {archiving.impact.pendingRequests === 1 ? "request" : "requests"} waiting for a
+              decision stay waiting, and can still be approved.
+            </li>
+            <li>
+              {archiving.impact.upcomingApproved} approved leave still to come stays approved.
+            </li>
+            <li>
+              {archiving.impact.peopleWithDaysLeft}{" "}
+              {archiving.impact.peopleWithDaysLeft === 1 ? "person still has" : "people still have"}{" "}
+              days of it this year, and can no longer use them.
+            </li>
+          </ul>
+        ) : (
+          <p className="text-xs">Counting what it affects…</p>
+        )}
+        <p>You can restore it later.</p>
+      </ConfirmRemoval>
     </div>
   );
+}
+
+/** D89 — how an earned type's rules read on its row. */
+function earnedSummary(t: LeaveType): string {
+  const parts = ["Earned by working"];
+  parts.push(
+    t.earnedExpiresAfterDays
+      ? `expires ${t.earnedExpiresAfterDays} days after approval`
+      : "never expires",
+  );
+  if (t.earnedClaimWithinDays) parts.push(`claim within ${t.earnedClaimWithinDays} days`);
+  if (t.earnedProofRequired) parts.push("proof needed");
+  return parts.join(" · ");
 }

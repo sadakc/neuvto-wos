@@ -25,6 +25,21 @@ import {
   type LeaveBalanceReportRow,
   type LeaveTakenReportRow,
   type LeavePendingReportRow,
+  type LeaveKind,
+  type UnpaidSummary,
+  type Blackout,
+  type LeaveTypeImpact,
+  type StagedOpeningBalance,
+  type StagedOpeningProblem,
+  type CompOffClaim,
+  type CompOffApprovalDetail,
+  type CompOffDay,
+  type EarnedTypeRules,
+  type CarryReview,
+  type LeaveLiabilityRow,
+  type CompOffRegisterRow,
+  type ApprovalTurnaroundRow,
+  type AbsenteeismRow,
 } from "./contracts";
 
 /**
@@ -188,6 +203,10 @@ export async function getApprovalTimeline(approvalRequestId: string): Promise<Ap
     decision: r.decision as ApprovalStep["decision"],
     comments: r.comments,
     decidedAt: r.decided_at,
+    reasonCode: r.reason_code,
+    escalatedFrom: r.escalated_from,
+    escalatedAt: r.escalated_at,
+    decidedBy: r.decided_by,
   }));
 }
 
@@ -237,15 +256,85 @@ export async function getApprovalDetail(approvalRequestId: string): Promise<Leav
   };
 }
 
-export async function getLeaveTypes(): Promise<{ id: string; name: string }[]> {
+export async function getLeaveTypes(): Promise<EarnedTypeRules[]> {
   const { data, error } = await supabase
     .from("leave_types")
-    .select("id, name")
+    .select(
+      "id, name, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required, accrual",
+    )
     .eq("status", "active")
     .order("name");
 
   if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the leave types.", 500);
-  return data ?? [];
+  return (data ?? []).map((t) => ({
+    id: t.id,
+    name: t.name,
+    kind: t.kind as LeaveKind,
+    earnedExpiresAfterDays: t.earned_expires_after_days,
+    earnedClaimWithinDays: t.earned_claim_within_days,
+    earnedProofRequired: t.earned_proof_required,
+    accrual: t.accrual as EarnedTypeRules["accrual"],
+  }));
+}
+
+/** Leave phase 2: the caller's unpaid leave this year, taken and awaiting a decision. */
+export async function getMyUnpaid(): Promise<UnpaidSummary[]> {
+  const { data, error } = await supabase.rpc("leave_my_unpaid");
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load your unpaid leave.", 500);
+  return (data ?? []).map((r) => ({
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    takenDays: Number(r.taken_days),
+    pendingDays: Number(r.pending_days),
+  }));
+}
+
+/** Leave phase 2: blackout periods, soonest first. Everybody in the company reads them. */
+export async function getBlackouts(): Promise<Blackout[]> {
+  const { data, error } = await supabase
+    .from("leave_blackouts")
+    .select("id, name, from_date, to_date")
+    .order("from_date");
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load the blackout periods.", 500);
+  return (data ?? []).map((b) => ({
+    id: b.id,
+    name: b.name,
+    fromDate: b.from_date,
+    toDate: b.to_date,
+  }));
+}
+
+/** Adds a blackout period. The organisation comes from the caller, never the form. */
+export async function saveBlackout(
+  input: { name: string; fromDate: string; toDate: string },
+  organizationId: string,
+): Promise<void> {
+  const { error } = await supabase.from("leave_blackouts").insert({
+    organization_id: organizationId,
+    name: input.name.trim(),
+    from_date: input.fromDate,
+    to_date: input.toDate,
+  });
+  if (error) {
+    if (error.message.includes("row-level security")) {
+      throw new AppError("FORBIDDEN", "Only a Leave Admin can add blackout periods.", 403);
+    }
+    throw new AppError("VALIDATION_FAILED", "That blackout period couldn't be saved.", 400);
+  }
+}
+
+/** Removes a blackout period. Leave already applied for is not touched. */
+export async function removeBlackout(id: string): Promise<void> {
+  const { error } = await supabase.rpc("leave_blackout_remove", { _id: id });
+  if (error)
+    throw new AppError("VALIDATION_FAILED", "That blackout period couldn't be removed.", 400);
+}
+
+/** What archiving a leave type would leave behind, for the confirmation. */
+export async function leaveTypeImpact(id: string): Promise<LeaveTypeImpact> {
+  const { data, error } = await supabase.rpc("leave_type_impact", { _leave_type_id: id });
+  if (error) throw toLeaveError(error.message);
+  return data as unknown as LeaveTypeImpact;
 }
 
 // ─────────────────────────────────────────────────────────── administration
@@ -265,7 +354,7 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
   const { data, error } = await supabase
     .from("leave_types")
     .select(
-      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status",
+      "id, name, description, max_days_per_year, min_notice_days, max_per_request, approval_required, status, kind, earned_expires_after_days, earned_claim_within_days, earned_proof_required, accrual, carry_forward_max",
     )
     .order("status")
     .order("name");
@@ -281,6 +370,12 @@ export async function listLeaveTypes(): Promise<LeaveType[]> {
     maxPerRequest: r.max_per_request === null ? null : Number(r.max_per_request),
     approvalRequired: r.approval_required,
     status: r.status as LeaveType["status"],
+    kind: r.kind as LeaveKind,
+    earnedExpiresAfterDays: r.earned_expires_after_days,
+    earnedClaimWithinDays: r.earned_claim_within_days,
+    earnedProofRequired: r.earned_proof_required,
+    accrual: r.accrual as LeaveType["accrual"],
+    carryForwardMax: r.carry_forward_max === null ? null : Number(r.carry_forward_max),
   }));
 }
 
@@ -300,11 +395,25 @@ export async function saveLeaveType(input: LeaveTypeInput, organizationId: strin
     min_notice_days: parsed.minNoticeDays,
     max_per_request: parsed.maxPerRequest,
     approval_required: parsed.approvalRequired,
+    // D89. Only an earned type has these; any other kind stores none.
+    earned_expires_after_days: parsed.kind === "earned" ? parsed.earnedExpiresAfterDays : null,
+    earned_claim_within_days: parsed.kind === "earned" ? parsed.earnedClaimWithinDays : null,
+    earned_proof_required: parsed.kind === "earned" ? parsed.earnedProofRequired : false,
+    // D90. Only a paid type accrues; the database refuses anything else.
+    accrual: parsed.kind === "paid" ? parsed.accrual : "upfront",
+    // D91. Only a paid type carries over.
+    carry_forward_max: parsed.kind === "paid" ? parsed.carryForwardMax : null,
   };
 
+  // A saved type's kind is fixed (the database refuses a change), so it is sent
+  // only when the type is created. Unpaid carries no allowance.
   const { error } = parsed.id
     ? await supabase.from("leave_types").update(row).eq("id", parsed.id)
-    : await supabase.from("leave_types").insert(row);
+    : await supabase.from("leave_types").insert({
+        ...row,
+        kind: parsed.kind,
+        max_days_per_year: parsed.kind === "paid" ? parsed.maxDaysPerYear : 0,
+      });
 
   if (error) {
     // uq_leave_type_name is case-insensitive, so "Casual" and "casual" collide.
@@ -415,5 +524,299 @@ export async function getLeavePendingReport(): Promise<LeavePendingReportRow[]> 
     currentLevel: Number(r.current_level),
     requiredLevels: Number(r.required_levels),
     waitingOn: r.waiting_on ?? null,
+  }));
+}
+
+// ═══════════════════════════════════════════════ opening balances, before joining (D88)
+
+/** Staging and its lists are the Leave Admin's; FORBIDDEN here is not about reports. */
+function toStagingError(message: string): AppError {
+  const e = toLeaveError(message);
+  return e.details?.code === "FORBIDDEN"
+    ? new AppError("FORBIDDEN", "Only the Leave Admin can set opening balances.", 403, e.details)
+    : e;
+}
+
+export async function getStagedOpeningBalances(): Promise<StagedOpeningBalance[]> {
+  const { data, error } = await supabase.rpc("leave_staged_opening_balances");
+  if (error) throw toStagingError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeRecordId: r.employee_record_id,
+    employeeName: r.employee_name,
+    employeeCode: r.employee_code,
+    stage: r.stage as StagedOpeningBalance["stage"],
+    joinedDate: r.joined_date,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    entitledDays: Number(r.entitled_days),
+    usedDays: Number(r.used_days),
+    carryforwardDays: Number(r.carryforward_days),
+    staged: r.staged,
+  }));
+}
+
+export async function stageOpeningBalance(
+  employeeRecordId: string,
+  leaveTypeId: string,
+  used: number,
+  carryforward: number,
+): Promise<void> {
+  const { error } = await supabase.rpc("leave_stage_opening_balance", {
+    _employee_record_id: employeeRecordId,
+    _leave_type_id: leaveTypeId,
+    _used: used,
+    _carryforward: carryforward,
+  });
+  if (error) throw toStagingError(error.message);
+}
+
+export async function getStagedOpeningProblems(): Promise<StagedOpeningProblem[]> {
+  const { data, error } = await supabase.rpc("leave_staged_opening_problems");
+  if (error) throw toStagingError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    leaveTypeName: r.leave_type_name,
+    usedDays: Number(r.used_days),
+    carryforwardDays: Number(r.carryforward_days),
+    problem: r.problem as StagedOpeningProblem["problem"],
+  }));
+}
+
+// ═══════════════════════════════════════════════ compensatory off (D89)
+
+const PROOF_BUCKET = "leave-proofs";
+const PROOF_TYPES = ["application/pdf", "image/png", "image/jpeg", "image/webp"];
+const PROOF_MAX_BYTES = 5 * 1024 * 1024;
+
+function toDays(raw: unknown): CompOffDay[] {
+  return ((raw as { date: string; days: number | string; note: string | null }[]) ?? []).map(
+    (d) => ({ date: d.date, days: Number(d.days), note: d.note }),
+  );
+}
+
+export async function getMyCompOffClaims(): Promise<CompOffClaim[]> {
+  const { data, error } = await supabase.rpc("comp_off_my_claims");
+  if (error) throw new AppError("INTERNAL_ERROR", "We couldn't load your claims.", 500);
+  return (data ?? []).map((r) => ({
+    claimId: r.claim_id,
+    leaveTypeId: r.leave_type_id,
+    leaveTypeName: r.leave_type_name,
+    reason: r.reason,
+    totalDays: Number(r.total_days),
+    status: r.status as CompOffClaim["status"],
+    hasProof: r.has_proof,
+    submittedAt: r.submitted_at,
+    decidedAt: r.decided_at,
+    expiresOn: r.expires_on,
+    expiredDays: Number(r.expired_days),
+    days: toDays(r.days),
+  }));
+}
+
+/**
+ * Claims compensatory off. Proof, if any, is uploaded first into the person's
+ * own folder (the bucket refuses any other), and its path sent with the claim.
+ */
+export async function submitCompOff(input: {
+  leaveTypeId: string;
+  days: { date: string; days: number; note: string }[];
+  reason: string;
+  proof: File | null;
+}): Promise<string> {
+  let proofPath: string | null = null;
+  if (input.proof) {
+    if (!PROOF_TYPES.includes(input.proof.type)) {
+      throw new AppError("VALIDATION_FAILED", "Attach a PDF or a photo (PNG, JPEG or WebP).", 400);
+    }
+    if (input.proof.size > PROOF_MAX_BYTES) {
+      throw new AppError("VALIDATION_FAILED", "Attach a file of 5 MB or less.", 400);
+    }
+    const { data: session } = await supabase.auth.getSession();
+    const uid = session.session?.user.id;
+    const { data: org } = await supabase.rpc("current_org_id");
+    if (!uid || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
+    const safe = input.proof.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
+    proofPath = `${org}/${uid}/${crypto.randomUUID()}-${safe}`;
+    const { error: upErr } = await supabase.storage
+      .from(PROOF_BUCKET)
+      .upload(proofPath, input.proof, { contentType: input.proof.type, upsert: false });
+    if (upErr)
+      throw new AppError("INTERNAL_ERROR", "The attachment didn't upload. Try again.", 500);
+  }
+  const { data, error } = await supabase.rpc("comp_off_submit", {
+    _leave_type_id: input.leaveTypeId,
+    _days: input.days.map((d) => ({ date: d.date, days: d.days, note: d.note || null })),
+    _reason: input.reason,
+    _proof_path: proofPath ?? undefined,
+  });
+  if (error) throw toLeaveError(error.message);
+  return data as string;
+}
+
+export async function cancelCompOff(claimId: string): Promise<void> {
+  const { error } = await supabase.rpc("comp_off_cancel", { _claim_id: claimId });
+  if (error) throw toLeaveError(error.message);
+}
+
+export async function getCompOffApprovalDetail(
+  approvalRequestId: string,
+): Promise<CompOffApprovalDetail> {
+  const { data, error } = await supabase.rpc("comp_off_approval_detail", {
+    _approval_request_id: approvalRequestId,
+  });
+  if (error) throw toLeaveError(error.message);
+  const r = data as Record<string, unknown>;
+  return {
+    claimId: r.claimId as string,
+    employeeName: r.employeeName as string,
+    leaveTypeName: r.leaveTypeName as string,
+    reason: r.reason as string,
+    totalDays: Number(r.totalDays),
+    status: r.status as CompOffApprovalDetail["status"],
+    proofPath: (r.proofPath as string | null) ?? null,
+    days: toDays(r.days),
+  };
+}
+
+/** A short-lived link to a claim's proof. The bucket decides who may have one. */
+export async function getProofUrl(path: string): Promise<string> {
+  const { data, error } = await supabase.storage.from(PROOF_BUCKET).createSignedUrl(path, 300);
+  if (error || !data) throw new AppError("FORBIDDEN", "That attachment can't be opened.", 403);
+  return data.signedUrl;
+}
+
+// ═══════════════════════════════════════════════ carry-forward review (D91)
+
+function toCarryError(message: string): AppError {
+  const e = toLeaveError(message);
+  return e.details?.code === "FORBIDDEN"
+    ? new AppError("FORBIDDEN", "Only the Leave Admin can review carry-forward.", 403, e.details)
+    : e;
+}
+
+export async function getCarryYears(): Promise<{ current: string; previous: string }> {
+  const { data, error } = await supabase.rpc("leave_carry_years");
+  if (error) throw toCarryError(error.message);
+  return data as { current: string; previous: string };
+}
+
+export async function getCarryReview(fromFy: string): Promise<CarryReview | null> {
+  const { data, error } = await supabase.rpc("leave_carry_review", { _from_fy: fromFy });
+  if (error) throw toCarryError(error.message);
+  if (!data) return null;
+  const r = data as Record<string, unknown>;
+  return {
+    id: r.id as string,
+    fromFy: r.fromFy as string,
+    toFy: r.toFy as string,
+    status: r.status as CarryReview["status"],
+    preparedAt: r.preparedAt as string,
+    lockedAt: (r.lockedAt as string | null) ?? null,
+    lockedBy: (r.lockedBy as string | null) ?? null,
+    nextYearOpen: Boolean(r.nextYearOpen),
+    lines: ((r.lines as Record<string, unknown>[]) ?? []).map((l) => ({
+      id: l.id as string,
+      employeeName: l.employeeName as string,
+      leaveTypeName: l.leaveTypeName as string,
+      availableDays: Number(l.availableDays),
+      proposedDays: Number(l.proposedDays),
+      adjustedDays: l.adjustedDays === null ? null : Number(l.adjustedDays),
+      carryForwardMax: Number(l.carryForwardMax),
+    })),
+  };
+}
+
+export async function prepareCarry(fromFy: string): Promise<string> {
+  const { data, error } = await supabase.rpc("leave_carry_prepare", { _from_fy: fromFy });
+  if (error) throw toCarryError(error.message);
+  return data as string;
+}
+
+/** Null puts the rule's number back. */
+export async function adjustCarry(lineId: string, days: number | null): Promise<void> {
+  const { error } = await supabase.rpc("leave_carry_adjust", {
+    _line_id: lineId,
+    _days: days as number,
+  });
+  if (error) throw toCarryError(error.message);
+}
+
+export async function lockCarry(reviewId: string): Promise<number> {
+  const { data, error } = await supabase.rpc("leave_carry_lock", { _review_id: reviewId });
+  if (error) throw toCarryError(error.message);
+  return data as number;
+}
+
+// ═══════════════════════════════════════════════ four more reports (D94)
+
+export async function getLeaveLiability(): Promise<LeaveLiabilityRow[]> {
+  const { data, error } = await supabase.rpc("leave_liability_report");
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeName: r.leave_type_name,
+    kind: r.kind as LeaveKind,
+    fyLabel: r.fy_label,
+    notTakenDays: Number(r.not_taken_days),
+    bookedDays: Number(r.booked_days),
+    freeDays: Number(r.free_days),
+  }));
+}
+
+export async function getCompOffRegister(from: string, to: string): Promise<CompOffRegisterRow[]> {
+  const { data, error } = await supabase.rpc("comp_off_register", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    claimId: r.claim_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    leaveTypeName: r.leave_type_name,
+    daysWorked: r.days_worked ?? "",
+    totalDays: Number(r.total_days),
+    reason: r.reason,
+    status: r.status as CompOffRegisterRow["status"],
+    submittedOn: r.submitted_on,
+    decidedOn: r.decided_on ?? null,
+    expiresOn: r.expires_on ?? null,
+    expiredDays: Number(r.expired_days),
+    hasProof: r.has_proof,
+  }));
+}
+
+export async function getApprovalTurnaround(
+  from: string,
+  to: string,
+): Promise<ApprovalTurnaroundRow[]> {
+  const { data, error } = await supabase.rpc("leave_approval_turnaround", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    stepId: r.step_id,
+    what: r.what,
+    employeeName: r.employee_name,
+    level: r.level,
+    approverName: r.approver_name,
+    decidedByName: r.decided_by_name ?? null,
+    decision: r.decision as ApprovalTurnaroundRow["decision"],
+    reachedAt: r.reached_at,
+    decidedAt: r.decided_at,
+    daysTaken: Number(r.days_taken),
+    movedUp: r.moved_up,
+  }));
+}
+
+export async function getAbsenteeism(from: string, to: string): Promise<AbsenteeismRow[]> {
+  const { data, error } = await supabase.rpc("leave_absenteeism_report", { _from: from, _to: to });
+  if (error) throw toLeaveError(error.message);
+  return (data ?? []).map((r) => ({
+    employeeId: r.employee_id,
+    employeeName: r.employee_name,
+    departmentName: r.department_name ?? null,
+    spells: r.spells,
+    days: Number(r.days),
+    unpaidDays: Number(r.unpaid_days),
+    bradfordFactor: Number(r.bradford_factor),
   }));
 }

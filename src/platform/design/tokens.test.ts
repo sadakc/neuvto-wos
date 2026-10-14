@@ -13,7 +13,7 @@
  */
 
 import { describe, expect, it } from "vitest";
-import { contrastRatio, isInSrgbGamut, oklchToHex, oklchToRgb } from "./color";
+import { contrastRatio, hexToOklch, isInSrgbGamut, oklchToHex, oklchToRgb } from "./color";
 import { SEMANTIC, RADIUS, SPACE, TYPE, type SemanticToken, type ThemeName } from "./tokens";
 
 const THEMES: ThemeName[] = ["light", "dark"];
@@ -75,6 +75,21 @@ const TEXT_PAIRS: Array<[SemanticToken, SemanticToken]> = [
   ["foreground", "neutralMuted"],
   ["foreground", "secondary"],
   ["foreground", "muted"],
+
+  // Core HR (D76). Second-level text, and every pill: status text on its own
+  // soft fill. The pill is the most common place a status word is read.
+  ["foregroundSecondary", "background"],
+  ["foregroundSecondary", "card"],
+  ["foregroundSecondary", "muted"],
+  ["primary", "background"],
+  ["primary", "card"],
+  ["success", "successMuted"],
+  ["warning", "warningMuted"],
+  ["destructive", "destructiveMuted"],
+  ["info", "infoMuted"],
+  ["success", "card"],
+  ["warning", "card"],
+  ["destructive", "card"],
 ];
 
 /**
@@ -134,19 +149,23 @@ describe.each(THEMES)("%s theme", (theme) => {
 });
 
 describe("themes are genuinely distinct", () => {
-  it("the brand keeps its hue in both themes", () => {
-    // Nocturne lifts lightness for contrast; it does not repaint the brand.
-    // If this fails, someone has made a brand decision inside a theme file.
-    expect(SEMANTIC.dark.primary.h).toBe(SEMANTIC.light.primary.h);
+  it("the accent keeps its hue in both themes", () => {
+    // Dark lifts the LIGHTNESS of the accent, it does not repaint it. The
+    // prototype's two teals are 2 to 3 degrees apart, which is authoring
+    // noise; a repaint would be tens of degrees. 8 degrees is the line.
+    const delta = Math.abs(SEMANTIC.dark.primary.h - SEMANTIC.light.primary.h);
+    expect(Math.min(delta, 360 - delta)).toBeLessThan(8);
   });
 
-  it("dark statuses are less saturated than their light twins", () => {
-    // The stated reason Nocturne exists: full-chroma status colours glare on a
-    // near-black surface at night.
+  it("no dark status colour is saturated enough to glare", () => {
+    // The worry is a full-chroma green on a near-black screen at night. Under
+    // Nocturne this was written as "dark is less saturated than light", which
+    // only meant something while light used full-chroma statuses. Core HR's
+    // light statuses are deep, low-chroma tones, so the rule is now stated
+    // directly: a cap on chroma in the dark theme. The highest is the green,
+    // at 0.125; #22C55E, the colour that motivated the rule, is 0.19.
     for (const token of ["success", "warning", "destructive", "info"] as const) {
-      expect(SEMANTIC.dark[token].c, `${token} is not desaturated on dark`).toBeLessThan(
-        SEMANTIC.light[token].c,
-      );
+      expect(SEMANTIC.dark[token].c, `${token} glares on dark`).toBeLessThanOrEqual(0.14);
     }
   });
 
@@ -187,8 +206,9 @@ describe("scales", () => {
   });
 
   it("inputs are at least 16px so iOS does not zoom on focus", () => {
+    // Body text is 14px in Core HR; a FIELD is not body text. The rule binds
+    // inputs, which use minInputSize on touch widths (DESIGN_SYSTEM §4).
     expect(TYPE.minInputSize).toBeGreaterThanOrEqual(16);
-    expect(TYPE.roles.body.size).toBeGreaterThanOrEqual(TYPE.minInputSize);
   });
 
   it("every type role has a line height with room to breathe", () => {
@@ -206,10 +226,46 @@ describe("colour conversion", () => {
   it("converts the brand blue to its published hex", () => {
     // #0EA5E9 is the authoritative brand value (DESIGN_SYSTEM §3). Within a
     // point per channel of the round trip through OKLCH.
-    const [r, g, b] = oklchToRgb(SEMANTIC.light.primary);
+    const [r, g, b] = oklchToRgb(SEMANTIC.light.brand);
     expect(Math.abs(r - 0x0e)).toBeLessThanOrEqual(3);
     expect(Math.abs(g - 0xa5)).toBeLessThanOrEqual(3);
     expect(Math.abs(b - 0xe9)).toBeLessThanOrEqual(3);
+  });
+
+  it("hexToOklch is the exact inverse of oklchToHex", () => {
+    // The Core HR tokens are authored as the prototype's hex codes. If this
+    // drifted, a token would silently stop being the designed colour.
+    for (const h of ["#0f5f79", "#52b4cf", "#f3f6f7", "#13212a", "#a62a20", "#000000", "#ffffff"]) {
+      expect(oklchToHex(hexToOklch(h))).toBe(h);
+    }
+  });
+
+  it("the palette is the Core HR prototype's, except where contrast required otherwise", () => {
+    // Exactly three tokens differ from the prototype, each documented in the
+    // header of tokens.ts with its measurement. A fourth difference is either
+    // a deliberate fix that needs documenting there, or a mistake.
+    const asDesigned: Array<[ThemeName, SemanticToken, string]> = [
+      ["light", "background", "#f3f6f7"],
+      ["light", "card", "#ffffff"],
+      ["light", "foreground", "#13212a"],
+      ["light", "foregroundSecondary", "#47585f"],
+      ["light", "primary", "#0f5f79"],
+      ["light", "accent", "#e0eef3"],
+      ["light", "border", "#dce3e6"],
+      ["light", "borderStrong", "#c5d1d5"],
+      ["light", "success", "#2d7a48"],
+      ["light", "destructive", "#a62a20"],
+      ["dark", "background", "#0c1317"],
+      ["dark", "card", "#141d22"],
+      ["dark", "primary", "#52b4cf"],
+      ["dark", "mutedForeground", "#7b8f98"],
+    ];
+    for (const [theme, token, want] of asDesigned) {
+      expect(oklchToHex(SEMANTIC[theme][token]), `${theme}.${token}`).toBe(want);
+    }
+    expect(oklchToHex(SEMANTIC.light.mutedForeground)).toBe("#5a6c73"); // not #6d8087
+    expect(oklchToHex(SEMANTIC.light.input)).toBe("#828d91"); // not --line-2
+    expect(oklchToHex(SEMANTIC.dark.input)).toBe("#5e717a"); // not --line-2
   });
 
   it("round-trips the achromatic ends", () => {

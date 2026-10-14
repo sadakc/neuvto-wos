@@ -36,7 +36,38 @@ export interface ModuleNavItem {
   soon?: string;
   /** Omitted means everyone. Presence means at least one of these roles. */
   roles?: readonly AppRole[];
+  /**
+   * D84. Only this module's admins: a company-wide Admin, or somebody a Super
+   * Admin made admin of this module. With `roles` as well, either one opens it.
+   */
+  moduleAdmin?: boolean;
+  /**
+   * Where the tab sits in the Core HR tab bar (DESIGN_SYSTEM §7). `main` is the
+   * row an employee uses; `company` is behind the Company menu and should carry
+   * `roles` that administer. Defaults to `main`. "For your team" (Approvals) is
+   * the platform's to add, so a module cannot claim it.
+   */
+  group?: "main" | "company";
+  /** One line under the label in the Company menu and the section picker. */
+  description?: string;
+  /**
+   * Where the tab lives in the rail. Omitted, under the module. `organisation`
+   * puts it under Organisation instead: a view of the whole company that a
+   * module happens to supply, like the directory or the company org chart
+   * (Sada, 14 Oct 2026). The route stays the module's.
+   */
+  placement?: "organisation";
 }
+
+/** D111. A list on Home's Approvals, contributed by a module for its admins. */
+export interface ModuleHomeQueue {
+  id: string;
+  title: string;
+  component: ComponentType | LazyExoticComponent<ComponentType>;
+}
+
+/** The rail groups modules under these, once there are more than six. */
+export type ModuleSection = "Time" | "People" | "Money" | "Company";
 
 /**
  * A card a module contributes to the dashboard.
@@ -179,6 +210,17 @@ export interface ModuleDefinition {
   name: string;
   version: string;
 
+  /** The rail's label where space is short ("Leave" for "Leave Management"). */
+  shortName?: string;
+  /** Which rail section the module belongs to. Defaults to `Company`. */
+  section?: ModuleSection;
+  /** The rail icon. A component, so the platform imports no icon by name. */
+  icon?: ComponentType<{ className?: string }>;
+  /** The Company menu's line under this module's Reports tab. */
+  reportsDescription?: string;
+  /** The Company menu's line under this module's Configuration tab. */
+  configurationDescription?: string;
+
   /**
    * A function, not an array, because what a manager sees differs from what an
    * employee sees. Hiding a link is presentation; RLS is what actually refuses
@@ -230,6 +272,21 @@ export interface ModuleDefinition {
   eventKeys: readonly string[];
 
   /**
+   * D111. Where a notice in the bell opens, by event key, from the notice's
+   * payload. A module names the screens its own notices are about; the
+   * platform answers for its own events (an approval waiting goes to the
+   * module's approvals) and for any event a module leaves out.
+   */
+  notificationLinks?: Record<string, (payload: Record<string, unknown>) => string | null>;
+
+  /**
+   * D111. Lists of things waiting on this module's admins that are not
+   * approvals in the engine's sense, shown on Home's Approvals: the Employee
+   * Card's change requests. Only this module's admins see them.
+   */
+  homeQueues?: () => ModuleHomeQueue[];
+
+  /**
    * Per-organisation configuration, persisted through `module_settings` (D7).
    * Customers configure modules even though they never write them.
    */
@@ -254,6 +311,11 @@ export const ModuleDefinitionSchema = z.object({
     .regex(/^[a-z][a-z0-9_]*$/, "Module key must be lower snake_case, matching modules.key"),
   name: z.string().min(1),
   version: z.string().min(1),
+  shortName: z.string().min(1).max(14, "A short name is for a 2-up phone grid").optional(),
+  section: z.enum(["Time", "People", "Money", "Company"]).optional(),
+  icon: z.any().optional(),
+  reportsDescription: z.string().optional(),
+  configurationDescription: z.string().optional(),
   navigation: z.function(),
   routes: z.array(
     z.object({
@@ -269,6 +331,8 @@ export const ModuleDefinitionSchema = z.object({
   approvalViews: z.function().optional(),
   approvalEntityTypes: z.array(z.string().regex(/^[a-z_]+$/)).readonly(),
   eventKeys: z.array(z.string().regex(/^[a-z_]+\.[a-z_]+$/)).readonly(),
+  notificationLinks: z.record(z.string(), z.function()).optional(),
+  homeQueues: z.function().optional(),
   settingsSchema: z.any(),
   ownedTables: z.array(z.string().regex(/^[a-z][a-z0-9_]*$/)).readonly(),
 });

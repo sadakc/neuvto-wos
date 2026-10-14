@@ -80,6 +80,20 @@ Order matters when running the files by hand:
 3. tests/verify_invariants.sql
 ```
 
+## Writing an assertion: NULL passes silently
+
+`if x <> 'expected' then raise ...` does not raise when `x` is NULL: the comparison is
+NULL, and `if NULL` is false. A JSON key the function stopped sending, a field that came
+back empty, a flag that is missing: all of them sail through. Found on 15 Oct 2026, when a
+sabotage that stopped deactivation closing a posting went uncaught, because the test read
+`r -> 'postingClosed' ->> 'lastDay' <> '2026-10-10'` and the key was null.
+
+So, in every suite:
+
+- compare with `is distinct from`, never `<>`, when either side can be NULL;
+- test a flag with `(x)::boolean is not true` (or `is not false`), never `not (x)::boolean`;
+- and prove the test by sabotage, which is how this was found.
+
 ## When to run
 
 After **every** build step, per the sequence in `../NEUVTO_MVP_BUILD_SPEC.md`.

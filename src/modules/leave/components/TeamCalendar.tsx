@@ -15,6 +15,7 @@
  * organisation be themed later without touching this file (D15).
  */
 
+import { Panel } from "@/components/shared/panel";
 import { useEffect, useMemo, useState } from "react";
 import { listDirectReports } from "@/platform/auth";
 import { supabase } from "@/integrations/supabase/client";
@@ -115,7 +116,7 @@ export default function TeamCalendar() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your team&apos;s calendar. Try refreshing.
         </p>
@@ -125,17 +126,17 @@ export default function TeamCalendar() {
 
   if (team.length === 0) {
     return (
-      <div className="mx-auto max-w-2xl">
-        <div className="mb-4">
+      <div className="flex min-w-0 flex-col gap-4">
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <h1 className="text-page-title font-semibold tracking-page-title">Your team</h1>
           <a
             href="/app/leave/calendar"
-            className="text-sm text-muted-foreground underline underline-offset-4"
+            className="text-sm font-medium text-primary hover:underline"
           >
             ← My own calendar
           </a>
         </div>
-        <h1 className="font-display text-lg font-semibold">Your team</h1>
-        <p className="mt-4 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
+        <p className="rounded-xl border border-dashed border-border p-8 text-center text-sm text-muted-foreground">
           Nobody reports to you yet. Once your administrator sets reporting lines, your team&apos;s
           leave shows here.
         </p>
@@ -146,94 +147,103 @@ export default function TeamCalendar() {
   const today = iso(new Date());
 
   return (
-    <div className="mx-auto max-w-4xl">
-      <div className="mb-4">
-        <a
-          href="/app/leave/calendar"
-          className="text-sm text-muted-foreground underline underline-offset-4"
-        >
+    <div className="flex min-w-0 flex-col gap-4">
+      <div className="flex flex-wrap items-baseline justify-between gap-2">
+        <div>
+          <h1 className="text-page-title font-semibold tracking-page-title">Your team</h1>
+          <p className="mt-1 text-sm text-foreground-secondary">
+            Who reports to you, and the days they are away.
+          </p>
+        </div>
+        <a href="/app/leave/calendar" className="text-sm font-medium text-primary hover:underline">
           ← My own calendar
         </a>
       </div>
 
-      <div className="flex items-center justify-between">
-        <h1 className="font-display text-lg font-semibold">
-          {month.toLocaleString(undefined, { month: "long", year: "numeric" })}
-        </h1>
-        <div className="flex gap-2">
-          <button
-            aria-label="Previous month"
-            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-border"
-          >
-            ‹
-          </button>
-          <button
-            aria-label="Next month"
-            onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
-            className="inline-flex h-12 w-12 items-center justify-center rounded-md border border-border"
-          >
-            ›
-          </button>
-        </div>
-      </div>
-
-      {/* One row per person, one narrow column per day. Scrolls horizontally on a
+      <Panel
+        title={month.toLocaleString(undefined, { month: "long", year: "numeric" })}
+        testId="panel-team-month"
+        aside={
+          <span className="flex gap-2">
+            <button
+              aria-label="Previous month"
+              onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() - 1, 1))}
+              className="-my-1.5 inline-flex size-9 items-center justify-center rounded-md border border-border text-foreground"
+            >
+              ‹
+            </button>
+            <button
+              aria-label="Next month"
+              onClick={() => setMonth((m) => new Date(m.getFullYear(), m.getMonth() + 1, 1))}
+              className="-my-1.5 inline-flex size-9 items-center justify-center rounded-md border border-border text-foreground"
+            >
+              ›
+            </button>
+          </span>
+        }
+        footer={
+          <span className="flex flex-wrap gap-4">
+            <span className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-sm bg-info" /> Approved
+            </span>
+            <span className="flex items-center gap-2">
+              <span className="h-3 w-3 rounded-sm bg-warning" /> Awaiting approval
+            </span>
+          </span>
+        }
+      >
+        {/* One row per person, one narrow column per day. Scrolls horizontally on a
           phone rather than reflowing — a month that wraps stops being a month. */}
-      <div className="mt-4 overflow-x-auto">
-        <table className="w-full border-separate border-spacing-0 text-xs">
-          <thead>
-            <tr>
-              <th className="sticky left-0 z-10 bg-background p-2 text-left font-medium">Person</th>
-              {days.map((d) => (
-                <th
-                  key={iso(d)}
-                  className={`w-6 p-1 text-center font-normal tabular-nums ${
-                    iso(d) === today ? "font-semibold text-foreground" : "text-muted-foreground"
-                  }`}
-                >
-                  {d.getDate()}
+        <div className="-mx-4 overflow-x-auto px-4">
+          <table className="w-full border-separate border-spacing-0 text-xs">
+            <thead>
+              <tr>
+                <th className="sticky left-0 z-10 bg-card p-2 text-left text-table-header font-semibold tracking-table-header text-muted-foreground uppercase">
+                  Person
                 </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {team.map((person) => (
-              <tr key={person.id} data-testid="team-row">
-                <td className="sticky left-0 z-10 max-w-[10rem] truncate bg-background p-2 text-sm">
-                  {person.fullName || person.email}
-                </td>
-                {days.map((d) => {
-                  const l = byPerson.get(person.id)?.get(iso(d));
-                  const tone = !l
-                    ? "bg-background"
-                    : l.status === "approved"
-                      ? "bg-info-muted"
-                      : "bg-warning-muted";
-                  return (
-                    <td key={iso(d)} className="p-0.5">
-                      <div
-                        title={l ? `${l.leaveTypeName} · ${l.status.replace("_", " ")}` : undefined}
-                        data-testid={l ? `team-day-${l.status}` : undefined}
-                        className={`h-8 rounded-sm border border-border ${tone}`}
-                      />
-                    </td>
-                  );
-                })}
+                {days.map((d) => (
+                  <th
+                    key={iso(d)}
+                    className={`w-6 p-1 text-center font-normal tabular-nums ${
+                      iso(d) === today ? "font-semibold text-foreground" : "text-muted-foreground"
+                    }`}
+                  >
+                    {d.getDate()}
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="mt-4 flex flex-wrap gap-4 text-xs text-muted-foreground">
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-info" /> Approved
-        </span>
-        <span className="flex items-center gap-2">
-          <span className="h-3 w-3 rounded-sm bg-warning" /> Awaiting approval
-        </span>
-      </div>
+            </thead>
+            <tbody>
+              {team.map((person) => (
+                <tr key={person.id} data-testid="team-row">
+                  <td className="sticky left-0 z-10 max-w-[10rem] truncate bg-card p-2 text-sm">
+                    {person.fullName || person.email}
+                  </td>
+                  {days.map((d) => {
+                    const l = byPerson.get(person.id)?.get(iso(d));
+                    const tone = !l
+                      ? "bg-background"
+                      : l.status === "approved"
+                        ? "bg-info-muted"
+                        : "bg-warning-muted";
+                    return (
+                      <td key={iso(d)} className="p-0.5">
+                        <div
+                          title={
+                            l ? `${l.leaveTypeName} · ${l.status.replace("_", " ")}` : undefined
+                          }
+                          data-testid={l ? `team-day-${l.status}` : undefined}
+                          className={`h-8 rounded-sm border border-border ${tone}`}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </Panel>
     </div>
   );
 }

@@ -15,8 +15,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { AppError, toAppError, type ErrorCode } from "@/platform/errors";
-import { InviteInput, type AppRole } from "./contracts";
+import { AppError, toAppError } from "@/platform/errors";
+import type { AppRole } from "./contracts";
 
 export interface Member {
   id: string;
@@ -30,6 +30,8 @@ export interface Member {
   /** D58. Null is ordinary: a workspace with no departments configured has nobody in one. */
   departmentId: string | null;
   roles: AppRole[];
+  /** D84. Modules a Super Admin made them admin of. Empty for most people. */
+  moduleAdmin: string[];
 }
 
 /** What deactivating somebody would move. Counts, so the confirmation states facts. */
@@ -52,55 +54,6 @@ export interface Invitation {
   revokedAt: string | null;
   /** The link, so an administrator can pass it on when email is slow. */
   inviteUrl: string | null;
-}
-
-/** Duplicates INSIDE this organisation. These are the admin's own data. */
-const INVITE_ERRORS: Partial<Record<ErrorCode, { message: string; field?: string }>> = {
-  ALREADY_A_MEMBER: {
-    message: "Somebody with that email address is already in this workspace.",
-    field: "email",
-  },
-  ALREADY_INVITED: {
-    message:
-      "That email address has already been invited. Revoke the invitation to change the role.",
-    field: "email",
-  },
-  PHONE_ALREADY_A_MEMBER: {
-    message: "Somebody with that phone number is already in this workspace.",
-    field: "phone",
-  },
-  PHONE_ALREADY_INVITED: {
-    message: "That phone number has already been invited.",
-    field: "phone",
-  },
-  INVALID_EMAIL: { message: "Enter a valid email address.", field: "email" },
-  NAME_REQUIRED: {
-    message: "Enter their name — it is how they appear on every screen.",
-    field: "fullName",
-  },
-  FORBIDDEN: { message: "Only an administrator can invite people.", field: undefined },
-};
-
-export async function inviteMember(input: unknown): Promise<string> {
-  const parsed = InviteInput.parse(input);
-
-  const { data, error } = await supabase.rpc("invitation_create", {
-    _email: parsed.email,
-    _phone: parsed.phone || undefined,
-    _role: parsed.role,
-    _full_name: parsed.fullName || undefined,
-    _department_id: parsed.departmentId || undefined,
-  });
-
-  if (error) {
-    const code = (Object.keys(INVITE_ERRORS) as ErrorCode[]).find((k) => error.message.includes(k));
-    if (code) {
-      const e = INVITE_ERRORS[code]!;
-      throw new AppError(code, e.message, 400, e.field ? { field: e.field } : undefined);
-    }
-    throw toAppError(error, "inviteMember");
-  }
-  return data as string;
 }
 
 export async function revokeInvitation(id: string): Promise<void> {
@@ -148,15 +101,16 @@ export async function listMembers(): Promise<Member[]> {
   // therefore has no relationship to traverse, and asking for one fails at
   // compile time rather than returning an empty array at runtime, which is the
   // better half of that trade.
-  const [people, roles] = await Promise.all([
+  const [people, roles, modules] = await Promise.all([
     supabase
       .from("profiles")
       .select("id, full_name, email, phone, joined_date, is_active, manager_id, department_id")
       .order("full_name"),
     supabase.from("user_roles").select("user_id, role"),
+    supabase.from("module_admins").select("user_id, module_key"),
   ]);
 
-  if (people.error || roles.error) {
+  if (people.error || roles.error || modules.error) {
     throw new AppError("INTERNAL_ERROR", "We couldn't load the people in this workspace.", 500);
   }
 
@@ -165,6 +119,10 @@ export async function listMembers(): Promise<Member[]> {
     const list = byUser.get(r.user_id) ?? [];
     list.push(r.role as AppRole);
     byUser.set(r.user_id, list);
+  }
+  const adminOf = new Map<string, string[]>();
+  for (const r of modules.data ?? []) {
+    adminOf.set(r.user_id, [...(adminOf.get(r.user_id) ?? []), r.module_key]);
   }
 
   return (people.data ?? []).map((r) => ({
@@ -177,6 +135,7 @@ export async function listMembers(): Promise<Member[]> {
     managerId: r.manager_id,
     departmentId: r.department_id,
     roles: byUser.get(r.id) ?? [],
+    moduleAdmin: (adminOf.get(r.id) ?? []).sort(),
   }));
 }
 
@@ -348,6 +307,9 @@ export async function deactivateMember(
     if (raw.includes("SUCCESSOR_REQUIRED")) {
       throw new AppError("VALIDATION_FAILED", "Choose who takes over their work.", 400);
     }
+    if (raw.includes("LAST_SUPER_ADMIN")) {
+      throw new AppError("VALIDATION_FAILED", LAST_SUPER_ADMIN, 400);
+    }
     if (raw.includes("LAST_ADMIN")) {
       throw new AppError(
         "VALIDATION_FAILED",
@@ -399,4 +361,72 @@ export async function listDirectReports(): Promise<Pick<Member, "id" | "fullName
   if (failed) throw new AppError("INTERNAL_ERROR", "We couldn't load your team.", 500);
 
   return (reports ?? []).map((r) => ({ id: r.id, fullName: r.full_name, email: r.email }));
+}
+
+const ROLE_NOT_YOURS =
+  "Only a Super Admin can make somebody an administrator, or give the Payroll or Statutory role.";
+const LAST_SUPER_ADMIN =
+  "They're the only Super Admin. Make somebody else a Super Admin first, or nobody will be able to manage access for this company.";
+
+/**
+ * Sets the whole of somebody's roles (D78). The database decides what this
+ * caller may change, and refuses the set whole if any one change is not
+ * theirs to make; this maps each refusal to a sentence.
+ */
+export async function setMemberRoles(userId: string, roles: AppRole[]): Promise<AppRole[]> {
+  const { data, error } = await supabase.rpc("member_set_roles", {
+    _user_id: userId,
+    _roles: roles,
+  });
+  if (!error) return (data ?? []) as AppRole[];
+
+  const raw = error.message ?? "";
+  if (raw.includes("ROLE_NOT_YOURS_TO_GRANT")) throw new AppError("FORBIDDEN", ROLE_NOT_YOURS, 403);
+  if (raw.includes("CANNOT_CHANGE_OWN_ROLES")) {
+    throw new AppError(
+      "FORBIDDEN",
+      "You can't change your own access. Another Super Admin can.",
+      403,
+    );
+  }
+  if (raw.includes("LAST_SUPER_ADMIN"))
+    throw new AppError("VALIDATION_FAILED", LAST_SUPER_ADMIN, 400);
+  if (raw.includes("STILL_HAS_REPORTS")) {
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "People report to them, so they need a role that approves. Move their reports to somebody else first, or keep Manager, Supervisor or Coordinator.",
+      400,
+    );
+  }
+  throw toAppError(error, "setMemberRoles");
+}
+
+/**
+ * D84. Sets which modules somebody administers, the whole set. A Super Admin
+ * only, never for themselves; the database refuses anything else.
+ */
+export async function setMemberModuleAdmins(userId: string, modules: string[]): Promise<string[]> {
+  const { data, error } = await supabase.rpc("member_set_module_admins", {
+    _user_id: userId,
+    _modules: modules,
+  });
+  if (!error) return data ?? [];
+
+  const raw = error.message ?? "";
+  if (raw.includes("ROLE_NOT_YOURS_TO_GRANT")) throw new AppError("FORBIDDEN", ROLE_NOT_YOURS, 403);
+  if (raw.includes("CANNOT_CHANGE_OWN_ROLES")) {
+    throw new AppError(
+      "FORBIDDEN",
+      "You can't change your own access. Another Super Admin can.",
+      403,
+    );
+  }
+  if (raw.includes("UNKNOWN_MODULE")) {
+    throw new AppError(
+      "VALIDATION_FAILED",
+      "That module isn't switched on for this company, so nobody can administer it yet.",
+      400,
+    );
+  }
+  throw toAppError(error, "setMemberModuleAdmins");
 }

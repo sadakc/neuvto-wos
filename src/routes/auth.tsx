@@ -14,6 +14,8 @@ import {
   isPlatformAdmin,
   getSessionEmail,
 } from "@/platform/auth";
+import { deviceSupportsPasskeys, signInWithFaceOrFingerprint } from "@/platform/auth/passkeys";
+import { Fingerprint } from "lucide-react";
 import { isAppError } from "@/platform/errors";
 import { hardNavigate } from "@/platform/navigate";
 import {
@@ -133,6 +135,12 @@ function AuthPage() {
   const { next, invite, reason } = Route.useSearch();
   const [step, setStep] = useState<Step>("email");
   const [busy, setBusy] = useState(false);
+  // D79. Offered only where the device can do it, so the button never exists
+  // just to fail. Asked once; the answer does not change during a visit.
+  const [passkeysHere, setPasskeysHere] = useState(false);
+  useEffect(() => {
+    void deviceSupportsPasskeys().then(setPasskeysHere);
+  }, []);
   const [checking, setChecking] = useState(true);
   const [joinError, setJoinError] = useState("");
 
@@ -398,37 +406,63 @@ function AuthPage() {
     setBusy(true);
     try {
       await verifyOtp({ email, token: code });
-      const user = await getCurrentUser().catch(() => null);
-      if (user) {
-        // The address just proved is already in a workspace, so there is
-        // nothing for the invitation to do. Same rule as on arrival: say so
-        // rather than answering an invitation with a dashboard.
-        if (invite) {
-          showSignedIn(user.email, "invite", safeNext(next));
-          return;
-        }
-        hardNavigate(safeNext(next));
-        return;
-      }
-      // Signed in, but in no workspace yet — redeem the invitation, send staff
-      // to the console, or explain.
-      //
-      // No interstitial here, deliberately: somebody who has just typed a
-      // six-digit code has expressed intent as clearly as anybody ever does.
-      // This is the branch D42 depends on — staff MUST still land on the
-      // console after verifying, and deleting it is the likeliest way this
-      // change breaks the thing it was built to protect.
-      if (invite) {
-        await finish();
-      } else {
-        const staff = await staffDestination();
-        if (staff) hardNavigate(staff);
-        else setStep(await workspacelessStep());
-      }
+      await afterSignIn();
     } catch (err) {
       fail(err);
     } finally {
       setBusy(false);
+    }
+  }
+
+  /**
+   * D79. Face or fingerprint, through a passkey. The device knows whose
+   * passkey it holds, so no email is asked for, and afterwards it is EXACTLY
+   * the email code's path: same workspace check, same staff routing (D42),
+   * same "you are nowhere" screens. A second post-sign-in path is how one of
+   * them quietly stops sending staff to the console.
+   *
+   * Cancelling the system prompt is not an error. It is somebody choosing the
+   * email code instead, so nothing is shown.
+   */
+  async function onPasskey() {
+    setBusy(true);
+    try {
+      if (await signInWithFaceOrFingerprint()) await afterSignIn();
+    } catch (err) {
+      fail(err);
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  /** Where somebody goes once they have proved who they are, however they did. */
+  async function afterSignIn() {
+    const user = await getCurrentUser().catch(() => null);
+    if (user) {
+      // The address just proved is already in a workspace, so there is
+      // nothing for the invitation to do. Same rule as on arrival: say so
+      // rather than answering an invitation with a dashboard.
+      if (invite) {
+        showSignedIn(user.email, "invite", safeNext(next));
+        return;
+      }
+      hardNavigate(safeNext(next));
+      return;
+    }
+    // Signed in, but in no workspace yet — redeem the invitation, send staff
+    // to the console, or explain.
+    //
+    // No interstitial here, deliberately: somebody who has just proved who they
+    // are has expressed intent as clearly as anybody ever does. This is the
+    // branch D42 depends on — staff MUST still land on the console after
+    // signing in, and deleting it is the likeliest way this change breaks the
+    // thing it was built to protect.
+    if (invite) {
+      await finish();
+    } else {
+      const staff = await staffDestination();
+      if (staff) hardNavigate(staff);
+      else setStep(await workspacelessStep());
     }
   }
 
@@ -498,6 +532,31 @@ function AuthPage() {
               {busy ? "Sending code…" : "Email me a code"}
             </button>
           </form>
+
+          {/* Not offered with an invitation: somebody redeeming one has never
+              signed in, so this device cannot hold a passkey for them yet. */}
+          {passkeysHere && !invite && (
+            <div className="mt-6">
+              <div className="flex items-center gap-3 text-caption text-muted-foreground">
+                <span className="h-px flex-1 bg-border" />
+                or
+                <span className="h-px flex-1 bg-border" />
+              </div>
+              <button
+                type="button"
+                onClick={() => void onPasskey()}
+                disabled={busy}
+                data-testid="sign-in-passkey"
+                className="mt-6 inline-flex h-12 w-full items-center justify-center gap-2 rounded-md border border-border-strong bg-card px-4 text-sm font-medium hover:bg-muted disabled:opacity-60"
+              >
+                <Fingerprint className="size-5" aria-hidden />
+                Sign in with face or fingerprint
+              </button>
+              <p className="mt-2 text-center text-caption text-muted-foreground">
+                Works once you have set it up on this device, from Sign-in and security.
+              </p>
+            </div>
+          )}
         </>
       )}
 

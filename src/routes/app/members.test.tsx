@@ -35,10 +35,6 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children?: React.ReactNode }) => children,
 }));
 
-vi.mock("@/platform/auth/InviteTeam", () => ({
-  InviteTeam: () => null,
-}));
-
 const MARK = "mark-id";
 const RAVI = "ravi-id";
 const PRIYA = "priya-id";
@@ -74,6 +70,7 @@ const MEMBERS = [
     // rather than as the first one in the list.
     departmentId: null,
     roles: ["org_admin"],
+    moduleAdmin: [],
   },
   {
     id: MARK,
@@ -86,6 +83,7 @@ const MEMBERS = [
     // The LAST option, not the first — see the note on SALES.
     departmentId: SALES.id,
     roles: ["manager"],
+    moduleAdmin: [],
   },
   {
     id: SUNITA,
@@ -100,6 +98,7 @@ const MEMBERS = [
     managerId: null,
     departmentId: null,
     roles: ["supervisor"],
+    moduleAdmin: [],
   },
   {
     id: RAVI,
@@ -113,6 +112,7 @@ const MEMBERS = [
     managerId: MARK,
     departmentId: OPERATIONS.id,
     roles: ["employee"],
+    moduleAdmin: [],
   },
   {
     id: PRIYA,
@@ -126,6 +126,7 @@ const MEMBERS = [
     managerId: SUNITA,
     departmentId: null,
     roles: ["employee"],
+    moduleAdmin: [],
   },
 ];
 
@@ -136,6 +137,7 @@ vi.mock("@/platform/auth", async () => ({
   // themselves and with nothing else. Pulled from `contracts`, which imports
   // only zod, rather than from the barrel, which would drag in the Supabase
   // client this mock exists to avoid.
+  setMemberModuleAdmins: vi.fn(),
   ROLE_LABELS: (await import("@/platform/auth/contracts")).ROLE_LABELS,
   getCurrentUser: async () => ({
     id: "alice-id",
@@ -144,8 +146,11 @@ vi.mock("@/platform/auth", async () => ({
     organizationId: "org",
     organizationName: "Acme",
     roles: ["org_admin"],
+    moduleAdmin: [],
   }),
   isAdmin: () => true,
+  isSuperAdmin: (u: { roles?: string[] } | null) => !!u?.roles?.includes("super_admin"),
+  setMemberRoles: vi.fn(),
   listMembers: async () => MEMBERS,
   listInvitations: async () => [],
   deactivateMember: vi.fn(),
@@ -168,6 +173,8 @@ vi.mock("@/platform/auth", async () => ({
 const listDepartments = vi.fn<() => Promise<{ id: string; name: string }[]>>();
 const setDepartment = vi.fn<(employeeId: string, departmentId: string | null) => Promise<void>>();
 
+// D84: the module list the access panel offers. None here; members.access proves it.
+vi.mock("@/platform/modules", () => ({ getEnabledModules: async () => [] }));
 vi.mock("@/platform/organization", () => ({
   listDepartments: () => listDepartments(),
   setDepartment: (employeeId: string, departmentId: string | null) =>

@@ -14,9 +14,9 @@
 
 import { useEffect, useState } from "react";
 import type { ModuleApprovalViewProps } from "@/platform/modules";
-import { decideApproval } from "@/platform/approvals";
-import { isAppError } from "@/platform/errors";
+import { rejectReasonLabel } from "@/platform/approvals";
 import { getApprovalDetail, getApprovalTimeline } from "../handlers";
+import { DecisionControls } from "./DecisionControls";
 import type { ApprovalStep, LeaveApprovalDetail } from "../contracts";
 
 function formatRange(from: string, to: string): string {
@@ -31,9 +31,6 @@ export default function LeaveApprovalCard({ item, onDecided }: ModuleApprovalVie
   const [detail, setDetail] = useState<LeaveApprovalDetail | null>(null);
   const [timeline, setTimeline] = useState<ApprovalStep[]>([]);
   const [expanded, setExpanded] = useState(false);
-  const [comments, setComments] = useState("");
-  const [busy, setBusy] = useState<"approved" | "rejected" | null>(null);
-  const [error, setError] = useState("");
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -58,19 +55,6 @@ export default function LeaveApprovalCard({ item, onDecided }: ModuleApprovalVie
       cancelled = true;
     };
   }, [expanded, item.approvalRequestId, timeline.length]);
-
-  async function decide(decision: "approved" | "rejected") {
-    setError("");
-    setBusy(decision);
-    try {
-      await decideApproval(item.approvalRequestId, decision, comments);
-      onDecided();
-    } catch (e) {
-      setError(isAppError(e) ? e.message : "That decision couldn't be recorded.");
-    } finally {
-      setBusy(null);
-    }
-  }
 
   if (failed) {
     return (
@@ -144,6 +128,22 @@ export default function LeaveApprovalCard({ item, onDecided }: ModuleApprovalVie
                     ? "waiting"
                     : `${s.decision}${s.decidedAt ? ` ${new Date(s.decidedAt).toLocaleDateString()}` : ""}`}
                 </span>
+                {s.decidedBy && (
+                  <span className="mt-0.5 block text-muted-foreground">
+                    decided by {s.decidedBy} on their behalf
+                  </span>
+                )}
+                {s.escalatedFrom && (
+                  <span className="mt-0.5 block text-muted-foreground">
+                    moved up from {s.escalatedFrom}
+                    {s.escalatedAt ? ` ${new Date(s.escalatedAt).toLocaleDateString()}` : ""}
+                  </span>
+                )}
+                {rejectReasonLabel(s.reasonCode) && (
+                  <span className="mt-0.5 block font-medium">
+                    {rejectReasonLabel(s.reasonCode)}
+                  </span>
+                )}
                 {s.comments && (
                   <span className="mt-0.5 block text-muted-foreground">“{s.comments}”</span>
                 )}
@@ -153,43 +153,7 @@ export default function LeaveApprovalCard({ item, onDecided }: ModuleApprovalVie
         </ol>
       )}
 
-      <div className="mt-4">
-        <label htmlFor={`c-${item.approvalRequestId}`} className="sr-only">
-          Comment
-        </label>
-        <input
-          id={`c-${item.approvalRequestId}`}
-          value={comments}
-          onChange={(e) => setComments(e.target.value)}
-          placeholder="Add a comment (optional)"
-          className="h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-        />
-      </div>
-
-      {error && (
-        <p role="alert" data-testid="decide-error" className="mt-3 text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
-      <div className="mt-3 flex gap-2">
-        <button
-          onClick={() => decide("approved")}
-          disabled={busy !== null}
-          data-testid="approve"
-          className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-        >
-          {busy === "approved" ? "Approving…" : "Approve"}
-        </button>
-        <button
-          onClick={() => decide("rejected")}
-          disabled={busy !== null}
-          data-testid="reject"
-          className="inline-flex h-12 items-center justify-center rounded-md border border-border px-4 text-sm font-medium disabled:opacity-50"
-        >
-          {busy === "rejected" ? "Rejecting…" : "Reject"}
-        </button>
-      </div>
+      <DecisionControls item={item} onDecided={onDecided} />
     </div>
   );
 }

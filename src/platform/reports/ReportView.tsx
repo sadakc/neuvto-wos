@@ -15,11 +15,14 @@
 
 import { useMemo, useState, type ReactNode } from "react";
 import { downloadCsv, reportFilename } from "./csv";
+import { downloadPdf, downloadXlsx } from "./export";
 import { reportHeaders, reportMatrix, type ReportColumn } from "./table";
 
 interface ReportViewProps<T> {
   /** Filename stem: `leave-balances` becomes `leave-balances-2026-08-03.csv`. */
   slug: string;
+  /** The report's name, as the PDF and the Excel sheet carry it (D94). */
+  title?: string;
   columns: ReportColumn<T>[];
   /** Already filtered. What is shown is what is exported. */
   rows: T[];
@@ -35,8 +38,15 @@ interface ReportViewProps<T> {
   today: string | null;
 }
 
+const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+const longDate = (iso: string) => {
+  const [y, m, d] = iso.split("-").map(Number);
+  return `${d} ${MONTHS[m - 1]} ${y}`;
+};
+
 export function ReportView<T>({
   slug,
+  title,
   columns,
   rows,
   rowKey,
@@ -79,6 +89,7 @@ export function ReportView<T>({
   }, [query, rows, fullMatrix]);
 
   const searching = query.trim() !== "";
+  const name = title ?? slug.replace(/-/g, " ").replace(/^./, (c) => c.toUpperCase());
   const canExport = state === "ready" && visibleRows.length > 0 && today !== null;
 
   return (
@@ -115,23 +126,55 @@ export function ReportView<T>({
               : `${rows.length} ${rows.length === 1 ? "row" : "rows"}`
             : " "}
         </p>
-        <button
-          type="button"
-          disabled={!canExport}
-          data-testid={`${slug}-export`}
-          title={
-            today === null && state === "ready"
-              ? "The workspace's date could not be read, so the file cannot be named."
-              : undefined
-          }
-          onClick={() => {
-            if (today === null) return;
-            downloadCsv(reportFilename(slug, today), headers, matrix);
-          }}
-          className="inline-flex min-h-12 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
-        >
-          Export CSV
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            disabled={!canExport}
+            data-testid={`${slug}-export`}
+            title={
+              today === null && state === "ready"
+                ? "The workspace's date could not be read, so the file cannot be named."
+                : undefined
+            }
+            onClick={() => {
+              if (today === null) return;
+              downloadCsv(reportFilename(slug, today), headers, matrix);
+            }}
+            className="inline-flex min-h-12 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            Export CSV
+          </button>
+          {/* D94. The same cells, so the three files never disagree. */}
+          <button
+            type="button"
+            disabled={!canExport}
+            onClick={() => {
+              if (today === null) return;
+              void downloadXlsx(reportFilename(slug, today, "xlsx"), name, headers, matrix);
+            }}
+            className="inline-flex min-h-12 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            Excel
+          </button>
+          <button
+            type="button"
+            disabled={!canExport}
+            onClick={() => {
+              if (today === null) return;
+              const count = `${visibleRows.length} ${visibleRows.length === 1 ? "row" : "rows"}`;
+              void downloadPdf(
+                reportFilename(slug, today, "pdf"),
+                name,
+                `As of ${longDate(today)} · ${count}${searching ? `, searched for “${query.trim()}”` : ""}`,
+                headers,
+                matrix,
+              );
+            }}
+            className="inline-flex min-h-12 items-center justify-center rounded-md border border-border px-4 py-2 text-sm font-medium disabled:opacity-50"
+          >
+            PDF
+          </button>
+        </div>
       </div>
 
       {error && (

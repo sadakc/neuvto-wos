@@ -16,18 +16,22 @@ export {
   getAdminSections,
   getModuleReports,
   getApprovalViews,
+  getNotificationLinks,
+  getHomeQueues,
 } from "./registry";
 
 export {
   ModuleDefinitionSchema,
   type ModuleDefinition,
   type ModuleNavItem,
+  type ModuleSection,
   type ModuleRoute,
   type ModuleDashboardCard,
   type ModuleAdminSection,
   type ModuleReport,
   type ModuleApprovalView,
   type ModuleApprovalViewProps,
+  type ModuleHomeQueue,
 } from "./contract";
 
 export { ModuleLink } from "./ModuleLink";

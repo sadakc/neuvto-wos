@@ -1,4 +1,4 @@
-import { createFileRoute, Outlet, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, Outlet, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getCurrentUser, signOut, type CurrentUser } from "@/platform/auth";
 import {
@@ -9,8 +9,11 @@ import {
   type Organization,
 } from "@/platform/organization";
 import { isAppError } from "@/platform/errors";
-import { AppNav } from "@/components/shared/app-nav";
+import { getEnabledModules, type ModuleDefinition } from "@/platform/modules";
+import { AppFrame, buildShell } from "@/platform/shell";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
+import { NotificationBell } from "@/platform/notifications";
+import { Building2, House } from "lucide-react";
 
 export const Route = createFileRoute("/app")({
   ssr: false,
@@ -28,6 +31,20 @@ function AppShell() {
   // problem and must never be why somebody cannot reach their leave.
   const [org, setOrg] = useState<Organization | null>(null);
   const [logoUrl, setLogoUrl] = useState<string | null>(null);
+
+  // The modules this organisation has granted and switched on (D44). Failing
+  // quietly to none is deliberate: a navigation hiccup must not blank the
+  // shell, and Home still works with every module off.
+  const [enabled, setEnabled] = useState<readonly ModuleDefinition[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    getEnabledModules()
+      .then((ms) => !cancelled && setEnabled(ms))
+      .catch(() => !cancelled && setEnabled([]));
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   // The shell outlives every page inside it, so identity changed under it
   // without it noticing. This is how it hears.
@@ -91,19 +108,23 @@ function AppShell() {
 
   if (state === "loading") {
     return (
-      <div className="flex min-h-screen flex-col">
-        <header className="flex h-14 items-center border-b border-border px-4">
-          <div className="h-4 w-28 animate-pulse rounded bg-muted" />
-        </header>
-        <div className="flex flex-1">
-          <div className="hidden w-56 shrink-0 flex-col gap-2 border-r border-border p-4 md:flex">
-            {[0, 1, 2, 3].map((i) => (
-              <div key={i} className="h-8 animate-pulse rounded bg-muted" />
-            ))}
-          </div>
-          <main className="flex-1 p-6">
+      // The shape of the Core HR shell, so nothing jumps when it arrives.
+      <div className="@container/app flex min-h-dvh bg-background @max-[1000px]/app:flex-col">
+        <div className="flex w-[246px] shrink-0 flex-col gap-2 border-r border-border bg-card p-4 @max-[1000px]/app:w-auto @max-[1000px]/app:border-r-0 @max-[1000px]/app:border-b">
+          <div className="h-8 w-36 animate-pulse rounded-md bg-muted" />
+          {[0, 1, 2].map((i) => (
+            <div
+              key={i}
+              className="h-10 animate-pulse rounded-md bg-muted @max-[1000px]/app:hidden"
+            />
+          ))}
+        </div>
+        <div className="flex-1">
+          <div className="h-14 border-b border-border bg-card" />
+          <div className="h-11 border-b border-border bg-card" />
+          <main className="p-5">
             <div className="h-6 w-48 animate-pulse rounded bg-muted" />
-            <div className="mt-4 h-24 max-w-md animate-pulse rounded-lg bg-muted" />
+            <div className="mt-4 h-24 max-w-md animate-pulse rounded-xl bg-muted" />
           </main>
         </div>
       </div>
@@ -114,7 +135,9 @@ function AppShell() {
     return (
       <main className="flex min-h-screen items-center justify-center px-6">
         <div className="max-w-sm text-center">
-          <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+          <h1 className="text-page-title font-semibold tracking-page-title">
+            This didn&apos;t load
+          </h1>
           <p className="mt-2 text-sm text-muted-foreground">{message}</p>
           <button
             onClick={() => window.location.reload()}
@@ -127,46 +150,70 @@ function AppShell() {
     );
   }
 
+  const name = companyName(org) || user?.organizationName || "";
+  const initials = (user?.fullName || user?.email || "?")
+    .split(/[\s@.]+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]!.toUpperCase())
+    .join("");
+
   return (
-    <div className="flex min-h-screen flex-col">
-      <header className="flex h-14 items-center justify-between gap-4 border-b border-border px-4">
-        <div className="flex min-w-0 items-center gap-3">
-          {logoUrl && (
+    <AppFrame
+      modules={buildShell(user, enabled, { home: House, organisation: Building2 })}
+      brand={
+        // D45. The workspace looks like the customer's: their logo and name,
+        // with ours underneath, small.
+        <div className="flex items-center gap-2.5">
+          {logoUrl ? (
             <img
               src={logoUrl}
               alt=""
               aria-hidden
-              className="h-8 w-8 shrink-0 rounded object-contain"
+              className="size-[30px] shrink-0 rounded-md object-contain"
             />
+          ) : (
+            <span
+              aria-hidden
+              className="grid size-[30px] shrink-0 place-items-center rounded-md bg-primary text-table-cell font-bold text-primary-foreground"
+            >
+              {name.slice(0, 2).toUpperCase()}
+            </span>
           )}
           <div className="min-w-0">
-            <p className="truncate font-display text-sm font-semibold">
-              {companyName(org) || user?.organizationName}
+            <p className="truncate text-sm leading-tight font-semibold tracking-card-title">
+              {name}
             </p>
-            <p className="truncate text-xs text-muted-foreground">{user?.email}</p>
+            <p className="truncate font-mono text-caption text-muted-foreground">neuvto</p>
           </div>
         </div>
-        <div className="flex shrink-0 items-center gap-1">
+      }
+      actions={
+        <>
+          {/* D111: what has happened for you, newest first. */}
+          <NotificationBell />
           <ThemeToggle />
           <button
             onClick={async () => {
               await signOut();
               window.location.href = "/auth";
             }}
-            className="inline-flex h-12 shrink-0 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-secondary hover:text-foreground"
+            className="inline-flex h-10 shrink-0 items-center rounded-md px-3 text-sm text-muted-foreground hover:bg-muted hover:text-foreground"
           >
             Sign out
           </button>
-        </div>
-      </header>
-
-      <div className="flex flex-1">
-        <AppNav user={user} />
-        {/* pb-20 clears the mobile tab bar. */}
-        <main className="min-w-0 flex-1 p-4 pb-20 md:p-6 md:pb-6">
-          <Outlet />
-        </main>
-      </div>
-    </div>
+          <Link
+            to="/app/security"
+            title={`${user?.email ?? ""} · Sign-in and security`}
+            aria-label={`Signed in as ${user?.email ?? ""}. Sign-in and security`}
+            className="grid size-[30px] shrink-0 place-items-center rounded-full border border-info-line bg-info-muted text-caption font-semibold text-info hover:border-info"
+          >
+            {initials}
+          </Link>
+        </>
+      }
+    >
+      <Outlet />
+    </AppFrame>
   );
 }

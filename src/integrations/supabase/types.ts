@@ -131,26 +131,189 @@ export type Database = {
           },
         ]
       }
+      approval_delegations: {
+        Row: {
+          cancelled_at: string | null
+          created_at: string
+          created_by: string | null
+          delegate_id: string
+          delegator_id: string
+          from_date: string
+          id: string
+          module_key: string | null
+          organization_id: string
+          reason: string | null
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delegate_id: string
+          delegator_id: string
+          from_date: string
+          id?: string
+          module_key?: string | null
+          organization_id: string
+          reason?: string | null
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          cancelled_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          delegate_id?: string
+          delegator_id?: string
+          from_date?: string
+          id?: string
+          module_key?: string | null
+          organization_id?: string
+          reason?: string | null
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_delegations_delegate_id_fkey"
+            columns: ["delegate_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_delegations_delegator_id_fkey"
+            columns: ["delegator_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_delegations_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "approval_delegations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       approval_entity_labels: {
         Row: {
           created_at: string
           entity_type: string
           label: string
+          module_key: string | null
           updated_at: string
         }
         Insert: {
           created_at?: string
           entity_type: string
           label: string
+          module_key?: string | null
           updated_at?: string
         }
         Update: {
           created_at?: string
           entity_type?: string
           label?: string
+          module_key?: string | null
           updated_at?: string
         }
-        Relationships: []
+        Relationships: [
+          {
+            foreignKeyName: "approval_entity_labels_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+        ]
+      }
+      approval_escalations: {
+        Row: {
+          approval_request_id: string
+          approval_step_id: string
+          created_at: string
+          escalated_at: string
+          from_approver_id: string
+          id: string
+          level: number
+          organization_id: string
+          to_approver_id: string | null
+          waited_days: number
+        }
+        Insert: {
+          approval_request_id: string
+          approval_step_id: string
+          created_at?: string
+          escalated_at?: string
+          from_approver_id: string
+          id?: string
+          level: number
+          organization_id: string
+          to_approver_id?: string | null
+          waited_days: number
+        }
+        Update: {
+          approval_request_id?: string
+          approval_step_id?: string
+          created_at?: string
+          escalated_at?: string
+          from_approver_id?: string
+          id?: string
+          level?: number
+          organization_id?: string
+          to_approver_id?: string | null
+          waited_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "approval_escalations_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_approval_step_id_fkey"
+            columns: ["approval_step_id"]
+            isOneToOne: false
+            referencedRelation: "approval_steps"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_from_approver_id_fkey"
+            columns: ["from_approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_escalations_to_approver_id_fkey"
+            columns: ["to_approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       approval_requests: {
         Row: {
@@ -229,11 +392,13 @@ export type Database = {
           created_at: string
           created_by: string | null
           decided_at: string | null
+          decided_by: string | null
           decision: Database["public"]["Enums"]["approval_decision"]
           deleted_at: string | null
           id: string
           level: number
           organization_id: string
+          reason_code: string | null
           updated_at: string
           updated_by: string | null
         }
@@ -244,11 +409,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           decided_at?: string | null
+          decided_by?: string | null
           decision?: Database["public"]["Enums"]["approval_decision"]
           deleted_at?: string | null
           id?: string
           level: number
           organization_id: string
+          reason_code?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -259,11 +426,13 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           decided_at?: string | null
+          decided_by?: string | null
           decision?: Database["public"]["Enums"]["approval_decision"]
           deleted_at?: string | null
           id?: string
           level?: number
           organization_id?: string
+          reason_code?: string | null
           updated_at?: string
           updated_by?: string | null
         }
@@ -278,6 +447,13 @@ export type Database = {
           {
             foreignKeyName: "approval_steps_approver_id_fkey"
             columns: ["approver_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "approval_steps_decided_by_fkey"
+            columns: ["decided_by"]
             isOneToOne: false
             referencedRelation: "profiles"
             referencedColumns: ["id"]
@@ -395,6 +571,162 @@ export type Database = {
           },
         ]
       }
+      comp_off_claim_days: {
+        Row: {
+          claim_id: string
+          created_at: string
+          days: number
+          employee_id: string
+          id: string
+          live: boolean
+          note: string | null
+          organization_id: string
+          worked_on: string
+        }
+        Insert: {
+          claim_id: string
+          created_at?: string
+          days: number
+          employee_id: string
+          id?: string
+          live?: boolean
+          note?: string | null
+          organization_id: string
+          worked_on: string
+        }
+        Update: {
+          claim_id?: string
+          created_at?: string
+          days?: number
+          employee_id?: string
+          id?: string
+          live?: boolean
+          note?: string | null
+          organization_id?: string
+          worked_on?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comp_off_claim_days_claim_id_fkey"
+            columns: ["claim_id"]
+            isOneToOne: false
+            referencedRelation: "comp_off_claims"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claim_days_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claim_days_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      comp_off_claims: {
+        Row: {
+          approval_request_id: string | null
+          created_at: string
+          created_by: string | null
+          credited_at: string | null
+          credited_fy: string | null
+          decided_at: string | null
+          deleted_at: string | null
+          employee_id: string
+          expired_at: string | null
+          expired_days: number
+          expires_on: string | null
+          id: string
+          leave_type_id: string
+          organization_id: string
+          proof_path: string | null
+          reason: string
+          status: string
+          total_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          approval_request_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credited_at?: string | null
+          credited_fy?: string | null
+          decided_at?: string | null
+          deleted_at?: string | null
+          employee_id: string
+          expired_at?: string | null
+          expired_days?: number
+          expires_on?: string | null
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          proof_path?: string | null
+          reason: string
+          status?: string
+          total_days: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          approval_request_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          credited_at?: string | null
+          credited_fy?: string | null
+          decided_at?: string | null
+          deleted_at?: string | null
+          employee_id?: string
+          expired_at?: string | null
+          expired_days?: number
+          expires_on?: string | null
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          proof_path?: string | null
+          reason?: string
+          status?: string
+          total_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "comp_off_claims_approval_request_id_fkey"
+            columns: ["approval_request_id"]
+            isOneToOne: false
+            referencedRelation: "approval_requests"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claims_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claims_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "comp_off_claims_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       demo_requests: {
         Row: {
           company: string | null
@@ -472,6 +804,1292 @@ export type Database = {
             columns: ["parent_department_id"]
             isOneToOne: false
             referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      deployment_units: {
+        Row: {
+          attendance_capture_mode: string | null
+          client_name: string | null
+          created_at: string
+          created_by: string | null
+          default_shift_id: string | null
+          deleted_at: string | null
+          id: string
+          is_billable: boolean
+          location: string | null
+          name: string
+          organization_id: string
+          requires_police_verification: boolean
+          state: string | null
+          status: string
+          unit_type: string
+          updated_at: string
+          updated_by: string | null
+          working_calendar_id: string | null
+        }
+        Insert: {
+          attendance_capture_mode?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_shift_id?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          location?: string | null
+          name: string
+          organization_id: string
+          requires_police_verification?: boolean
+          state?: string | null
+          status?: string
+          unit_type: string
+          updated_at?: string
+          updated_by?: string | null
+          working_calendar_id?: string | null
+        }
+        Update: {
+          attendance_capture_mode?: string | null
+          client_name?: string | null
+          created_at?: string
+          created_by?: string | null
+          default_shift_id?: string | null
+          deleted_at?: string | null
+          id?: string
+          is_billable?: boolean
+          location?: string | null
+          name?: string
+          organization_id?: string
+          requires_police_verification?: boolean
+          state?: string | null
+          status?: string
+          unit_type?: string
+          updated_at?: string
+          updated_by?: string | null
+          working_calendar_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "deployment_units_default_shift_id_fkey"
+            columns: ["default_shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deployment_units_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "deployment_units_working_calendar_id_fkey"
+            columns: ["working_calendar_id"]
+            isOneToOne: false
+            referencedRelation: "working_calendars"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      designations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          grade: string | null
+          id: string
+          name: string
+          organization_id: string
+          rank: number | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          grade?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          rank?: number | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          grade?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          rank?: number | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "designations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_addresses: {
+        Row: {
+          address_type: string
+          city: string
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          district: string | null
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          line: string
+          nearest_police_station: string | null
+          organization_id: string
+          pincode: string
+          state: string
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          address_type: string
+          city: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          district?: string | null
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          line: string
+          nearest_police_station?: string | null
+          organization_id: string
+          pincode: string
+          state: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          address_type?: string
+          city?: string
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          district?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          line?: string
+          nearest_police_station?: string | null
+          organization_id?: string
+          pincode?: string
+          state?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_addresses_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_addresses_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_bank: {
+        Row: {
+          account_cipher: string | null
+          account_holder: string | null
+          account_last4: string | null
+          bank_name: string | null
+          branch: string | null
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          ifsc: string | null
+          organization_id: string
+          penny_drop_status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          account_cipher?: string | null
+          account_holder?: string | null
+          account_last4?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          ifsc?: string | null
+          organization_id: string
+          penny_drop_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          account_cipher?: string | null
+          account_holder?: string | null
+          account_last4?: string | null
+          bank_name?: string | null
+          branch?: string | null
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          ifsc?: string | null
+          organization_id?: string
+          penny_drop_status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_bank_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_bank_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_card_views: {
+        Row: {
+          employee_id: string
+          id: string
+          organization_id: string
+          viewed_at: string
+          viewer_id: string
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          organization_id: string
+          viewed_at?: string
+          viewer_id: string
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          viewed_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_card_views_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_card_views_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_card_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_change_requests: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          details: string
+          employee_id: string
+          id: string
+          organization_id: string
+          requested_by: string | null
+          resolution_note: string | null
+          resolved_at: string | null
+          resolved_by: string | null
+          section: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          details: string
+          employee_id: string
+          id?: string
+          organization_id: string
+          requested_by?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          details?: string
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          requested_by?: string | null
+          resolution_note?: string | null
+          resolved_at?: string | null
+          resolved_by?: string | null
+          section?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_change_requests_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_change_requests_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_deployments: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          deployment_order_ref: string
+          deployment_unit_id: string
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          expected_duration: string | null
+          id: string
+          organization_id: string
+          reason: string | null
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deployment_order_ref: string
+          deployment_unit_id: string
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          expected_duration?: string | null
+          id?: string
+          organization_id: string
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          deployment_order_ref?: string
+          deployment_unit_id?: string
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          expected_duration?: string | null
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_deployments_deployment_unit_id_fkey"
+            columns: ["deployment_unit_id"]
+            isOneToOne: false
+            referencedRelation: "deployment_units"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deployments_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_deployments_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_document_views: {
+        Row: {
+          document_id: string
+          file_path: string
+          id: string
+          viewed_at: string
+          viewer_id: string
+        }
+        Insert: {
+          document_id: string
+          file_path: string
+          id?: string
+          viewed_at?: string
+          viewer_id: string
+        }
+        Update: {
+          document_id?: string
+          file_path?: string
+          id?: string
+          viewed_at?: string
+          viewer_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_document_views_document_id_fkey"
+            columns: ["document_id"]
+            isOneToOne: false
+            referencedRelation: "employee_documents"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_document_views_viewer_id_fkey"
+            columns: ["viewer_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_documents: {
+        Row: {
+          address_id: string | null
+          created_at: string
+          created_by: string | null
+          doc_type: string
+          employee_id: string
+          expires_on: string | null
+          file_name: string
+          file_path: string
+          id: string
+          mime_type: string
+          organization_id: string
+          removed_at: string | null
+          removed_by: string | null
+          removed_reason: string | null
+          replaced_at: string | null
+          size_bytes: number
+          title: string | null
+          updated_at: string
+          updated_by: string | null
+          uploaded_at: string
+          uploaded_by: string | null
+          verified_at: string | null
+          verified_by: string | null
+        }
+        Insert: {
+          address_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          doc_type: string
+          employee_id: string
+          expires_on?: string | null
+          file_name: string
+          file_path: string
+          id?: string
+          mime_type: string
+          organization_id: string
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
+          replaced_at?: string | null
+          size_bytes: number
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Update: {
+          address_id?: string | null
+          created_at?: string
+          created_by?: string | null
+          doc_type?: string
+          employee_id?: string
+          expires_on?: string | null
+          file_name?: string
+          file_path?: string
+          id?: string
+          mime_type?: string
+          organization_id?: string
+          removed_at?: string | null
+          removed_by?: string | null
+          removed_reason?: string | null
+          replaced_at?: string | null
+          size_bytes?: number
+          title?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          uploaded_at?: string
+          uploaded_by?: string | null
+          verified_at?: string | null
+          verified_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_documents_address_id_fkey"
+            columns: ["address_id"]
+            isOneToOne: false
+            referencedRelation: "employee_addresses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_removed_by_fkey"
+            columns: ["removed_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_uploaded_by_fkey"
+            columns: ["uploaded_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_documents_verified_by_fkey"
+            columns: ["verified_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_field_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_can_update: boolean | null
+          field_key: string
+          organization_id: string
+          required: boolean | null
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_can_update?: boolean | null
+          field_key: string
+          organization_id: string
+          required?: boolean | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_can_update?: boolean | null
+          field_key?: string
+          organization_id?: string
+          required?: boolean | null
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_field_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_onboarding_items: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          due_within_days: number
+          item_key: string
+          mandatory: boolean
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          due_within_days: number
+          item_key: string
+          mandatory: boolean
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          due_within_days?: number
+          item_key?: string
+          mandatory?: boolean
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_items_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_onboarding_reminders: {
+        Row: {
+          detail: Json
+          id: string
+          kind: string
+          organization_id: string
+          people: number
+          sent_at: string
+        }
+        Insert: {
+          detail: Json
+          id?: string
+          kind: string
+          organization_id: string
+          people: number
+          sent_at?: string
+        }
+        Update: {
+          detail?: Json
+          id?: string
+          kind?: string
+          organization_id?: string
+          people?: number
+          sent_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_reminders_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_onboarding_settings: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          escalate_after_days: number
+          organization_id: string
+          remind_every_days: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          escalate_after_days?: number
+          organization_id: string
+          remind_every_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          escalate_after_days?: number
+          organization_id?: string
+          remind_every_days?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_onboarding_settings_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: true
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_restricted: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          employee_id: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+          values_cipher: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          employee_id: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+          values_cipher: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          employee_id?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          values_cipher?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_restricted_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_restricted_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_shift_overrides: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          organization_id: string
+          reason: string | null
+          shift_id: string
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          organization_id: string
+          reason?: string | null
+          shift_id: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          reason?: string | null
+          shift_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_shift_overrides_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_shift_overrides_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_shift_overrides_shift_id_fkey"
+            columns: ["shift_id"]
+            isOneToOne: false
+            referencedRelation: "shifts"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employee_statutory: {
+        Row: {
+          aadhaar_cipher: string | null
+          aadhaar_index: string | null
+          aadhaar_last4: string | null
+          created_at: string
+          created_by: string | null
+          education_check: string
+          employee_id: string
+          epf_cipher: string | null
+          epf_last4: string | null
+          esic_cipher: string | null
+          esic_last4: string | null
+          identity_document_type: string | null
+          licence_cipher: string | null
+          licence_last4: string | null
+          old_esic_cipher: string | null
+          old_esic_last4: string | null
+          old_uan_cipher: string | null
+          old_uan_last4: string | null
+          organization_id: string
+          pan_cipher: string | null
+          pan_index: string | null
+          pan_last4: string | null
+          police_verification: string
+          police_verified_on: string | null
+          previous_employer_check: string
+          reverification_due: string | null
+          uan_cipher: string | null
+          uan_last4: string | null
+          updated_at: string
+          updated_by: string | null
+          verified_on: string | null
+        }
+        Insert: {
+          aadhaar_cipher?: string | null
+          aadhaar_index?: string | null
+          aadhaar_last4?: string | null
+          created_at?: string
+          created_by?: string | null
+          education_check?: string
+          employee_id: string
+          epf_cipher?: string | null
+          epf_last4?: string | null
+          esic_cipher?: string | null
+          esic_last4?: string | null
+          identity_document_type?: string | null
+          licence_cipher?: string | null
+          licence_last4?: string | null
+          old_esic_cipher?: string | null
+          old_esic_last4?: string | null
+          old_uan_cipher?: string | null
+          old_uan_last4?: string | null
+          organization_id: string
+          pan_cipher?: string | null
+          pan_index?: string | null
+          pan_last4?: string | null
+          police_verification?: string
+          police_verified_on?: string | null
+          previous_employer_check?: string
+          reverification_due?: string | null
+          uan_cipher?: string | null
+          uan_last4?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_on?: string | null
+        }
+        Update: {
+          aadhaar_cipher?: string | null
+          aadhaar_index?: string | null
+          aadhaar_last4?: string | null
+          created_at?: string
+          created_by?: string | null
+          education_check?: string
+          employee_id?: string
+          epf_cipher?: string | null
+          epf_last4?: string | null
+          esic_cipher?: string | null
+          esic_last4?: string | null
+          identity_document_type?: string | null
+          licence_cipher?: string | null
+          licence_last4?: string | null
+          old_esic_cipher?: string | null
+          old_esic_last4?: string | null
+          old_uan_cipher?: string | null
+          old_uan_last4?: string | null
+          organization_id?: string
+          pan_cipher?: string | null
+          pan_index?: string | null
+          pan_last4?: string | null
+          police_verification?: string
+          police_verified_on?: string | null
+          previous_employer_check?: string
+          reverification_due?: string | null
+          uan_cipher?: string | null
+          uan_last4?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          verified_on?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employee_statutory_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: true
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employee_statutory_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      employees: {
+        Row: {
+          alternate_mobile: string | null
+          blood_group: string | null
+          chest_cm: number | null
+          confirmed_on: string | null
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          deleted_at: string | null
+          designation_id: string | null
+          draft_department_id: string | null
+          draft_email: string | null
+          draft_full_name: string | null
+          draft_joined_date: string | null
+          draft_manager_id: string | null
+          draft_phone: string | null
+          education_qualification: string | null
+          emergency_contact_name: string | null
+          emergency_contact_phone: string | null
+          emergency_contact_relation: string | null
+          employee_code: string | null
+          employment_type: string | null
+          height_cm: number | null
+          id: string
+          invitation_id: string | null
+          marital_status: string | null
+          name_as_per_id: string | null
+          nationality: string | null
+          native_state: string | null
+          nearest_police_station: string | null
+          organization_id: string
+          personal_email: string | null
+          prior_experience_months: number | null
+          profile_id: string | null
+          re_joining_date: string | null
+          reason_for_leaving_last_org: string | null
+          sex: string | null
+          status: string
+          termination_date: string | null
+          termination_reason: string | null
+          updated_at: string
+          updated_by: string | null
+          weight_kg: number | null
+        }
+        Insert: {
+          alternate_mobile?: string | null
+          blood_group?: string | null
+          chest_cm?: number | null
+          confirmed_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          designation_id?: string | null
+          draft_department_id?: string | null
+          draft_email?: string | null
+          draft_full_name?: string | null
+          draft_joined_date?: string | null
+          draft_manager_id?: string | null
+          draft_phone?: string | null
+          education_qualification?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
+          employee_code?: string | null
+          employment_type?: string | null
+          height_cm?: number | null
+          id?: string
+          invitation_id?: string | null
+          marital_status?: string | null
+          name_as_per_id?: string | null
+          nationality?: string | null
+          native_state?: string | null
+          nearest_police_station?: string | null
+          organization_id: string
+          personal_email?: string | null
+          prior_experience_months?: number | null
+          profile_id?: string | null
+          re_joining_date?: string | null
+          reason_for_leaving_last_org?: string | null
+          sex?: string | null
+          status?: string
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Update: {
+          alternate_mobile?: string | null
+          blood_group?: string | null
+          chest_cm?: number | null
+          confirmed_on?: string | null
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          deleted_at?: string | null
+          designation_id?: string | null
+          draft_department_id?: string | null
+          draft_email?: string | null
+          draft_full_name?: string | null
+          draft_joined_date?: string | null
+          draft_manager_id?: string | null
+          draft_phone?: string | null
+          education_qualification?: string | null
+          emergency_contact_name?: string | null
+          emergency_contact_phone?: string | null
+          emergency_contact_relation?: string | null
+          employee_code?: string | null
+          employment_type?: string | null
+          height_cm?: number | null
+          id?: string
+          invitation_id?: string | null
+          marital_status?: string | null
+          name_as_per_id?: string | null
+          nationality?: string | null
+          native_state?: string | null
+          nearest_police_station?: string | null
+          organization_id?: string
+          personal_email?: string | null
+          prior_experience_months?: number | null
+          profile_id?: string | null
+          re_joining_date?: string | null
+          reason_for_leaving_last_org?: string | null
+          sex?: string | null
+          status?: string
+          termination_date?: string | null
+          termination_reason?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          weight_kg?: number | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "employees_designation_id_fkey"
+            columns: ["designation_id"]
+            isOneToOne: false
+            referencedRelation: "designations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_draft_department_id_fkey"
+            columns: ["draft_department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_draft_manager_id_fkey"
+            columns: ["draft_manager_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_invitation_id_fkey"
+            columns: ["invitation_id"]
+            isOneToOne: false
+            referencedRelation: "invitations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "employees_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      family_members: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          employee_id: string
+          id: string
+          is_dependent: boolean
+          name: string
+          organization_id: string
+          relation: string
+          sort_order: number
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          employee_id: string
+          id?: string
+          is_dependent?: boolean
+          name: string
+          organization_id: string
+          relation: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          employee_id?: string
+          id?: string
+          is_dependent?: boolean
+          name?: string
+          organization_id?: string
+          relation?: string
+          sort_order?: number
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "family_members_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "family_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      holiday_calendars: {
+        Row: {
+          calendar_id: string
+          holiday_id: string
+          organization_id: string
+        }
+        Insert: {
+          calendar_id: string
+          holiday_id: string
+          organization_id: string
+        }
+        Update: {
+          calendar_id?: string
+          holiday_id?: string
+          organization_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "holiday_calendars_calendar_id_fkey"
+            columns: ["calendar_id"]
+            isOneToOne: false
+            referencedRelation: "working_calendars"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_calendars_holiday_id_fkey"
+            columns: ["holiday_id"]
+            isOneToOne: false
+            referencedRelation: "holidays"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "holiday_calendars_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
             referencedColumns: ["id"]
           },
         ]
@@ -683,6 +2301,248 @@ export type Database = {
           },
         ]
       }
+      leave_blackouts: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          from_date: string
+          id: string
+          name: string
+          organization_id: string
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          from_date: string
+          id?: string
+          name: string
+          organization_id: string
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          from_date?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_blackouts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_carry_lines: {
+        Row: {
+          adjusted_days: number | null
+          available_days: number
+          employee_id: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          proposed_days: number
+          review_id: string
+        }
+        Insert: {
+          adjusted_days?: number | null
+          available_days: number
+          employee_id: string
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          proposed_days: number
+          review_id: string
+        }
+        Update: {
+          adjusted_days?: number | null
+          available_days?: number
+          employee_id?: string
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          proposed_days?: number
+          review_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_carry_lines_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_lines_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_lines_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_lines_review_id_fkey"
+            columns: ["review_id"]
+            isOneToOne: false
+            referencedRelation: "leave_carry_reviews"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_carry_reviews: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          from_fy: string
+          id: string
+          locked_at: string | null
+          locked_by: string | null
+          organization_id: string
+          prepared_at: string
+          status: string
+          to_fy: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          from_fy: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          organization_id: string
+          prepared_at?: string
+          status?: string
+          to_fy: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          from_fy?: string
+          id?: string
+          locked_at?: string | null
+          locked_by?: string | null
+          organization_id?: string
+          prepared_at?: string
+          status?: string
+          to_fy?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_carry_reviews_locked_by_fkey"
+            columns: ["locked_by"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_carry_reviews_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      leave_opening_staged: {
+        Row: {
+          applied_at: string | null
+          carryforward_days: number
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          employee_record_id: string
+          fy_label: string
+          id: string
+          leave_type_id: string
+          organization_id: string
+          problem: string | null
+          updated_at: string
+          updated_by: string | null
+          used_days: number
+        }
+        Insert: {
+          applied_at?: string | null
+          carryforward_days?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          employee_record_id: string
+          fy_label: string
+          id?: string
+          leave_type_id: string
+          organization_id: string
+          problem?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          used_days?: number
+        }
+        Update: {
+          applied_at?: string | null
+          carryforward_days?: number
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          employee_record_id?: string
+          fy_label?: string
+          id?: string
+          leave_type_id?: string
+          organization_id?: string
+          problem?: string | null
+          updated_at?: string
+          updated_by?: string | null
+          used_days?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "leave_opening_staged_employee_record_id_fkey"
+            columns: ["employee_record_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_opening_staged_leave_type_id_fkey"
+            columns: ["leave_type_id"]
+            isOneToOne: false
+            referencedRelation: "leave_types"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "leave_opening_staged_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       leave_requests: {
         Row: {
           approval_request_id: string | null
@@ -777,12 +2637,18 @@ export type Database = {
       }
       leave_types: {
         Row: {
+          accrual: string
           approval_required: boolean
+          carry_forward_max: number | null
           created_at: string
           created_by: string | null
           deleted_at: string | null
           description: string | null
+          earned_claim_within_days: number | null
+          earned_expires_after_days: number | null
+          earned_proof_required: boolean
           id: string
+          kind: string
           max_days_per_year: number
           max_per_request: number | null
           min_notice_days: number | null
@@ -793,12 +2659,18 @@ export type Database = {
           updated_by: string | null
         }
         Insert: {
+          accrual?: string
           approval_required?: boolean
+          carry_forward_max?: number | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           description?: string | null
+          earned_claim_within_days?: number | null
+          earned_expires_after_days?: number | null
+          earned_proof_required?: boolean
           id?: string
+          kind?: string
           max_days_per_year?: number
           max_per_request?: number | null
           min_notice_days?: number | null
@@ -809,12 +2681,18 @@ export type Database = {
           updated_by?: string | null
         }
         Update: {
+          accrual?: string
           approval_required?: boolean
+          carry_forward_max?: number | null
           created_at?: string
           created_by?: string | null
           deleted_at?: string | null
           description?: string | null
+          earned_claim_within_days?: number | null
+          earned_expires_after_days?: number | null
+          earned_proof_required?: boolean
           id?: string
+          kind?: string
           max_days_per_year?: number
           max_per_request?: number | null
           min_notice_days?: number | null
@@ -827,6 +2705,57 @@ export type Database = {
         Relationships: [
           {
             foreignKeyName: "leave_types_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      module_admins: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          id: string
+          module_key: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          module_key: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          id?: string
+          module_key?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "module_admins_module_key_fkey"
+            columns: ["module_key"]
+            isOneToOne: false
+            referencedRelation: "modules"
+            referencedColumns: ["key"]
+          },
+          {
+            foreignKeyName: "module_admins_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -901,6 +2830,231 @@ export type Database = {
           updated_at?: string
         }
         Relationships: []
+      }
+      nomination_versions: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          effective_from: string
+          effective_to: string | null
+          employee_id: string
+          id: string
+          organization_id: string
+          scheme: string
+          updated_at: string
+          updated_by: string | null
+          validity: unknown
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          effective_from: string
+          effective_to?: string | null
+          employee_id: string
+          id?: string
+          organization_id: string
+          scheme?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          effective_from?: string
+          effective_to?: string | null
+          employee_id?: string
+          id?: string
+          organization_id?: string
+          scheme?: string
+          updated_at?: string
+          updated_by?: string | null
+          validity?: unknown
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nomination_versions_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nomination_versions_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      nominees: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          date_of_birth: string | null
+          id: string
+          name: string
+          organization_id: string
+          relation: string
+          share_percent: number
+          updated_at: string
+          updated_by: string | null
+          version_id: string
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          id?: string
+          name: string
+          organization_id: string
+          relation: string
+          share_percent: number
+          updated_at?: string
+          updated_by?: string | null
+          version_id: string
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          date_of_birth?: string | null
+          id?: string
+          name?: string
+          organization_id?: string
+          relation?: string
+          share_percent?: number
+          updated_at?: string
+          updated_by?: string | null
+          version_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "nominees_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "nominees_version_id_fkey"
+            columns: ["version_id"]
+            isOneToOne: false
+            referencedRelation: "nomination_versions"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_custom_recipients: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          department_id: string | null
+          entity_type: string
+          event_key: string
+          id: string
+          organization_id: string
+          profile_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          entity_type: string
+          event_key: string
+          id?: string
+          organization_id: string
+          profile_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          department_id?: string | null
+          entity_type?: string
+          event_key?: string
+          id?: string
+          organization_id?: string
+          profile_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_custom_recipients_department_id_fkey"
+            columns: ["department_id"]
+            isOneToOne: false
+            referencedRelation: "departments"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_custom_recipients_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "notification_custom_recipients_profile_id_fkey"
+            columns: ["profile_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      notification_rules: {
+        Row: {
+          audience: string
+          created_at: string
+          created_by: string | null
+          enabled: boolean
+          entity_type: string
+          event_key: string
+          id: string
+          organization_id: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          audience: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          entity_type: string
+          event_key: string
+          id?: string
+          organization_id: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          audience?: string
+          created_at?: string
+          created_by?: string | null
+          enabled?: boolean
+          entity_type?: string
+          event_key?: string
+          id?: string
+          organization_id?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "notification_rules_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       notification_templates: {
         Row: {
@@ -1271,6 +3425,66 @@ export type Database = {
           },
         ]
       }
+      previous_organisations: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          designation: string | null
+          employee_id: string
+          from_date: string
+          id: string
+          organisation_name: string
+          organization_id: string
+          reason_for_leaving: string | null
+          to_date: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          employee_id: string
+          from_date: string
+          id?: string
+          organisation_name: string
+          organization_id: string
+          reason_for_leaving?: string | null
+          to_date: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          designation?: string | null
+          employee_id?: string
+          from_date?: string
+          id?: string
+          organisation_name?: string
+          organization_id?: string
+          reason_for_leaving?: string | null
+          to_date?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "previous_organisations_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "previous_organisations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       profiles: {
         Row: {
           created_at: string
@@ -1340,6 +3554,54 @@ export type Database = {
           },
           {
             foreignKeyName: "profiles_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      record_withdrawals: {
+        Row: {
+          employee_id: string
+          id: string
+          kind: string
+          organization_id: string
+          reason: string
+          record: Json
+          withdrawn_at: string
+          withdrawn_by: string | null
+        }
+        Insert: {
+          employee_id: string
+          id?: string
+          kind: string
+          organization_id: string
+          reason: string
+          record: Json
+          withdrawn_at?: string
+          withdrawn_by?: string | null
+        }
+        Update: {
+          employee_id?: string
+          id?: string
+          kind?: string
+          organization_id?: string
+          reason?: string
+          record?: Json
+          withdrawn_at?: string
+          withdrawn_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "record_withdrawals_employee_id_fkey"
+            columns: ["employee_id"]
+            isOneToOne: false
+            referencedRelation: "employees"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "record_withdrawals_organization_id_fkey"
             columns: ["organization_id"]
             isOneToOne: false
             referencedRelation: "organizations"
@@ -1437,6 +3699,97 @@ export type Database = {
           },
         ]
       }
+      restricted_reads: {
+        Row: {
+          employee_id: string
+          fields: string[]
+          id: string
+          organization_id: string
+          read_at: string
+          reader_id: string
+          reader_name: string | null
+          reason: string | null
+        }
+        Insert: {
+          employee_id: string
+          fields: string[]
+          id?: string
+          organization_id: string
+          read_at?: string
+          reader_id: string
+          reader_name?: string | null
+          reason?: string | null
+        }
+        Update: {
+          employee_id?: string
+          fields?: string[]
+          id?: string
+          organization_id?: string
+          read_at?: string
+          reader_id?: string
+          reader_name?: string | null
+          reason?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "restricted_reads_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      shifts: {
+        Row: {
+          break_minutes: number
+          created_at: string
+          created_by: string | null
+          end_time: string
+          id: string
+          name: string
+          organization_id: string
+          start_time: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          break_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          end_time: string
+          id?: string
+          name: string
+          organization_id: string
+          start_time: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          break_minutes?: number
+          created_at?: string
+          created_by?: string | null
+          end_time?: string
+          id?: string
+          name?: string
+          organization_id?: string
+          start_time?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "shifts_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       user_roles: {
         Row: {
           created_at: string
@@ -1481,11 +3834,63 @@ export type Database = {
           },
         ]
       }
+      working_calendars: {
+        Row: {
+          created_at: string
+          created_by: string | null
+          id: string
+          is_default: boolean
+          name: string
+          organization_id: string
+          status: string
+          updated_at: string
+          updated_by: string | null
+          weekly_off: number[]
+        }
+        Insert: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name: string
+          organization_id: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekly_off?: number[]
+        }
+        Update: {
+          created_at?: string
+          created_by?: string | null
+          id?: string
+          is_default?: boolean
+          name?: string
+          organization_id?: string
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+          weekly_off?: number[]
+        }
+        Relationships: [
+          {
+            foreignKeyName: "working_calendars_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
+      aadhaar_is_valid: { Args: { _n: string }; Returns: boolean }
+      active_super_admin_count: {
+        Args: { _except?: string; _org: string }
+        Returns: number
+      }
       admin_set_department: {
         Args: { _department_id: string; _employee_id: string }
         Returns: undefined
@@ -1503,11 +3908,68 @@ export type Database = {
         Args: {
           _comments?: string
           _decision: Database["public"]["Enums"]["approval_decision"]
+          _reason_code?: string
           _request_id: string
         }
         Returns: Database["public"]["Enums"]["approval_status"]
       }
+      approval_decide_many: {
+        Args: { _request_ids: string[] }
+        Returns: {
+          approval_request_id: string
+          error: string
+          status: string
+        }[]
+      }
+      approval_delegate: {
+        Args: {
+          _delegate_id: string
+          _delegator_id?: string
+          _from_date: string
+          _module_key?: string
+          _reason?: string
+          _to_date: string
+        }
+        Returns: string
+      }
+      approval_delegate_candidates: {
+        Args: never
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
+      approval_delegation_active: {
+        Args: {
+          _approver: string
+          _delegate: string
+          _entity_type: string
+          _org: string
+        }
+        Returns: boolean
+      }
+      approval_delegation_cancel: { Args: { _id: string }; Returns: undefined }
       approval_entity_label: { Args: { _entity_type: string }; Returns: string }
+      approval_escalate_due: { Args: never; Returns: number }
+      approval_escalation_target: {
+        Args: { _step_id: string }
+        Returns: string
+      }
+      approval_my_delegations: {
+        Args: never
+        Returns: {
+          delegate_name: string
+          delegator_name: string
+          direction: string
+          from_date: string
+          id: string
+          in_force: boolean
+          module_key: string
+          module_name: string
+          reason: string
+          to_date: string
+        }[]
+      }
       approval_queue: {
         Args: never
         Returns: {
@@ -1516,11 +3978,20 @@ export type Database = {
           created_at: string
           entity_id: string
           entity_type: string
+          escalated_from: string
           level: number
+          level_since: string
+          on_behalf_of: string
           requester_id: string
           requester_name: string
           required_levels: number
+          target_days: number
         }[]
+      }
+      approval_reject_reasons: { Args: never; Returns: string[] }
+      approval_step_waiting_since: {
+        Args: { _step_id: string }
+        Returns: string
       }
       approval_submit: {
         Args: { _context?: Json; _entity_id: string; _entity_type: string }
@@ -1532,8 +4003,12 @@ export type Database = {
           approver_name: string
           comments: string
           decided_at: string
+          decided_by: string
           decision: Database["public"]["Enums"]["approval_decision"]
+          escalated_at: string
+          escalated_from: string
           level: number
+          reason_code: string
         }[]
       }
       assert_own_org: { Args: { _org_id: string }; Returns: undefined }
@@ -1541,14 +4016,86 @@ export type Database = {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
         Returns: number
       }
+      calculate_entitlement_from: {
+        Args: {
+          _fy: string
+          _joined: string
+          _leave_type_id: string
+          _org_id: string
+        }
+        Returns: number
+      }
       calculate_working_days: {
         Args: { _from: string; _org_id: string; _to: string }
         Returns: number
+      }
+      calculate_working_days_for: {
+        Args: { _from: string; _profile_id: string; _to: string }
+        Returns: number
+      }
+      calendar_day: {
+        Args: { _calendar_id: string; _day: string; _org_id: string }
+        Returns: {
+          label: string
+          reason: string
+          working: boolean
+        }[]
       }
       can_approve: { Args: { _user_id: string }; Returns: boolean }
       chain_condition_matches: {
         Args: { _context: Json; _field: string; _op: string; _value: number }
         Returns: boolean
+      }
+      comp_off_approval_detail: {
+        Args: { _approval_request_id: string }
+        Returns: Json
+      }
+      comp_off_cancel: { Args: { _claim_id: string }; Returns: undefined }
+      comp_off_expire_due: { Args: never; Returns: number }
+      comp_off_my_claims: {
+        Args: never
+        Returns: {
+          approval_request_id: string
+          claim_id: string
+          days: Json
+          decided_at: string
+          expired_days: number
+          expires_on: string
+          has_proof: boolean
+          leave_type_id: string
+          leave_type_name: string
+          reason: string
+          status: string
+          submitted_at: string
+          total_days: number
+        }[]
+      }
+      comp_off_register: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          claim_id: string
+          days_worked: string
+          decided_on: string
+          department_name: string
+          employee_name: string
+          expired_days: number
+          expires_on: string
+          has_proof: boolean
+          leave_type_name: string
+          reason: string
+          status: string
+          submitted_on: string
+          total_days: number
+        }[]
+      }
+      comp_off_submit: {
+        Args: {
+          _days: Json
+          _leave_type_id: string
+          _proof_path?: string
+          _reason: string
+        }
+        Returns: string
       }
       current_org_id: { Args: never; Returns: string }
       deactivate_employee: {
@@ -1561,6 +4108,468 @@ export type Database = {
       emit_platform_event: {
         Args: { _event_key: string; _payload: Json }
         Returns: undefined
+      }
+      employee_add_address: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: Json
+      }
+      employee_add_department: { Args: { _name: string }; Returns: string }
+      employee_address_attach_proof: {
+        Args: {
+          _address_id: string
+          _file_name: string
+          _file_path: string
+          _mime_type: string
+          _size_bytes: number
+        }
+        Returns: string
+      }
+      employee_admin_overview: { Args: never; Returns: Json }
+      employee_age: { Args: { _dob: string; _org: string }; Returns: number }
+      employee_apply_draft: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_calendar_on: {
+        Args: { _day: string; _profile_id: string }
+        Returns: string
+      }
+      employee_calendars: {
+        Args: never
+        Returns: {
+          id: string
+          is_default: boolean
+          name: string
+          status: string
+          units: number
+          weekly_off: number[]
+        }[]
+      }
+      employee_card: { Args: { _employee_id?: string }; Returns: Json }
+      employee_card_views_list: {
+        Args: { _employee_id: string }
+        Returns: {
+          viewed_at: string
+          viewer_name: string
+        }[]
+      }
+      employee_card_views_prune: { Args: never; Returns: number }
+      employee_change_requests: {
+        Args: { _status?: string }
+        Returns: {
+          created_at: string
+          details: string
+          employee_id: string
+          employee_name: string
+          id: string
+          resolution_note: string
+          resolved_at: string
+          resolved_by_name: string
+          section: string
+          status: string
+        }[]
+      }
+      employee_close_posting: {
+        Args: { _employee_id: string; _last_day: string }
+        Returns: Json
+      }
+      employee_create_draft: { Args: { _values: Json }; Returns: string }
+      employee_deactivate: {
+        Args: {
+          _employee_id: string
+          _last_working_day: string
+          _reason: string
+          _successor_id: string
+        }
+        Returns: Json
+      }
+      employee_deactivation_preview: {
+        Args: { _employee_id: string }
+        Returns: Json
+      }
+      employee_directory: {
+        Args: { _q?: string }
+        Returns: {
+          admin_role: string
+          date_of_joining: string
+          department: string
+          deployed_unit: string
+          designation: string
+          employee_code: string
+          full_name: string
+          has_signed_in: boolean
+          id: string
+          is_active: boolean
+          mobile: string
+          reports_to: string
+          stage: string
+          status: string
+          work_email: string
+        }[]
+      }
+      employee_document_add: {
+        Args: {
+          _doc_type: string
+          _employee_id: string
+          _expires_on?: string
+          _file_name: string
+          _file_path: string
+          _mime_type: string
+          _size_bytes: number
+          _title: string
+        }
+        Returns: string
+      }
+      employee_document_may_read: { Args: { _name: string }; Returns: boolean }
+      employee_document_may_upload: {
+        Args: { _name: string }
+        Returns: boolean
+      }
+      employee_document_open: {
+        Args: { _document_id: string }
+        Returns: string
+      }
+      employee_document_remove: {
+        Args: { _document_id: string; _reason: string }
+        Returns: undefined
+      }
+      employee_document_verify: {
+        Args: { _document_id: string }
+        Returns: undefined
+      }
+      employee_document_views_list: {
+        Args: { _employee_id: string }
+        Returns: {
+          doc_type: string
+          document_id: string
+          title: string
+          viewed_at: string
+          viewer_name: string
+        }[]
+      }
+      employee_documents_allowed: {
+        Args: { _employee_id: string }
+        Returns: boolean
+      }
+      employee_documents_list: {
+        Args: { _employee_id: string }
+        Returns: {
+          doc_type: string
+          expires_on: string
+          file_name: string
+          id: string
+          size_bytes: number
+          status: string
+          title: string
+          uploaded_at: string
+          uploaded_by: string
+          verified_at: string
+          verified_by: string
+        }[]
+      }
+      employee_email_is_free: {
+        Args: { _email: string; _except?: string; _org: string }
+        Returns: undefined
+      }
+      employee_experience_months: {
+        Args: { _employee_id: string }
+        Returns: number
+      }
+      employee_family_fields_touched: {
+        Args: { _employee_id: string; _rows: Json }
+        Returns: string[]
+      }
+      employee_field_defaults: {
+        Args: never
+        Returns: {
+          employee_can_update: boolean
+          field_key: string
+          follows: string
+          label: string
+          payload: string[]
+          required: boolean
+          required_lock: string
+          sort: number
+          update_lock: string
+        }[]
+      }
+      employee_field_keys: { Args: { _values: Json }; Returns: string[] }
+      employee_field_required: {
+        Args: { _employee_id: string; _field_key: string }
+        Returns: boolean
+      }
+      employee_field_rules: {
+        Args: { _org: string }
+        Returns: {
+          customised: boolean
+          employee_can_update: boolean
+          field_key: string
+          label: string
+          payload: string[]
+          required: boolean
+          required_lock: string
+          sort: number
+          update_lock: string
+        }[]
+      }
+      employee_field_settings: {
+        Args: never
+        Returns: {
+          can_change: boolean
+          customised: boolean
+          employee_can_update: boolean
+          field_key: string
+          label: string
+          required: boolean
+          required_lock: string
+          update_lock: string
+        }[]
+      }
+      employee_import_keys: { Args: { _tab: string }; Returns: string[] }
+      employee_import_master: {
+        Args: { _commit: boolean; _only_clean?: boolean; _workbook: Json }
+        Returns: Json
+      }
+      employee_import_pick: { Args: { _map: Json; _r: Json }; Returns: Json }
+      employee_make_manager: {
+        Args: { _profile_id: string }
+        Returns: undefined
+      }
+      employee_manager_candidates: {
+        Args: never
+        Returns: {
+          full_name: string
+          profile_id: string
+        }[]
+      }
+      employee_move_unit: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: Json
+      }
+      employee_onboarding_defaults: {
+        Args: never
+        Returns: {
+          due_within_days: number
+          item_key: string
+          label: string
+          mandatory: boolean
+          sort: number
+        }[]
+      }
+      employee_onboarding_gaps: {
+        Args: { _employee_id: string }
+        Returns: Json
+      }
+      employee_onboarding_items: {
+        Args: never
+        Returns: {
+          customised: boolean
+          due_within_days: number
+          item_key: string
+          label: string
+          mandatory: boolean
+        }[]
+      }
+      employee_onboarding_overdue: {
+        Args: { _org_id: string }
+        Returns: {
+          days_overdue: number
+          employee_id: string
+          full_name: string
+          items: string[]
+        }[]
+      }
+      employee_onboarding_remind_due: { Args: never; Returns: number }
+      employee_onboarding_settings: { Args: never; Returns: Json }
+      employee_org_chart: {
+        Args: never
+        Returns: {
+          designation: string
+          direct_reports: number
+          full_name: string
+          id: string
+          manager_profile_id: string
+          profile_id: string
+        }[]
+      }
+      employee_rank_designations: {
+        Args: { _ids: string[] }
+        Returns: undefined
+      }
+      employee_record_joining_date: {
+        Args: { _employee_record_id: string }
+        Returns: string
+      }
+      employee_relation_field: { Args: { _relation: string }; Returns: string }
+      employee_relationship: {
+        Args: { _employee_id: string }
+        Returns: string[]
+      }
+      employee_request_change: {
+        Args: { _details: string; _employee_id: string; _section: string }
+        Returns: string
+      }
+      employee_require_admin: {
+        Args: { _employee_id: string }
+        Returns: undefined
+      }
+      employee_require_config_admin: { Args: never; Returns: string }
+      employee_require_filled: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_require_writer: {
+        Args: { _employee_id: string; _fields: string[] }
+        Returns: undefined
+      }
+      employee_resolve_change: {
+        Args: { _note?: string; _outcome: string; _request_id: string }
+        Returns: undefined
+      }
+      employee_restricted_reads: {
+        Args: { _employee_id: string }
+        Returns: {
+          fields: string[]
+          read_at: string
+          reader_name: string
+          reason: string
+        }[]
+      }
+      employee_reveal_restricted: {
+        Args: { _employee_id: string; _fields: string[]; _reason?: string }
+        Returns: Json
+      }
+      employee_save_calendar: {
+        Args: { _calendar_id: string; _values: Json }
+        Returns: string
+      }
+      employee_save_designation: {
+        Args: { _designation_id: string; _values: Json }
+        Returns: string
+      }
+      employee_save_family: {
+        Args: { _employee_id: string; _rows: Json }
+        Returns: undefined
+      }
+      employee_save_field_setting: {
+        Args: { _field_key: string; _setting: string; _value: boolean }
+        Returns: undefined
+      }
+      employee_save_nomination: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: string
+      }
+      employee_save_onboarding_item: {
+        Args: {
+          _due_within_days: number
+          _item_key: string
+          _mandatory: boolean
+        }
+        Returns: undefined
+      }
+      employee_save_onboarding_settings: {
+        Args: { _escalate_after_days: number; _remind_every_days: number }
+        Returns: undefined
+      }
+      employee_save_previous_orgs: {
+        Args: { _employee_id: string; _rows: Json }
+        Returns: undefined
+      }
+      employee_save_shift: {
+        Args: { _shift_id: string; _values: Json }
+        Returns: string
+      }
+      employee_save_unit: {
+        Args: { _unit_id: string; _values: Json }
+        Returns: string
+      }
+      employee_send_invite: {
+        Args: {
+          _employee_id: string
+          _role?: Database["public"]["Enums"]["app_role"]
+        }
+        Returns: string
+      }
+      employee_set_bank: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_calendar_status: {
+        Args: { _calendar_id: string; _status: string }
+        Returns: undefined
+      }
+      employee_set_designation_status: {
+        Args: { _designation_id: string; _status: string }
+        Returns: undefined
+      }
+      employee_set_restricted: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_shift: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_shift_status: {
+        Args: { _shift_id: string; _status: string }
+        Returns: undefined
+      }
+      employee_set_statutory: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_set_unit_status: {
+        Args: { _status: string; _unit_id: string }
+        Returns: undefined
+      }
+      employee_shifts: {
+        Args: never
+        Returns: {
+          break_minutes: number
+          end_time: string
+          id: string
+          name: string
+          people: number
+          start_time: string
+          status: string
+          units: number
+        }[]
+      }
+      employee_this_year: { Args: { _employee_id: string }; Returns: Json }
+      employee_units: {
+        Args: never
+        Returns: {
+          attendance_capture_mode: string
+          client_name: string
+          default_shift_id: string
+          id: string
+          is_billable: boolean
+          location: string
+          name: string
+          posted_now: number
+          postings_ever: number
+          requires_police_verification: boolean
+          state: string
+          status: string
+          unit_type: string
+          working_calendar_id: string
+        }[]
+      }
+      employee_update: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_update_draft: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: undefined
+      }
+      employee_withdraw_posting: {
+        Args: { _deployment_id: string; _reason: string }
+        Returns: Json
+      }
+      employee_work_pattern: {
+        Args: { _employee_id: string; _with_history: boolean }
+        Returns: Json
       }
       ensure_balance: {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
@@ -1591,6 +4600,7 @@ export type Database = {
       }
       ensure_system_notification_templates: { Args: never; Returns: undefined }
       escape_html: { Args: { _text: string }; Returns: string }
+      field_check: { Args: { _ok: boolean; _rule: string }; Returns: undefined }
       financial_year_start: {
         Args: { _fy: string; _org_id: string }
         Returns: string
@@ -1605,6 +4615,10 @@ export type Database = {
           _user_id: string
         }
         Returns: boolean
+      }
+      holiday_set_calendars: {
+        Args: { _calendar_ids: string[]; _holiday_id: string }
+        Returns: undefined
       }
       install_default_approval_chain: {
         Args: { _org_id: string }
@@ -1631,8 +4645,27 @@ export type Database = {
         Returns: boolean
       }
       is_manager_of: { Args: { _employee_id: string }; Returns: boolean }
+      is_module_admin: { Args: { _module: string }; Returns: boolean }
       is_platform_admin: { Args: never; Returns: boolean }
       is_requester_of: { Args: { _request_id: string }; Returns: boolean }
+      is_reserved_for_super_admin: {
+        Args: { _role: Database["public"]["Enums"]["app_role"] }
+        Returns: boolean
+      }
+      is_super_admin: { Args: never; Returns: boolean }
+      leave_absenteeism_report: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          bradford_factor: number
+          days: number
+          department_name: string
+          employee_id: string
+          employee_name: string
+          spells: number
+          unpaid_days: number
+        }[]
+      }
+      leave_accrue_due: { Args: never; Returns: number }
       leave_all_balances: {
         Args: never
         Returns: {
@@ -1669,7 +4702,46 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_approval_turnaround: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          approver_name: string
+          days_taken: number
+          decided_at: string
+          decided_by_name: string
+          decision: string
+          employee_name: string
+          level: number
+          moved_up: boolean
+          reached_at: string
+          step_id: string
+          what: string
+        }[]
+      }
+      leave_blackout_remove: { Args: { _id: string }; Returns: undefined }
       leave_cancel: { Args: { _request_id: string }; Returns: undefined }
+      leave_carry_adjust: {
+        Args: { _days: number; _line_id: string }
+        Returns: undefined
+      }
+      leave_carry_lock: { Args: { _review_id: string }; Returns: number }
+      leave_carry_prepare: { Args: { _from_fy: string }; Returns: string }
+      leave_carry_review: { Args: { _from_fy: string }; Returns: Json }
+      leave_carry_years: { Args: never; Returns: Json }
+      leave_liability_report: {
+        Args: never
+        Returns: {
+          booked_days: number
+          department_name: string
+          employee_id: string
+          employee_name: string
+          free_days: number
+          fy_label: string
+          kind: string
+          leave_type_name: string
+          not_taken_days: number
+        }[]
+      }
       leave_mark_approved: { Args: { _request_id: string }; Returns: undefined }
       leave_mature_all_balances: { Args: never; Returns: number }
       leave_mature_balances: { Args: { _org_id: string }; Returns: number }
@@ -1687,6 +4759,17 @@ export type Database = {
           used_days: number
         }[]
       }
+      leave_my_unpaid: {
+        Args: never
+        Returns: {
+          fy_label: string
+          leave_type_id: string
+          leave_type_name: string
+          pending_days: number
+          taken_days: number
+        }[]
+      }
+      leave_next_fy: { Args: { _fy: string; _org_id: string }; Returns: string }
       leave_pending_report: {
         Args: never
         Returns: {
@@ -1721,7 +4804,12 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_proof_readable: { Args: { _name: string }; Returns: boolean }
       leave_report_schedule_run: { Args: never; Returns: number }
+      leave_report_window: {
+        Args: { _from: string; _to: string }
+        Returns: undefined
+      }
       leave_set_opening_balance: {
         Args: {
           _carryforward: number
@@ -1730,6 +4818,44 @@ export type Database = {
           _used: number
         }
         Returns: undefined
+      }
+      leave_stage_opening_balance: {
+        Args: {
+          _carryforward: number
+          _employee_record_id: string
+          _leave_type_id: string
+          _used: number
+        }
+        Returns: undefined
+      }
+      leave_staged_opening_balances: {
+        Args: never
+        Returns: {
+          carryforward_days: number
+          employee_code: string
+          employee_name: string
+          employee_record_id: string
+          entitled_days: number
+          fy_label: string
+          joined_date: string
+          leave_type_id: string
+          leave_type_name: string
+          problem: string
+          stage: string
+          staged: boolean
+          used_days: number
+        }[]
+      }
+      leave_staged_opening_problems: {
+        Args: never
+        Returns: {
+          carryforward_days: number
+          employee_id: string
+          employee_name: string
+          leave_type_name: string
+          problem: string
+          used_days: number
+        }[]
       }
       leave_submit: {
         Args: {
@@ -1788,9 +4914,21 @@ export type Database = {
           working_days: number
         }[]
       }
+      leave_type_impact: { Args: { _leave_type_id: string }; Returns: Json }
       leave_year_open: {
         Args: { _org_id: string; _ref: string }
         Returns: boolean
+      }
+      member_set_module_admins: {
+        Args: { _modules: string[]; _user_id: string }
+        Returns: string[]
+      }
+      member_set_roles: {
+        Args: {
+          _roles: Database["public"]["Enums"]["app_role"][]
+          _user_id: string
+        }
+        Returns: Database["public"]["Enums"]["app_role"][]
       }
       missing_system_notification_templates: { Args: never; Returns: string[] }
       module_enabled_for: {
@@ -1798,6 +4936,15 @@ export type Database = {
         Returns: boolean
       }
       my_account_status: { Args: never; Returns: string }
+      my_days_excluded: {
+        Args: { _from: string; _to: string }
+        Returns: {
+          day: string
+          label: string
+          reason: string
+        }[]
+      }
+      my_working_days: { Args: { _from: string; _to: string }; Returns: number }
       notification_claim_batch: {
         Args: { _limit?: number }
         Returns: {
@@ -1810,6 +4957,29 @@ export type Database = {
           subject: string
         }[]
       }
+      notification_custom_add: {
+        Args: {
+          _department_id?: string
+          _entity_type: string
+          _event_key: string
+          _profile_id: string
+        }
+        Returns: string
+      }
+      notification_custom_list: {
+        Args: { _module_key: string }
+        Returns: {
+          department_id: string
+          department_name: string
+          entity_label: string
+          entity_type: string
+          event_key: string
+          id: string
+          person_name: string
+          profile_id: string
+        }[]
+      }
+      notification_custom_remove: { Args: { _id: string }; Returns: undefined }
       notification_mark_failed: {
         Args: { _id: string; _reason: string }
         Returns: undefined
@@ -1819,7 +4989,47 @@ export type Database = {
         Returns: undefined
       }
       notification_mark_sent: { Args: { _id: string }; Returns: undefined }
+      notification_matrix: {
+        Args: { _module_key: string }
+        Returns: {
+          audience: string
+          enabled: boolean
+          entity_label: string
+          entity_type: string
+          event_key: string
+          mandatory: boolean
+        }[]
+      }
       notification_max_attempts: { Args: never; Returns: number }
+      notification_people: {
+        Args: { _module_key: string }
+        Returns: {
+          full_name: string
+          id: string
+        }[]
+      }
+      notification_rule_set: {
+        Args: {
+          _audience: string
+          _enabled: boolean
+          _entity_type: string
+          _event_key: string
+        }
+        Returns: undefined
+      }
+      notifications_feed: {
+        Args: { _limit?: number }
+        Returns: {
+          created_at: string
+          event_key: string
+          id: string
+          payload: Json
+          read_at: string
+          subject: string
+        }[]
+      }
+      notifications_mark_read: { Args: { _ids?: string[] }; Returns: number }
+      notifications_unread: { Args: never; Returns: number }
       notify: {
         Args: { _event_key: string; _payload: Json; _recipient_id: string }
         Returns: string
@@ -1836,6 +5046,10 @@ export type Database = {
       }
       org_today: { Args: { _org_id: string }; Returns: string }
       organization_display_name: { Args: { _org_id: string }; Returns: string }
+      platform_add_super_admin: {
+        Args: { _email: string; _full_name?: string; _org_id: string }
+        Returns: string
+      }
       platform_client_errors: {
         Args: { p_days?: number }
         Returns: {
@@ -1877,6 +5091,19 @@ export type Database = {
           test_reason: string
         }[]
       }
+      platform_list_super_admins: {
+        Args: { _org_id: string }
+        Returns: {
+          email: string
+          full_name: string
+          invitation_id: string
+          invite_url: string
+          is_active: boolean
+          kind: string
+          since: string
+          user_id: string
+        }[]
+      }
       platform_mail_health: {
         Args: never
         Returns: {
@@ -1893,6 +5120,10 @@ export type Database = {
         Args: { _org: string; _reason: string }
         Returns: undefined
       }
+      platform_remove_super_admin: {
+        Args: { _org_id: string; _user_id: string }
+        Returns: undefined
+      }
       platform_secret: { Args: { _name: string }; Returns: string }
       platform_set_module: {
         Args: { _granted: boolean; _module_key: string; _org_id: string }
@@ -1900,6 +5131,10 @@ export type Database = {
       }
       platform_unmark_test_organization: {
         Args: { _org: string }
+        Returns: undefined
+      }
+      platform_withdraw_super_admin_invite: {
+        Args: { _invitation_id: string }
         Returns: undefined
       }
       provision_organization: {
@@ -2009,10 +5244,23 @@ export type Database = {
           name: string
         }[]
       }
+      resolve_notification_fyi: {
+        Args: { _event_key: string; _payload: Json }
+        Returns: string[]
+      }
       resolve_notification_recipients: {
         Args: { _event_key: string; _payload: Json }
         Returns: string[]
       }
+      restricted_decrypt: { Args: { _cipher: string }; Returns: string }
+      restricted_encrypt: { Args: { _value: string }; Returns: string }
+      restricted_index: { Args: { _value: string }; Returns: string }
+      restricted_known_keys: {
+        Args: { _known: string[]; _values: Json }
+        Returns: undefined
+      }
+      restricted_reads_prune: { Args: never; Returns: number }
+      restricted_target: { Args: { _employee_id: string }; Returns: string[] }
       scrub_client_text: {
         Args: { _limit: number; _text: string }
         Returns: string
@@ -2024,8 +5272,27 @@ export type Database = {
           idle_minutes: number
         }[]
       }
+      statutory_key: { Args: never; Returns: string }
+      statutory_normalise: { Args: { _v: string }; Returns: string }
+      statutory_rotate_key: { Args: never; Returns: Json }
+      valid_code: { Args: { _t: string }; Returns: boolean }
+      valid_phone: { Args: { _p: string }; Returns: boolean }
+      valid_text: { Args: { _max: number; _t: string }; Returns: boolean }
+      valid_words: { Args: { _max: number; _t: string }; Returns: boolean }
+      working_calendar_default_id: {
+        Args: { _org_id: string }
+        Returns: string
+      }
       working_days_excluded: {
         Args: { _from: string; _org_id: string; _to: string }
+        Returns: {
+          day: string
+          label: string
+          reason: string
+        }[]
+      }
+      working_days_excluded_for: {
+        Args: { _from: string; _profile_id: string; _to: string }
         Returns: {
           day: string
           label: string
@@ -2041,6 +5308,9 @@ export type Database = {
         | "employee"
         | "supervisor"
         | "coordinator"
+        | "super_admin"
+        | "payroll_officer"
+        | "statutory_officer"
       approval_decision: "pending" | "approved" | "rejected"
       approval_status: "pending" | "approved" | "rejected" | "cancelled"
       approver_rule: "reporting_manager" | "manager_of_manager" | "role"
@@ -2190,6 +5460,9 @@ export const Constants = {
         "employee",
         "supervisor",
         "coordinator",
+        "super_admin",
+        "payroll_officer",
+        "statutory_officer",
       ],
       approval_decision: ["pending", "approved", "rejected"],
       approval_status: ["pending", "approved", "rejected", "cancelled"],

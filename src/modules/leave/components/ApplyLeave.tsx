@@ -13,17 +13,20 @@
 import { useEffect, useMemo, useState } from "react";
 import { Link, useNavigate } from "@tanstack/react-router";
 import {
-  getWorkingDays,
-  getExcludedDays,
+  getMyWorkingDays,
+  getMyExcludedDays,
   describeExcludedDays,
   type ExcludedDay,
 } from "@/platform/calendar";
-import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
+import { getCurrentUser, isModuleAdmin, type CurrentUser } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
-import { getLeaveTypes, getMyBalances, submitLeave } from "../handlers";
-import type { LeaveBalance } from "../contracts";
+import { DateField } from "@/components/shared/date-field";
+import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
+import { Panel } from "@/components/shared/panel";
+import { getBlackouts, getLeaveTypes, getMyBalances, getMyUnpaid, submitLeave } from "../handlers";
+import type { Blackout, LeaveBalance, LeaveKind, UnpaidSummary } from "../contracts";
 
-type LeaveType = { id: string; name: string };
+type LeaveType = { id: string; name: string; kind: LeaveKind };
 
 /** Today in ISO, for the date inputs' `min`. */
 function todayIso(): string {
@@ -31,17 +34,26 @@ function todayIso(): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+const EYEBROW = "block text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase";
+
 export default function ApplyLeave() {
   const navigate = useNavigate();
 
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [types, setTypes] = useState<LeaveType[]>([]);
   const [balances, setBalances] = useState<LeaveBalance[]>([]);
+  /** Leave phase 2: unpaid leave has no balance, only what was taken. */
+  const [unpaid, setUnpaid] = useState<UnpaidSummary[]>([]);
+  const [blackouts, setBlackouts] = useState<Blackout[]>([]);
   const [loading, setLoading] = useState(true);
 
   const [typeId, setTypeId] = useState("");
-  const [fromDate, setFromDate] = useState("");
-  const [toDate, setToDate] = useState("");
+  // What is in the date boxes: an ISO date once it is a whole, real one, else
+  // the half-typed text. Everything below works from the whole dates only.
+  const [fromRaw, setFromRaw] = useState("");
+  const [toRaw, setToRaw] = useState("");
+  const fromDate = isIsoDate(fromRaw) ? fromRaw : "";
+  const toDate = isIsoDate(toRaw) ? toRaw : "";
   const [reason, setReason] = useState("");
 
   const [workingDays, setWorkingDays] = useState<number | null>(null);
@@ -63,12 +75,28 @@ export default function ApplyLeave() {
         setLoading(false);
       })
       .catch(() => setLoading(false));
+    // Separately and forgivingly: the database refuses a blackout and counts
+    // unpaid leave whether or not these load; they only let the form say so
+    // before sending.
+    getMyUnpaid()
+      .then(setUnpaid)
+      .catch(() => {});
+    getBlackouts()
+      .then(setBlackouts)
+      .catch(() => {});
   }, []);
 
   const balance = useMemo(
     () => balances.find((b) => b.leaveTypeId === typeId) ?? null,
     [balances, typeId],
   );
+  const isUnpaid = types.find((t) => t.id === typeId)?.kind === "unpaid";
+  const unpaidSummary = unpaid.find((u) => u.leaveTypeId === typeId) ?? null;
+  // ISO dates compare as strings. Inclusive at both ends, as the database's.
+  const blackout =
+    fromDate && toDate
+      ? (blackouts.find((b) => b.fromDate <= toDate && b.toDate >= fromDate) ?? null)
+      : null;
 
   // Asked of the database on every date change, debounced. Deliberately not
   // computed here — see the header.
@@ -85,8 +113,9 @@ export default function ApplyLeave() {
       // still shows — a missing sentence is worse than nothing, but a missing
       // number stops the form.
       Promise.all([
-        getWorkingDays(user.organizationId, fromDate, toDate),
-        getExcludedDays(user.organizationId, fromDate, toDate).catch(() => []),
+        // D102: on the applicant's own calendar, which their unit decides.
+        getMyWorkingDays(fromDate, toDate),
+        getMyExcludedDays(fromDate, toDate).catch(() => []),
       ])
         .then(([d, x]) => {
           if (cancelled) return;
@@ -133,19 +162,32 @@ export default function ApplyLeave() {
 
   // AC2. The message carries the numbers, because "insufficient balance" tells
   // an employee nothing they can act on.
+  // Unpaid leave has no balance row (the database creates none), so `balance`
+  // is null for it and there is never a shortfall to show.
   const shortfall =
     available !== null && workingDays !== null && workingDays > available
       ? `You need ${workingDays} ${workingDays === 1 ? "day" : "days"} but have ${available} available.`
       : "";
 
   const noWorkingDays = workingDays === 0;
+  // AC1. The calendar offers no past day; a typed one is said at once.
+  const dateProblem =
+    (fromRaw && !fromDate) || (toRaw && !toDate)
+      ? DATE_FORMAT_MESSAGE
+      : fromDate && fromDate < minDate
+        ? "The first day can't be in the past."
+        : fromDate && toDate && toDate < fromDate
+          ? "The last day can't be before the first."
+          : "";
   const canSubmit =
+    !dateProblem &&
     !!typeId &&
     !!fromDate &&
     !!toDate &&
     toDate >= fromDate &&
     !!workingDays &&
     !shortfall &&
+    !blackout &&
     !countingDays &&
     !submitting;
 
@@ -176,13 +218,13 @@ export default function ApplyLeave() {
   if (done) {
     return (
       <div className="mx-auto max-w-lg">
-        <div className="rounded-lg border border-border bg-card p-6">
-          <h1 className="font-display text-lg font-semibold">Request sent</h1>
+        <div className="rounded-xl border border-border bg-card p-5 shadow-card">
+          <h1 className="text-page-title font-semibold tracking-page-title">Request sent</h1>
           <p className="mt-2 text-sm text-muted-foreground">
             Your leave request is with your approver. You&apos;ll get an email when it&apos;s
             decided.
           </p>
-          <div className="mt-6 flex flex-col gap-3 sm:flex-row">
+          <div className="mt-6 flex flex-col gap-3 @min-[640px]/app:flex-row">
             <button
               onClick={() => navigate({ to: "/app/$", params: { _splat: "leave" } })}
               className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
@@ -192,8 +234,8 @@ export default function ApplyLeave() {
             <button
               onClick={() => {
                 setDone(false);
-                setFromDate("");
-                setToDate("");
+                setFromRaw("");
+                setToRaw("");
                 setReason("");
                 setWorkingDays(null);
                 getMyBalances()
@@ -215,13 +257,13 @@ export default function ApplyLeave() {
   if (types.length === 0) {
     return (
       <div className="max-w-lg">
-        <h1 className="font-display text-lg font-semibold">Apply for leave</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Apply for leave</h1>
         <p className="mt-2 text-sm text-muted-foreground">
-          {isAdmin(user)
+          {isModuleAdmin(user, "leave")
             ? "No leave types are set up yet, so there's nothing to apply for."
             : "No leave types have been set up yet. Ask your administrator to add them."}
         </p>
-        {isAdmin(user) && (
+        {isModuleAdmin(user, "leave") && (
           <Link
             to="/app/settings"
             className="mt-5 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground"
@@ -234,138 +276,212 @@ export default function ApplyLeave() {
   }
 
   return (
-    <form onSubmit={onSubmit} className="mx-auto max-w-lg space-y-6">
-      <h1 className="font-display text-lg font-semibold">Apply for leave</h1>
-
+    <form onSubmit={onSubmit} className="flex min-w-0 flex-col gap-4">
       <div>
-        <label htmlFor="leave-type" className="block text-sm font-medium">
-          Leave type
-        </label>
-        <select
-          id="leave-type"
-          value={typeId}
-          onChange={(e) => setTypeId(e.target.value)}
-          className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+        <h1 className="text-page-title font-semibold tracking-page-title">Apply for leave</h1>
+        <p className="mt-1 text-sm text-foreground-secondary">
+          Choose the type and the days. What it costs is worked out as you go, weekends and holidays
+          left out, and the request goes to your approver.
+        </p>
+      </div>
+
+      <div className="grid gap-4 @min-[800px]/app:grid-cols-2 @min-[800px]/app:items-start">
+        <Panel title="Your request" testId="panel-request">
+          <div className="grid gap-4">
+            <div>
+              <label htmlFor="leave-type" className={EYEBROW}>
+                Leave type
+              </label>
+              <select
+                id="leave-type"
+                value={typeId}
+                onChange={(e) => setTypeId(e.target.value)}
+                className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3 text-sm"
+              >
+                <option value="">Choose…</option>
+                {types.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            {/* AC1 — the calendar offers no past day; a typed one is said at once. */}
+            <div className="grid grid-cols-1 gap-4 @min-[560px]/app:grid-cols-2">
+              <div>
+                <label htmlFor="from-date" className={EYEBROW}>
+                  First day
+                </label>
+                <DateField
+                  id="from-date"
+                  value={fromRaw}
+                  min={minDate}
+                  invalid={
+                    !!dateProblem && dateProblem !== "The last day can't be before the first."
+                  }
+                  describedBy={dateProblem ? "date-problem" : undefined}
+                  onChange={(v) => {
+                    setFromRaw(v);
+                    if (isIsoDate(v) && toDate && v > toDate) setToRaw(v);
+                  }}
+                  className="mt-1"
+                />
+              </div>
+              <div>
+                <label htmlFor="to-date" className={EYEBROW}>
+                  Last day
+                </label>
+                <DateField
+                  id="to-date"
+                  value={toRaw}
+                  min={fromDate || minDate}
+                  openAt={fromDate || undefined}
+                  invalid={dateProblem === "The last day can't be before the first."}
+                  describedBy={dateProblem ? "date-problem" : undefined}
+                  onChange={setToRaw}
+                  className="mt-1"
+                />
+              </div>
+            </div>
+            {dateProblem && (
+              <p
+                id="date-problem"
+                data-testid="date-problem"
+                className="-mt-2 text-sm text-destructive"
+              >
+                {dateProblem}
+              </p>
+            )}
+
+            <div>
+              <label htmlFor="reason" className={EYEBROW}>
+                Reason <span className="normal-case">(optional)</span>
+              </label>
+              <textarea
+                id="reason"
+                value={reason}
+                maxLength={500}
+                rows={3}
+                onChange={(e) => setReason(e.target.value)}
+                className="mt-1 w-full rounded-md border border-input bg-background p-3 text-sm"
+              />
+              <p className="mt-1 text-caption text-muted-foreground">{reason.length}/500</p>
+            </div>
+
+            {error && (
+              <p data-testid="submit-error" role="alert" className="text-sm text-destructive">
+                {error}
+              </p>
+            )}
+
+            <button
+              type="submit"
+              disabled={!canSubmit}
+              data-testid="submit-leave"
+              className="inline-flex h-11 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-semibold text-primary-foreground disabled:opacity-45 @min-[640px]/app:w-auto @min-[640px]/app:justify-self-start"
+            >
+              {submitting ? "Sending…" : "Send request"}
+            </button>
+          </div>
+        </Panel>
+
+        <Panel
+          title="What it costs"
+          testId="panel-cost"
+          footer="Days are taken from your balance when you apply, and given back if the request is declined or cancelled."
         >
-          <option value="">Choose…</option>
-          {types.map((t) => (
-            <option key={t.id} value={t.id}>
-              {t.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* AC1 — past dates are unselectable rather than rejected after the fact. */}
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <div>
-          <label htmlFor="from-date" className="block text-sm font-medium">
-            First day
-          </label>
-          <input
-            id="from-date"
-            type="date"
-            value={fromDate}
-            min={minDate}
-            onChange={(e) => {
-              setFromDate(e.target.value);
-              if (toDate && e.target.value > toDate) setToDate(e.target.value);
-            }}
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </div>
-        <div>
-          <label htmlFor="to-date" className="block text-sm font-medium">
-            Last day
-          </label>
-          <input
-            id="to-date"
-            type="date"
-            value={toDate}
-            min={fromDate || minDate}
-            onChange={(e) => setToDate(e.target.value)}
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-          />
-        </div>
-      </div>
-
-      {/* The live line the PRD asks for. Only shown once there is something true
+          <div className="grid gap-3">
+            {!balance && !isUnpaid && (
+              <p className="text-sm text-muted-foreground">
+                Choose a leave type to see your balance.
+              </p>
+            )}
+            {/* The live line the PRD asks for. Only shown once there is something true
           to say — a balance line reading "0" before dates are chosen is noise. */}
-      {balance && (
-        <div
-          data-testid="balance-line"
-          className="rounded-md border border-border bg-secondary/40 p-4 text-sm"
-        >
-          {countingDays ? (
-            <span className="text-muted-foreground">Counting working days…</span>
-          ) : workingDays === null ? (
-            <span>
-              Available: <strong className="tabular-nums">{balance.availableDays}</strong>
-            </span>
-          ) : (
-            <span className="flex flex-wrap gap-x-3 gap-y-1">
-              <span>
-                Available: <strong className="tabular-nums">{balance.availableDays}</strong>
-              </span>
-              <span aria-hidden>·</span>
-              <span>
-                Requested: <strong className="tabular-nums">{workingDays}</strong>
-              </span>
-              <span aria-hidden>·</span>
-              <span>
-                Remaining: <strong className="tabular-nums">{remaining}</strong>
-              </span>
-            </span>
-          )}
-          {exclusionNote && !countingDays && (
-            <p data-testid="exclusion-note" className="mt-2 text-xs text-muted-foreground">
-              {exclusionNote}
-            </p>
-          )}
-        </div>
-      )}
+            {isUnpaid && (
+              <div
+                data-testid="unpaid-line"
+                className="rounded-md border border-border bg-secondary/40 p-4 text-sm"
+              >
+                <p>
+                  <strong>Unpaid.</strong> There is no balance: these days are not paid.
+                  {workingDays !== null && !countingDays && (
+                    <>
+                      {" "}
+                      Requested: <strong className="tabular-nums">{workingDays}</strong>
+                    </>
+                  )}
+                </p>
+                {unpaidSummary && (
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {unpaidSummary.takenDays} {unpaidSummary.takenDays === 1 ? "day" : "days"} taken
+                    this year
+                    {unpaidSummary.pendingDays > 0 &&
+                      ` · ${unpaidSummary.pendingDays} awaiting a decision`}
+                  </p>
+                )}
+                {exclusionNote && !countingDays && (
+                  <p className="mt-2 text-xs text-muted-foreground">{exclusionNote}</p>
+                )}
+              </div>
+            )}
 
-      {noWorkingDays && !countingDays && (
-        <p data-testid="no-working-days" className="text-sm text-destructive">
-          Those dates are all weekend or holiday — there&apos;s nothing to book.
-        </p>
-      )}
+            {blackout && (
+              <p data-testid="blackout" className="text-sm text-destructive">
+                Those dates fall in a blackout period ({blackout.name}), when leave can&apos;t be
+                applied for. Choose dates outside it.
+              </p>
+            )}
 
-      {shortfall && (
-        <p data-testid="shortfall" className="text-sm text-destructive">
-          {shortfall}
-        </p>
-      )}
+            {balance && (
+              <div
+                data-testid="balance-line"
+                className="rounded-md border border-border bg-secondary/40 p-4 text-sm"
+              >
+                {countingDays ? (
+                  <span className="text-muted-foreground">Counting working days…</span>
+                ) : workingDays === null ? (
+                  <span>
+                    Available: <strong className="tabular-nums">{balance.availableDays}</strong>
+                  </span>
+                ) : (
+                  <span className="flex flex-wrap gap-x-3 gap-y-1">
+                    <span>
+                      Available: <strong className="tabular-nums">{balance.availableDays}</strong>
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span>
+                      Requested: <strong className="tabular-nums">{workingDays}</strong>
+                    </span>
+                    <span aria-hidden>·</span>
+                    <span>
+                      Remaining: <strong className="tabular-nums">{remaining}</strong>
+                    </span>
+                  </span>
+                )}
+                {exclusionNote && !countingDays && (
+                  <p data-testid="exclusion-note" className="mt-2 text-xs text-muted-foreground">
+                    {exclusionNote}
+                  </p>
+                )}
+              </div>
+            )}
 
-      <div>
-        <label htmlFor="reason" className="block text-sm font-medium">
-          Reason <span className="text-muted-foreground">(optional)</span>
-        </label>
-        <textarea
-          id="reason"
-          value={reason}
-          maxLength={500}
-          rows={3}
-          onChange={(e) => setReason(e.target.value)}
-          className="mt-2 w-full rounded-md border border-border bg-background p-3 text-sm"
-        />
-        <p className="mt-1 text-xs text-muted-foreground">{reason.length}/500</p>
+            {noWorkingDays && !countingDays && (
+              <p data-testid="no-working-days" className="text-sm text-destructive">
+                Those dates are all weekend or holiday — there&apos;s nothing to book.
+              </p>
+            )}
+
+            {shortfall && (
+              <p data-testid="shortfall" className="text-sm text-destructive">
+                {shortfall}
+              </p>
+            )}
+          </div>
+        </Panel>
       </div>
-
-      {error && (
-        <p data-testid="submit-error" role="alert" className="text-sm text-destructive">
-          {error}
-        </p>
-      )}
-
-      <button
-        type="submit"
-        disabled={!canSubmit}
-        data-testid="submit-leave"
-        className="inline-flex h-12 w-full items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50 sm:w-auto"
-      >
-        {submitting ? "Sending…" : "Send request"}
-      </button>
     </form>
   );
 }

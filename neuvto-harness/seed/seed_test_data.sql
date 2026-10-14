@@ -17,6 +17,22 @@
 
 begin;
 
+-- ------------------------------------------- the statutory encryption key (D80)
+--
+-- Production's is set by hand and never appears in a file
+-- (docs/operations/STATUTORY_DATA.md). A test database gets a random one, made
+-- here once and kept: a key that changed on every seed would leave any
+-- encrypted row from an earlier run undecryptable.
+do $$
+begin
+  if to_regclass('vault.secrets') is not null
+     and not exists (select 1 from vault.secrets where name = 'statutory_encryption_key') then
+    perform vault.create_secret(encode(extensions.gen_random_bytes(32), 'hex'),
+                                'statutory_encryption_key',
+                                'TEST DATABASE ONLY — made by seed_test_data.sql');
+  end if;
+end $$;
+
 -- ------------------------------------------- keep what migrations installed
 --
 -- ⚠️ A GLOBAL TEMPLATE IS SCHEMA, NOT TEST DATA.
@@ -216,6 +232,8 @@ begin
       ('00000000-0000-0000-0000-0000000000a0','leave_request',1,'reporting_manager',  null,          null,null,2),
       ('00000000-0000-0000-0000-0000000000a0','leave_request',2,'manager_of_manager','working_days','>', 3,  2),
       ('00000000-0000-0000-0000-0000000000b0','leave_request',1,'reporting_manager',  null,          null,null,3),
+      -- D89: compensatory off claims go to the reporting manager.
+      ('00000000-0000-0000-0000-0000000000a0','comp_off_claim',1,'reporting_manager',  null,          null,null,2),
 
       -- A deliberately non-leave entity type. The Approval Engine's gate is that
       -- it can be driven end to end without any leave table existing — a service

@@ -143,6 +143,35 @@ run "verifying tenant isolation" "$HARNESS_DIR/tests/verify_rls.sql"
 run "verifying data integrity"   "$HARNESS_DIR/tests/verify_invariants.sql"
 run "verifying the error store"  "$HARNESS_DIR/tests/verify_error_reporting.sql"
 run "verifying session policy"   "$HARNESS_DIR/tests/verify_session_policy.sql"
+run "verifying company access"   "$HARNESS_DIR/tests/verify_company_access.sql"
+run "verifying the employee record" "$HARNESS_DIR/tests/verify_employee_master.sql"
+run "verifying the employee card"   "$HARNESS_DIR/tests/verify_employee_card.sql"
+run "verifying statutory and bank data" "$HARNESS_DIR/tests/verify_statutory.sql"
+run "verifying the record is written" "$HARNESS_DIR/tests/verify_employee_writes.sql"
+run "verifying change requests" "$HARNESS_DIR/tests/verify_change_requests.sql"
+run "verifying adding people and letting them go" "$HARNESS_DIR/tests/verify_employee_lifecycle.sql"
+run "verifying employee import" "$HARNESS_DIR/tests/verify_employee_import.sql"
+run "verifying employee configuration" "$HARNESS_DIR/tests/verify_employee_config.sql"
+run "verifying Neuvto names Super Admins" "$HARNESS_DIR/tests/verify_platform_super_admins.sql"
+run "verifying an admin for each module" "$HARNESS_DIR/tests/verify_module_admins.sql"
+run "verifying leave phase 2" "$HARNESS_DIR/tests/verify_leave_phase2.sql"
+run "verifying waiting approvals move up" "$HARNESS_DIR/tests/verify_escalation.sql"
+run "verifying opening balances wait for them" "$HARNESS_DIR/tests/verify_opening_staged.sql"
+run "verifying compensatory off" "$HARNESS_DIR/tests/verify_comp_off.sql"
+run "verifying leave credited monthly" "$HARNESS_DIR/tests/verify_accrual.sql"
+run "verifying the carry-forward review" "$HARNESS_DIR/tests/verify_carry_forward.sql"
+run "verifying approvals handed over" "$HARNESS_DIR/tests/verify_delegation.sql"
+run "verifying who is told of what" "$HARNESS_DIR/tests/verify_notification_rules.sql"
+run "verifying four more leave reports" "$HARNESS_DIR/tests/verify_leave_reports_more.sql"
+run "verifying the record's documents" "$HARNESS_DIR/tests/verify_employee_documents.sql"
+run "verifying the rest of the card" "$HARNESS_DIR/tests/verify_card_rest.sql"
+run "verifying shift and calendar" "$HARNESS_DIR/tests/verify_shift_calendar.sql"
+run "verifying every field is checked" "$HARNESS_DIR/tests/verify_field_checks.sql"
+run "verifying the second round (D104)" "$HARNESS_DIR/tests/verify_second_round.sql"
+run "verifying the third round (D105)" "$HARNESS_DIR/tests/verify_third_round.sql"
+run "verifying the fourth round (D106)" "$HARNESS_DIR/tests/verify_fourth_round.sql"
+run "verifying the fields the company sets (D107)" "$HARNESS_DIR/tests/verify_field_settings.sql"
+run "verifying the bell (D111)" "$HARNESS_DIR/tests/verify_the_bell.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which
@@ -163,6 +192,12 @@ PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_concurrency.
 # for four build steps under a green harness. It waits, and it is meant to.
 printf '\n──  %s\n' "verifying scheduled work"
 PSQL="$PSQL" DATABASE_URL="$DB_URL" bash "$HARNESS_DIR/tests/verify_scheduled_work.sh"
+
+# D79. Face and fingerprint sign-in, against the real local auth server, with
+# a software authenticator standing in for the phone. Skips itself when the
+# auth server has passkeys off. Needs Mailpit, which the local stack runs.
+printf '\n──  %s\n' "verifying face and fingerprint sign-in"
+PSQL="$PSQL" DATABASE_URL="$DB_URL" bun "$HARNESS_DIR/tests/verify_passkeys.ts"
 
 # ── the suite must leave the database as consistent as it found it
 #

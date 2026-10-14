@@ -1,6 +1,6 @@
 # NEUVTO WOS — Translating the design system to native
 
-**Version:** 1.0 · **Status:** Active · **Updated:** 8 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 13 Oct 2026
 
 **Status:** Active · **Decided:** 4 Aug 2026
 **Read with:** `NEUVTO_DESIGN_SYSTEM.md`, which this does not repeat.
@@ -59,7 +59,7 @@ gets clipped on the way to sRGB and the two platforms cannot disagree.
 accessibility features; an app that ignores them is a real App Store review risk and, more
 to the point, unusable for the people who rely on them.
 
-`TYPE.roles.body.size` is 16 **at the OS default**, not finally. Native multiplies by the
+`TYPE.roles.body.size` is 14 (Core HR, D76) **at the OS default**, not finally. Native multiplies by the
 system scale factor. The web equivalent is already correct — `rem` inherits the browser's
 root size — which is why the scale is stored in px and converted at the edge rather than
 baked into either platform's units.
@@ -124,3 +124,18 @@ unbranded workspace look like our product. A native app inherits this rule.
 **The console does not go native.** `/neuvto-hq` is a desktop tool used by Neuvto staff to
 provision workspaces. It has no mobile case, and giving it one widens the surface on which
 D42 — platform admins never read tenant data — has to hold.
+
+---
+
+## 7. Restricted data on a phone (D80)
+
+A mobile session gets the **last four** of Aadhaar, PAN, UAN, EPF, ESIC and the bank
+account, and **no reveal**, whatever the person's role. The Statutory and bank tab on a
+phone shows the masked values and says that revealing is done from a computer. A phone is
+lost, shared and screenshotted more than a laptop, and the reveal's two-minute lifetime
+means nothing once a screenshot exists.
+
+Enforced in the database, not the app: when the app exists, `employee_reveal_restricted()`
+must refuse a session marked as mobile, so a modified app cannot get round it. How a
+session is marked is the app's first auth decision; until then there is no mobile session
+to refuse.

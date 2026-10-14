@@ -25,3 +25,13 @@ neuvto-harness/
 **/invoke-tool/**
 **/oauth-protected-resource.ts
 src/routes/mcp.ts
+
+# Its token block is written from src/platform/design/tokens.ts by
+# `bun run tokens`, and `bun run tokens --check` in CI compares it byte for
+# byte. Formatting it would only make that check fail.
+src/styles.css
+
+# Stryker's sandbox, a whole copy of the repo while a run is going, and the
+# local test reports.
+.stryker-tmp/
+reports/

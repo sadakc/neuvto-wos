@@ -352,10 +352,12 @@ begin
       raise notice 'ok: single-level approval completes';
 
       -- Deciding twice must not reopen a closed request.
+      -- With a valid reason and note, so the refusal can only be ALREADY_DECIDED.
       v_raised := false;
       begin
-        perform public.approval_decide(v_req, 'rejected', null);
-      exception when raise_exception then v_raised := true;
+        perform public.approval_decide(v_req, 'rejected', 'changed my mind', 'other');
+      exception when raise_exception then
+        v_raised := sqlerrm like '%ALREADY_DECIDED%';
       end;
       if not v_raised then raise exception 'RLS FAIL: a completed approval was decided again'; end if;
       raise notice 'ok: a completed approval cannot be decided again';
@@ -397,7 +399,7 @@ begin
       perform pg_temp.as_user(ravi);
       v_req := public.approval_submit('harness_probe', v_ent, '{"size": 5}'::jsonb);
       perform pg_temp.as_user(mark);
-      v_status := public.approval_decide(v_req, 'rejected', 'clashes with a deadline');
+      v_status := public.approval_decide(v_req, 'rejected', 'clashes with a deadline', 'business_need');
       if v_status <> 'rejected' then
         raise exception 'RLS FAIL: rejection at level 1 should end it, got %', v_status;
       end if;
@@ -1031,6 +1033,8 @@ begin
       -- exist yet. That is the ordering a customer's spreadsheet actually has,
       -- and the half that is easy to get wrong.
       perform pg_temp.as_user(alice);
+      -- D110: invitations come from a record; marked as employee_send_invite marks them.
+      perform set_config('neuvto.inviting', 'record', true);
       perform public.invitation_create('import.report@acme.test', null, 'employee',
         'Imported Report', date '2022-03-01', 'import.boss@acme.test', null);
       perform public.invitation_create('import.boss@acme.test', null, 'manager',
@@ -1109,6 +1113,15 @@ begin
 
     -- ─────────────────────────────────────── cleanup
     perform pg_temp.as_postgres();
+    -- Removing a whole workspace is a purge, and a purge says so: employee
+    -- history refuses deletion otherwise (D82). First, so the audit rows its
+    -- deletion writes are swept by the audit_logs delete below.
+    if to_regclass('public.employees') is not null then
+      perform set_config('neuvto.purge', 'on', true);
+      delete from public.employees where organization_id in
+        (select id from organizations where slug = 'provisioned-co');
+      perform set_config('neuvto.purge', '', true);
+    end if;
     delete from public.leave_requests where employee_id = ravi;
     delete from public.notifications  where organization_id in
       (select id from organizations where slug = 'provisioned-co');
@@ -1891,7 +1904,7 @@ begin
         v_req2 := public.approval_submit('harness_probe', v_ent2, '{"size": 5}'::jsonb);
 
         perform pg_temp.as_user(mark);
-        perform public.approval_decide(v_req2, 'rejected', 'not this time');
+        perform public.approval_decide(v_req2, 'rejected', 'not this time', 'business_need');
 
         perform pg_temp.as_postgres();
         select count(*) into n from notifications
@@ -2224,8 +2237,14 @@ begin
       raise notice 'ok: retroactive leave is refused in org-local time';
 
       begin
-        -- A Saturday and Sunday for Acme, whose weekend is Sat/Sun.
-        perform public.leave_submit(casual, date '2026-09-05', date '2026-09-06', 'weekend');
+        -- A Saturday and Sunday for Acme, whose weekend is Sat/Sun: the first
+        -- Saturday at least a week out. This was the literal 2026-09-05, which
+        -- turned into a past date on 5 Sep 2026 and from then on was refused
+        -- as PAST_DATE before the weekend rule was ever reached.
+        perform public.leave_submit(casual,
+          d0 + 7 + ((6 - extract(isodow from d0 + 7)::int + 7) % 7),
+          d0 + 8 + ((6 - extract(isodow from d0 + 7)::int + 7) % 7),
+          'weekend');
         raise exception 'RLS FAIL: leave was accepted for non-working days only';
       exception when raise_exception then
         if sqlerrm <> 'NO_WORKING_DAYS' then raise; end if;
@@ -2235,7 +2254,7 @@ begin
       -- Priya's balance covers 3 days; a fortnight cannot fit in it.
       perform pg_temp.as_user(priya);
       begin
-        perform public.leave_submit(casual, d0 + 100, d0 + 113, 'overdraw');
+        perform public.leave_submit(casual, d0 + 10, d0 + 23, 'overdraw');
         raise exception 'RLS FAIL: a request larger than the balance was accepted';
       exception when raise_exception then
         if sqlerrm not like 'INSUFFICIENT_BALANCE%' then raise; end if;
@@ -2379,7 +2398,7 @@ begin
           perform pg_temp.as_user(ravi);
           select available_days into v_avail0 from leave_balances
            where employee_id = ravi and leave_type_id = casual;
-          v_req2 := public.leave_submit(casual, d0 + 100, d0 + 102, 'to withdraw');
+          v_req2 := public.leave_submit(casual, d0 + 30, d0 + 32, 'to withdraw');
 
           perform pg_temp.as_postgres();
           select working_days into n from leave_requests where id = v_req2;
@@ -2423,8 +2442,12 @@ begin
           raise notice 'ok: cancelling twice pays out once';
 
           ------------------------------------------- somebody else's leave
+          -- Offsets kept within ~6 weeks of d0 (11 Oct 2026). They were +100
+          -- and +130, and d0 is already 40-100 days out, so by October they
+          -- landed in a leave year not yet open (D34) and raised
+          -- NEXT_YEAR_NOT_OPEN_YET instead of the refusal under test.
           perform pg_temp.as_user(ravi);
-          v_req2 := public.leave_submit(casual, d0 + 130, d0 + 132, 'not yours');
+          v_req2 := public.leave_submit(casual, d0 + 40, d0 + 42, 'not yours');
 
           perform pg_temp.as_user(priya);
           v_bad := false;

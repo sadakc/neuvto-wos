@@ -1,6 +1,6 @@
 # NEUVTO WOS — Coding Standards
 
-**Version:** 1.2 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 19 Aug 2026
+**Version:** 1.3 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 13 Oct 2026
 
 Two goals: consistency across every module, and **portability out of Lovable at any time**. §9 is the portability contract — treat it as non-negotiable.
 
@@ -194,6 +194,35 @@ Coverage targets are not the goal — the following must be tested regardless:
 5. Approval chain resolution when the manager is missing, is the requester, or is inactive
 
 The SQL harness in `neuvto-harness/` is part of the test suite, not a separate activity. It runs after every build step.
+
+### Browser tests: a real browser, the real screens, the local stack
+
+`e2e/` holds Playwright tests that sign in through the real sign-in screen, as real seeded people, and click through the app the way a person does. They need the local stack (`supabase start`). They use the Chrome installed on the machine.
+
+```bash
+bun run e2e        # everything, about six minutes
+bun run e2e:ui     # Playwright's window: watch each step, re-run one test
+```
+
+- **Local only, by construction.** `e2e/global-setup.ts` refuses to start unless `.env.local` points the app at local Docker, then re-seeds the database. Every run starts from the same data, and the tests run one at a time because they change it.
+- **Each flow tests the wrong way as well as the right one.** A wrong sign-in code, an address nobody registered, a rejection with no reason, a request over the balance, a date clash, a colleague trying a control only an Admin has. Each guard was broken on purpose once and its test watched fail (13 Oct 2026).
+- **`screens.spec.ts` covers every screen it can reach,** found by following the app's own links and menus, as HR, an employee and a manager, at laptop and phone size. On each screen, and in each card tab and Configuration section, every button, link and field must have a name, nothing may scroll sideways, and the browser must report no error. A new screen is covered the day it is linked. Its first run found the approval threshold box with no name.
+- **New screens get a flow test when they change data.** Add it to the module's spec file, with a negative case beside each positive one.
+
+### Mutation testing: do the tests notice a break?
+
+A passing test only proves something if it fails when the code is wrong. Stryker (`stryker.config.mjs`) checks that by breaking the TypeScript on purpose, one small change at a time: a `>` turned into `>=`, a condition forced true, a word emptied. It runs the unit tests against each break. A break no test notices **survives**, and each survivor is a rule, message or branch nothing pins.
+
+```bash
+bun run mutate src/modules/employee/format.ts
+```
+
+- **Run it on the file or folder you changed**, not the whole app: one file takes about three minutes; all of `src` takes hours. The report is at `reports/mutation/index.html` (local, not committed).
+- **Every survivor is either fixed with a test or explained.** Some can never change what a person sees. For example, `end < start` becoming `end <= start` in `describeShift` is harmless, because the database forbids a shift that starts and ends at the same time. Say so in the PR; don't chase 100%.
+- **No incremental cache.** It reported stale survivors for module-level constants after the tests that kill them were added (tried 13 Oct 2026).
+- **SQL is out of its reach.** Database guards are sabotaged through the harness, by changing the migration and watching the harness fail.
+
+First run, on `src/modules/employee/format.ts`: 80% → 97%. It found that the weekly-off wording for Monday, Tuesday and Thursday, three month names, and every family plural, `wives` included, could be blanked with no test failing. Day shifts and zero-break shifts were never checked either.
 
 ---
 

@@ -16,10 +16,19 @@
 
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
-import { cancelLeave, getApprovalTimeline, getMyBalances, getMyRequests } from "../handlers";
+import {
+  cancelLeave,
+  getApprovalTimeline,
+  getLeaveTypes,
+  getMyBalances,
+  getMyRequests,
+} from "../handlers";
+import { ModuleLink } from "@/platform/modules";
 import { BalanceCard } from "./BalanceCard";
 import type { ApprovalStep, LeaveBalance, LeaveRequest } from "../contracts";
 import { StatusBadge } from "@/components/shared/status-badge";
+import { Panel } from "@/components/shared/panel";
+import { formatRange } from "@/lib/dates";
 import { LEAVE_STATUS_LABEL, LEAVE_STATUS_TONE } from "../status";
 
 const FILTERS = [
@@ -42,6 +51,10 @@ export default function MyLeave() {
   const [timeline, setTimeline] = useState<ApprovalStep[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
+  /** D89: whether the company has compensatory off to claim. */
+  const [hasEarned, setHasEarned] = useState(false);
+  /** D90: the types credited monthly, so their cards can say why Entitled grows. */
+  const [monthly, setMonthly] = useState<Set<string>>(new Set());
 
   async function load() {
     const [b, r] = await Promise.all([getMyBalances(), getMyRequests()]);
@@ -54,6 +67,14 @@ export default function MyLeave() {
     load()
       .then(() => !cancelled && setState("ready"))
       .catch(() => !cancelled && setState("error"));
+    // Decoration: failing it leaves the link out, never the page.
+    getLeaveTypes()
+      .then((t) => {
+        if (cancelled) return;
+        setHasEarned(t.some((x) => x.kind === "earned"));
+        setMonthly(new Set(t.filter((x) => x.accrual === "monthly").map((x) => x.id)));
+      })
+      .catch(() => {});
     return () => {
       cancelled = true;
     };
@@ -118,7 +139,7 @@ export default function MyLeave() {
   if (state === "error") {
     return (
       <div className="max-w-md">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your leave just now. Try refreshing.
         </p>
@@ -127,9 +148,25 @@ export default function MyLeave() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="flex min-w-0 flex-col gap-4">
       <section>
-        <h1 className="font-display text-lg font-semibold">My leave</h1>
+        <div className="flex flex-wrap items-baseline justify-between gap-2">
+          <div>
+            <h1 className="text-page-title font-semibold tracking-page-title">My leave</h1>
+            <p className="mt-1 text-sm text-foreground-secondary">
+              What you have left this year, and every request you have made. Open one to see who
+              decided it.
+            </p>
+          </div>
+          {hasEarned && (
+            <ModuleLink
+              path="leave/comp-off"
+              className="text-sm font-medium text-primary hover:underline"
+            >
+              Claim compensatory off
+            </ModuleLink>
+          )}
+        </div>
 
         {balances.length === 0 ? (
           <p className="mt-2 text-sm text-muted-foreground">
@@ -137,44 +174,50 @@ export default function MyLeave() {
             leave types.
           </p>
         ) : (
-          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-4 grid gap-3 @min-[560px]/app:grid-cols-2 @min-[900px]/app:grid-cols-3">
             {balances.map((b) => (
-              <BalanceCard key={`${b.leaveTypeId}-${b.fyLabel}`} balance={b} />
+              <BalanceCard
+                key={`${b.leaveTypeId}-${b.fyLabel}`}
+                balance={b}
+                monthly={monthly.has(b.leaveTypeId)}
+              />
             ))}
           </div>
         )}
       </section>
 
-      <section>
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <h2 className="font-display text-base font-semibold">History</h2>
-          <div className="flex flex-wrap gap-2" role="group" aria-label="Filter requests">
+      <Panel
+        title="History"
+        testId="panel-history"
+        aside={
+          <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filter requests">
             {FILTERS.map((f) => (
               <button
                 key={f.key}
                 onClick={() => setFilter(f.key)}
                 aria-pressed={filter === f.key}
                 data-testid={`filter-${f.key}`}
-                className={`inline-flex h-12 items-center rounded-md border px-3 text-sm ${
+                className={`inline-flex min-h-9 items-center rounded-md border px-3 text-sm ${
                   filter === f.key
-                    ? "border-foreground bg-secondary font-medium"
-                    : "border-border text-muted-foreground"
+                    ? "border-primary bg-accent font-medium text-foreground"
+                    : "border-border text-muted-foreground hover:text-foreground"
                 }`}
               >
                 {f.label}
               </button>
             ))}
           </div>
-        </div>
-
+        }
+        footer="Cancelling gives the days straight back. Whether a request can still be cancelled is decided when you press the button."
+      >
         {visible.length === 0 ? (
-          <p className="mt-4 text-sm text-muted-foreground">
+          <p className="text-sm text-muted-foreground">
             {requests.length === 0
               ? "You haven't requested any leave yet."
               : "Nothing matches that filter."}
           </p>
         ) : (
-          <ul className="mt-4 divide-y divide-border">
+          <ul className="-my-3 divide-y divide-border">
             {visible.map((r) => {
               const open = openId === r.id;
               return (
@@ -187,8 +230,8 @@ export default function MyLeave() {
                   >
                     <span className="min-w-0">
                       <span className="block truncate text-sm font-medium">{r.leaveTypeName}</span>
-                      <span className="block text-xs text-muted-foreground">
-                        {r.fromDate} to {r.toDate} · {r.workingDays}{" "}
+                      <span className="block text-caption text-muted-foreground">
+                        {formatRange(r.fromDate, r.toDate)} · {r.workingDays}{" "}
                         {r.workingDays === 1 ? "day" : "days"}
                       </span>
                     </span>
@@ -200,11 +243,11 @@ export default function MyLeave() {
                   {open && (
                     <div
                       data-testid="request-detail"
-                      className="mt-3 rounded-md bg-secondary/40 p-4"
+                      className="mt-3 rounded-lg border border-border bg-secondary/40 p-4"
                     >
                       {r.reason && <p className="text-sm">{r.reason}</p>}
 
-                      <h3 className="mt-3 text-xs uppercase tracking-wide text-muted-foreground">
+                      <h3 className="mt-3 text-eyebrow font-semibold tracking-eyebrow text-muted-foreground uppercase">
                         Approval
                       </h3>
                       {timeline.length === 0 ? (
@@ -218,6 +261,17 @@ export default function MyLeave() {
                               <span className="text-sm">
                                 <span className="text-muted-foreground">Level {s.level}</span>{" "}
                                 {s.approverName}
+                                {s.decidedBy && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    Decided by {s.decidedBy} on their behalf
+                                  </span>
+                                )}
+                                {s.escalatedFrom && (
+                                  <span className="block text-xs text-muted-foreground">
+                                    Moved up from {s.escalatedFrom}, who had it longer than the
+                                    company allows
+                                  </span>
+                                )}
                                 {s.comments && (
                                   <span className="block text-xs text-muted-foreground">
                                     “{s.comments}”
@@ -272,7 +326,7 @@ export default function MyLeave() {
             })}
           </ul>
         )}
-      </section>
+      </Panel>
     </div>
   );
 }

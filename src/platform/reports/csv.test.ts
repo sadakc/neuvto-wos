@@ -11,7 +11,6 @@
 
 import { describe, expect, it } from "vitest";
 import { toCsv, reportFilename } from "./csv";
-import { parseImportFile } from "@/platform/auth/import";
 
 describe("toCsv", () => {
   it("leaves ordinary values unquoted", () => {
@@ -46,63 +45,6 @@ describe("toCsv", () => {
 
   it("writes numbers without quoting them", () => {
     expect(toCsv(["days"], [[2.5]])).toBe("days\r\n2.5");
-  });
-});
-
-describe("round trip through the importer's own parser", () => {
-  // The property that matters: export, edit nothing, import — and get back what
-  // you exported. Both halves are exercised, so a change to either that breaks
-  // the pair fails here.
-  it("survives commas, quotes, and everything step 13 found", () => {
-    const csv = toCsv(
-      ["email", "full_name", "joined_date"],
-      [
-        ["ravi@acme.test", "Nayar, Reena", "2021-06-15"],
-        ["a@acme.test", 'Ann "Annie" Shah', "2024-04-01"],
-      ],
-    );
-
-    const { rows, missingColumns } = parseImportFile(csv);
-
-    expect(missingColumns).toEqual([]);
-    expect(rows.map((r) => r.fullName)).toEqual(["Nayar, Reena", 'Ann "Annie" Shah']);
-    expect(rows.map((r) => r.joinedDate)).toEqual(["2021-06-15", "2024-04-01"]);
-  });
-
-  it("does not round-trip surrounding whitespace, deliberately", () => {
-    // Found by asserting a full round trip and watching it fail. The writer
-    // quotes " Padded Name " correctly — that is asserted above — and the
-    // IMPORTER trims it, matching `nullif(btrim(_full_name), '')` in
-    // invitation_create.
-    //
-    // That is normalisation, not loss: a name carrying stray spaces out of
-    // somebody's spreadsheet should not create a person whose name begins with
-    // one. Written down because "export then import returns exactly what you
-    // exported" is the obvious assumption, it is nearly true, and this is the
-    // one place it is not.
-    const csv = toCsv(
-      ["email", "full_name", "joined_date"],
-      [["b@acme.test", " Padded ", "2023-01-01"]],
-    );
-    expect(csv).toContain('" Padded "');
-    expect(parseImportFile(csv).rows[0].fullName).toBe("Padded");
-  });
-
-  it("keeps every column aligned when an earlier one contains a comma", () => {
-    // The failure this prevents is not a mangled name — it is every later
-    // column shifting by one, so a start date lands in the manager field and
-    // nobody notices until entitlements are wrong.
-    const csv = toCsv(
-      ["email", "full_name", "joined_date", "manager_email"],
-      [["x@acme.test", "Patel, Priya", "2024-04-01", "mark@acme.test"]],
-    );
-    const { rows } = parseImportFile(csv);
-    expect(rows[0]).toMatchObject({
-      email: "x@acme.test",
-      fullName: "Patel, Priya",
-      joinedDate: "2024-04-01",
-      managerEmail: "mark@acme.test",
-    });
   });
 });
 

@@ -75,7 +75,7 @@ stack — it resets local and replays a backup into it. It never connects to pro
   contrast for every pairing and fails the build under AA. This is how we learned that
   `--primary` had never been `#0EA5E9` — the authored OKLCH was outside sRGB, so every
   browser clipped it to a colour nobody chose.
-- **The employee app is dark by default, the console is always light** (`design/theme.ts`).
+- **The app follows the device's light or dark setting, the console is always light** (`design/theme.ts`, D77).
   The console's theme is not a preference: a platform admin must never mistake it for a
   tenant workspace (D42).
 

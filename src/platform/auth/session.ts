@@ -101,12 +101,15 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     throw new AppError("NO_ORGANIZATION", "Your account is not linked to a workspace yet.", 404);
   }
 
-  const { data: roleRows, error: rolesError } = await supabase
-    .from("user_roles")
-    .select("role")
-    .eq("user_id", session.user.id);
+  const [{ data: roleRows, error: rolesError }, { data: moduleRows, error: moduleError }] =
+    await Promise.all([
+      supabase.from("user_roles").select("role").eq("user_id", session.user.id),
+      // D84. RLS returns only live rows in the caller's own organisation.
+      supabase.from("module_admins").select("module_key").eq("user_id", session.user.id),
+    ]);
 
   if (rolesError) throw toAppError(rolesError, "getCurrentUser.roles");
+  if (moduleError) throw toAppError(moduleError, "getCurrentUser.moduleAdmin");
 
   return {
     id: profile.id,
@@ -115,6 +118,7 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
     organizationId: profile.organization_id,
     organizationName: profile.organizations?.name ?? "",
     roles: (roleRows ?? []).map((r) => r.role as AppRole),
+    moduleAdmin: (moduleRows ?? []).map((r) => r.module_key),
   };
 }
 
@@ -122,9 +126,28 @@ export function hasRole(user: CurrentUser | null, role: AppRole): boolean {
   return user?.roles.includes(role) ?? false;
 }
 
-/** Mirrors the database `is_admin()` — org_admin or hr_admin. */
+/** Mirrors the database `is_admin()`: super_admin, org_admin or hr_admin. */
 export function isAdmin(user: CurrentUser | null): boolean {
-  return hasRole(user, "org_admin") || hasRole(user, "hr_admin");
+  return hasRole(user, "super_admin") || hasRole(user, "org_admin") || hasRole(user, "hr_admin");
+}
+
+/**
+ * Mirrors `is_module_admin()` (D84): a company-wide Admin, or somebody a Super
+ * Admin made this module's admin. Decides only what a screen offers; every
+ * function the module calls asks the database the same question.
+ */
+export function isModuleAdmin(user: CurrentUser | null, moduleKey: string): boolean {
+  return isAdmin(user) || (user?.moduleAdmin?.includes(moduleKey) ?? false);
+}
+
+/** True when the person administers at least one module, by grant or company-wide. */
+export function administersAnyModule(user: CurrentUser | null): boolean {
+  return isAdmin(user) || (user?.moduleAdmin?.length ?? 0) > 0;
+}
+
+/** Mirrors `is_super_admin()` (D78): the only tier that grants administrator roles. */
+export function isSuperAdmin(user: CurrentUser | null): boolean {
+  return hasRole(user, "super_admin");
 }
 
 /**
