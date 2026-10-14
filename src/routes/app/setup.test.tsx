@@ -1,18 +1,13 @@
 // @vitest-environment happy-dom
 
 /**
- * D78 — the set-up wizard's "Your team" step, and who it lets you invite.
+ * The set-up wizard invites nobody (Sada, 14 Oct 2026, D110). There is one
+ * way into the company: a person's record, Employee Card › Add Employee. The
+ * wizard's old "Your team" step was a second, and so was People's form; both
+ * are gone, and the database refuses an invitation made any other way.
  *
- * An invitation is a role grant that arrives later, so only a Super Admin may
- * invite somebody as an administrator. `InviteTeam.test.tsx` proves the form
- * narrows its list when told to. What it cannot prove is that this screen
- * tells it — and the wizard is where a newly provisioned administrator invites
- * their first colleagues, so it is the likeliest place for the wrong flag to
- * hand an Admin an "Administrator" option the database will only refuse.
- *
- * The real InviteTeam renders; only its network is replaced. Everything the
- * other steps reach for is stubbed to nothing, because they are not on screen
- * at the step under test.
+ * Everything the steps reach for is stubbed to nothing; what is under test is
+ * which steps there are and what the last one says.
  */
 
 import { describe, expect, it, vi } from "vitest";
@@ -58,40 +53,31 @@ vi.mock("@/platform/organization", () => ({
   getOrganization: async () => null,
   listDepartments: async () => [],
 }));
-vi.mock("@/platform/auth/members", () => ({ inviteMember: vi.fn() }));
 
 import { Route } from "./setup";
 
 const SetupWizard = (Route as unknown as { component: () => React.ReactElement }).component;
 
-async function openTeamStep(callerRoles: string[]) {
-  h.callerRoles = callerRoles;
+function openWizard() {
   window.scrollTo = vi.fn() as unknown as typeof window.scrollTo;
-  const user = userEvent.setup();
   render(<SetupWizard />);
-  await user.click(await screen.findByRole("button", { name: /^Your team/ }));
-  await screen.findByLabelText("Role");
 }
 
-function inviteRoleValues(): string[] {
-  const select = screen.getByLabelText("Role") as HTMLSelectElement;
-  return [...select.options].map((o) => o.value);
-}
-
-describe("Set-up wizard — Your team", () => {
-  it("does not let an Admin who is not a Super Admin invite an Administrator", async () => {
-    await openTeamStep(["org_admin"]);
-
-    const values = inviteRoleValues();
-    expect(values).not.toContain("org_admin");
-    expect(values).not.toContain("super_admin");
-    expect(values).not.toContain("hr_admin");
-    expect(values).toContain("employee");
+describe("Set-up wizard — one way in", () => {
+  it("has no team step and no invite form", async () => {
+    openWizard();
+    expect(await screen.findByRole("button", { name: /^Modules/ })).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Your team/ })).toBeNull();
+    expect(screen.queryByLabelText("Role")).toBeNull();
+    expect(screen.queryByRole("button", { name: /Send invitation/ })).toBeNull();
   });
 
-  it("lets a Super Admin invite an Administrator", async () => {
-    await openTeamStep(["super_admin"]);
-
-    expect(inviteRoleValues()).toContain("org_admin");
+  it("says, at the end, where people are added", async () => {
+    openWizard();
+    const user = userEvent.setup();
+    await user.click(await screen.findByRole("button", { name: /^Done/ }));
+    expect(await screen.findByTestId("setup-add-people")).toHaveTextContent(
+      "start their record and invite them from it",
+    );
   });
 });

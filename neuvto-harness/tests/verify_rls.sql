@@ -1033,6 +1033,8 @@ begin
       -- exist yet. That is the ordering a customer's spreadsheet actually has,
       -- and the half that is easy to get wrong.
       perform pg_temp.as_user(alice);
+      -- D110: invitations come from a record; marked as employee_send_invite marks them.
+      perform set_config('neuvto.inviting', 'record', true);
       perform public.invitation_create('import.report@acme.test', null, 'employee',
         'Imported Report', date '2022-03-01', 'import.boss@acme.test', null);
       perform public.invitation_create('import.boss@acme.test', null, 'manager',

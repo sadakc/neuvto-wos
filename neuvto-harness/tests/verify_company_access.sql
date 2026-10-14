@@ -110,9 +110,12 @@ begin
   perform pg_temp.ca_refused('an hr_admin cannot grant the Statutory role', hema,
     format('select public.member_set_roles(%L, ''{employee,statutory_officer}'')', priya),
     'ROLE_NOT_YOURS_TO_GRANT');
+  -- D110: an invitation comes from a record; marked as employee_send_invite marks it.
+  perform set_config('neuvto.inviting', 'record', true);
   perform pg_temp.ca_refused('an hr_admin cannot invite an org_admin either', hema,
     $q$select public.invitation_create('new.admin@acme.test', null, 'org_admin', 'New Admin')$q$,
     'ROLE_NOT_YOURS_TO_GRANT');
+  perform set_config('neuvto.inviting', '', true);
   -- The old way round: straight at the table, which four policies used to allow.
   perform pg_temp.ca_refused('an hr_admin cannot insert a role row directly', hema,
     format($q$insert into public.user_roles (user_id, organization_id, role)

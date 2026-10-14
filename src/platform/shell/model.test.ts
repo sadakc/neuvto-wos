@@ -72,7 +72,12 @@ describe("what each role is offered", () => {
     // Approvals for anyone who can approve, including the Supervisor and
     // Coordinator the old nav forgot (it checked manager and admins only).
     expect(labels(shell, "home").includes("Approvals"), `${name}: home Approvals`).toBe(approver);
-    expect(labels(shell, "leave").includes("Approvals"), `${name}: leave Approvals`).toBe(approver);
+    // Leave's own queue is named for what is in it (Sada, 14 Oct 2026); Home's
+    // stays Approvals, for the company's own decisions.
+    expect(labels(shell, "leave").includes("Leave approvals"), `${name}: Leave approvals`).toBe(
+      approver,
+    );
+    expect(labels(shell, "leave").includes("Approvals"), `${name}: no bare Approvals`).toBe(false);
 
     // Company tabs and the Organisation entry for administrators only. Not
     // disabled for everyone else: absent. Approval rules and Reports belong

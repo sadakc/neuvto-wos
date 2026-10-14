@@ -1,5 +1,5 @@
 import { Panel } from "@/components/shared/panel";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { Suspense, useEffect, useState } from "react";
 import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { Delegations } from "@/platform/approvals/Delegations";
@@ -32,8 +32,15 @@ export const Route = createFileRoute("/app/approvals")({
  * request routed correctly, emailed the right approver, and then waited forever.
  */
 function ApprovalsPage() {
+  // Opened from a module's tab (?m=), that module's requests alone, named for
+  // it: "Leave approvals". From Home, everything waiting on you (Sada, 14 Oct
+  // 2026: Home's queue is the company's own decisions; leave is its own).
+  const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
+  const moduleKey = typeof search.m === "string" ? search.m : undefined;
+  const scoped = moduleKey ? moduleByKey(moduleKey) : undefined;
+  const title = scoped ? `${scoped.shortName ?? scoped.name} approvals` : "Approvals";
   const [user, setUser] = useState<CurrentUser | null>(null);
-  const [items, setItems] = useState<ApprovalQueueItem[]>([]);
+  const [allItems, setItems] = useState<ApprovalQueueItem[]>([]);
   const [views, setViews] = useState<Map<string, ModuleApprovalView & { moduleKey: string }>>(
     new Map(),
   );
@@ -56,6 +63,10 @@ function ApprovalsPage() {
       (prev) => new Set([...prev].filter((id) => queue.some((q) => q.approvalRequestId === id))),
     );
   }
+
+  const items = moduleKey
+    ? allItems.filter((i) => views.get(i.entityType)?.moduleKey === moduleKey)
+    : allItems;
 
   async function onApproveSelected() {
     const ids = items.map((i) => i.approvalRequestId).filter((id) => selected.has(id));
@@ -125,7 +136,7 @@ function ApprovalsPage() {
   return (
     <div className="flex min-w-0 flex-col gap-4 pb-16">
       <div>
-        <h1 className="text-page-title font-semibold tracking-page-title">Approvals</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">{title}</h1>
         <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
           Waiting on you. Something appears here only while it is at your level — an earlier level
           that has not decided yet is not yours to act on.

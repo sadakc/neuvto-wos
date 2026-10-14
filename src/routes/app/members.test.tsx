@@ -35,10 +35,6 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children?: React.ReactNode }) => children,
 }));
 
-vi.mock("@/platform/auth/InviteTeam", () => ({
-  InviteTeam: () => null,
-}));
-
 const MARK = "mark-id";
 const RAVI = "ravi-id";
 const PRIYA = "priya-id";

@@ -15,8 +15,8 @@
  */
 
 import { supabase } from "@/integrations/supabase/client";
-import { AppError, toAppError, type ErrorCode } from "@/platform/errors";
-import { InviteInput, type AppRole } from "./contracts";
+import { AppError, toAppError } from "@/platform/errors";
+import type { AppRole } from "./contracts";
 
 export interface Member {
   id: string;
@@ -54,59 +54,6 @@ export interface Invitation {
   revokedAt: string | null;
   /** The link, so an administrator can pass it on when email is slow. */
   inviteUrl: string | null;
-}
-
-/** Duplicates INSIDE this organisation. These are the admin's own data. */
-const INVITE_ERRORS: Partial<Record<ErrorCode, { message: string; field?: string }>> = {
-  ALREADY_A_MEMBER: {
-    message: "Somebody with that email address is already in this workspace.",
-    field: "email",
-  },
-  ALREADY_INVITED: {
-    message:
-      "That email address has already been invited. Revoke the invitation to change the role.",
-    field: "email",
-  },
-  PHONE_ALREADY_A_MEMBER: {
-    message: "Somebody with that phone number is already in this workspace.",
-    field: "phone",
-  },
-  PHONE_ALREADY_INVITED: {
-    message: "That phone number has already been invited.",
-    field: "phone",
-  },
-  INVALID_EMAIL: { message: "Enter a valid email address.", field: "email" },
-  NAME_REQUIRED: {
-    message: "Enter their name — it is how they appear on every screen.",
-    field: "fullName",
-  },
-  FORBIDDEN: { message: "Only an administrator can invite people.", field: undefined },
-};
-
-export async function inviteMember(input: unknown): Promise<string> {
-  const parsed = InviteInput.parse(input);
-
-  const { data, error } = await supabase.rpc("invitation_create", {
-    _email: parsed.email,
-    _phone: parsed.phone || undefined,
-    _role: parsed.role,
-    _full_name: parsed.fullName || undefined,
-    _department_id: parsed.departmentId || undefined,
-  });
-
-  if (error) {
-    // D78. Inviting somebody as an administrator is granting them the role.
-    if (error.message.includes("ROLE_NOT_YOURS_TO_GRANT")) {
-      throw new AppError("FORBIDDEN", ROLE_NOT_YOURS, 403, { field: "role" });
-    }
-    const code = (Object.keys(INVITE_ERRORS) as ErrorCode[]).find((k) => error.message.includes(k));
-    if (code) {
-      const e = INVITE_ERRORS[code]!;
-      throw new AppError(code, e.message, 400, e.field ? { field: e.field } : undefined);
-    }
-    throw toAppError(error, "inviteMember");
-  }
-  return data as string;
 }
 
 export async function revokeInvitation(id: string): Promise<void> {

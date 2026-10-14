@@ -136,7 +136,9 @@ export function buildShell(
       if (approver) {
         tabs.push({
           id: "approvals",
-          label: "Approvals",
+          // Named for what is in it: Home's Approvals is the company's own
+          // decisions, a module's is its requests (Sada, 14 Oct 2026).
+          label: `${m.shortName ?? m.name} approvals`,
           to: "/app/approvals",
           module: m.key,
           group: "team",

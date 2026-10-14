@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.22 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.23 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -806,7 +806,8 @@ company's for everybody and the person's own line on the card; approval rules an
 belong to Leave.
 
 - **One way in.** People no longer has an invite form, nor the link to the old spreadsheet
-  import. A person is invited from their record (Add Employee), and once they accept they
+  import; since D110 neither does the setup wizard, the old import is gone, and the database
+  refuses an invitation not made from a record (`INVITE_FROM_THE_RECORD`). A person is invited from their record (Add Employee), and once they accept they
   are in every module. People keeps Waiting to join (copy the link, withdraw), who is in,
   their access, deactivation, and the reporting line.
 - **Organisation is everybody's now**, holding what the modules place there

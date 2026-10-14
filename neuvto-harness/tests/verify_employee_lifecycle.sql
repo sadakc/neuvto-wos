@@ -156,6 +156,11 @@ begin
   perform pg_temp.lc_refused('an Admin cannot invite an Admin (D78)', hema,
     format($q$select public.employee_send_invite(%L, 'org_admin')$q$, d), 'ROLE_NOT_YOURS_TO_GRANT');
   perform pg_temp.lc_do(hema, format('select public.employee_send_invite(%L)', d));
+  -- D110: the record is the one way in. Inviting from it leaves no opening
+  -- behind it, and the invite function on its own refuses even an Admin.
+  perform pg_temp.lc_refused('nobody invites except from a record', hema,
+    $q$select public.invitation_create('round.the.record@acme.test', null, 'employee', 'Round It')$q$,
+    'INVITE_FROM_THE_RECORD');
   select i.* into inv from public.invitations i join public.employees e on e.invitation_id = i.id where e.id = d;
   if inv.email <> 'nisha.rao@acme.test' or inv.full_name <> 'Nisha R. Rao' or inv.joined_date <> '2026-11-01'
      or inv.department_id <> ops or inv.manager_email <> 'mark.manager@acme.test' then

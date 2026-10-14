@@ -1,13 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useState } from "react";
-import {
-  getCurrentUser,
-  isAdmin,
-  isSuperAdmin,
-  listInvitations,
-  listMembers,
-  type CurrentUser,
-} from "@/platform/auth";
+import { getCurrentUser, isAdmin, type CurrentUser } from "@/platform/auth";
 import { supabase } from "@/integrations/supabase/client";
 import { isAppError } from "@/platform/errors";
 import { OrgModules } from "@/platform/modules";
@@ -19,7 +12,6 @@ import {
   getOrganization,
   type Organization,
 } from "@/platform/organization";
-import { InviteTeam } from "@/platform/auth/InviteTeam";
 
 export const Route = createFileRoute("/app/setup")({
   ssr: false,
@@ -43,24 +35,24 @@ export const Route = createFileRoute("/app/setup")({
  *
  * Every step saves as it goes, and every step can be skipped. A wizard that
  * cannot be abandoned half-way is one people abandon at the beginning.
+ *
+ * It invites nobody (D110): there is one way into the company, the person's
+ * record. The last step says where that is.
  */
 
 interface SetupState {
   org: Organization | null;
   /** At least one module switched on. */
   hasModule: boolean;
-  /** Anybody besides the administrator — a member or an outstanding invitation. */
-  hasPeople: boolean;
 }
 
-type StepKey = "welcome" | "identity" | "calendar" | "modules" | "people" | "done";
+type StepKey = "welcome" | "identity" | "calendar" | "modules" | "done";
 
 const STEPS: { key: StepKey; label: string }[] = [
   { key: "welcome", label: "Welcome" },
   { key: "identity", label: "Your company" },
   { key: "calendar", label: "Working calendar" },
   { key: "modules", label: "Modules" },
-  { key: "people", label: "Your team" },
   { key: "done", label: "Done" },
 ];
 
@@ -82,8 +74,6 @@ function isDone(step: StepKey, s: SetupState): boolean {
       return Boolean(s.org?.displayName || s.org?.logoPath || s.org?.industryType);
     case "modules":
       return s.hasModule;
-    case "people":
-      return s.hasPeople;
     default:
       return true;
   }
@@ -93,26 +83,18 @@ function SetupWizard() {
   const navigate = useNavigate();
   const [user, setUser] = useState<CurrentUser | null>(null);
   const [state, setState] = useState<"loading" | "ready" | "denied">("loading");
-  const [data, setData] = useState<SetupState>({ org: null, hasModule: false, hasPeople: false });
+  const [data, setData] = useState<SetupState>({ org: null, hasModule: false });
   const [step, setStep] = useState<StepKey>("welcome");
   const [error, setError] = useState("");
 
   const refresh = useCallback(async () => {
-    const [org, mods, members, invites] = await Promise.all([
+    const [org, mods] = await Promise.all([
       getOrganization(),
       supabase.from("organization_modules").select("enabled"),
-      listMembers().catch(() => []),
-      listInvitations("").catch(() => []),
     ]);
     const next: SetupState = {
       org,
       hasModule: (mods.data ?? []).some((m) => m.enabled),
-      // A PENDING invitation, not any invitation. The administrator arrived
-      // through one of their own, and counting it told them "Your team —
-      // already set" about a workspace containing exactly themselves. Their own
-      // invitation is accepted by the time they read this, so excluding
-      // accepted ones is both correct and the simplest rule that is.
-      hasPeople: members.length > 1 || invites.some((i) => !i.revokedAt && !i.acceptedAt),
     };
     setData(next);
     return next;
@@ -267,20 +249,9 @@ function SetupWizard() {
           title="Modules"
           blurb="What Neuvto has added to your workspace. Switch on what you want your people using."
           onBack={() => void go("calendar")}
-          onNext={() => void go("people")}
-        >
-          <OrgModules user={user} />
-        </StepShell>
-      )}
-
-      {step === "people" && (
-        <StepShell
-          title="Your team"
-          blurb="Invite the people who will use this. They get an email with a link, confirm their address with a six-digit code, and land straight in your workspace."
-          onBack={() => void go("modules")}
           onNext={() => void go("done")}
         >
-          <InviteTeam onInvited={() => void refresh()} canGrantAdmin={isSuperAdmin(user)} />
+          <OrgModules user={user} />
         </StepShell>
       )}
 
@@ -315,6 +286,14 @@ function SetupWizard() {
               change any of this later under Settings.
             </p>
           )}
+
+          <p
+            data-testid="setup-add-people"
+            className="mt-4 max-w-prose text-sm text-muted-foreground"
+          >
+            To bring your people in, start their record and invite them from it: each one gets an
+            email with a link, and lands in every module you switched on.
+          </p>
 
           <p className="mt-4 max-w-prose text-sm text-muted-foreground">
             Modules you switched on may have their own setup — leave types, for instance. Your

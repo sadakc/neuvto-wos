@@ -21,7 +21,6 @@ import { Route as AppSettingsRouteImport } from './routes/app/settings'
 import { Route as AppSecurityRouteImport } from './routes/app/security'
 import { Route as AppReportsRouteImport } from './routes/app/reports'
 import { Route as AppMembersRouteImport } from './routes/app/members'
-import { Route as AppImportRouteImport } from './routes/app/import'
 import { Route as AppApprovalsRouteImport } from './routes/app/approvals'
 import { Route as AppApprovalRulesRouteImport } from './routes/app/approval-rules'
 import { Route as AppSplatRouteImport } from './routes/app/$'
@@ -90,11 +89,6 @@ const AppMembersRoute = AppMembersRouteImport.update({
   path: '/members',
   getParentRoute: () => AppRouteRoute,
 } as any)
-const AppImportRoute = AppImportRouteImport.update({
-  id: '/import',
-  path: '/import',
-  getParentRoute: () => AppRouteRoute,
-} as any)
 const AppApprovalsRoute = AppApprovalsRouteImport.update({
   id: '/approvals',
   path: '/approvals',
@@ -145,7 +139,6 @@ export interface FileRoutesByFullPath {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
-  '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
   '/app/security': typeof AppSecurityRoute
@@ -166,7 +159,6 @@ export interface FileRoutesByTo {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
-  '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
   '/app/security': typeof AppSecurityRoute
@@ -189,7 +181,6 @@ export interface FileRoutesById {
   '/app/$': typeof AppSplatRoute
   '/app/approval-rules': typeof AppApprovalRulesRoute
   '/app/approvals': typeof AppApprovalsRoute
-  '/app/import': typeof AppImportRoute
   '/app/members': typeof AppMembersRoute
   '/app/reports': typeof AppReportsRoute
   '/app/security': typeof AppSecurityRoute
@@ -213,7 +204,6 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
-    | '/app/import'
     | '/app/members'
     | '/app/reports'
     | '/app/security'
@@ -234,7 +224,6 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
-    | '/app/import'
     | '/app/members'
     | '/app/reports'
     | '/app/security'
@@ -256,7 +245,6 @@ export interface FileRouteTypes {
     | '/app/$'
     | '/app/approval-rules'
     | '/app/approvals'
-    | '/app/import'
     | '/app/members'
     | '/app/reports'
     | '/app/security'
@@ -367,13 +355,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AppMembersRouteImport
       parentRoute: typeof AppRouteRoute
     }
-    '/app/import': {
-      id: '/app/import'
-      path: '/import'
-      fullPath: '/app/import'
-      preLoaderRoute: typeof AppImportRouteImport
-      parentRoute: typeof AppRouteRoute
-    }
     '/app/approvals': {
       id: '/app/approvals'
       path: '/approvals'
@@ -430,7 +411,6 @@ interface AppRouteRouteChildren {
   AppSplatRoute: typeof AppSplatRoute
   AppApprovalRulesRoute: typeof AppApprovalRulesRoute
   AppApprovalsRoute: typeof AppApprovalsRoute
-  AppImportRoute: typeof AppImportRoute
   AppMembersRoute: typeof AppMembersRoute
   AppReportsRoute: typeof AppReportsRoute
   AppSecurityRoute: typeof AppSecurityRoute
@@ -443,7 +423,6 @@ const AppRouteRouteChildren: AppRouteRouteChildren = {
   AppSplatRoute: AppSplatRoute,
   AppApprovalRulesRoute: AppApprovalRulesRoute,
   AppApprovalsRoute: AppApprovalsRoute,
-  AppImportRoute: AppImportRoute,
   AppMembersRoute: AppMembersRoute,
   AppReportsRoute: AppReportsRoute,
   AppSecurityRoute: AppSecurityRoute,

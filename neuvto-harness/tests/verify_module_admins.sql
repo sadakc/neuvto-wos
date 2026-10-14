@@ -224,10 +224,17 @@ begin
   perform pg_temp.ma_allowed('an Employee Admin adds a draft', dan,
     $q$select public.employee_create_draft('{"fullName":"Nisha Rao"}')$q$);
   perform pg_temp.ma_allowed('and reads the overview', dan, 'select public.employee_admin_overview()');
+  -- D110: an invitation comes from a record. Round it, even the Employee Admin is refused;
+  -- marked as employee_send_invite marks it, the role rules below still hold.
+  perform pg_temp.ma_refused('and invites only from a record', dan,
+    $q$select public.invitation_create('nisha.rao@acme.test', null, 'employee', 'Nisha Rao')$q$,
+    'INVITE_FROM_THE_RECORD');
+  perform set_config('neuvto.inviting', 'record', true);
   perform pg_temp.ma_allowed('and invites an employee', dan,
     $q$select public.invitation_create('nisha.rao@acme.test', null, 'employee', 'Nisha Rao')$q$);
   perform pg_temp.ma_refused('but cannot invite an administrator', dan,
     $q$select public.invitation_create('boss@acme.test', null, 'hr_admin', 'A Boss')$q$, 'ROLE_NOT_YOURS_TO_GRANT');
+  perform set_config('neuvto.inviting', '', true);
   perform pg_temp.ma_refused('nor read the Leave reports', dan,
     'select count(*) from public.leave_all_balances()', 'FORBIDDEN');
   perform pg_temp.ma_refused('nor set an opening balance', dan,

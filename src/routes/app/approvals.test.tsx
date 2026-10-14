@@ -20,10 +20,14 @@ import type { ApprovalQueueItem } from "@/platform/approvals";
 const h = vi.hoisted(() => ({
   listApprovalQueue: vi.fn(),
   approveMany: vi.fn(),
+  /** The page's ?m=, as the router holds it. */
+  search: {} as Record<string, unknown>,
 }));
 
 vi.mock("@tanstack/react-router", () => ({
   createFileRoute: () => (opts: unknown) => opts,
+  useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
+    select({ location: { search: h.search } }),
 }));
 vi.mock("@/platform/auth", () => ({
   getCurrentUser: async () => ({
@@ -45,8 +49,14 @@ vi.mock("@/platform/modules", () => ({
   getApprovalViews: async () =>
     new Map([
       ["leave_request", { entityType: "leave_request", moduleKey: "leave", component: null }],
+      ["record_change", { entityType: "record_change", moduleKey: "employee", component: null }],
     ]),
-  moduleByKey: (key: string) => (key === "leave" ? { key, name: "Leave Management" } : undefined),
+  moduleByKey: (key: string) =>
+    key === "leave"
+      ? { key, name: "Leave Management", shortName: "Leave" }
+      : key === "employee"
+        ? { key, name: "Employee Card" }
+        : undefined,
 }));
 vi.mock("@/platform/approvals/Delegations", () => ({
   Delegations: ({ modules, isAdmin }: { modules: { name: string }[]; isAdmin: boolean }) => (
@@ -87,6 +97,7 @@ const row = (
 
 beforeEach(() => {
   vi.resetAllMocks();
+  h.search = {};
   h.listApprovalQueue.mockResolvedValue([
     row("a", "Ravi Employee", 3, 2),
     row("b", "Priya Employee", 1, 2),
@@ -162,5 +173,26 @@ describe("handing approvals over (D92)", () => {
   it("offers an approver the hand-over, with the workspace's modules that have approvals", async () => {
     render(<Page />);
     expect(await screen.findByTestId("delegations")).toHaveTextContent("Leave Management|false");
+  });
+});
+
+describe("whose approvals (Sada, 14 Oct 2026)", () => {
+  const change = { ...row("z", "Zara Changed", 0, null), entityType: "record_change" };
+
+  it("opened from Leave: Leave approvals, and only leave requests", async () => {
+    h.listApprovalQueue.mockResolvedValue([row("a", "Ravi Employee", 3, 2), change]);
+    h.search = { m: "leave" };
+    render(<Page />);
+    expect(await screen.findByRole("heading", { name: "Leave approvals" })).toBeInTheDocument();
+    expect(await screen.findByText("Ravi Employee")).toBeInTheDocument();
+    expect(screen.queryByText("Zara Changed")).toBeNull();
+  });
+
+  it("opened from Home: everything waiting on you", async () => {
+    h.listApprovalQueue.mockResolvedValue([row("a", "Ravi Employee", 3, 2), change]);
+    render(<Page />);
+    expect(await screen.findByRole("heading", { name: "Approvals" })).toBeInTheDocument();
+    expect(await screen.findByText("Zara Changed")).toBeInTheDocument();
+    expect(screen.getByText("Ravi Employee")).toBeInTheDocument();
   });
 });
