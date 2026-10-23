@@ -4,9 +4,11 @@
  * it on a narrow one, and one section shown at a time in its own panel.
  */
 
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { usePhone, useSubNav } from "@/platform/shell";
 import { Panel } from "./panel";
+import { SectionList } from "./section-list";
 
 export interface PageSection {
   id: string;
@@ -34,6 +36,63 @@ export function SectionedPage({
   const [chosen, setChosen] = useState<string | null>(null);
   const current = sections.find((s) => s.id === chosen) ?? sections[0];
   const number = (i: number) => String(i + 1).padStart(2, "0");
+
+  // Doc 11.4: on a phone, a vertical list of the sections, then one at a time,
+  // carried by the app bar's title menu. Never a sideways-scrolling row.
+  const phone = usePhone();
+  const [phoneChosen, setPhoneChosen] = useState("");
+  const phoneCurrent = sections.find((s) => s.id === phoneChosen);
+  useSubNav(
+    phone && sections.length > 0
+      ? {
+          title,
+          items: sections.map((s, i) => ({ id: s.id, label: `${number(i)} ${s.label}` })),
+          current: phoneCurrent?.id ?? "",
+          select: setPhoneChosen,
+          clear: () => setPhoneChosen(""),
+        }
+      : null,
+  );
+  useEffect(() => {
+    if (phone) window.scrollTo?.(0, 0);
+  }, [phone, phoneChosen]);
+
+  if (phone) {
+    if (phoneCurrent) {
+      return (
+        <div className="flex min-w-0 flex-col gap-4 pb-16">
+          <Panel title={phoneCurrent.label} testId={`${testIdPrefix}-panel`}>
+            {phoneCurrent.description && (
+              <p className="mb-4 max-w-prose text-sm text-muted-foreground">
+                {phoneCurrent.description}
+              </p>
+            )}
+            {phoneCurrent.content}
+          </Panel>
+        </div>
+      );
+    }
+    return (
+      <div className="flex min-w-0 flex-col gap-4 pb-16">
+        <div>
+          <h1 className="text-page-title font-semibold tracking-page-title">{title}</h1>
+          {description && (
+            <p className="mt-1 max-w-prose text-sm text-foreground-secondary">{description}</p>
+          )}
+        </div>
+        {sections.length === 0 ? (
+          empty && <p className="text-sm text-muted-foreground">{empty}</p>
+        ) : (
+          <SectionList
+            label={`${title} sections`}
+            testIdPrefix={testIdPrefix}
+            items={sections.map((s, i) => ({ id: s.id, label: `${number(i)} ${s.label}` }))}
+            onSelect={setPhoneChosen}
+          />
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="flex min-w-0 flex-col gap-4 pb-16">

@@ -12,3 +12,6 @@ export { fitTabs, fitRail, railMode, PICK_WIDTH } from "./fit";
 export { TabBar, hiddenNote } from "./TabBar";
 export { ModuleRail } from "./ModuleRail";
 export { NavPanel } from "./NavPanel";
+export { PHONE_WIDTH, isPhoneWidth, moduleHome, sectionGroups, homeTiles } from "./phone";
+export { usePhone, useSubNav, type SubNav, type SubNavItem } from "./phone-context";
+export { PhoneProvider } from "./PhoneProvider";

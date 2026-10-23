@@ -160,3 +160,12 @@ describe("a reason, when the notice carries one (D113)", () => {
     expect(within(approved).queryByTestId("notice-reason")).toBeNull();
   });
 });
+
+describe("in the phone's app bar (doc 11.7)", () => {
+  it("is sized by the caller, so it can be the 48px a thumb needs", () => {
+    render(<NotificationBell className="size-12" />);
+    const bell = screen.getByTestId("bell");
+    expect(bell.className).toContain("size-12");
+    expect(bell.className).not.toContain("size-10");
+  });
+});

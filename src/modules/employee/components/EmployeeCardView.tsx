@@ -17,7 +17,9 @@
  * the card carried one, which it does for the person and the Employee Admin.
  */
 
-import { useRef, useState, type KeyboardEvent } from "react";
+import { usePhone, useSubNav } from "@/platform/shell";
+import { SectionList } from "@/components/shared/section-list";
+import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
 import { cn } from "@/lib/utils";
 import {
@@ -104,6 +106,27 @@ function cardTabs(card: EmployeeCard): { key: TabKey; label: string }[] {
   return tabs;
 }
 
+/** One line under each section in the phone's index and its sheet (doc 11.4). */
+const SECTION_HINT: Record<TabKey, string> = {
+  overview: "Contact, deployment, emergency contact, this year",
+  personal: "Identity, education, physical record",
+  family: "Family members and nominees",
+  employment: "Position, shift and calendar, previous employers",
+  statutory: "PF, ESIC, bank, identity documents",
+  history: "Addresses, postings and changes over time",
+  documents: "Files on record, and who opened them",
+};
+
+const SECTION_GROUP: Record<TabKey, string> = {
+  overview: "Record",
+  personal: "Record",
+  family: "Record",
+  employment: "Record",
+  statutory: "Compliance",
+  documents: "Compliance",
+  history: "Audit trail",
+};
+
 export function EmployeeCardView({
   card,
   onChanged = () => {},
@@ -114,6 +137,30 @@ export function EmployeeCardView({
 }) {
   const tabs = cardTabs(card);
   const [tab, setTab] = useState<TabKey>("overview");
+  // Doc 11.4: on a phone the record is an index of its sections, then one
+  // section at a time, carried by the app bar's title menu. "" is the index.
+  const phone = usePhone();
+  const [phoneTab, setPhoneTab] = useState<TabKey | "">("");
+  const phoneActive = tabs.some((t) => t.key === phoneTab) ? (phoneTab as TabKey) : "";
+  useSubNav(
+    phone
+      ? {
+          title: card.fullName ?? "Record",
+          items: tabs.map((t) => ({
+            id: t.key,
+            label: t.label,
+            hint: SECTION_HINT[t.key],
+            group: SECTION_GROUP[t.key],
+          })),
+          current: phoneActive,
+          select: (id) => setPhoneTab(id as TabKey),
+          clear: () => setPhoneTab(""),
+        }
+      : null,
+  );
+  useEffect(() => {
+    if (phone) window.scrollTo?.(0, 0);
+  }, [phone, phoneActive]);
   const [requestsSent, setRequestsSent] = useState(0);
   const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
   const active = tabs.some((t) => t.key === tab) ? tab : "overview";
@@ -176,6 +223,47 @@ export function EmployeeCardView({
   // station on record, when the truth is that this viewer may not know.
   if ("nearestPoliceStation" in card) {
     strip.push({ label: "Nearest police station", value: card.nearestPoliceStation });
+  }
+
+  const panel = (key: TabKey) => (
+    <>
+      {key === "overview" && (
+        <div className="flex flex-col gap-4">
+          <Overview card={card} onChanged={onChanged} />
+          {card.capabilities.canRequestChange && <MyChangeRequests refreshKey={requestsSent} />}
+        </div>
+      )}
+      {key === "personal" && <Personal card={card} onChanged={onChanged} />}
+      {key === "family" && <Family card={card} onChanged={onChanged} />}
+      {key === "employment" && (
+        <Employment
+          card={card}
+          onChanged={onChanged}
+          onSeeHistory={
+            tabs.some((t) => t.key === "history")
+              ? () => (phone ? setPhoneTab("history") : setTab("history"))
+              : undefined
+          }
+        />
+      )}
+      {key === "statutory" && <StatutoryTab card={card} onChanged={onChanged} />}
+      {key === "history" && <History card={card} onChanged={onChanged} />}
+      {key === "documents" && (
+        <DocumentsTab
+          employeeId={card.id}
+          isAdmin={card.relationship.includes("admin")}
+          isSelf={card.relationship.includes("self")}
+        />
+      )}
+    </>
+  );
+
+  if (phone && phoneActive) {
+    return (
+      <div className="flex min-w-0 flex-col gap-4" data-testid="record-section">
+        {panel(phoneActive)}
+      </div>
+    );
   }
 
   return (
@@ -273,71 +361,57 @@ export function EmployeeCardView({
         </dl>
       </section>
 
-      {/* ── sub-tabs */}
-      <div
-        role="tablist"
-        aria-label="Record sections"
-        className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border"
-      >
-        {tabs.map((t) => (
-          <button
-            key={t.key}
-            ref={(el) => {
-              tabRefs.current[t.key] = el;
-            }}
-            role="tab"
-            type="button"
-            id={`card-tab-${t.key}`}
-            aria-selected={active === t.key}
-            aria-controls={`card-panel-${t.key}`}
-            tabIndex={active === t.key ? 0 : -1}
-            onClick={() => setTab(t.key)}
-            onKeyDown={onTabKey}
-            className={cn(
-              "-mb-px h-11 shrink-0 border-b-2 px-3 text-sm whitespace-nowrap",
-              active === t.key
-                ? "border-primary font-semibold text-foreground"
-                : "border-transparent text-muted-foreground hover:text-foreground",
-            )}
+      {/* ── sub-tabs; on a phone, the index of sections instead (doc 11.4) */}
+      {phone ? (
+        <SectionList
+          label={`${card.fullName ?? "This person"}'s record`}
+          testIdPrefix="record"
+          items={tabs.map((t) => ({ id: t.key, label: t.label, hint: SECTION_HINT[t.key] }))}
+          onSelect={(id) => setPhoneTab(id as TabKey)}
+        />
+      ) : (
+        <>
+          <div
+            role="tablist"
+            aria-label="Record sections"
+            className="flex gap-1 overflow-x-auto overflow-y-hidden border-b border-border"
           >
-            {t.label}
-          </button>
-        ))}
-      </div>
-
-      <div
-        role="tabpanel"
-        id={`card-panel-${active}`}
-        aria-labelledby={`card-tab-${active}`}
-        className="min-w-0"
-      >
-        {active === "overview" && (
-          <div className="flex flex-col gap-4">
-            <Overview card={card} onChanged={onChanged} />
-            {card.capabilities.canRequestChange && <MyChangeRequests refreshKey={requestsSent} />}
+            {tabs.map((t) => (
+              <button
+                key={t.key}
+                ref={(el) => {
+                  tabRefs.current[t.key] = el;
+                }}
+                role="tab"
+                type="button"
+                id={`card-tab-${t.key}`}
+                aria-selected={active === t.key}
+                aria-controls={`card-panel-${t.key}`}
+                tabIndex={active === t.key ? 0 : -1}
+                onClick={() => setTab(t.key)}
+                onKeyDown={onTabKey}
+                className={cn(
+                  "-mb-px h-11 shrink-0 border-b-2 px-3 text-sm whitespace-nowrap",
+                  active === t.key
+                    ? "border-primary font-semibold text-foreground"
+                    : "border-transparent text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {t.label}
+              </button>
+            ))}
           </div>
-        )}
-        {active === "personal" && <Personal card={card} onChanged={onChanged} />}
-        {active === "family" && <Family card={card} onChanged={onChanged} />}
-        {active === "employment" && (
-          <Employment
-            card={card}
-            onChanged={onChanged}
-            onSeeHistory={
-              tabs.some((t) => t.key === "history") ? () => setTab("history") : undefined
-            }
-          />
-        )}
-        {active === "statutory" && <StatutoryTab card={card} onChanged={onChanged} />}
-        {active === "history" && <History card={card} onChanged={onChanged} />}
-        {active === "documents" && (
-          <DocumentsTab
-            employeeId={card.id}
-            isAdmin={card.relationship.includes("admin")}
-            isSelf={card.relationship.includes("self")}
-          />
-        )}
-      </div>
+
+          <div
+            role="tabpanel"
+            id={`card-panel-${active}`}
+            aria-labelledby={`card-tab-${active}`}
+            className="min-w-0"
+          >
+            {panel(active)}
+          </div>
+        </>
+      )}
     </div>
   );
 }

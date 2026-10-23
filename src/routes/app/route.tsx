@@ -192,6 +192,38 @@ function AppShell() {
           </div>
         </div>
       }
+      phone={{
+        initials,
+        trailing: <NotificationBell className="size-12 rounded-full" />,
+        drawer: (
+          <div className="flex flex-col gap-1">
+            <Link
+              to="/app/security"
+              className="flex min-h-12 items-center rounded-md px-3 text-sm hover:bg-muted"
+            >
+              <span className="min-w-0">
+                <span className="block">Sign-in and security</span>
+                <span className="block truncate text-caption text-muted-foreground">
+                  {user?.email}
+                </span>
+              </span>
+            </Link>
+            <div className="flex min-h-12 items-center justify-between rounded-md px-3 text-sm">
+              Theme
+              <ThemeToggle />
+            </div>
+            <button
+              onClick={async () => {
+                await signOut();
+                window.location.href = "/auth";
+              }}
+              className="flex min-h-12 items-center rounded-md px-3 text-left text-sm hover:bg-muted"
+            >
+              Sign out
+            </button>
+          </div>
+        ),
+      }}
       actions={
         <>
           {/* D111: what has happened for you, newest first. */}

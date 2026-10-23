@@ -38,4 +38,28 @@ describe("shared dialogs", () => {
     expect(screen.getByTestId("a").className).toMatch(/max-h-\[calc\(100dvh-2rem\)\]/);
     expect(screen.getByTestId("a").className).toMatch(/overflow-y-auto/);
   });
+
+  it("are bottom sheets under 600px, both kinds (doc 11.5)", () => {
+    render(
+      <>
+        <Dialog open>
+          <DialogContent data-testid="d">
+            <DialogTitle>A dialog</DialogTitle>
+          </DialogContent>
+        </Dialog>
+        <AlertDialog open>
+          <AlertDialogContent data-testid="a">
+            <AlertDialogTitle>A confirmation</AlertDialogTitle>
+          </AlertDialogContent>
+        </AlertDialog>
+      </>,
+    );
+    for (const id of ["d", "a"]) {
+      const c = screen.getByTestId(id).className;
+      expect(c).toMatch(/max-\[599px\]:bottom-0/);
+      expect(c).toMatch(/max-\[599px\]:top-auto/);
+      expect(c).toMatch(/max-\[599px\]:rounded-t-\[18px\]/);
+      expect(c).toMatch(/max-\[599px\]:max-w-none/);
+    }
+  });
 });

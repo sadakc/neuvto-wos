@@ -24,7 +24,11 @@ export const employee: ModuleDefinition = {
     // Your own reporting line. The whole company's chart, and the directory
     // of everybody, are views of the company: under Organisation, where the
     // directory is for its admins only (Sada, 14 Oct 2026).
-    { label: "Org Chart", to: "/app/employee/my-org-chart" },
+    {
+      label: "Org Chart",
+      to: "/app/employee/my-org-chart",
+      description: "Who you report to, up to the top",
+    },
     {
       label: "Directory",
       to: "/app/employee/directory",
@@ -32,7 +36,12 @@ export const employee: ModuleDefinition = {
       moduleAdmin: true,
       description: "Everybody, with their unit and status; open a record to edit it",
     },
-    { label: "Org Chart", to: "/app/employee/org-chart", placement: "organisation" },
+    {
+      label: "Org Chart",
+      to: "/app/employee/org-chart",
+      placement: "organisation",
+      description: "The whole company, from the top",
+    },
     {
       label: "Add Employee",
       to: "/app/employee/add",

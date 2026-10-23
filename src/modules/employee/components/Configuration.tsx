@@ -14,6 +14,8 @@
  * change on their own card. Only a Super Admin sets them.
  */
 
+import { usePhone, useSubNav } from "@/platform/shell";
+import { SectionList } from "@/components/shared/section-list";
 import { emptyMessage } from "@/lib/required";
 import { ChevronDown, ChevronUp, Lock } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -75,8 +77,63 @@ const th =
   "px-3 py-2 text-left text-table-header font-semibold tracking-table-header whitespace-nowrap text-muted-foreground uppercase";
 const errorText = (e: unknown, fallback: string) => (isAppError(e) ? e.message : fallback);
 
+function SectionBody({ section }: { section: Section }) {
+  return (
+    <>
+      {section === "fields" && <FieldsSection />}
+      {section === "units" && <UnitsSection />}
+      {section === "rules" && <RulesSection />}
+      {section === "onboarding" && <OnboardingSection />}
+      {section === "access" && <AccessSection />}
+      {section === "calendars" && <CalendarsAndShifts />}
+    </>
+  );
+}
+
 export default function Configuration() {
   const [section, setSection] = useState<Section>("fields");
+  // Doc 11.4: on a phone, a vertical list of the sections, then one at a time,
+  // carried by the app bar's title menu.
+  const phone = usePhone();
+  const [phoneSection, setPhoneSection] = useState<Section | "">("");
+  useSubNav(
+    phone
+      ? {
+          title: "Configuration",
+          items: SECTIONS.map(([id, label]) => ({ id, label })),
+          current: phoneSection,
+          select: (id) => setPhoneSection(id as Section),
+          clear: () => setPhoneSection(""),
+        }
+      : null,
+  );
+  useEffect(() => {
+    if (phone) window.scrollTo?.(0, 0);
+  }, [phone, phoneSection]);
+
+  if (phone) {
+    return phoneSection ? (
+      <div className="flex min-w-0 flex-col gap-4">
+        <SectionBody section={phoneSection} />
+      </div>
+    ) : (
+      <div className="flex min-w-0 flex-col gap-4">
+        <div>
+          <h1 className="text-page-title font-semibold tracking-page-title">Configuration</h1>
+          <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
+            The lists the record is built from, and the rules it keeps.
+          </p>
+        </div>
+        <SectionList
+          label="Configuration sections"
+          testIdPrefix="config"
+          items={SECTIONS.map(([id, label]) => ({ id, label }))}
+          onSelect={(id) => setPhoneSection(id as Section)}
+        />
+      </div>
+    );
+  }
+
   return (
     <div className="flex min-w-0 flex-col gap-4">
       <div>
@@ -109,12 +166,7 @@ export default function Configuration() {
           </ul>
         </nav>
         <div className="min-w-0">
-          {section === "fields" && <FieldsSection />}
-          {section === "units" && <UnitsSection />}
-          {section === "rules" && <RulesSection />}
-          {section === "onboarding" && <OnboardingSection />}
-          {section === "access" && <AccessSection />}
-          {section === "calendars" && <CalendarsAndShifts />}
+          <SectionBody section={section} />
         </div>
       </div>
     </div>

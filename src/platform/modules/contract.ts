@@ -222,6 +222,19 @@ export interface ModuleDefinition {
   configurationDescription?: string;
 
   /**
+   * The section a phone opens this module on, its home (doc 11.3): the tiles
+   * for the rest sit above it. The first section when omitted.
+   */
+  home?: string;
+  /**
+   * One live line per tile on the phone home, keyed by a section's `to`
+   * ("5.25 days available"). From data the module already serves; a tile
+   * without one shows its description. Failing quietly is fine: a tile with no
+   * line is still a tile.
+   */
+  tileLines?: (user: CurrentUser | null) => Promise<Record<string, string>>;
+
+  /**
    * A function, not an array, because what a manager sees differs from what an
    * employee sees. Hiding a link is presentation; RLS is what actually refuses
    * the data.

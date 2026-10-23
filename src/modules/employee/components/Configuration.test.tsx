@@ -22,6 +22,7 @@
  *   employee_field_settings() output (__fixtures__/fieldSettings.json).
  */
 
+import { PhoneProvider } from "@/platform/shell";
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
@@ -557,5 +558,23 @@ describe("a unit's state (D106)", () => {
       "Karnataka",
       "Maharashtra",
     ]);
+  });
+});
+
+describe("on a phone (doc 11.4)", () => {
+  it("is a list of its sections, then one at a time", async () => {
+    const user = userEvent.setup();
+    render(
+      <PhoneProvider phone>
+        <Configuration />
+      </PhoneProvider>,
+    );
+    expect(screen.getByTestId("config-units")).toHaveTextContent("02 Deployment units");
+    expect(
+      document.querySelector('nav[aria-label="Configuration sections"] .overflow-x-auto'),
+    ).toBeNull();
+    await user.click(screen.getByTestId("config-calendars"));
+    expect(screen.queryByTestId("config-units")).toBeNull();
+    expect(await screen.findByRole("button", { name: "Add a calendar" })).toBeInTheDocument();
   });
 });

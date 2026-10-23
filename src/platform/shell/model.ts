@@ -30,6 +30,7 @@
 import type { ComponentType } from "react";
 import type { CurrentUser } from "@/platform/auth";
 import { canApprove, isAdmin, isModuleAdmin } from "@/platform/auth";
+import { listApprovalQueue } from "@/platform/approvals";
 import type { ModuleDefinition, ModuleSection } from "@/platform/modules";
 
 export type TabGroup = "main" | "team" | "company";
@@ -59,6 +60,10 @@ export interface ShellModule {
   tabs: ShellTab[];
   /** How many tabs this module has that the person's roles do not reach. */
   hiddenForRole: number;
+  /** The tab a phone opens the module on (doc 11.3). */
+  homeTabId?: string;
+  /** Live lines for the phone's tiles, keyed by a tab's `to`. */
+  tileLines?: ModuleDefinition["tileLines"];
 }
 
 export const HOME_KEY = "home";
@@ -86,7 +91,13 @@ export function buildShell(
     tabs: [
       { id: "dashboard", label: "Dashboard", to: "/app", group: "main" },
       // D79. Everybody's own: how they sign in, including face or fingerprint.
-      { id: "security", label: "Sign-in and security", to: "/app/security", group: "main" },
+      {
+        id: "security",
+        label: "Sign-in and security",
+        to: "/app/security",
+        group: "main",
+        description: "How you sign in, and face or fingerprint",
+      },
       ...(approver
         ? [
             {
@@ -100,6 +111,13 @@ export function buildShell(
         : []),
     ],
     hiddenForRole: approver ? 0 : 1,
+    // The phone's Approvals tile says how many are waiting (doc 11.3).
+    tileLines: approver
+      ? () =>
+          listApprovalQueue().then((q) => ({
+            "/app/approvals": q.length ? `${q.length} waiting on you` : "Nothing waiting on you",
+          }))
+      : undefined,
   };
 
   // Tabs modules place under Organisation, and how many of those the person
@@ -189,12 +207,40 @@ export function buildShell(
       icon: m.icon,
       tabs,
       hiddenForRole: hidden,
+      homeTabId: tabs.find((t) => m.home && t.to === m.home)?.id,
+      // The module's own lines, and the platform's for its approvals tab: how
+      // many of this module's requests are waiting on the person (doc 11.3).
+      tileLines: tabs.some((t) => t.id === "approvals")
+        ? async () => {
+            const [own, queue] = await Promise.allSettled([
+              m.tileLines?.(user) ?? Promise.resolve({}),
+              listApprovalQueue(),
+            ]);
+            const lines: Record<string, string> =
+              own.status === "fulfilled" ? { ...own.value } : {};
+            if (queue.status === "fulfilled") {
+              const n = queue.value.filter((q) =>
+                m.approvalEntityTypes.includes(q.entityType),
+              ).length;
+              lines["/app/approvals"] = n ? `${n} waiting on you` : "Nothing waiting on you";
+            }
+            return lines;
+          }
+        : m.tileLines && (() => m.tileLines!(user)),
     };
   });
 
   const orgTabs: ShellTab[] = [
     ...(admin
-      ? [{ id: "people", label: "People", to: "/app/members", group: "main" as const }]
+      ? [
+          {
+            id: "people",
+            label: "People",
+            to: "/app/members",
+            group: "main" as const,
+            description: "Who is in, who is waiting to join, and their access",
+          },
+        ]
       : []),
     ...placed,
     ...(admin

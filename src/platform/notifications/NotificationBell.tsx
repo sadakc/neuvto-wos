@@ -31,7 +31,8 @@ function reasonOf(n: Notice): string | null {
   return typeof r === "string" && r.trim() ? r.trim() : null;
 }
 
-export function NotificationBell() {
+/** `className` sizes the button: 48px in the phone's app bar (doc 11.7). */
+export function NotificationBell({ className }: { className?: string } = {}) {
   const navigate = useNavigate();
   const [open, setOpen] = useState(false);
   const [unread, setUnread] = useState(0);
@@ -94,7 +95,10 @@ export function NotificationBell() {
           type="button"
           aria-label={unread > 0 ? `Notifications, ${unread} unread` : "Notifications"}
           data-testid="bell"
-          className="relative inline-flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+          className={cn(
+            "relative inline-flex size-10 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground",
+            className,
+          )}
         >
           <Bell className="size-5" aria-hidden />
           {unread > 0 && (

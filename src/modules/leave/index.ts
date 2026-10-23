@@ -40,8 +40,18 @@ export const leave: ModuleDefinition = {
     // Core HR labels (D76). Apply first: it is what most people come for.
     { label: "Apply Leave", to: "/app/leave/apply" },
     { label: "My Leave", to: "/app/leave" },
-    { label: "Calendar", to: "/app/leave/calendar" },
+    { label: "Calendar", to: "/app/leave/calendar", description: "Who is away, by month" },
   ],
+
+  // Doc 11.3: on a phone, My Leave is the home (balances and history), and
+  // Apply and the rest are tiles above it.
+  home: "/app/leave",
+  tileLines: async () => {
+    const { getMyBalances } = await import("./handlers");
+    const balances = await getMyBalances();
+    const days = balances.reduce((n, b) => n + Number(b.availableDays), 0);
+    return { "/app/leave/apply": `${days} ${days === 1 ? "day" : "days"} available` };
+  },
 
   routes: [
     { path: "leave", component: lazy(() => import("./components/MyLeave")) },

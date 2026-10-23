@@ -1,6 +1,6 @@
 # NEUVTO WOS — Design System
 
-**Version:** 2.1 · **Status:** Active · **Applies to:** every screen, web and native
+**Version:** 2.2 · **Status:** Active · **Applies to:** every screen, web and native
 **Audience:** designers, engineers, and AI build tools — all three work from this file
 
 The contract between design and code. A designer should be able to open this, look at a
@@ -316,6 +316,45 @@ whenever the value changes (a module appended out of order then duplicates a hea
 The rail lists only the modules **granted and switched on** for this organisation
 (D44). Adding a module is a manifest change only (D32). With 12 modules nothing scrolls
 sideways at any width.
+
+### The phone shell, under 600px (D115)
+
+Below 600px the desktop shell is **replaced, not adapted** ([CORE_HR_PHONE_LAYOUT.md](CORE_HR_PHONE_LAYOUT.md),
+the Core HR pack's doc 11). The rail's `grid` mode and the tab bar's `pick` mode above are
+never reached on a phone any more; they stay for a narrow pane at 600px and over.
+
+- **App bar, 64px, sticky**, the only chrome above the content. Leading: the avatar at a
+  module's home (opens the drawer), a back arrow anywhere else. The title is a button, the
+  current section's name over the module's, with a chevron; it opens the **section sheet**.
+  Trailing: the bell.
+- **Bottom bar, 80px**: Home, Employees, Leave and Organisation (Sada, 23 Oct 2026: all
+  four, nothing in the drawer), a pill behind the current one, label always shown.
+- **Section sheet**: every section of the current level, grouped `For you`, `For your
+team`, `Company`, the current one marked, a footer counting what is hidden for the role;
+  52px rows, 18px top corners, a handle, scrolling inside past 78%.
+- **A module's home** (`home` in the manifest, else its first section; Leave's is My Leave)
+  shows `What do you want to do` and a two-column grid of tiles for its other sections
+  above its own content, and one full-width `Company` tile that opens the sheet. A tile's
+  second line is live where the module already serves the number (`tileLines`: days
+  available, requests waiting on you), else the section's description.
+- **Moving sideways replaces the history entry**, so back from a section reached through
+  the menu lands on the level's home. The back arrow goes to the module's home.
+- **A second level inside a screen** (a person's record, Settings, Employee Configuration)
+  is declared with `useSubNav`: with nothing chosen the screen shows its index, a
+  `SectionList` (58px rows, a one-line hint); with one chosen it shows that section alone,
+  the title menu lists its siblings and the back arrow returns to the index. The tiles are
+  not shown above an open section.
+- **Every dialog is a bottom sheet** under 600px (the shared `Dialog` and `AlertDialog`).
+- Not yet, by decision (Sada, 23 Oct 2026, first round): dropdowns stay the phone's own
+  picker rather than a custom sheet; tables keep scrolling inside their own box rather than
+  becoming card lists; no Undo snackbars and no floating action button; Add Employee stays
+  one form. The Android back gesture closes the browser's page, not an open sheet.
+
+One shell model feeds the desktop tabs, the tiles and the sheet, so a section the role
+may not open is absent from all three at once. Proved by `src/platform/shell/phone.test.ts`
+and `PhoneFrame.test.tsx`, and by a sweep of 22 screens at 360, 390, 430, 599, 600, 834 and
+1440px: no sideways scroll at any width; under 600px a 64px app bar, no tab row, no rail
+and no navigation control under 48px; at 600px and over, the desktop shell.
 
 ### Native (Core HR Mobile)
 
