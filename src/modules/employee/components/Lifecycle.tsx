@@ -44,7 +44,9 @@ import {
   getAdminOverview,
   getDeactivationPreview,
   listDesignations,
+  resendInvite,
   sendInvite,
+  withdrawInvite,
   updateDraft,
   updateEmployee,
   type Option,
@@ -608,6 +610,114 @@ export function DraftEditor({
         },
       ]}
     />
+  );
+}
+
+/**
+ * D118: somebody invited who will not join, or never got the email. The Admin
+ * sends a fresh invitation (the old link stops working) or withdraws it; a
+ * withdrawn record is a draft again, to correct and invite again, or leave.
+ */
+export function InvitationActions({
+  card,
+  onChanged,
+}: {
+  card: EmployeeCard;
+  onChanged: () => Promise<void> | void;
+}) {
+  const [busy, setBusy] = useState<"resend" | "withdraw" | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const [notice, setNotice] = useState("");
+  const [error, setError] = useState("");
+  const expires = card.capabilities.invitationExpiresAt;
+
+  async function run(what: "resend" | "withdraw") {
+    setError("");
+    setNotice("");
+    setBusy(what);
+    try {
+      if (what === "resend") {
+        await resendInvite(card.id);
+        setNotice("A fresh invitation was sent. The old link no longer works.");
+      } else {
+        await withdrawInvite(card.id);
+        setConfirming(false);
+      }
+      await onChanged();
+    } catch (err) {
+      setError(errorText(err, "That couldn't be done. Try again."));
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  return (
+    <div className="flex flex-col items-start gap-1" data-testid="invitation-actions">
+      <div className="flex flex-wrap gap-2">
+        <button
+          type="button"
+          data-testid="resend-invite"
+          disabled={busy !== null}
+          onClick={() => void run("resend")}
+          className="h-11 rounded-md border border-border px-4 text-sm font-medium disabled:opacity-45"
+        >
+          {busy === "resend" ? "Sending…" : "Send a fresh invitation"}
+        </button>
+        <button
+          type="button"
+          data-testid="withdraw-invite"
+          disabled={busy !== null}
+          onClick={() => setConfirming(true)}
+          className="h-11 rounded-md border border-destructive-line px-4 text-sm font-medium text-destructive disabled:opacity-45"
+        >
+          Withdraw invitation
+        </button>
+      </div>
+      {expires && (
+        <p className="text-caption text-muted-foreground">
+          The invitation they were sent works until {formatDate(expires)}.
+        </p>
+      )}
+      {notice && (
+        <p role="status" data-testid="invitation-notice" className="text-caption text-success">
+          {notice}
+        </p>
+      )}
+      {error && (
+        <p role="alert" data-testid="invitation-error" className="text-caption text-destructive">
+          {error}
+        </p>
+      )}
+      <Dialog open={confirming} onOpenChange={(o) => busy === null && setConfirming(o)}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Withdraw {card.fullName}&apos;s invitation?</DialogTitle>
+            <DialogDescription>
+              The link they were sent stops working. Their record is kept as a draft, which you can
+              correct and invite again, or leave.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex flex-wrap gap-2">
+            <button
+              type="button"
+              data-testid="withdraw-invite-confirm"
+              disabled={busy !== null}
+              onClick={() => void run("withdraw")}
+              className="h-11 rounded-md bg-destructive px-4 text-sm font-semibold text-destructive-foreground disabled:opacity-45"
+            >
+              {busy === "withdraw" ? "Withdrawing…" : "Withdraw invitation"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setConfirming(false)}
+              className="h-11 rounded-md border border-border px-4 text-sm"
+            >
+              Keep it
+            </button>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </div>
   );
 }
 

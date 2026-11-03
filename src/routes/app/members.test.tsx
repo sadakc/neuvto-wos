@@ -152,11 +152,12 @@ vi.mock("@/platform/auth", async () => ({
   isSuperAdmin: (u: { roles?: string[] } | null) => !!u?.roles?.includes("super_admin"),
   setMemberRoles: vi.fn(),
   listMembers: async () => MEMBERS,
-  listInvitations: async () => [],
+  listInvitations: vi.fn(async () => []),
   deactivateMember: vi.fn(),
   deactivationImpact: vi.fn(),
   reactivateMember: vi.fn(),
   revokeInvitation: vi.fn(),
+  resendInvitation: vi.fn(),
   setJoinedDate: vi.fn(),
   setReportingLine: vi.fn(),
 }));
@@ -184,7 +185,13 @@ vi.mock("@/platform/organization", () => ({
 import { MembersPage } from "./members";
 // The same mocked functions the component imports, so a test can decide what
 // the database says back.
-import { deactivateMember, deactivationImpact, setReportingLine } from "@/platform/auth";
+import {
+  deactivateMember,
+  deactivationImpact,
+  listInvitations,
+  resendInvitation,
+  setReportingLine,
+} from "@/platform/auth";
 
 async function renderPeople() {
   render(<MembersPage />);
@@ -611,5 +618,32 @@ describe("People — handing over to nobody (D113)", () => {
     await user.click(go);
     expect(within(confirm).getByText("Hand their work to can't be empty.")).toBeInTheDocument();
     expect(deactivateMember).not.toHaveBeenCalled();
+  });
+});
+
+describe("People — somebody waiting to join (D118)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("can be sent a fresh invitation, and says the old link is dead", async () => {
+    vi.mocked(listInvitations).mockResolvedValue([
+      {
+        id: "inv-1",
+        email: "kavya@acme.test",
+        fullName: "Kavya Rao",
+        role: "employee",
+        expiresAt: "2026-11-17T00:00:00Z",
+        inviteUrl: null,
+      },
+    ] as never);
+    vi.mocked(resendInvitation).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    await renderPeople();
+    const row = await screen.findByTestId("pending-invitation");
+    await user.click(within(row).getByTestId("resend-invitation"));
+    expect(resendInvitation).toHaveBeenCalledWith("inv-1");
+    expect(await screen.findByTestId("resent-notice")).toHaveTextContent(
+      "The old link no longer works",
+    );
+    expect(within(row).getByTestId("revoke-invitation")).toBeInTheDocument();
   });
 });

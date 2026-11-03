@@ -48,6 +48,7 @@ export {
 } from "./platform";
 export {
   revokeInvitation,
+  resendInvitation,
   listInvitations,
   listMembers,
   listDirectReports,

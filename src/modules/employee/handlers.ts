@@ -6,6 +6,7 @@
  * may not see, so the JSON that arrives is already the right shape.
  */
 
+import { randomId } from "@/lib/random-id";
 import { supabase } from "@/integrations/supabase/client";
 import { AppError } from "@/platform/errors";
 import {
@@ -438,6 +439,18 @@ export async function sendInvite(employeeId: string): Promise<void> {
   if (error) throw toEmployeeError(error.message, error.details);
 }
 
+/** D118: the invitation waiting on this record is withdrawn; the record is a draft again. */
+export async function withdrawInvite(employeeId: string): Promise<void> {
+  const { error } = await supabase.rpc("employee_withdraw_invite", { _employee_id: employeeId });
+  if (error) throw toEmployeeError(error.message, error.details);
+}
+
+/** D118: a fresh invitation, the waiting one's link withdrawn. */
+export async function resendInvite(employeeId: string): Promise<void> {
+  const { error } = await supabase.rpc("employee_resend_invite", { _employee_id: employeeId });
+  if (error) throw toEmployeeError(error.message, error.details);
+}
+
 export async function getAdminOverview(): Promise<AdminOverview> {
   const { data, error } = await supabase.rpc("employee_admin_overview");
   if (error) throw toEmployeeError(error.message, error.details);
@@ -745,7 +758,7 @@ async function uploadToRecord(employeeId: string, file: File): Promise<string> {
   const { data: org, error: orgErr } = await supabase.rpc("current_org_id");
   if (orgErr || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
   const safe = file.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
-  const path = `${org}/${employeeId}/${crypto.randomUUID()}-${safe}`;
+  const path = `${org}/${employeeId}/${randomId()}-${safe}`;
   const { error: upErr } = await supabase.storage
     .from(DOCUMENT_BUCKET)
     .upload(path, file, { contentType: file.type, upsert: false });

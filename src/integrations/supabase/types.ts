@@ -4334,6 +4334,10 @@ export type Database = {
         Returns: Json
       }
       employee_import_pick: { Args: { _map: Json; _r: Json }; Returns: Json }
+      employee_invite_back_to_draft: {
+        Args: { _invitation_id: string }
+        Returns: string
+      }
       employee_items_for_the_person: { Args: never; Returns: string[] }
       employee_make_manager: {
         Args: { _profile_id: string }
@@ -4429,6 +4433,10 @@ export type Database = {
       employee_require_writer: {
         Args: { _employee_id: string; _fields: string[] }
         Returns: undefined
+      }
+      employee_resend_invite: {
+        Args: { _employee_id: string }
+        Returns: string
       }
       employee_resolve_change: {
         Args: { _note?: string; _outcome: string; _request_id: string }
@@ -4575,6 +4583,10 @@ export type Database = {
         Args: { _employee_id: string; _values: Json }
         Returns: undefined
       }
+      employee_withdraw_invite: {
+        Args: { _employee_id: string }
+        Returns: undefined
+      }
       employee_withdraw_posting: {
         Args: { _deployment_id: string; _reason: string }
         Returns: Json
@@ -4654,6 +4666,7 @@ export type Database = {
         }
         Returns: string
       }
+      invitation_resend: { Args: { _id: string }; Returns: string }
       invitation_revoke: { Args: { _id: string }; Returns: undefined }
       is_admin: { Args: never; Returns: boolean }
       is_approver_on: { Args: { _request_id: string }; Returns: boolean }

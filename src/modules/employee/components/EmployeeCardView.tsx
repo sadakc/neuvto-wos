@@ -50,7 +50,7 @@ import { AttachProofForm, ProofCell } from "./AddressProof";
 import { ShiftCalendarPanel } from "./ShiftAndCalendar";
 import { downloadRecordPdf } from "../recordExport";
 import { MyChangeRequests, RequestChangeButton } from "./ChangeRequests";
-import { DeactivateDialog, DraftEditor, SendInviteButton } from "./Lifecycle";
+import { DeactivateDialog, DraftEditor, InvitationActions, SendInviteButton } from "./Lifecycle";
 import { STAGE_TONE } from "../status";
 import { addressLine } from "../indiaPlaces";
 import {
@@ -340,6 +340,7 @@ export function EmployeeCardView({
             </button>
           </div>
           {(card.capabilities.canSendInvite ||
+            card.capabilities.canWithdrawInvite ||
             card.capabilities.canDeactivate ||
             card.capabilities.canEditDraft) && (
             <div
@@ -349,6 +350,9 @@ export function EmployeeCardView({
               {card.capabilities.canEditDraft && <DraftEditor card={card} onChanged={onChanged} />}
               {card.capabilities.canSendInvite && (
                 <SendInviteButton card={card} onChanged={onChanged} />
+              )}
+              {card.capabilities.canWithdrawInvite && (
+                <InvitationActions card={card} onChanged={onChanged} />
               )}
               {card.capabilities.canDeactivate && (
                 <DeactivateDialog card={card} onChanged={onChanged} />

@@ -56,6 +56,27 @@ export interface Invitation {
   inviteUrl: string | null;
 }
 
+/**
+ * D118: a fresh invitation, sent from the record it came from; the old link
+ * stops working. One made before invitations came from a record is refused.
+ */
+export async function resendInvitation(id: string): Promise<void> {
+  const { error } = await supabase.rpc("invitation_resend", { _id: id });
+  if (error) {
+    if (error.message.includes("INVITE_FROM_THE_RECORD")) {
+      throw new AppError(
+        "VALIDATION_FAILED",
+        "This invitation came from before records. Withdraw it, and invite them from their record.",
+        400,
+      );
+    }
+    if (error.message.includes("NO_INVITATION_WAITING")) {
+      throw new AppError("INVITATION_NOT_FOUND", "That invitation is no longer open.", 404);
+    }
+    throw toAppError(error, "resendInvitation");
+  }
+}
+
 export async function revokeInvitation(id: string): Promise<void> {
   const { error } = await supabase.rpc("invitation_revoke", { _id: id });
   if (error) {

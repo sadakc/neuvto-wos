@@ -25,6 +25,8 @@ const api = vi.hoisted(() => ({
   createDraft: vi.fn(),
   updateDraft: vi.fn(),
   sendInvite: vi.fn(),
+  withdrawInvite: vi.fn(),
+  resendInvite: vi.fn(),
   getAdminOverview: vi.fn(),
   getDeactivationPreview: vi.fn(),
   deactivateEmployee: vi.fn(),
@@ -284,5 +286,60 @@ describe("inviting from the card with no email (D113)", () => {
       "Add their work email first",
     );
     expect(api.sendInvite).not.toHaveBeenCalled();
+  });
+});
+
+describe("an invitation waiting (D118)", () => {
+  const invited = (): EmployeeCard => ({
+    ...as("draft"),
+    stage: "invited",
+    capabilities: {
+      ...as("draft").capabilities,
+      canEditDraft: false,
+      canSendInvite: false,
+      canWithdrawInvite: true,
+      invitationExpiresAt: "2026-11-17T10:00:00Z",
+    },
+  });
+
+  it("offers a fresh one and Withdraw, and says when the link stops working", () => {
+    render(<EmployeeCardView card={invited()} />);
+    const actions = screen.getByTestId("invitation-actions");
+    expect(within(actions).getByTestId("resend-invite")).toHaveTextContent(
+      "Send a fresh invitation",
+    );
+    expect(within(actions).getByTestId("withdraw-invite")).toHaveTextContent("Withdraw invitation");
+    expect(actions).toHaveTextContent("works until 17 Nov 2026");
+  });
+
+  it("sends a fresh one, and says the old link is dead", async () => {
+    const user = userEvent.setup();
+    api.resendInvite.mockResolvedValue(undefined);
+    const onChanged = vi.fn();
+    render(<EmployeeCardView card={invited()} onChanged={onChanged} />);
+    await user.click(screen.getByTestId("resend-invite"));
+    expect(api.resendInvite).toHaveBeenCalledWith(invited().id);
+    expect(await screen.findByTestId("invitation-notice")).toHaveTextContent(
+      "old link no longer works",
+    );
+    expect(onChanged).toHaveBeenCalled();
+  });
+
+  it("withdraws only once confirmed, saying the record stays as a draft", async () => {
+    const user = userEvent.setup();
+    api.withdrawInvite.mockResolvedValue(undefined);
+    render(<EmployeeCardView card={invited()} />);
+    await user.click(screen.getByTestId("withdraw-invite"));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toHaveTextContent("stops working");
+    expect(dialog).toHaveTextContent("kept as a draft");
+    expect(api.withdrawInvite).not.toHaveBeenCalled();
+    await user.click(within(dialog).getByTestId("withdraw-invite-confirm"));
+    expect(api.withdrawInvite).toHaveBeenCalledWith(invited().id);
+  });
+
+  it("is not offered once nothing is waiting", () => {
+    render(<EmployeeCardView card={as("admin")} />);
+    expect(screen.queryByTestId("invitation-actions")).toBeNull();
   });
 });

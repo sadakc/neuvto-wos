@@ -236,6 +236,10 @@ export interface EmployeeCard {
     /** D102: give the person their own shift, or return them to their unit's. */
     canSetShift?: boolean;
     canSendInvite?: boolean;
+    /** D118: an invitation is waiting; it can be withdrawn or sent afresh. */
+    canWithdrawInvite?: boolean;
+    /** D118: when the waiting invitation's link stops working. */
+    invitationExpiresAt?: string | null;
     canDeactivate?: boolean;
     canEditDraft?: boolean;
     /**
@@ -529,6 +533,7 @@ export function employeeErrorMessage(code: string, detail?: string | null): stri
     ["ALREADY_ON_THAT_SHIFT", "They already work that shift."],
     ["NOMINEE_SHARES_NOT_100", "Nominee shares must add up to exactly 100%."],
     ["NOMINEES_REQUIRED", "Add at least one nominee."],
+    ["NO_INVITATION_WAITING", "There's no invitation waiting on this record any more. Reload it."],
     ["NOT_ON_PEOPLE", "Not on the People tab. Check the employee code."],
     ["TWICE_IN_FILE", "Appears twice in this file."],
     ["CODE_TAKEN", "Somebody in your company already has this employee code."],

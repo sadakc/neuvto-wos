@@ -10,6 +10,7 @@
  * module hands off to platform services and has no opinion about any of them.
  */
 
+import { randomId } from "@/lib/random-id";
 import { supabase } from "@/integrations/supabase/client";
 import { AppError } from "@/platform/errors";
 import {
@@ -637,7 +638,7 @@ export async function submitCompOff(input: {
     const { data: org } = await supabase.rpc("current_org_id");
     if (!uid || !org) throw new AppError("UNAUTHENTICATED", "Please sign in again.", 401);
     const safe = input.proof.name.replace(/[^A-Za-z0-9._-]+/g, "-").slice(-80);
-    proofPath = `${org}/${uid}/${crypto.randomUUID()}-${safe}`;
+    proofPath = `${org}/${uid}/${randomId()}-${safe}`;
     const { error: upErr } = await supabase.storage
       .from(PROOF_BUCKET)
       .upload(proofPath, input.proof, { contentType: input.proof.type, upsert: false });

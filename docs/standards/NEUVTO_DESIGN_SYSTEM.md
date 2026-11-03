@@ -1,6 +1,6 @@
 # NEUVTO WOS — Design System
 
-**Version:** 2.3 · **Status:** Active · **Applies to:** every screen, web and native
+**Version:** 2.4 · **Status:** Active · **Applies to:** every screen, web and native
 **Audience:** designers, engineers, and AI build tools — all three work from this file
 
 The contract between design and code. A designer should be able to open this, look at a
@@ -344,7 +344,7 @@ team`, `Company`, the current one marked, a footer counting what is hidden for t
   `SectionList` (58px rows, a one-line hint); with one chosen it shows that section alone,
   the title menu lists its siblings and the back arrow returns to the index. The tiles are
   not shown above an open section.
-- **Every dialog is a bottom sheet** under 600px (the shared `Dialog` and `AlertDialog`).
+- **Every dialog is a bottom sheet** under 600px (the shared `Dialog` and `AlertDialog`). So is the date picker's calendar (D118): a popover beside a field ran off the top of the screen inside a sheet.
 - **The keyboard shrinks the page** (`interactive-widget=resizes-content` in the viewport
   meta, D116), so a sheet stays above it and scrolls inside, instead of hiding its fields
   behind the keyboard or its title under the address bar.

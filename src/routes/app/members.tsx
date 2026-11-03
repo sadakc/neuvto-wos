@@ -12,6 +12,7 @@ import {
   listMembers,
   reactivateMember,
   revokeInvitation,
+  resendInvitation,
   ROLE_LABELS,
   setJoinedDate,
   setMemberModuleAdmins,
@@ -111,6 +112,20 @@ export function MembersPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // D118: a fresh link, for somebody who never got the email.
+  const [resent, setResent] = useState<string | null>(null);
+  async function onResend(id: string) {
+    setError("");
+    setResent(null);
+    try {
+      await resendInvitation(id);
+      await load();
+      setResent("A fresh invitation was sent. The old link no longer works.");
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That invitation couldn't be sent again.");
+    }
+  }
 
   async function onRevoke(id: string) {
     setError("");
@@ -382,6 +397,11 @@ export function MembersPage() {
       {pending.length > 0 && (
         <section className="mt-10">
           <h2 className="text-card-title font-semibold tracking-card-title">Waiting to join</h2>
+          {resent && (
+            <p role="status" data-testid="resent-notice" className="mt-1 text-sm text-success">
+              {resent}
+            </p>
+          )}
           <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
             {pending.map((i) => (
               <li
@@ -415,6 +435,13 @@ export function MembersPage() {
                       {copied === i.id ? "Copied" : "Copy link"}
                     </button>
                   )}
+                  <button
+                    onClick={() => onResend(i.id)}
+                    data-testid="resend-invitation"
+                    className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
+                  >
+                    Send again
+                  </button>
                   <button
                     onClick={() => onRevoke(i.id)}
                     data-testid="revoke-invitation"

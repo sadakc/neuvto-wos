@@ -8,7 +8,7 @@
 import { render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { useState } from "react";
-import { describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { DateField } from "./date-field";
 import { isIsoDate } from "./date-rules";
 
@@ -124,5 +124,35 @@ describe("how far ahead the calendar goes (D105)", () => {
     await u.click(screen.getByRole("button", { name: "Clear date of birth" }));
     expect(value()).toBe("");
     expect(screen.queryByRole("button", { name: "Clear date of birth" })).toBeNull();
+  });
+});
+
+describe("on a phone (Sada, 3 Nov 2026)", () => {
+  const screenIs = (narrow: boolean) =>
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: narrow && q.includes("max-width: 599px"),
+      addEventListener: () => {},
+      removeEventListener: () => {},
+    }));
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("opens the calendar as a bottom sheet, not a popover that runs off the screen", async () => {
+    screenIs(true);
+    const user = userEvent.setup();
+    render(<DateField value="" onChange={() => {}} label="Confirmed" testId="d" />);
+    await user.click(screen.getByTestId("d-calendar"));
+    const sheet = await screen.findByTestId("d-sheet");
+    expect(sheet.className).toMatch(/max-\[599px\]:bottom-0/);
+    expect(screen.queryByTestId("d-popover")).toBeNull();
+    expect(within(sheet).getByRole("button", { name: "Today" })).toBeInTheDocument();
+  });
+
+  it("keeps the popover on a laptop", async () => {
+    screenIs(false);
+    const user = userEvent.setup();
+    render(<DateField value="" onChange={() => {}} label="Confirmed" testId="d" />);
+    await user.click(screen.getByTestId("d-calendar"));
+    expect(await screen.findByTestId("d-popover")).toBeInTheDocument();
+    expect(screen.queryByTestId("d-sheet")).toBeNull();
   });
 });

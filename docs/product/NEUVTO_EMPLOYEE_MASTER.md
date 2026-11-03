@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.26 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.27 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -890,6 +890,19 @@ one place, both need to sync."
   value already on record outside them is still shown.
 - Proved by `verify_one_person_one_record.sql` (9 database guards broken on purpose, each
   caught) and `OnePerson.test.tsx` with `fieldRules.test.ts` (9 screen guards, each caught).
+
+### Withdraw or resend an invitation (D118, 3 Nov 2026)
+
+- An invited person's card offers **Send a fresh invitation** and **Withdraw invitation**,
+  and says until when the link they were sent works. A fresh one withdraws the old link
+  and sends a new invitation with the same details and role.
+- **Withdrawn** (confirmed first, from the card or from People › Waiting to join), the
+  record is a **draft again**, with its name, email, mobile, joining date, department and
+  manager, to correct and invite again, or leave. Records a withdrawal had already left
+  "Invited" by a dead link were restored to drafts by the migration.
+- People › Waiting to join has **Send again** beside Withdraw.
+- Proved by `verify_withdraw_or_resend.sql` (8 database guards broken on purpose, each
+  caught), `Lifecycle.test.tsx` and `members.test.tsx` (6 screen guards, each caught).
 
 ## 8. Acceptance criteria, module level
 

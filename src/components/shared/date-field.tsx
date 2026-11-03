@@ -13,8 +13,10 @@ import { useEffect, useState } from "react";
 import { CalendarDays, X } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Dialog, DialogContent, DialogTitle } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
 import { isIsoDate } from "./date-rules";
+import { useNarrowScreen } from "./use-narrow-screen";
 
 const ISO = /^(\d{4})-(\d{2})-(\d{2})$/;
 
@@ -92,6 +94,7 @@ export function DateField({
 }) {
   const [text, setText] = useState(() => toText(value));
   const [open, setOpen] = useState(false);
+  const phone = useNarrowScreen();
 
   // A value set from outside (the calendar, a reset) is shown; what is being
   // typed is left alone while it still means the same thing.
@@ -106,6 +109,53 @@ export function DateField({
   const startAt = chosen ?? toDate(openAt && isIsoDate(openAt) ? openAt : todayIso());
   const today = todayIso();
   const todayAllowed = (!min || today >= min) && (!max || today <= max);
+
+  // The calendar and its Today and Clear, in a popover or a sheet.
+  const picker = (
+    <>
+      <Calendar
+        mode="single"
+        captionLayout="dropdown"
+        selected={chosen}
+        defaultMonth={startAt}
+        startMonth={first}
+        endMonth={last}
+        disabled={[{ before: first }, { after: last }]}
+        onSelect={(d) => {
+          if (!d) return;
+          const iso = toIso(d);
+          setText(toText(iso));
+          onChange(iso);
+          setOpen(false);
+        }}
+      />
+      <div className="flex justify-between gap-2 border-t border-border p-2">
+        <button
+          type="button"
+          disabled={!todayAllowed}
+          onClick={() => {
+            setText(toText(today));
+            onChange(today);
+            setOpen(false);
+          }}
+          className="h-9 rounded-md px-3 text-sm font-medium text-primary hover:bg-muted disabled:opacity-45"
+        >
+          Today
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setText("");
+            onChange("");
+            setOpen(false);
+          }}
+          className="h-9 rounded-md px-3 text-sm text-muted-foreground hover:bg-muted"
+        >
+          Clear
+        </button>
+      </div>
+    </>
+  );
 
   return (
     <span className={cn("relative flex min-w-0 items-center", className)}>
@@ -145,7 +195,7 @@ export function DateField({
           <X className="size-4" aria-hidden />
         </button>
       )}
-      <Popover open={open} onOpenChange={setOpen}>
+      <Popover open={open && !phone} onOpenChange={setOpen}>
         <PopoverTrigger asChild>
           <button
             type="button"
@@ -158,50 +208,29 @@ export function DateField({
             <CalendarDays className="size-4" aria-hidden />
           </button>
         </PopoverTrigger>
-        <PopoverContent align="end" className="w-auto p-0">
-          <Calendar
-            mode="single"
-            captionLayout="dropdown"
-            selected={chosen}
-            defaultMonth={startAt}
-            startMonth={first}
-            endMonth={last}
-            disabled={[{ before: first }, { after: last }]}
-            onSelect={(d) => {
-              if (!d) return;
-              const iso = toIso(d);
-              setText(toText(iso));
-              onChange(iso);
-              setOpen(false);
-            }}
-          />
-          <div className="flex justify-between gap-2 border-t border-border p-2">
-            <button
-              type="button"
-              disabled={!todayAllowed}
-              onClick={() => {
-                setText(toText(today));
-                onChange(today);
-                setOpen(false);
-              }}
-              className="h-9 rounded-md px-3 text-sm font-medium text-primary hover:bg-muted disabled:opacity-45"
-            >
-              Today
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setText("");
-                onChange("");
-                setOpen(false);
-              }}
-              className="h-9 rounded-md px-3 text-sm text-muted-foreground hover:bg-muted"
-            >
-              Clear
-            </button>
-          </div>
+        <PopoverContent
+          align="end"
+          collisionPadding={8}
+          className="w-auto p-0"
+          data-testid={testId ? `${testId}-popover` : undefined}
+        >
+          {phone ? null : picker}
         </PopoverContent>
       </Popover>
+      {/* Under 600px a bottom sheet (doc 11.5): a popover beside the field ran
+          off the top of a phone's screen inside a sheet (Sada, 3 Nov 2026). */}
+      {phone && (
+        <Dialog open={open} onOpenChange={setOpen}>
+          <DialogContent
+            className="w-auto gap-0 p-0 max-[599px]:pt-6"
+            data-testid={testId ? `${testId}-sheet` : undefined}
+            aria-describedby={undefined}
+          >
+            <DialogTitle className="sr-only">{label ?? "Choose a date"}</DialogTitle>
+            <div className="mx-auto">{picker}</div>
+          </DialogContent>
+        </Dialog>
+      )}
     </span>
   );
 }
