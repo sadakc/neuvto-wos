@@ -18,6 +18,31 @@
 
 begin;
 
+-- The fixture's dates were written for the week of 2 Nov 2026, and the suite
+-- needs that week still to come (leave cannot be asked for in the past, and
+-- "today" must fall before the move). They are moved forward by whole weeks,
+-- so every weekday stays a weekday, to the first week far enough ahead with no
+-- seeded working-day holiday in the fixture's span (Republic Day, 26 Jan, would
+-- otherwise change a count). It failed in CI on 3 Nov 2026 for want of this.
+do $$
+declare
+  k integer := greatest(0, ceil((current_date + 21 - date '2026-10-26') / 7.0)::integer);
+begin
+  while exists (
+    select 1 from public.holidays h
+     where h.organization_id = '00000000-0000-0000-0000-0000000000a0'
+       and h.holiday_date between date '2026-10-26' + 7 * k and date '2026-11-07' + 7 * k
+       and extract(dow from h.holiday_date) <> 0)
+  loop
+    k := k + 1;
+  end loop;
+  perform set_config('neuvto.sc_shift', (7 * k)::text, true);
+end $$;
+
+create or replace function pg_temp.sd(_d text) returns date as $$
+  select _d::date + coalesce(nullif(current_setting('neuvto.sc_shift', true), ''), '0')::integer
+$$ language sql stable;
+
 create or replace function pg_temp.sc_as(_uid uuid) returns void as $$
 begin
   perform set_config('role', 'authenticated', true);
@@ -186,42 +211,42 @@ begin
   -- Ravi at HQ (Company calendar, Saturday and Sunday off) until he moves to
   -- Hosur (Sunday only) on Monday 2 Nov 2026. Priya stays at HQ.
   insert into public.employee_deployments (organization_id, employee_id, deployment_unit_id, effective_from, effective_to, deployment_order_ref)
-  values (acme, e_ravi, u_hq, '2026-01-01', '2026-11-02', 'DO-1'),
-         (acme, e_ravi, u_hosur, '2026-11-02', null, 'DO-2'),
-         (acme, e_priya, u_hq, '2026-01-01', null, 'DO-3');
+  values (acme, e_ravi, u_hq, pg_temp.sd('2026-01-01'), pg_temp.sd('2026-11-02'), 'DO-1'),
+         (acme, e_ravi, u_hosur, pg_temp.sd('2026-11-02'), null, 'DO-2'),
+         (acme, e_priya, u_hq, pg_temp.sd('2026-01-01'), null, 'DO-3');
 
   perform pg_temp.sc_check('the week before the move: five days',
-    public.calculate_working_days_for(ravi, '2026-10-26', '2026-11-01')::text, '5');
+    public.calculate_working_days_for(ravi, pg_temp.sd('2026-10-26'), pg_temp.sd('2026-11-01'))::text, '5');
   perform pg_temp.sc_check('the week after: six',
-    public.calculate_working_days_for(ravi, '2026-11-02', '2026-11-08')::text, '6');
+    public.calculate_working_days_for(ravi, pg_temp.sd('2026-11-02'), pg_temp.sd('2026-11-08'))::text, '6');
   perform pg_temp.sc_check('a range across the move counts each side by its own calendar',
-    public.calculate_working_days_for(ravi, '2026-10-31', '2026-11-07')::text, '6');
+    public.calculate_working_days_for(ravi, pg_temp.sd('2026-10-31'), pg_temp.sd('2026-11-07'))::text, '6');
   perform pg_temp.sc_check('Priya, never moved, five',
-    public.calculate_working_days_for(priya, '2026-11-02', '2026-11-08')::text, '5');
+    public.calculate_working_days_for(priya, pg_temp.sd('2026-11-02'), pg_temp.sd('2026-11-08'))::text, '5');
   perform pg_temp.sc_check('the company count is the Company calendar''s',
-    public.calculate_working_days(acme, '2026-11-02', '2026-11-08')::text, '5');
+    public.calculate_working_days(acme, pg_temp.sd('2026-11-02'), pg_temp.sd('2026-11-08'))::text, '5');
   perform pg_temp.sc_check('somebody posted nowhere counts on the Company calendar',
-    public.calculate_working_days_for('00000000-0000-0000-0000-00000000a008', '2026-11-02', '2026-11-08')::text, '5');
+    public.calculate_working_days_for('00000000-0000-0000-0000-00000000a008', pg_temp.sd('2026-11-02'), pg_temp.sd('2026-11-08'))::text, '5');
 
   -- A Wednesday holiday for the six-day sites only.
-  insert into public.holidays (organization_id, name, holiday_date) values (acme, 'Site day', '2026-11-04')
+  insert into public.holidays (organization_id, name, holiday_date) values (acme, 'Site day', pg_temp.sd('2026-11-04'))
   returning id into h_mid;
   perform pg_temp.sc_val(hema, format('select public.holiday_set_calendars(%L, array[%L]::uuid[])::text', h_mid, c_six));
   perform pg_temp.sc_check('a holiday limited to a calendar frees its people',
-    public.calculate_working_days_for(ravi, '2026-11-02', '2026-11-08')::text, '5');
+    public.calculate_working_days_for(ravi, pg_temp.sd('2026-11-02'), pg_temp.sd('2026-11-08'))::text, '5');
   perform pg_temp.sc_check('and nobody else',
-    public.calculate_working_days_for(priya, '2026-11-02', '2026-11-08')::text, '5');
+    public.calculate_working_days_for(priya, pg_temp.sd('2026-11-02'), pg_temp.sd('2026-11-08'))::text, '5');
   perform pg_temp.sc_check('the company count does not see it either',
-    public.calculate_working_days(acme, '2026-11-04', '2026-11-04')::text, '1');
+    public.calculate_working_days(acme, pg_temp.sd('2026-11-04'), pg_temp.sd('2026-11-04'))::text, '1');
   perform pg_temp.sc_val(hema, format('select public.holiday_set_calendars(%L, array[%L]::uuid[])::text', h_mid, c_company));
   perform pg_temp.sc_check('limited to the Company calendar, it frees Priya',
-    public.calculate_working_days_for(priya, '2026-11-04', '2026-11-04')::text, '0');
+    public.calculate_working_days_for(priya, pg_temp.sd('2026-11-04'), pg_temp.sd('2026-11-04'))::text, '0');
   perform pg_temp.sc_check('and not Ravi',
-    public.calculate_working_days_for(ravi, '2026-11-04', '2026-11-04')::text, '1');
+    public.calculate_working_days_for(ravi, pg_temp.sd('2026-11-04'), pg_temp.sd('2026-11-04'))::text, '1');
   perform pg_temp.sc_val(hema, format('select public.holiday_set_calendars(%L, %L::uuid[])::text', h_mid, '{}'));
   perform pg_temp.sc_check('limited to nothing, it is everybody''s',
-    public.calculate_working_days_for(ravi, '2026-11-04', '2026-11-04') || '/' ||
-    public.calculate_working_days_for(priya, '2026-11-04', '2026-11-04'), '0/0');
+    public.calculate_working_days_for(ravi, pg_temp.sd('2026-11-04'), pg_temp.sd('2026-11-04')) || '/' ||
+    public.calculate_working_days_for(priya, pg_temp.sd('2026-11-04'), pg_temp.sd('2026-11-04')), '0/0');
   perform pg_temp.sc_refused('an employee cannot limit a holiday', ravi,
     format('select public.holiday_set_calendars(%L, array[%L]::uuid[])', h_mid, c_six), 'FORBIDDEN');
   perform pg_temp.sc_refused('nor the Employee Admin, who is not a company Admin', dan,
@@ -234,38 +259,38 @@ begin
 
   -- The preview, its explanation and the charge agree.
   perform pg_temp.sc_check('Ravi''s preview counts on his calendar',
-    pg_temp.sc_val(ravi, 'select public.my_working_days(''2026-11-02'', ''2026-11-08'')'), '6');
+    pg_temp.sc_val(ravi, 'select public.my_working_days(''' || pg_temp.sd('2026-11-02') || ''', ''' || pg_temp.sd('2026-11-08') || ''')'), '6');
   perform pg_temp.sc_check('and says the Sunday is why',
-    pg_temp.sc_val(ravi, 'select string_agg(label, '','' order by day) from public.my_days_excluded(''2026-11-02'', ''2026-11-08'')'),
+    pg_temp.sc_val(ravi, 'select string_agg(label, '','' order by day) from public.my_days_excluded(''' || pg_temp.sd('2026-11-02') || ''', ''' || pg_temp.sd('2026-11-08') || ''')'),
     'Sunday');
   perform pg_temp.sc_check('Priya''s says Saturday and Sunday',
-    pg_temp.sc_val(priya, 'select string_agg(label, '','' order by day) from public.my_days_excluded(''2026-11-02'', ''2026-11-08'')'),
+    pg_temp.sc_val(priya, 'select string_agg(label, '','' order by day) from public.my_days_excluded(''' || pg_temp.sd('2026-11-02') || ''', ''' || pg_temp.sd('2026-11-08') || ''')'),
     'Saturday,Sunday');
   perform pg_temp.sc_check('counted and explained days partition the range',
-    pg_temp.sc_val(ravi, 'select public.my_working_days(''2026-10-01'', ''2026-11-30'') + (select count(*) from public.my_days_excluded(''2026-10-01'', ''2026-11-30''))'),
+    pg_temp.sc_val(ravi, 'select public.my_working_days(''' || pg_temp.sd('2026-10-01') || ''', ''' || pg_temp.sd('2026-11-30') || ''') + (select count(*) from public.my_days_excluded(''' || pg_temp.sd('2026-10-01') || ''', ''' || pg_temp.sd('2026-11-30') || '''))'),
     '61');
   perform pg_temp.sc_refused('the per-person rule is not callable directly', ravi,
     format('select public.calculate_working_days_for(%L, current_date, current_date)', priya), 'permission denied');
   perform pg_temp.sc_refused('nor the day rule', ravi,
     format('select * from public.calendar_day(%L, %L, current_date)', acme, c_six), 'permission denied');
 
-  r_ravi := pg_temp.sc_val(ravi, 'select public.leave_submit(''00000000-0000-0000-0000-0000000000c1'', ''2026-11-05'', ''2026-11-07'')')::uuid;
-  r_priya := pg_temp.sc_val(priya, 'select public.leave_submit(''00000000-0000-0000-0000-0000000000c1'', ''2026-11-05'', ''2026-11-07'')')::uuid;
+  r_ravi := pg_temp.sc_val(ravi, 'select public.leave_submit(''00000000-0000-0000-0000-0000000000c1'', ''' || pg_temp.sd('2026-11-05') || ''', ''' || pg_temp.sd('2026-11-07') || ''')')::uuid;
+  r_priya := pg_temp.sc_val(priya, 'select public.leave_submit(''00000000-0000-0000-0000-0000000000c1'', ''' || pg_temp.sd('2026-11-05') || ''', ''' || pg_temp.sd('2026-11-07') || ''')')::uuid;
   perform pg_temp.sc_check('Thursday to Saturday costs Ravi three days and Priya two',
     (select working_days from public.leave_requests where id = r_ravi) || '/' ||
     (select working_days from public.leave_requests where id = r_priya), '3/2');
 
   -- Moving Priya to Hosur after she asked does not change what she asked for.
-  update public.employee_deployments set effective_to = '2026-11-01' where employee_id = e_priya and effective_to is null;
+  update public.employee_deployments set effective_to = pg_temp.sd('2026-11-01') where employee_id = e_priya and effective_to is null;
   insert into public.employee_deployments (organization_id, employee_id, deployment_unit_id, effective_from, deployment_order_ref)
-  values (acme, e_priya, u_hosur, '2026-11-01', 'DO-4');
+  values (acme, e_priya, u_hosur, pg_temp.sd('2026-11-01'), 'DO-4');
   perform pg_temp.sc_check('leave already asked for keeps its count',
     (select working_days::text from public.leave_requests where id = r_priya), '2');
 
   -- The absenteeism report counts each person's days on their own calendar.
   update public.leave_requests set status = 'approved' where id in (r_ravi, r_priya);
   perform pg_temp.sc_check('the absenteeism report counts Ravi''s three',
-    pg_temp.sc_val(hema, format('select days from public.leave_absenteeism_report(''2026-11-01'', ''2026-11-30'') where employee_id = %L', ravi)),
+    pg_temp.sc_val(hema, format('select days from public.leave_absenteeism_report(''' || pg_temp.sd('2026-11-01') || ''', ''' || pg_temp.sd('2026-11-30') || ''') where employee_id = %L', ravi)),
     '3');
 
   -- ════════════════════════════════════════════ shifts
@@ -293,7 +318,7 @@ begin
     'select public.employee_save_unit(%L, ''{"name":"Tata AIG, Hosur","unitType":"client_site","clientName":"Tata AIG","defaultShiftId":"%s"}'')', u_hosur, s_day));
 
   j := pg_temp.sc_val(ravi, 'select public.employee_card() -> ''workPattern''')::jsonb;
-  if today >= '2026-11-02' then
+  if today >= pg_temp.sd('2026-11-02') then
     raise exception 'CALENDAR FAIL: fixture — this suite assumes today is before 2 Nov 2026 (%)', today;
   end if;
   -- Today Ravi is still at HQ: Company calendar, no unit shift.
