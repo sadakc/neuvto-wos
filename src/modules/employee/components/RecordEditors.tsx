@@ -104,13 +104,14 @@ function asRelation(v: string | null | undefined) {
 /** The dropdowns' ranges (D104). The database allows a wider range; a value outside these is still shown. */
 const range = (from: number, to: number) =>
   Array.from({ length: to - from + 1 }, (_, i) => from + i);
-// From 4 ft (122 cm), Sada's floor (D105).
-const HEIGHTS = range(122, 230).map((cm) => {
+// From 4 ft (122 cm), Sada's floor (D105), to 6 ft 6 in (198 cm), his ceiling (D117).
+const HEIGHTS = range(122, 198).map((cm) => {
   const inches = Math.round(cm / 2.54);
   return [String(cm), `${cm} cm (${Math.floor(inches / 12)}′ ${inches % 12}″)`] as const;
 });
-const CHESTS = range(50, 150).map((cm) => [String(cm), `${cm} cm`] as const);
-const WEIGHTS = range(30, 200).map((kg) => [String(kg), `${kg} kg`] as const);
+// What an Indian workforce measures (Sada, 3 Nov 2026).
+const CHESTS = range(60, 130).map((cm) => [String(cm), `${cm} cm`] as const);
+const WEIGHTS = range(30, 150).map((kg) => [String(kg), `${kg} kg`] as const);
 
 // ═══════════════════════════════════════════════════════════ own fields
 
@@ -619,7 +620,11 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
 
   async function save() {
     setError("");
-    const wrong = rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean);
+    // D117: one father and one mother.
+    const twice = ["father", "mother"].find((p) => rows.filter((r) => r.relation === p).length > 1);
+    const wrong =
+      (twice ? `There can be only one ${twice}. Change the one on record instead.` : null) ??
+      rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean);
     if (wrong) {
       setError(wrong);
       return;
@@ -1026,7 +1031,12 @@ interface NomineeRow {
   relation: string;
   dateOfBirth: string;
   share: string;
+  /** D117: the family member this nominee is. */
+  familyMemberId?: string;
 }
+
+/** One of each: picking it as a nominee's relation picks the person (D117). */
+const ONE_OF = new Set(["father", "mother"]);
 
 export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const current = card.nominations?.find((n) => !n.effectiveTo);
@@ -1037,9 +1047,31 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
       relation: n.relation,
       dateOfBirth: n.dateOfBirth ?? "",
       share: String(Number(n.sharePercent)),
+      familyMemberId: n.familyMemberId ?? undefined,
     }));
   const [open, setOpen] = useState(false);
   const [rows, setRows] = useState<NomineeRow[]>(fromCard);
+  // D117: a nominee is a family member, one person in one record.
+  const family = card.familyMembers ?? [];
+  const fromFamily = (f: (typeof family)[number]): Partial<NomineeRow> => ({
+    name: f.name,
+    relation: f.relation,
+    dateOfBirth: f.dateOfBirth ?? "",
+    familyMemberId: f.id,
+  });
+  const notYetNominated = family.filter((f) => !rows.some((r) => r.familyMemberId === f.id));
+  /** A relation chosen for a row: a father or mother is the one in Family. */
+  const chooseRelation = (row: NomineeRow, relation: string) => {
+    const parent = ONE_OF.has(relation) ? family.find((f) => f.relation === relation) : undefined;
+    if (parent) set(row.key, fromFamily(parent));
+    else {
+      const linked = family.find((f) => f.id === row.familyMemberId);
+      set(row.key, {
+        relation,
+        familyMemberId: linked && linked.relation === relation ? linked.id : undefined,
+      });
+    }
+  };
   const [from, setFrom] = useState(todayIso());
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -1072,6 +1104,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
           relation: r.relation,
           dateOfBirth: r.dateOfBirth || null,
           sharePercent: Number(r.share),
+          familyMemberId: r.familyMemberId ?? null,
         })),
       });
       setOpen(false);
@@ -1151,7 +1184,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                     <span className={eyebrow}>Relation</span>
                     <select
                       value={r.relation}
-                      onChange={(e) => set(r.key, { relation: e.target.value })}
+                      onChange={(e) => chooseRelation(r, e.target.value)}
                       className={`mt-1 ${input}`}
                     >
                       <option value="" disabled>
@@ -1212,6 +1245,36 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
             >
               Add a nominee
             </button>
+            {notYetNominated.length > 0 && (
+              <label className="mt-3 block text-sm">
+                <span className={eyebrow}>Or add from Family</span>
+                <select
+                  data-testid="nominee-from-family"
+                  value=""
+                  onChange={(e) => {
+                    const f = family.find((x) => x.id === e.target.value);
+                    if (f)
+                      setRows((rs) => [
+                        ...rs,
+                        { key: newKey(), share: "", ...fromFamily(f) } as NomineeRow,
+                      ]);
+                  }}
+                  className={`mt-1 ${input}`}
+                >
+                  <option value="">Choose a family member</option>
+                  {notYetNominated.map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.name} ({humanise(f.relation)}
+                      {f.dateOfBirth ? `, born ${formatDate(f.dateOfBirth)}` : ""})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
+            <p data-testid="nominee-is-family" className="mt-3 text-caption text-muted-foreground">
+              A nominee is a member of your family. Somebody new is added to Family too, and a name
+              or date of birth changed here is changed in Family.
+            </p>
             <p className="mt-3 text-caption text-muted-foreground">
               One nomination covers PF, gratuity, ESIC and insurance alike (D105). Saving archives
               the current one rather than overwriting it; the superseded form is what a claim is

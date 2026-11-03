@@ -75,6 +75,54 @@ function words(v: string, max: number) {
 /** As statutory_normalise: letters and digits only, upper-cased. */
 const norm = (v: string) => v.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
 
+/**
+ * The codes a driving licence can start with: every state and union
+ * territory, old codes too. The database keeps the same list
+ * (indian_licence_state, D117).
+ */
+export const LICENCE_STATES = new Set([
+  "AN",
+  "AP",
+  "AR",
+  "AS",
+  "BR",
+  "CG",
+  "CH",
+  "DD",
+  "DL",
+  "DN",
+  "GA",
+  "GJ",
+  "HP",
+  "HR",
+  "JH",
+  "JK",
+  "KA",
+  "KL",
+  "LA",
+  "LD",
+  "MH",
+  "ML",
+  "MN",
+  "MP",
+  "MZ",
+  "NL",
+  "OD",
+  "OR",
+  "PB",
+  "PY",
+  "RJ",
+  "SK",
+  "TG",
+  "TN",
+  "TR",
+  "TS",
+  "UA",
+  "UK",
+  "UP",
+  "WB",
+]);
+
 // Verhoeff, as aadhaar_is_valid: the last digit of an Aadhaar is a checksum, so
 // a single mistyped digit or two swapped neighbours is caught here.
 const VERHOEFF_D = [
@@ -208,8 +256,11 @@ export const FIELD_RULES: Record<
     message: "An account number is 9 to 18 digits.",
   },
   licence: {
-    check: (v) => /^[A-Z]{2}[0-9A-Z]{8,16}$/.test(norm(v)),
-    message: "A driving licence number starts with the state's two letters, like KA01 20110012345.",
+    // Any state or union territory (Sada, 3 Nov 2026), not letters that are none.
+    check: (v) =>
+      /^[A-Z]{2}[0-9A-Z]{8,16}$/.test(norm(v)) && LICENCE_STATES.has(norm(v).slice(0, 2)),
+    message:
+      "A driving licence number starts with a state's code, like KA01 20110012345 or MH12 20190034567.",
   },
   percent: {
     check: (v) => /^[0-9]+(\.[0-9]{1,2})?$/.test(v) && Number(v) <= 100,

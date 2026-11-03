@@ -185,3 +185,21 @@ describe("every rule the database names has words on the screen", () => {
     expect(employeeErrorMessage("REPORTING_CYCLE")).toContain("loop");
   });
 });
+
+describe("a driving licence from any state (Sada, 3 Nov 2026)", () => {
+  it("is accepted from Karnataka, Maharashtra, Rajasthan and Delhi", () => {
+    for (const v of [
+      "KA01 20110012345",
+      "MH12 20190034567",
+      "RJ14 20150067890",
+      "DL-0420110012345",
+    ]) {
+      expect(checkField("licence", v), v).toBeNull();
+    }
+  });
+
+  it("is refused when its first letters are no state's", () => {
+    expect(checkField("licence", "XX12 20110012345")).toMatch(/starts with a state's code/);
+    expect(checkField("licence", "ZZ01 20110012345")).not.toBeNull();
+  });
+});

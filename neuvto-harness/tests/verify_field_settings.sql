@@ -232,9 +232,11 @@ begin
     format($q$select public.employee_save_nomination(%L, jsonb_build_object('nominees',
       jsonb_build_array(jsonb_build_object('name', 'Mohan Kumar', 'relation', 'father', 'sharePercent', 100))))$q$, e_ravi));
   perform pg_temp.fs_set('nomineeDob', 'required', true);
+  -- Somebody with no date of birth anywhere: since D117 a nominee who is in
+  -- Family takes the date Family has, so the father would pass.
   perform pg_temp.fs_refused('a nominee without a date of birth, once it is required', hema,
     format($q$select public.employee_save_nomination(%L, jsonb_build_object('effectiveFrom', '2026-12-01', 'nominees',
-      jsonb_build_array(jsonb_build_object('name', 'Mohan Kumar', 'relation', 'father', 'sharePercent', 100))))$q$, e_ravi),
+      jsonb_build_array(jsonb_build_object('name', 'Lakshmi Kumar', 'relation', 'sister', 'sharePercent', 100))))$q$, e_ravi),
     'Nominee date of birth');
   perform pg_temp.fs_set('nomineeName', 'employeeCanUpdate', false);
   perform pg_temp.fs_refused('switched off, the nomination is refused', ravi,

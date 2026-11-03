@@ -282,7 +282,14 @@ export async function savePreviousOrgs(
 
 export interface NominationInput {
   effectiveFrom: string;
-  nominees: { name: string; relation: string; dateOfBirth?: string | null; sharePercent: number }[];
+  nominees: {
+    name: string;
+    relation: string;
+    dateOfBirth?: string | null;
+    sharePercent: number;
+    /** D117: the family member this nominee is. */
+    familyMemberId?: string | null;
+  }[];
 }
 
 /** A new nomination, for every scheme (D105), that supersedes the open one, which is kept. */

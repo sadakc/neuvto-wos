@@ -104,6 +104,8 @@ export interface Nominee {
   relation: string;
   dateOfBirth: string | null;
   sharePercent: number;
+  /** D117: the family member this nominee is. */
+  familyMemberId?: string | null;
 }
 
 export interface Nomination {
@@ -505,7 +507,12 @@ export function employeeErrorMessage(code: string, detail?: string | null): stri
     ["ORDER_INCOMPLETE", "The list changed while you were ordering it. Reload and try again."],
     [
       "INVALID_LICENCE",
-      "A driving licence number starts with the state's two letters, like KA01 20110012345.",
+      "A driving licence number starts with a state's code, like KA01 20110012345 or MH12 20190034567.",
+    ],
+    // D117: one father and one mother.
+    [
+      "ONE_PARENT_EACH",
+      "There can be only one father and one mother. Change the one on record instead.",
     ],
     // D102, shift and calendar.
     ["CALENDAR_NOT_AVAILABLE", "That calendar isn't available. Choose one in use."],

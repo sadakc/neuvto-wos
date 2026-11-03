@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.25 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.26 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -862,6 +862,32 @@ Found testing on a phone, as Priya, Hema and Alice.
   `verify_card_rest.sql`, `verify_change_requests.sql`, `verify_third_round.sql` (each
   database check watched failing without the migration; 46 screen guards broken on purpose,
   each caught). The e2e specs are updated but not run locally.
+
+### One person, one record (D117, 3 Nov 2026)
+
+Sada: "I cannot have two different fathers or two different mothers. If I edit it in
+one place, both need to sync."
+
+- **A nominee is a family member** (`nominees.family_member_id`). The nominee form offers
+  **Or add from Family**, which brings the person's name, relation and date of birth;
+  choosing **father** or **mother** as a relation is the one already in Family; somebody new
+  is added to Family when the nomination is saved. A name or date of birth typed for a
+  nominee is written back to Family; one left empty is filled from Family.
+- **Family changes the nomination.** When a nominee's details change in Family, the current
+  nomination is re-issued from today with them, and the old version is kept as it was
+  declared, for the day a claim is settled against it (the same day, it is a correction).
+- **Where the company keeps the person's Family rows** (D107), Family wins: a linked nominee
+  takes Family's details, and somebody new is nominated without being added.
+- **One father and one mother.** Family refuses a second (`ONE_PARENT_EACH`), in the form
+  before anything is sent and in the database.
+- **Reports to is optional** by default: the CEO reports to nobody. A Super Admin can still
+  make it required under Fields and visibility.
+- **A driving licence from any state.** It must start with a real state or union territory
+  code (`indian_licence_state`, mirrored as `LICENCE_STATES`): MH and RJ as much as KA.
+- **The physical record's lists** stop at 6 ft 6 in (198 cm), a 130 cm chest and 150 kg. A
+  value already on record outside them is still shown.
+- Proved by `verify_one_person_one_record.sql` (9 database guards broken on purpose, each
+  caught) and `OnePerson.test.tsx` with `fieldRules.test.ts` (9 screen guards, each caught).
 
 ## 8. Acceptance criteria, module level
 

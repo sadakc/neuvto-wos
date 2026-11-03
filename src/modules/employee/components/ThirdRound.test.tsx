@@ -431,9 +431,7 @@ describe("numbers", () => {
     await u.click(within(editor).getByRole("button", { name: "Change Driving licence" }));
     await u.type(within(editor).getByLabelText("Driving licence"), "12345");
     await u.click(screen.getByTestId("save-identity-docs"));
-    expect(within(editor).getByRole("alert")).toHaveTextContent(
-      "starts with the state's two letters",
-    );
+    expect(within(editor).getByRole("alert")).toHaveTextContent("starts with a state's code");
     await u.clear(within(editor).getByLabelText("Driving licence"));
     await u.type(within(editor).getByLabelText("Driving licence"), "KA01 20110012345");
     await u.click(screen.getByTestId("save-identity-docs"));

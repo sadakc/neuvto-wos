@@ -2896,6 +2896,7 @@ export type Database = {
           created_at: string
           created_by: string | null
           date_of_birth: string | null
+          family_member_id: string | null
           id: string
           name: string
           organization_id: string
@@ -2909,6 +2910,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          family_member_id?: string | null
           id?: string
           name: string
           organization_id: string
@@ -2922,6 +2924,7 @@ export type Database = {
           created_at?: string
           created_by?: string | null
           date_of_birth?: string | null
+          family_member_id?: string | null
           id?: string
           name?: string
           organization_id?: string
@@ -4331,6 +4334,7 @@ export type Database = {
         Returns: Json
       }
       employee_import_pick: { Args: { _map: Json; _r: Json }; Returns: Json }
+      employee_items_for_the_person: { Args: never; Returns: string[] }
       employee_make_manager: {
         Args: { _profile_id: string }
         Returns: undefined
@@ -4405,6 +4409,10 @@ export type Database = {
         Args: { _employee_id: string }
         Returns: string[]
       }
+      employee_remind_people: {
+        Args: { _every: number; _org: string }
+        Returns: number
+      }
       employee_request_change: {
         Args: { _details: string; _employee_id: string; _section: string }
         Returns: string
@@ -4434,6 +4442,10 @@ export type Database = {
           reader_name: string
           reason: string
         }[]
+      }
+      employee_resync_nomination: {
+        Args: { _employee_id: string }
+        Returns: undefined
       }
       employee_reveal_restricted: {
         Args: { _employee_id: string; _fields: string[]; _reason?: string }
@@ -4571,6 +4583,10 @@ export type Database = {
         Args: { _employee_id: string; _with_history: boolean }
         Returns: Json
       }
+      employee_write_nomination: {
+        Args: { _employee_id: string; _values: Json }
+        Returns: string
+      }
       ensure_balance: {
         Args: { _employee_id: string; _fy: string; _leave_type_id: string }
         Returns: {
@@ -4620,6 +4636,7 @@ export type Database = {
         Args: { _calendar_ids: string[]; _holiday_id: string }
         Returns: undefined
       }
+      indian_licence_state: { Args: { _code: string }; Returns: boolean }
       install_default_approval_chain: {
         Args: { _org_id: string }
         Returns: undefined
