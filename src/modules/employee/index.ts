@@ -11,11 +11,29 @@ import { IdCard } from "lucide-react";
 import { z } from "zod";
 import type { ModuleDefinition } from "@/platform/modules";
 
+/**
+ * The section of the person's own record holding the first thing it still
+ * needs, from the reminder's own list ("date of birth, uan, bank account").
+ */
+export function neededSection(items: unknown): string {
+  const first = String(items ?? "")
+    .split(",")[0]
+    .trim()
+    .toLowerCase();
+  if (/uan|bank|pf|esic|pan|aadhaar|identity/.test(first)) return "statutory";
+  if (/nominee|family/.test(first)) return "family";
+  if (/emergency/.test(first)) return "overview";
+  if (/address/.test(first)) return "history";
+  return "personal";
+}
+
 export const employee: ModuleDefinition = {
   key: "employee",
   name: "Employee Card",
   version: "0.5.0",
   shortName: "Employees",
+  // Sada, 27 Oct 2026: on a phone it is the person's own, first.
+  phoneLabel: "My Profile",
   section: "People",
   icon: IdCard,
 
@@ -101,14 +119,15 @@ export const employee: ModuleDefinition = {
   // D111. Where each of this module's notices opens from the bell.
   notificationLinks: {
     "employee.change_requested": () => "/app/employee/change-requests",
-    "employee.change_resolved": () => "/app/employee",
+    // Sada, 27 Oct 2026: a notice opens the section it is about.
+    "employee.change_resolved": () => "/app/employee#my-change-requests",
     "employee.changed_own_record": (p) =>
       typeof p.employee_id === "string"
         ? `/app/employee/directory/person?id=${p.employee_id}`
         : "/app/employee/change-requests",
     "employee.onboarding_overdue": () => "/app/employee/add",
     "employee.onboarding_escalated": () => "/app/employee/add",
-    "employee.your_record_needs": () => "/app/employee",
+    "employee.your_record_needs": (p) => `/app/employee#section-${neededSection(p.items)}`,
   },
 
   // D111. Change requests wait on the Employee Admins on Home's Approvals too.

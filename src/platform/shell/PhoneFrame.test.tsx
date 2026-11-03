@@ -25,13 +25,14 @@ import type { ModuleDefinition } from "@/platform/modules";
 const where = vi.hoisted(() => ({
   pathname: "/app/leave",
   search: {} as Record<string, unknown>,
+  hash: "",
   navigate: vi.fn(),
 }));
 
 vi.mock("@tanstack/react-router", () => ({
   useLocation: () => ({ pathname: where.pathname }),
   useRouterState: ({ select }: { select: (s: unknown) => unknown }) =>
-    select({ location: { search: where.search } }),
+    select({ location: { search: where.search, hash: where.hash } }),
   useNavigate: () => where.navigate,
   Link: ({
     children,
@@ -53,6 +54,7 @@ vi.mock("@/platform/approvals", () => ({ listApprovalQueue: vi.fn(async () => []
 import { AppFrame } from "./AppFrame";
 import { buildShell } from "./model";
 import { useSubNav } from "./phone-context";
+import { useAnchor } from "./anchor";
 
 const person = (roles: AppRole[]): CurrentUser => ({
   id: "u",
@@ -102,6 +104,7 @@ beforeEach(() => {
   width = 390;
   where.pathname = "/app/leave";
   where.search = {};
+  where.hash = "";
   where.navigate.mockReset();
   original = Object.getOwnPropertyDescriptor(HTMLElement.prototype, "clientWidth");
   Object.defineProperty(HTMLElement.prototype, "clientWidth", {
@@ -295,5 +298,57 @@ describe("a screen's own sections", () => {
     expect(screen.queryByTestId("open-section")).toBeNull();
     expect(screen.getByTestId("hub")).toBeInTheDocument();
     expect(where.navigate).not.toHaveBeenCalled();
+  });
+});
+
+/** A screen that says which anchor it was handed, and renders the target late. */
+function Anchored() {
+  const anchor = useAnchor();
+  const [late, setLate] = useState(false);
+  setTimeout(() => setLate(true), 300);
+  return (
+    <>
+      <p data-testid="handed">{anchor}</p>
+      {late && <section id="my-change-requests">your requests</section>}
+    </>
+  );
+}
+
+describe("a notice's link (Sada, 27 Oct 2026)", () => {
+  it("hands the screen its anchor, then scrolls to it once rendered, and marks it", async () => {
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo as never;
+    where.hash = "#my-change-requests";
+    frame(["employee"], <Anchored />);
+    expect(screen.getByTestId("handed")).toHaveTextContent("my-change-requests");
+    const target = await screen.findByText("your requests");
+    await vi.waitFor(() => expect(scrollTo).toHaveBeenCalled());
+    expect(target).toHaveAttribute("data-anchored", "true");
+  });
+
+  it("scrolls nowhere without one", async () => {
+    const scrollTo = vi.fn();
+    window.scrollTo = scrollTo as never;
+    frame(["employee"], <Anchored />);
+    await screen.findByText("your requests");
+    await new Promise((r) => setTimeout(r, 300));
+    expect(scrollTo).not.toHaveBeenCalled();
+  });
+});
+
+describe("the bottom bar's label", () => {
+  it("is the module's phone label where it has one (My Profile)", () => {
+    render(
+      <AppFrame
+        modules={buildShell(person(["employee"]), [{ ...leave, phoneLabel: "My Leave" }])}
+        brand={null}
+        actions={null}
+        phone={{ initials: "UU" }}
+      >
+        <p>screen</p>
+      </AppFrame>,
+    );
+    expect(screen.getByTestId("bottom-leave")).toHaveTextContent("My Leave");
+    expect(screen.getByTestId("bottom-leave")).not.toHaveTextContent(/^Leave$/);
   });
 });

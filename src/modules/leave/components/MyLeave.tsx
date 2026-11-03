@@ -14,6 +14,7 @@
  * would meet that as a button that does nothing.
  */
 
+import { useAnchor } from "@/platform/shell";
 import { useEffect, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import {
@@ -48,6 +49,14 @@ export default function MyLeave() {
 
   const [filter, setFilter] = useState<FilterKey>("all");
   const [openId, setOpenId] = useState<string | null>(null);
+  // A notice about one request opens it here (`#leave-<id>`, Sada 27 Oct 2026).
+  const anchor = useAnchor();
+  useEffect(() => {
+    const id = anchor.startsWith("leave-") ? anchor.slice("leave-".length) : "";
+    if (!id || !requests.some((r) => r.id === id)) return;
+    setFilter("all");
+    setOpenId(id);
+  }, [anchor, requests]);
   const [timeline, setTimeline] = useState<ApprovalStep[]>([]);
   const [cancellingId, setCancellingId] = useState<string | null>(null);
   const [cancelError, setCancelError] = useState("");
@@ -221,7 +230,11 @@ export default function MyLeave() {
             {visible.map((r) => {
               const open = openId === r.id;
               return (
-                <li key={r.id} className="py-3">
+                <li
+                  key={r.id}
+                  id={`leave-${r.id}`}
+                  className="-mx-2 rounded-md px-2 py-3 transition-colors data-[anchored=true]:bg-accent"
+                >
                   <button
                     onClick={() => setOpenId(open ? null : r.id)}
                     aria-expanded={open}

@@ -12,7 +12,7 @@
  */
 
 import { useLocation, useRouterState } from "@tanstack/react-router";
-import { useState, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { cn } from "@/lib/utils";
 import { railMode } from "./fit";
 import { locate, type ShellModule } from "./model";
@@ -22,6 +22,7 @@ import { useSize } from "./useSize";
 import { PhoneFrame } from "./PhoneFrame";
 import { isPhoneWidth } from "./phone";
 import { PhoneProvider } from "./PhoneProvider";
+import { AnchorContext, scrollToAnchor } from "./anchor";
 
 /** Below this usable height the shell compacts (phone landscape is ~390px). */
 export const SHORT_HEIGHT = 600;
@@ -45,12 +46,21 @@ export function AppFrame({
   const { pathname } = useLocation();
   const search = useRouterState({ select: (s) => s.location.search as Record<string, unknown> });
   const m = typeof search.m === "string" ? search.m : undefined;
+  // A notice's link names the section it is about (`#leave-<id>`).
+  const hash = useRouterState({ select: (s) => (s.location as { hash?: string }).hash ?? "" });
+  const anchor = hash.replace(/^#/, "");
 
   const { module, tab } = locate(modules, { pathname, module: m });
   // Before the first measurement, the window's width: a phone must not flash
   // the desktop rail, nor a desktop the phone bar.
   const measured = width || (typeof window !== "undefined" ? window.innerWidth : 1440);
   const onPhone = isPhoneWidth(measured);
+
+  useEffect(() => {
+    if (!anchor) return;
+    // Clear of the sticky bars: the phone's app bar, or the desktop's top bar and tabs.
+    return scrollToAnchor(anchor, onPhone ? 80 : 128);
+  }, [anchor, pathname, onPhone]);
 
   if (onPhone) {
     return (
@@ -59,19 +69,21 @@ export function AppFrame({
         data-short={false}
         className="group/stage @container/app min-h-dvh w-full"
       >
-        <PhoneProvider phone>
-          <PhoneFrame
-            modules={modules}
-            module={module}
-            tab={tab}
-            brand={brand}
-            trailing={phone?.trailing}
-            drawer={phone?.drawer}
-            initials={phone?.initials ?? ""}
-          >
-            {children}
-          </PhoneFrame>
-        </PhoneProvider>
+        <AnchorContext.Provider value={anchor}>
+          <PhoneProvider phone>
+            <PhoneFrame
+              modules={modules}
+              module={module}
+              tab={tab}
+              brand={brand}
+              trailing={phone?.trailing}
+              drawer={phone?.drawer}
+              initials={phone?.initials ?? ""}
+            >
+              {children}
+            </PhoneFrame>
+          </PhoneProvider>
+        </AnchorContext.Provider>
       </div>
     );
   }
@@ -83,47 +95,51 @@ export function AppFrame({
   const rail = <ModuleRail modules={modules} activeKey={module.key} mode={mode} brand={brand} />;
 
   return (
-    <PhoneProvider phone={false}>
-      <div
-        ref={setStage}
-        data-short={short}
-        data-rail={mode}
-        className="group/stage @container/app min-h-dvh w-full bg-background"
-      >
-        <div className={cn("flex min-h-dvh", mode === "column" ? "items-start" : "flex-col")}>
-          {rail}
-          <div className="relative flex min-w-0 flex-1 flex-col">
-            <header
-              className={cn(
-                "z-30 flex items-center gap-3.5 border-b border-border bg-card px-5 py-2.5 @max-[640px]/app:flex-wrap @max-[640px]/app:px-4",
-                mode === "column" && "sticky top-0",
-              )}
-            >
-              <div className="min-w-0">
-                <p className="truncate text-bar-title font-semibold tracking-bar-title">
-                  {module.name}
-                </p>
-                {tab && (
-                  <p className="truncate font-mono text-caption text-muted-foreground group-data-[short=true]/stage:hidden">
-                    {tab.label}
-                  </p>
+    <AnchorContext.Provider value={anchor}>
+      <PhoneProvider phone={false}>
+        <div
+          ref={setStage}
+          data-short={short}
+          data-rail={mode}
+          className="group/stage @container/app min-h-dvh w-full bg-background"
+        >
+          <div className={cn("flex min-h-dvh", mode === "column" ? "items-start" : "flex-col")}>
+            {rail}
+            <div className="relative flex min-w-0 flex-1 flex-col">
+              <header
+                className={cn(
+                  "z-30 flex items-center gap-3.5 border-b border-border bg-card px-5 py-2.5 @max-[640px]/app:flex-wrap @max-[640px]/app:px-4",
+                  mode === "column" && "sticky top-0",
                 )}
+              >
+                <div className="min-w-0">
+                  <p className="truncate text-bar-title font-semibold tracking-bar-title">
+                    {module.name}
+                  </p>
+                  {tab && (
+                    <p className="truncate font-mono text-caption text-muted-foreground group-data-[short=true]/stage:hidden">
+                      {tab.label}
+                    </p>
+                  )}
+                </div>
+                <div className="ml-auto flex shrink-0 items-center gap-1.5">{actions}</div>
+              </header>
+              <div
+                className={cn(mode === "column" ? "sticky top-[57px] z-20" : "sticky top-0 z-20")}
+              >
+                <TabBar module={module} activeTabId={tab?.id ?? null} />
               </div>
-              <div className="ml-auto flex shrink-0 items-center gap-1.5">{actions}</div>
-            </header>
-            <div className={cn(mode === "column" ? "sticky top-[57px] z-20" : "sticky top-0 z-20")}>
-              <TabBar module={module} activeTabId={tab?.id ?? null} />
-            </div>
-            {/* A block, not a flex column. In a flex column a child with auto
+              {/* A block, not a flex column. In a flex column a child with auto
               margins (every existing page is `mx-auto max-w-…`) shrink-wraps
               to its content instead of taking the screen's width, and a wide
               table then widened the page by 375px at phone width. */}
-            <main className="app-screen @container/screen w-full max-w-[1520px] min-w-0 px-5 pt-5 pb-18 @max-[640px]/app:px-4 @max-[640px]/app:pt-4 group-data-[short=true]/stage:pt-3">
-              {children}
-            </main>
+              <main className="app-screen @container/screen w-full max-w-[1520px] min-w-0 px-5 pt-5 pb-18 @max-[640px]/app:px-4 @max-[640px]/app:pt-4 group-data-[short=true]/stage:pt-3">
+                {children}
+              </main>
+            </div>
           </div>
         </div>
-      </div>
-    </PhoneProvider>
+      </PhoneProvider>
+    </AnchorContext.Provider>
   );
 }

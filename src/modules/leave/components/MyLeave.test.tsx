@@ -7,7 +7,7 @@
  * nothing of the kind.
  */
 
-import { render, screen } from "@testing-library/react";
+import { render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -25,6 +25,7 @@ vi.mock("@/platform/modules", () => ({
   ),
 }));
 
+import { AnchorContext } from "@/platform/shell/anchor";
 import MyLeave from "./MyLeave";
 
 beforeEach(() => {
@@ -155,5 +156,24 @@ describe("the history, in the Core HR design (14 Oct 2026)", () => {
     expect(screen.getByTestId("panel-history")).toContainElement(row);
     expect(row).toHaveTextContent("05 Jan 2099 to 09 Jan 2099");
     expect(row).not.toHaveTextContent("2099-01-05");
+  });
+});
+
+describe("a notice about one request (Sada, 27 Oct 2026)", () => {
+  it("opens that request, with its anchor on the row", async () => {
+    render(
+      <AnchorContext.Provider value="leave-r1">
+        <MyLeave />
+      </AnchorContext.Provider>,
+    );
+    // Opened once the requests have arrived, a moment after the row first shows.
+    const row = await screen.findByTestId("request-row");
+    await waitFor(() => expect(row).toHaveAttribute("aria-expanded", "true"));
+    expect(row.closest("li")).toHaveAttribute("id", "leave-r1");
+  });
+
+  it("opens nothing without one", async () => {
+    render(<MyLeave />);
+    expect(await screen.findByTestId("request-row")).toHaveAttribute("aria-expanded", "false");
   });
 });

@@ -80,7 +80,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // interactive-widget: on a phone the keyboard shrinks the page rather than
+      // covering it, so a bottom sheet sits above the keyboard and scrolls
+      // inside, instead of hiding its fields behind it (Sada, 27 Oct 2026).
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, interactive-widget=resizes-content",
+      },
       { title: "Neuvto WOS — Workforce Operating System" },
       { property: "og:title", content: "Neuvto WOS — Workforce Operating System" },
       { name: "twitter:title", content: "Neuvto WOS — Workforce Operating System" },

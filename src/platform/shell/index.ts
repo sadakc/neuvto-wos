@@ -15,3 +15,4 @@ export { NavPanel } from "./NavPanel";
 export { PHONE_WIDTH, isPhoneWidth, moduleHome, sectionGroups, homeTiles } from "./phone";
 export { usePhone, useSubNav, type SubNav, type SubNavItem } from "./phone-context";
 export { PhoneProvider } from "./PhoneProvider";
+export { useAnchor } from "./anchor";

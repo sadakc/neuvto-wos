@@ -62,6 +62,8 @@ export interface ShellModule {
   hiddenForRole: number;
   /** The tab a phone opens the module on (doc 11.3). */
   homeTabId?: string;
+  /** The phone's bottom bar label; `short` when absent. */
+  phoneLabel?: string;
   /** Live lines for the phone's tiles, keyed by a tab's `to`. */
   tileLines?: ModuleDefinition["tileLines"];
 }
@@ -208,6 +210,7 @@ export function buildShell(
       tabs,
       hiddenForRole: hidden,
       homeTabId: tabs.find((t) => m.home && t.to === m.home)?.id,
+      phoneLabel: m.phoneLabel,
       // The module's own lines, and the platform's for its approvals tab: how
       // many of this module's requests are waiting on the person (doc 11.3).
       tileLines: tabs.some((t) => t.id === "approvals")

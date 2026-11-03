@@ -357,7 +357,7 @@ function BottomNav({ modules, activeKey }: { modules: readonly ShellModule[]; ac
                 active ? "font-semibold text-foreground" : "text-muted-foreground",
               )}
             >
-              {m.short}
+              {m.phoneLabel ?? m.short}
             </span>
           </Link>
         );
@@ -405,7 +405,7 @@ export function BottomSheet({
               <X className="size-5" aria-hidden />
             </DialogPrimitive.Close>
           </div>
-          <div className="min-h-0 overflow-y-auto pb-3">{children}</div>
+          <div className="min-h-0 overflow-y-auto overscroll-contain pb-3">{children}</div>
           {footer && (
             <p
               data-testid="sheet-footer"

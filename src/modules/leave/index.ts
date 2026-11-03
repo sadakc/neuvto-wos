@@ -15,6 +15,10 @@ import { CalendarDays } from "lucide-react";
 import type { ModuleDefinition } from "@/platform/modules";
 import { LeaveSettings } from "./contracts";
 
+/** My Leave, opened at one request when the notice names it. */
+const leaveAnchor = (id: unknown) =>
+  typeof id === "string" && id ? `/app/leave#leave-${id}` : "/app/leave";
+
 export const leave: ModuleDefinition = {
   key: "leave",
   name: "Leave Management",
@@ -211,8 +215,9 @@ export const leave: ModuleDefinition = {
   // on you opens Leave approvals (the platform's answer); your own request,
   // sent (D112) or decided, opens My Leave; a summary opens the reports.
   notificationLinks: {
-    "approval.sent": () => "/app/leave",
-    "approval.completed": () => "/app/leave",
+    // Sada, 27 Oct 2026: a notice opens the request it is about.
+    "approval.sent": (p) => leaveAnchor(p.entity_id),
+    "approval.completed": (p) => leaveAnchor(p.entity_id),
     "leave_summary.weekly": () => "/app/reports?m=leave",
     "leave_summary.monthly": () => "/app/reports?m=leave",
   },

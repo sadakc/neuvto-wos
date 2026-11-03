@@ -64,7 +64,9 @@ vi.mock("@/platform/organization", () => ({
 
 vi.mock("@/components/shared/theme-toggle", () => ({ ThemeToggle: () => null }));
 // The bell asks the database for its count; it has its own tests.
-vi.mock("@/platform/notifications", () => ({ NotificationBell: () => null }));
+vi.mock("@/platform/notifications", () => ({
+  NotificationBell: () => <button type="button" data-testid="bell" />,
+}));
 
 const leave: ModuleDefinition = {
   key: "leave",
@@ -148,5 +150,26 @@ describe("whose page a sign-in returns to", () => {
     render(<AppShell />);
     await waitFor(() => expect(localStorage.getItem("neuvto.returnTo")).not.toBeNull());
     expect(returnFor(window.location.pathname, "mark")).toBe("/app");
+  });
+});
+
+describe("the phone's app bar (Sada, 27 Oct 2026)", () => {
+  it("signs out in one tap, from beside the bell", async () => {
+    const { signOut } = await import("@/platform/auth");
+    Object.defineProperty(HTMLElement.prototype, "clientWidth", {
+      configurable: true,
+      get: () => 390,
+    });
+    getCurrentUser.mockResolvedValue(user(["employee"]));
+    render(<AppShell />);
+    const out = await screen.findByTestId("app-bar-sign-out");
+    expect(out).toHaveAccessibleName("Sign out");
+    const bar = screen.getByTestId("app-bar");
+    const buttons = [...bar.querySelectorAll("button")];
+    expect(buttons.indexOf(out as HTMLButtonElement)).toBeLessThan(
+      buttons.findIndex((b) => b.dataset.testid === "bell"),
+    );
+    out.click();
+    await vi.waitFor(() => expect(signOut).toHaveBeenCalled());
   });
 });

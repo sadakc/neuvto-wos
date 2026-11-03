@@ -1,6 +1,6 @@
 # NEUVTO WOS — Design System
 
-**Version:** 2.2 · **Status:** Active · **Applies to:** every screen, web and native
+**Version:** 2.3 · **Status:** Active · **Applies to:** every screen, web and native
 **Audience:** designers, engineers, and AI build tools — all three work from this file
 
 The contract between design and code. A designer should be able to open this, look at a
@@ -345,6 +345,21 @@ team`, `Company`, the current one marked, a footer counting what is hidden for t
   the title menu lists its siblings and the back arrow returns to the index. The tiles are
   not shown above an open section.
 - **Every dialog is a bottom sheet** under 600px (the shared `Dialog` and `AlertDialog`).
+- **The keyboard shrinks the page** (`interactive-widget=resizes-content` in the viewport
+  meta, D116), so a sheet stays above it and scrolls inside, instead of hiding its fields
+  behind the keyboard or its title under the address bar.
+- **Sign out is one tap**, an icon left of the bell (D116). The bottom bar reads `My
+Profile` for the Employee Card (a module's `phoneLabel`).
+
+### A notice opens the section it is about (D116)
+
+A notice's link carries the section as its anchor: `/app/leave#leave-<id>` opens My
+Leave with that request open, `/app/employee#my-change-requests` opens the record at
+Overview's change requests, `#section-<name>` opens a section of the record. The shell
+hands the anchor to the screen (`useAnchor`), so a screen with sections opens the right
+one, and scrolls to the element with that id once it renders, marking it briefly. A new
+notice gets a link with an anchor, never the bare page.
+
 - Not yet, by decision (Sada, 23 Oct 2026, first round): dropdowns stay the phone's own
   picker rather than a custom sheet; tables keep scrolling inside their own box rather than
   becoming card lists; no Undo snackbars and no floating action button; Add Employee stays

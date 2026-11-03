@@ -212,6 +212,8 @@ export interface ModuleDefinition {
 
   /** The rail's label where space is short ("Leave" for "Leave Management"). */
   shortName?: string;
+  /** The phone's bottom bar label, when it should read differently ("My Profile"). */
+  phoneLabel?: string;
   /** Which rail section the module belongs to. Defaults to `Company`. */
   section?: ModuleSection;
   /** The rail icon. A component, so the platform imports no icon by name. */

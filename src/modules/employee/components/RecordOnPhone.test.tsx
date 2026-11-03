@@ -10,6 +10,7 @@ import { render, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { PhoneProvider } from "@/platform/shell";
+import { AnchorContext } from "@/platform/shell/anchor";
 import type { EmployeeCard } from "../contracts";
 import cards from "./__fixtures__/cards.json";
 
@@ -92,5 +93,57 @@ describe("a person's record on a phone", () => {
     render(<EmployeeCardView card={admin} />);
     expect(screen.getByRole("tablist", { name: "Record sections" })).toBeInTheDocument();
     expect(screen.queryByTestId("record-overview")).toBeNull();
+  });
+});
+
+describe("a notice's anchor on the record (Sada, 27 Oct 2026)", () => {
+  const anchored = (anchor: string, card: EmployeeCard = as("self")) =>
+    render(
+      <AnchorContext.Provider value={anchor}>
+        <PhoneProvider phone>
+          <EmployeeCardView card={card} />
+        </PhoneProvider>
+      </AnchorContext.Provider>,
+    );
+
+  it("opens Overview, where the person's change requests are, for an answered request", async () => {
+    anchored("my-change-requests");
+    expect(screen.getByTestId("record-section")).toBeInTheDocument();
+    expect(document.getElementById("my-change-requests")).not.toBeNull();
+  });
+
+  it("opens the section a reminder names", () => {
+    anchored("section-family", admin);
+    expect(screen.getByTestId("record-section")).toHaveTextContent("Nominees");
+  });
+
+  it("opens the tab on a laptop too", () => {
+    render(
+      <AnchorContext.Provider value="section-family">
+        <EmployeeCardView card={admin} />
+      </AnchorContext.Provider>,
+    );
+    expect(screen.getByRole("tab", { name: "Family" })).toHaveAttribute("aria-selected", "true");
+  });
+
+  it("ignores an anchor for a section the viewer may not open", () => {
+    anchored("section-statutory", as("colleague"));
+    expect(screen.queryByTestId("record-section")).toBeNull();
+  });
+
+  it("leaves the section open alone for an anchor that names none of its sections", async () => {
+    const user = userEvent.setup();
+    const { rerender } = render(
+      <AnchorContext.Provider value="">
+        <EmployeeCardView card={admin} />
+      </AnchorContext.Provider>,
+    );
+    await user.click(screen.getByRole("tab", { name: "Family" }));
+    rerender(
+      <AnchorContext.Provider value="leave-r1">
+        <EmployeeCardView card={admin} />
+      </AnchorContext.Provider>,
+    );
+    expect(screen.getByRole("tab", { name: "Family" })).toHaveAttribute("aria-selected", "true");
   });
 });

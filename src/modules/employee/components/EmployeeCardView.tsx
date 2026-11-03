@@ -17,7 +17,7 @@
  * the card carried one, which it does for the person and the Employee Admin.
  */
 
-import { usePhone, useSubNav } from "@/platform/shell";
+import { useAnchor, usePhone, useSubNav } from "@/platform/shell";
 import { SectionList } from "@/components/shared/section-list";
 import { useEffect, useRef, useState, type KeyboardEvent } from "react";
 import { StatusBadge, type StatusTone } from "@/components/shared/status-badge";
@@ -117,6 +117,11 @@ const SECTION_HINT: Record<TabKey, string> = {
   documents: "Files on record, and who opened them",
 };
 
+/** An anchor that names a part of a section, and the section it is in. */
+const ANCHOR_SECTION: Record<string, TabKey> = {
+  "my-change-requests": "overview",
+};
+
 const SECTION_GROUP: Record<TabKey, string> = {
   overview: "Record",
   personal: "Record",
@@ -141,6 +146,18 @@ export function EmployeeCardView({
   // section at a time, carried by the app bar's title menu. "" is the index.
   const phone = usePhone();
   const [phoneTab, setPhoneTab] = useState<TabKey | "">("");
+  // A notice opens the section it is about (Sada, 27 Oct 2026): its anchor is
+  // a part of a section (`my-change-requests`) or the section itself
+  // (`section-family`).
+  const anchor = useAnchor();
+  useEffect(() => {
+    const key = (ANCHOR_SECTION[anchor] ?? anchor.replace(/^section-/, "")) as TabKey;
+    if (!tabs.some((t) => t.key === key)) return;
+    setTab(key);
+    setPhoneTab(key);
+    // `tabs` follows the card; the anchor is what changed.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anchor]);
   const phoneActive = tabs.some((t) => t.key === phoneTab) ? (phoneTab as TabKey) : "";
   useSubNav(
     phone
@@ -230,7 +247,14 @@ export function EmployeeCardView({
       {key === "overview" && (
         <div className="flex flex-col gap-4">
           <Overview card={card} onChanged={onChanged} />
-          {card.capabilities.canRequestChange && <MyChangeRequests refreshKey={requestsSent} />}
+          {card.capabilities.canRequestChange && (
+            <div
+              id="my-change-requests"
+              className="rounded-xl transition-shadow data-[anchored=true]:ring-2 data-[anchored=true]:ring-primary"
+            >
+              <MyChangeRequests refreshKey={requestsSent} />
+            </div>
+          )}
         </div>
       )}
       {key === "personal" && <Personal card={card} onChanged={onChanged} />}

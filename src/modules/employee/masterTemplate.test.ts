@@ -12,7 +12,11 @@
  */
 
 import { readFileSync } from "node:fs";
-import { describe, expect, it } from "vitest";
+import { vi, describe, expect, it } from "vitest";
+
+// Each test builds a real workbook, which takes seconds when the whole suite
+// runs at once; 5s was hit on a loaded machine (27 Oct 2026).
+vi.setConfig({ testTimeout: 30_000 });
 import ExcelJS from "exceljs";
 import { MASTER_TEMPLATE, forDatabase, readGrids, toIsoDate } from "./masterTemplate";
 import { buildTemplate, readWorkbook } from "./masterWorkbook";

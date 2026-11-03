@@ -14,7 +14,7 @@ import { AppFrame, buildShell } from "@/platform/shell";
 import { ThemeToggle } from "@/components/shared/theme-toggle";
 import { NotificationBell } from "@/platform/notifications";
 import { leavingFor, rememberShellUser } from "@/platform/auth/return-to";
-import { Building2, House } from "lucide-react";
+import { Building2, House, LogOut } from "lucide-react";
 
 export const Route = createFileRoute("/app")({
   ssr: false,
@@ -194,7 +194,25 @@ function AppShell() {
       }
       phone={{
         initials,
-        trailing: <NotificationBell className="size-12 rounded-full" />,
+        trailing: (
+          <>
+            {/* One tap out, beside the bell (Sada, 27 Oct 2026). */}
+            <button
+              type="button"
+              data-testid="app-bar-sign-out"
+              aria-label="Sign out"
+              title="Sign out"
+              onClick={async () => {
+                await signOut();
+                window.location.href = "/auth";
+              }}
+              className="grid size-12 shrink-0 place-items-center rounded-full text-muted-foreground hover:bg-muted hover:text-foreground"
+            >
+              <LogOut className="size-5" aria-hidden />
+            </button>
+            <NotificationBell className="size-12 rounded-full" />
+          </>
+        ),
         drawer: (
           <div className="flex flex-col gap-1">
             <Link
