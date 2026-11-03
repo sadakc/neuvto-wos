@@ -144,6 +144,13 @@ begin
        join public.nomination_versions v on v.id = n.version_id
        join public.family_members f on f.employee_id = e_priya and f.relation = 'brother'
       where v.employee_id = e_priya and v.effective_to is null and n.relation = 'brother'), 'true');
+  perform pg_temp.op_do('a son typed by name, already in Family', hema, format($q$select public.employee_save_nomination(%L,
+    '{"nominees":[{"name":"Ramesh","relation":"father","sharePercent":50},{"name":"  karan ","relation":"son","sharePercent":50}]}')$q$, e_priya));
+  perform pg_temp.op_check('is that son, not a second Karan',
+    (select count(*)::text from public.family_members where employee_id = e_priya and lower(name) = 'karan'), '1');
+  perform pg_temp.op_do('the brother again, for the checks below', hema, format($q$select public.employee_save_nomination(%L,
+    '{"nominees":[{"name":"Ramesh","relation":"father","dateOfBirth":"1960-06-15","sharePercent":60},
+                  {"name":"Vikram","relation":"brother","dateOfBirth":"1990-01-01","sharePercent":40}]}')$q$, e_priya));
   perform pg_temp.op_check('saved the same day, it was a correction: one nomination still',
     (select count(*)::text from public.nomination_versions where employee_id = e_priya), '1');
 

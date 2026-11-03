@@ -871,7 +871,9 @@ one place, both need to sync."
 - **A nominee is a family member** (`nominees.family_member_id`). The nominee form offers
   **Or add from Family**, which brings the person's name, relation and date of birth;
   choosing **father** or **mother** as a relation is the one already in Family; somebody new
-  is added to Family when the nomination is saved. A name or date of birth typed for a
+  is added to Family when the nomination is saved. A nominee with the same relation and
+  name as somebody in Family is that person (a spreadsheet lists them in both), never a
+  second one. A name or date of birth typed for a
   nominee is written back to Family; one left empty is filled from Family.
 - **Family changes the nomination.** When a nominee's details change in Family, the current
   nomination is re-issued from today with them, and the old version is kept as it was

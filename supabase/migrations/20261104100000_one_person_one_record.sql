@@ -77,8 +77,8 @@ revoke all on function public.employee_write_nomination(uuid, jsonb) from public
 
 /**
  * The person's own save, or an Admin's. Each nominee is linked to a family
- * member: the one named, else the father or mother of that relation, else a
- * new member added to Family. A nominee's name or date of birth left empty is
+ * member: the one named, else the father or mother of that relation, else
+ * the one of that relation and name, else a new member added to Family. A nominee's name or date of birth left empty is
  * Family's; one typed is written back to Family. Where the person may not
  * change Family (the company keeps it, D107), Family wins: a linked nominee
  * takes Family's details, and somebody new is nominated without being added.
@@ -122,6 +122,15 @@ begin
     if v_link is null and n ->> 'relation' in ('father', 'mother') then
       select f.id into v_link from public.family_members f
        where f.employee_id = _employee_id and f.relation = n ->> 'relation' limit 1;
+    end if;
+    -- Somebody already in Family under the same relation and name is that
+    -- person, not a second one (a spreadsheet lists them in both, CI 3 Nov 2026).
+    if v_link is null then
+      select f.id into v_link from public.family_members f
+       where f.employee_id = _employee_id and f.relation = n ->> 'relation'
+         and lower(regexp_replace(btrim(f.name), '\s+', ' ', 'g'))
+             = lower(regexp_replace(btrim(coalesce(n ->> 'name', '')), '\s+', ' ', 'g'))
+       limit 1;
     end if;
 
     if v_link is not null then
