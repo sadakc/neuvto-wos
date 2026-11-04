@@ -1,0 +1,102 @@
+# Neuvto WOS — publish the `qa` branch to qa.neuvto.com (ENVIRONMENTS.md)
+#
+# The QA stack (Sada, 4 Nov 2026): a change goes to `qa`, is tested on
+# qa.neuvto.com against the QA database (Supabase `neuvto-wos-qa`), and only
+# then goes to `main` and production.
+#
+# A second Worker, never production's: `--env=qa` names it neuvto-wos-qa and
+# gives it qa.neuvto.com alone, and refuses production's name or hostnames.
+# The build is checked to be talking to the QA database before it is published.
+#
+# Migrations are applied to QA by hand, as they are to production
+# (docs/operations/ENVIRONMENTS.md, "Applying migrations to QA").
+#
+# QA sends no email: it has no notification dispatcher configured, by Sada's
+# decision of 4 Nov 2026.
+
+name: Deploy QA
+
+on:
+  push:
+    branches: [qa]
+    paths-ignore:
+      - "docs/**"
+      - "**/*.md"
+      - "supabase/**"
+      - "neuvto-harness/**"
+      - ".claude/**"
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-qa
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: oven-sh/setup-bun@v2
+
+      - name: Install
+        run: bun install --frozen-lockfile
+
+      - name: Lint, types, tests
+        run: |
+          bun run lint
+          bun run typecheck
+          bun run test
+
+      # The one mistake that matters here is a QA build pointed at production's
+      # database, or the reverse. Refuse both before building anything.
+      - name: The build talks to the QA database
+        env:
+          QA_URL: ${{ secrets.QA_VITE_SUPABASE_URL }}
+          QA_KEY: ${{ secrets.QA_VITE_SUPABASE_PUBLISHABLE_KEY }}
+          PROD_URL: ${{ secrets.VITE_SUPABASE_URL }}
+        run: |
+          if [ -z "$QA_URL" ] || [ -z "$QA_KEY" ]; then
+            echo "::error::QA_VITE_SUPABASE_URL and QA_VITE_SUPABASE_PUBLISHABLE_KEY are not set"
+            exit 1
+          fi
+          case "$QA_URL" in
+            *apwnhyjgwukwyjnmcjeg*) ;;
+            *) echo "::error::QA_VITE_SUPABASE_URL is not the QA project (neuvto-wos-qa)"; exit 1 ;;
+          esac
+          if [ "$QA_URL" = "$PROD_URL" ]; then
+            echo "::error::QA_VITE_SUPABASE_URL is production's database"
+            exit 1
+          fi
+
+      - name: Build
+        env:
+          VITE_SUPABASE_URL: ${{ secrets.QA_VITE_SUPABASE_URL }}
+          VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.QA_VITE_SUPABASE_PUBLISHABLE_KEY }}
+          SUPABASE_URL: ${{ secrets.QA_VITE_SUPABASE_URL }}
+          SUPABASE_PUBLISHABLE_KEY: ${{ secrets.QA_VITE_SUPABASE_PUBLISHABLE_KEY }}
+          NITRO_COMPATIBILITY_DATE: "2026-08-17"
+        run: bun run build
+
+      # The same check production's build gets, expecting the QA project.
+      - name: Verify the build before publishing it
+        env:
+          EXPECT_REF: apwnhyjgwukwyjnmcjeg
+        run: bash scripts/verify-deploy.sh --dir .output
+
+      - name: Make it the QA Worker, on qa.neuvto.com only
+        run: bun scripts/cloudflare-worker-config.mjs --env=qa
+
+      - name: Publish to Cloudflare Workers
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+        run: bunx wrangler@4 deploy --config .output/server/wrangler.json
+
+      - name: Verify the live site
+        env:
+          EXPECT_REF: apwnhyjgwukwyjnmcjeg
+        run: |
+          echo "Waiting for the rollout to settle before checking."
+          sleep 30
+          bash scripts/verify-deploy.sh --url https://qa.neuvto.com

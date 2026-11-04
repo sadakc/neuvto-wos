@@ -1,6 +1,6 @@
 # Four stacks, and why hosting is moving to get them
 
-**Version:** 1.5 · **Status:** In progress · **Updated:** 19 Aug 2026
+**Version:** 1.6 · **Status:** In progress · **Updated:** 4 Nov 2026
 
 Sada's instruction, 8 Aug 2026:
 
@@ -18,13 +18,13 @@ this triggered.
 
 ## The five environments, not four
 
-| Environment        | Reached by                       | Backing database                           | Status                                     |
-| ------------------ | -------------------------------- | ------------------------------------------ | ------------------------------------------ |
-| **Local**          | `supabase start` on your machine | local Docker Postgres                      | already exists, unchanged                  |
-| **QA**             | `qa` branch → `qa.neuvto.com`    | new Supabase project, org **Neuvto QA**    | branch pushed; project pending             |
-| **UAT**            | `uat` branch → `uat.neuvto.com`  | new Supabase project, org **Neuvto QA**    | branch pushed; project pending             |
-| **Pre-production** | Lovable's own preview            | Lovable Cloud (`vkyvzhgigncranprhidn`)     | already exists, **unchanged by this plan** |
-| **Production**     | `main` branch → `neuvto.com`     | `neuvto-wos-prod` (`udrzhfgwqgolvyimbwto`) | already exists, unchanged                  |
+| Environment        | Reached by                       | Backing database                                         | Status                                                          |
+| ------------------ | -------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
+| **Local**          | `supabase start` on your machine | local Docker Postgres                                    | already exists, unchanged                                       |
+| **QA**             | `qa` branch → `qa.neuvto.com`    | `neuvto-wos-qa` (`apwnhyjgwukwyjnmcjeg`), org **Neuvto** | **database ready 4 Nov 2026**; site waits on two GitHub secrets |
+| **UAT**            | `uat` branch → `uat.neuvto.com`  | would need a second free organisation                    | **later** (Sada, 4 Nov 2026): not in the same free tier         |
+| **Pre-production** | Lovable's own preview            | Lovable Cloud (`vkyvzhgigncranprhidn`)                   | already exists, **unchanged by this plan**                      |
+| **Production**     | `main` branch → `neuvto.com`     | `neuvto-wos-prod` (`udrzhfgwqgolvyimbwto`)               | already exists, unchanged                                       |
 
 **Do not call the UAT stack "pre-production."** That name is already
 [DEPLOYMENT.md](DEPLOYMENT.md)'s term for Lovable Cloud — the database Lovable's
@@ -35,6 +35,60 @@ Sada names the demo org's admin, no self-serve signup, staff don't read tenant
 data. It being a demo stack doesn't relax that.
 
 ---
+
+## QA, as built on 4 Nov 2026
+
+The free plan allows two active projects in an organisation, so production and
+QA share **Neuvto**; UAT waits until it is wanted, in a second organisation
+(Sada, 4 Nov 2026). Cost: $0.
+
+**The flow.** A change goes to the `qa` branch; `deploy-qa.yml` publishes it to
+qa.neuvto.com against the QA database; Sada tests there; only then does it go
+to `main` and production, and only then are its migrations applied to
+production.
+
+**The Worker.** QA is a second Cloudflare Worker, `neuvto-wos-qa`, on
+qa.neuvto.com alone. `scripts/cloudflare-worker-config.mjs --env=qa` names it
+and refuses production's name or hostnames; production keeps its own Worker
+(`tanstack-start-ts`) untouched. The workflow refuses to build unless its
+database address is the QA project's, and `verify-deploy.sh` checks the build
+and the live site with `EXPECT_REF=apwnhyjgwukwyjnmcjeg`.
+
+**GitHub secrets it reads**, which Sada adds (a session's guard refuses secret
+writes): `QA_VITE_SUPABASE_URL` and `QA_VITE_SUPABASE_PUBLISHABLE_KEY`, from the
+QA project's API settings. The publishable key is the public one the browser
+gets, never the service key. `CLOUDFLARE_API_TOKEN` and `CLOUDFLARE_ACCOUNT_ID`
+are production's, already set.
+
+**Its data.** Started from the local stack on 4 Nov 2026: every migration, then
+the local data (public schema, sign-in accounts, the seven stored documents).
+Sada adds to it from there. The local stack's two organisation logos had a
+record but no file, so QA has neither.
+
+**No email.** QA has no notification dispatcher configured (no Vault secrets),
+so invitations and notifications wait and are never sent (Sada, 4 Nov 2026).
+Sign-in codes are separate: on a free project Supabase's own mail only reaches
+members of the Supabase team and cannot carry the six-digit code template.
+Signing in to QA needs a custom SMTP sender (Resend, free) and deliverable
+addresses on the test accounts: an open decision.
+
+**Pausing.** A free project pauses after about a week unused. Restore it from
+the dashboard or ask for it; nothing is lost.
+
+### Applying migrations to QA
+
+By hand, from a scratch copy of `supabase/` linked to QA, never the repository
+itself, so a `db push` in the repository can never reach QA by accident:
+
+```bash
+W=$(mktemp -d); mkdir -p $W/supabase
+cp -R supabase/migrations supabase/templates supabase/config.toml $W/supabase/
+supabase link --project-ref apwnhyjgwukwyjnmcjeg --workdir $W
+PGOPTIONS='-c search_path="$user",public,extensions' supabase db push --linked --workdir $W
+```
+
+`PGOPTIONS` is needed: the CLI signs in as a temporary role with no search path
+of its own, and without `extensions` on it `gen_random_bytes` is not found.
 
 ## Supabase: a second free organization
 
