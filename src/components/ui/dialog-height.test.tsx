@@ -9,8 +9,8 @@
  * remember to.
  */
 
-import { render, screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import { act, render, screen } from "@testing-library/react";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { AlertDialog, AlertDialogContent, AlertDialogTitle } from "./alert-dialog";
 import { Dialog, DialogContent, DialogTitle } from "./dialog";
 
@@ -61,5 +61,37 @@ describe("shared dialogs", () => {
       expect(c).toMatch(/max-\[599px\]:rounded-t-\[18px\]/);
       expect(c).toMatch(/max-\[599px\]:max-w-none/);
     }
+  });
+});
+
+/**
+ * An iPhone's keyboard covers the page instead of shrinking it, so a sheet
+ * sized by CSS alone stays as tall as the screen and runs off the top: the
+ * small-iPhone run on the iOS Simulator caught every tall sheet so (D120).
+ * The sheet takes its height from what is visible, and follows it.
+ */
+describe("a sheet with the iPhone keyboard up", () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("is no taller than what the keyboard leaves, and follows it", () => {
+    const vv = Object.assign(new EventTarget(), { height: 667 });
+    vi.stubGlobal("visualViewport", vv);
+    render(
+      <Dialog open>
+        <DialogContent data-testid="d">
+          <DialogTitle>A sheet</DialogTitle>
+        </DialogContent>
+      </Dialog>,
+    );
+    const sheet = screen.getByTestId("d");
+    expect(sheet.className).toMatch(/max-\[599px\]:max-h-\[min\(.*var\(--sheet-room/);
+    expect(sheet.style.getPropertyValue("--sheet-room")).toBe("667px");
+
+    // The keyboard comes up.
+    act(() => {
+      vv.height = 451;
+      vv.dispatchEvent(new Event("resize"));
+    });
+    expect(sheet.style.getPropertyValue("--sheet-room")).toBe("451px");
   });
 });

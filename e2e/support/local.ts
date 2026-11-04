@@ -9,8 +9,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { networkInterfaces } from "node:os";
 import type { Page } from "@playwright/test";
 
-export const DB_URL = "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
-export const MAIL_URL = "http://127.0.0.1:54324";
+/**
+ * The usual local stack, or the device lab (scripts/device-lab.sh), which sets
+ * these two so the phone, Android and iOS tests never touch the usual stack.
+ */
+export const DB_URL =
+  process.env.E2E_DB_URL ?? "postgresql://postgres:postgres@127.0.0.1:54322/postgres";
+export const MAIL_URL = process.env.E2E_MAIL_URL ?? "http://127.0.0.1:54324";
 
 const LOCAL = /^https?:\/\/(127\.0\.0\.1|localhost)(:\d+)?(\/|$)/;
 
@@ -45,7 +50,8 @@ export function assertLocalOnly() {
           .map((l) => l.replace(/^[^=]*=/, "").replace(/^["']|["']\s*$/g, ""))
           .pop()
       : undefined;
-  const url = read(".env.local") ?? read(".env") ?? "";
+  // A variable in the environment beats both files, as it does for Vite.
+  const url = process.env.VITE_SUPABASE_URL ?? read(".env.local") ?? read(".env") ?? "";
   if (!isLocalTarget(url)) {
     throw new Error(
       `REFUSING TO RUN. The app would talk to ${url || "nothing"}, which is not the local stack.\n` +

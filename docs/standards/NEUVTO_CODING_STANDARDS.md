@@ -1,6 +1,6 @@
 # NEUVTO WOS — Coding Standards
 
-**Version:** 1.3 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 13 Oct 2026
+**Version:** 1.4 · **Status:** Active · **Applies to:** all code, whether written by a person or an AI agent · **Updated:** 4 Nov 2026
 
 Two goals: consistency across every module, and **portability out of Lovable at any time**. §9 is the portability contract — treat it as non-negotiable.
 
@@ -208,6 +208,10 @@ bun run e2e:ui     # Playwright's window: watch each step, re-run one test
 - **Each flow tests the wrong way as well as the right one.** A wrong sign-in code, an address nobody registered, a rejection with no reason, a request over the balance, a date clash, a colleague trying a control only an Admin has. Each guard was broken on purpose once and its test watched fail (13 Oct 2026).
 - **`screens.spec.ts` covers every screen it can reach,** found by following the app's own links and menus, as HR, an employee and a manager, at laptop and phone size. On each screen, and in each card tab and Configuration section, every button, link and field must have a name, nothing may scroll sideways, and the browser must report no error. A new screen is covered the day it is linked. Its first run found the approval threshold box with no name.
 - **New screens get a flow test when they change data.** Add it to the module's spec file, with a negative case beside each positive one.
+
+### Phone tests: the way a phone reaches the app
+
+`bun run e2e:devices` and `bun run e2e:ios` test phones: every screen at three phone widths and in WebKit, real Android Chrome on the Android Emulator and Apple's Safari on the iOS Simulator (D119). They run in the **device lab**, a second local stack they may re-seed, never the one a person is testing on, and through this Mac's Wi-Fi address, never localhost, because a browser treats localhost as secure and a phone's address as not. Chrome at phone width does not draw a keyboard or an address bar, so a phone-only fix is proved on the emulator. See `docs/operations/DEVICE_TESTING.md`.
 
 ### Mutation testing: do the tests notice a break?
 

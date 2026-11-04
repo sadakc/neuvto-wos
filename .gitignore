@@ -58,4 +58,9 @@ reports/mutation
 
 # Browser tests (playwright.config.ts): saved sign-ins and their reports.
 e2e/.auth
+e2e/.auth-lab
 reports/e2e
+reports/devices
+
+# The device lab (scripts/device-lab.sh): a copy of supabase/ with its own ports.
+.device-lab/

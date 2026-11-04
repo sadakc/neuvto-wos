@@ -256,18 +256,20 @@ export function FieldEditor({
             <DialogTitle>
               {verb} {lower(title)}
             </DialogTitle>
-            <DialogDescription>
-              {description ??
-                (fields.some((f) => f.masked)
-                  ? "Only what you change is saved. A number on record stays as it is unless you choose Change."
-                  : "Only what you change is saved. The × in a box clears it.")}
-              {required.length > 0 && (
-                <span data-testid={`required-${id}`} className="mt-1 block">
-                  Required: {required.join(", ")}.
-                </span>
-              )}
-            </DialogDescription>
           </DialogHeader>
+          {/* Below the header, not in it: on a phone the header stays in sight
+              and a long description would leave the fields no room (D120). */}
+          <DialogDescription className="-mt-2.5 text-center sm:text-left">
+            {description ??
+              (fields.some((f) => f.masked)
+                ? "Only what you change is saved. A number on record stays as it is unless you choose Change."
+                : "Only what you change is saved. The × in a box clears it.")}
+            {required.length > 0 && (
+              <span data-testid={`required-${id}`} className="mt-1 block">
+                Required: {required.join(", ")}.
+              </span>
+            )}
+          </DialogDescription>
           <form
             onSubmit={submit}
             data-testid={`editor-${id}`}

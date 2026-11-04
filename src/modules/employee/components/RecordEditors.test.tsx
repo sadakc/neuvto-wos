@@ -270,3 +270,42 @@ describe("the record's own fields", () => {
     expect(api.updateEmployee).toHaveBeenCalledWith(admin.id, { alternateMobile: null });
   });
 });
+
+/**
+ * On a phone the sheet's header stays at the top while the fields scroll
+ * under it, so with the keyboard up the title and the way out are still in
+ * sight (D120). That needs the title and a Close button in the one header;
+ * the Android run on the device lab proves the header then stays put.
+ */
+describe("on a phone, a sheet keeps its title and close in its header (D120)", () => {
+  const headerOf = (title: string) => {
+    const header = screen.getByRole("heading", { name: title }).closest("[data-sheet-header]");
+    expect(header, `${title}: its title is not in the sheet's header`).not.toBeNull();
+    return header as HTMLElement;
+  };
+
+  for (const [tab, opener, title] of [
+    ["Family", "edit-family", "Edit family"],
+    ["Family", "edit-nominees", "New nomination"],
+    ["History", "edit-previous-orgs", "Edit previous organisations"],
+  ] as const) {
+    it(`${title}`, async () => {
+      const user = userEvent.setup();
+      render(<EmployeeCardView card={admin} />);
+      await openTab(tab);
+      await user.click(screen.getByTestId(opener));
+      const header = headerOf(title);
+      expect(within(header).getByRole("button", { name: "Close" })).toBeInTheDocument();
+    });
+  }
+
+  it("a field editor, with its long description below the header", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={{ ...admin, mobile: "9845011100" }} />);
+    await user.click(screen.getByTestId("edit-contact"));
+    const title = screen.getByRole("dialog").querySelector("h2")!.textContent!;
+    const header = headerOf(title);
+    expect(within(header).getByRole("button", { name: "Close" })).toBeInTheDocument();
+    expect(within(header).queryByText(/Only what you change is saved/)).toBeNull();
+  });
+});

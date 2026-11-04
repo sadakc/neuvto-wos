@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.21 · **Status:** Active · **Updated:** 3 Nov 2026
+**Version:** 1.23 · **Status:** Active · **Updated:** 4 Nov 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -24,9 +24,10 @@ predates 31 Jul 2026 and is wrong.
 | The employee record, who may make whom an admin, and the build order                      | [product/NEUVTO_EMPLOYEE_MASTER.md](product/NEUVTO_EMPLOYEE_MASTER.md)                     |
 | What the Core HR bundle's Leave chapter adds, where it conflicts, and what needs deciding | [product/LEAVE_PHASE_2_SCOPE.md](product/LEAVE_PHASE_2_SCOPE.md)                           |
 | What a screen looks like (the Core HR design)                                             | [standards/NEUVTO_DESIGN_SYSTEM.md](standards/NEUVTO_DESIGN_SYSTEM.md)                     |
-| Why something was built differently from the PRD                                          | the **D1–D118** decision table in the same file                                            |
+| Why something was built differently from the PRD                                          | the **D1–D120** decision table in the same file                                            |
 | Whether the platform itself is finished                                                   | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
 | How to run the thing on your own machine                                                  | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
+| How the app is tested on phones, emulators and simulators                                 | [operations/DEVICE_TESTING.md](operations/DEVICE_TESTING.md)                               |
 | How code and schema reach the hosted site                                                 | [operations/DEPLOYMENT.md](operations/DEPLOYMENT.md)                                       |
 | Who hosts `neuvto.com`, and how a deploy is proved                                        | [operations/PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)                       |
 | What each tool in the stack is for, in plain English                                      | Plate 05 of [architecture/neuvto-architecture.html](architecture/neuvto-architecture.html) |
@@ -49,7 +50,7 @@ predates 31 Jul 2026 and is wrong.
 **[NEUVTO_MVP_BUILD_SPEC.md](product/NEUVTO_MVP_BUILD_SPEC.md)** — the single
 source of truth. The platform and its services, the module contract, the build
 sequence with its status column, the verification gate for every step, and the
-**D1–D118 decision table** recording every deliberate deviation from the PRD with
+**D1–D120 decision table** recording every deliberate deviation from the PRD with
 its reason. Its "Known gaps" section is the live list of launch blockers; there
 is no separate blockers file, because two lists of blockers means one of them is
 wrong.
@@ -94,6 +95,7 @@ The rules code must follow. CI enforces the mechanically checkable ones.
 | File                                                                    | Covers                                                                                                                      |
 | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | [LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                 | running locally, and the `.env` trap that points at the shared database                                                     |
+| [DEVICE_TESTING.md](operations/DEVICE_TESTING.md)                       | the device lab, and testing on phone widths, the Android Emulator and the iOS Simulator, without touching local data        |
 | [DEPLOYMENT.md](operations/DEPLOYMENT.md)                               | the three environments, why `db push` cannot work, applying migrations to Lovable Cloud                                     |
 | [PRODUCTION_HOSTING.md](operations/PRODUCTION_HOSTING.md)               | how `neuvto.com` is built by GitHub Actions and served by Cloudflare Workers, written for a non-developer                   |
 | [EMAIL_AND_DOMAINS.md](operations/EMAIL_AND_DOMAINS.md)                 | sign-in addresses vs the `neuvto.com` sending domain, Resend setup, where the API key lives                                 |

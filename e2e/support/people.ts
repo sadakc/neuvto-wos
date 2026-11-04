@@ -18,4 +18,6 @@ export const PEOPLE = {
 
 export type Role = keyof typeof PEOPLE;
 
-export const sessionFile = (role: Role) => `e2e/.auth/${role}.json`;
+/** Sessions for the device lab are for a different address and database, so kept apart. */
+export const sessionFile = (role: Role) =>
+  `e2e/${process.env.DEVICE_LAB ? ".auth-lab" : ".auth"}/${role}.json`;

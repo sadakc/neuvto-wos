@@ -252,3 +252,15 @@
     }
   }
 }
+
+/* iOS Safari zooms the whole page in when a field under 16px is tapped, and
+   leaves it zoomed (D120). On a phone or any touch screen, every field is at
+   least 16px. Outside @layer on purpose: an unlayered rule beats the text-sm
+   utility a form puts round its fields; a layered one would lose to it. */
+@media (max-width: 599px), (pointer: coarse) {
+  input:not([type="checkbox"], [type="radio"], [type="file"], [type="range"], [type="color"]),
+  select,
+  textarea {
+    font-size: max(16px, 1em);
+  }
+}

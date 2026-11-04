@@ -668,7 +668,7 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent className="max-w-3xl">
           <section data-testid="family-editor">
-            <div className="flex flex-wrap items-baseline gap-2 pr-8">
+            <DialogHeader className="flex-row flex-wrap items-baseline gap-2 space-y-0 pr-8 text-left">
               <DialogTitle>{filled ? "Edit family" : "Add family"}</DialogTitle>
               <DialogDescription className="sr-only">
                 Every relative, in any order. Saving replaces the list.
@@ -679,7 +679,7 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
               >
                 {familySummary(rows.map((r) => r.relation))}
               </span>
-            </div>
+            </DialogHeader>
             <ul className="mt-3 flex flex-col gap-3">
               {rows.map((r, i) => (
                 <li
@@ -915,7 +915,9 @@ export function PreviousOrgsEditor({
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent className="max-w-3xl">
           <section data-testid="previous-orgs-editor">
-            <DialogTitle>{title}</DialogTitle>
+            <DialogHeader className="text-left">
+              <DialogTitle>{title}</DialogTitle>
+            </DialogHeader>
             <DialogDescription className="mt-1">
               Total experience is worked out from these rows, unless the experience before joining
               is set on the Personal tab. Saving replaces the list.
@@ -1134,7 +1136,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
       <Dialog open={open} onOpenChange={(o) => !busy && setOpen(o)}>
         <DialogContent className="max-w-3xl">
           <section data-testid="nominee-editor">
-            <div className="flex flex-wrap items-baseline gap-2 pr-8">
+            <DialogHeader className="flex-row flex-wrap items-baseline gap-2 space-y-0 pr-8 text-left">
               <DialogTitle>New nomination</DialogTitle>
               <DialogDescription className="sr-only">
                 Saving archives the current nomination rather than overwriting it.
@@ -1146,7 +1148,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
               >
                 {total === 100 ? "Shares total 100%" : `Shares total ${total}%, must be 100`}
               </span>
-            </div>
+            </DialogHeader>
             <div className="mt-3 grid gap-2 sm:grid-cols-2">
               <label className="min-w-0 text-sm">
                 <span className={eyebrow}>
