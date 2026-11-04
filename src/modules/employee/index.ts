@@ -39,14 +39,9 @@ export const employee: ModuleDefinition = {
 
   navigation: () => [
     { label: "My Card", to: "/app/employee" },
-    // Your own reporting line. The whole company's chart, and the directory
-    // of everybody, are views of the company: under Organisation, where the
-    // directory is for its admins only (Sada, 14 Oct 2026).
-    {
-      label: "Org Chart",
-      to: "/app/employee/my-org-chart",
-      description: "Who you report to, up to the top",
-    },
+    // The org chart and the directory are views of the company: under
+    // Organisation, where the directory is for its admins only (Sada, 14 Oct
+    // 2026). My Card has no chart of its own (Sada, 4 Nov 2026).
     {
       label: "Directory",
       to: "/app/employee/directory",
@@ -96,7 +91,6 @@ export const employee: ModuleDefinition = {
     // Under Directory, so the tab bar keeps Directory lit while you read somebody.
     { path: "employee/directory/person", component: lazy(() => import("./components/PersonCard")) },
     { path: "employee/org-chart", component: lazy(() => import("./components/OrgChart")) },
-    { path: "employee/my-org-chart", component: lazy(() => import("./components/MyOrgChart")) },
     { path: "employee/add", component: lazy(() => import("./components/Lifecycle")) },
     { path: "employee/import", component: lazy(() => import("./components/ImportRecords")) },
     { path: "employee/config", component: lazy(() => import("./components/Configuration")) },

@@ -212,16 +212,17 @@ export function EmployeeCardView({
     .filter(Boolean)
     .join(", ");
 
-  const strip: { label: string; value: React.ReactNode }[] = [
+  // Sada, 4 Nov 2026: the strip says what is there, and leaves out what is
+  // not; a row of dashes read as missing data. The police station is in
+  // Physical record, not here.
+  const deployed =
+    card.currentDeployment?.unitName ??
     // Before the first posting starts, the one that is coming (Kavya, 14 Oct 2026).
-    {
-      label: "Deployed unit",
-      value:
-        card.currentDeployment?.unitName ??
-        (card.nextDeployment
-          ? `${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`
-          : null),
-    },
+    (card.nextDeployment
+      ? `${card.nextDeployment.unitName} from ${formatDate(card.nextDeployment.effectiveFrom)}`
+      : null);
+  const strip: { label: string; value: React.ReactNode }[] = [
+    ...(deployed ? [{ label: "Deployed unit", value: deployed }] : []),
     {
       label: "Reports to",
       value: card.reportsTo?.fullName ? (
@@ -234,13 +235,9 @@ export function EmployeeCardView({
     },
     { label: "Status", value: EMPLOYEE_STATUS_LABEL[card.status] },
     { label: "Mobile", value: card.mobile },
-    { label: "Alternate mobile", value: card.alternateMobile },
+    ...(card.alternateMobile ? [{ label: "Alternate mobile", value: card.alternateMobile }] : []),
+    ...(card.workEmail ? [{ label: "Email", value: card.workEmail }] : []),
   ];
-  // Only where it was sent. A cell reading "—" would claim there is no police
-  // station on record, when the truth is that this viewer may not know.
-  if ("nearestPoliceStation" in card) {
-    strip.push({ label: "Nearest police station", value: card.nearestPoliceStation });
-  }
 
   const panel = (key: TabKey) => (
     <>

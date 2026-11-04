@@ -76,7 +76,8 @@ describe("EmployeeCardView", () => {
       "History",
       "Documents",
     ]);
-    expect(within(screen.getByTestId("card-strip")).getByText("Yelahanka")).toBeInTheDocument();
+    // Sada, 4 Nov 2026: the police station is in Physical record, not the strip.
+    expect(within(screen.getByTestId("card-strip")).queryByText("Yelahanka")).toBeNull();
 
     await user.click(screen.getByRole("tab", { name: "Personal" }));
     expect(screen.getByText("12 Jun 1994")).toBeInTheDocument();
@@ -159,5 +160,56 @@ describe("EmployeeCardView", () => {
     render(<EmployeeCardView card={as("colleague")} />);
     await user.click(screen.getByRole("button", { name: "Export record" }));
     expect(exportRecord).toHaveBeenCalledWith(as("colleague"));
+  });
+});
+
+/**
+ * The strip at the top says what is there and leaves out what is not (Sada,
+ * 4 Nov 2026): a row of dashes read as missing data.
+ */
+describe("the strip at the top of the card", () => {
+  const cells = () =>
+    within(screen.getByTestId("card-strip"))
+      .getAllByRole("term")
+      .map((t) => t.textContent);
+  const self = as("self");
+
+  it("leaves out a unit, an alternate mobile and an email that are not there", () => {
+    render(
+      <EmployeeCardView
+        card={{
+          ...self,
+          currentDeployment: null,
+          nextDeployment: null,
+          alternateMobile: null,
+          workEmail: null,
+        }}
+      />,
+    );
+    expect(cells()).toEqual(["Reports to", "Status", "Mobile"]);
+  });
+
+  it("shows each when it is there, the email included", () => {
+    render(
+      <EmployeeCardView
+        card={{ ...self, alternateMobile: "+91 98450 11122", workEmail: "priya@acme.test" }}
+      />,
+    );
+    expect(cells()).toEqual([
+      "Deployed unit",
+      "Reports to",
+      "Status",
+      "Mobile",
+      "Alternate mobile",
+      "Email",
+    ]);
+    expect(screen.getByTestId("card-strip")).toHaveTextContent("priya@acme.test");
+  });
+
+  it("never shows the police station, even to those who may read it", () => {
+    render(<EmployeeCardView card={{ ...self, nearestPoliceStation: "Yelahanka" }} />);
+    expect(
+      within(screen.getByTestId("card-strip")).queryByText("Nearest police station"),
+    ).toBeNull();
   });
 });

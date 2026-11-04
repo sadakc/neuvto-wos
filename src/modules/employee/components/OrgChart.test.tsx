@@ -4,7 +4,7 @@
  * The Org Chart. What it promises:
  *
  * - under Organisation, the whole company from the top (Sada, 14 Oct 2026),
- *   with you marked; on the Employee Card, only your own line (MyOrgChart);
+ *   with you marked;
  * - it draws four levels and then offers "Start here" rather than drawing on;
  * - somebody whose manager is not in the chart is drawn, at the top, not lost.
  */
@@ -125,55 +125,5 @@ describe("folding a team away (D106)", () => {
     await user.click(screen.getByTestId("org-open-all"));
     expect(screen.getByText("dan")).toBeInTheDocument();
     expect(screen.getByText("mark")).toBeInTheDocument();
-  });
-});
-
-import MyOrgChart from "./MyOrgChart";
-
-describe("your own line, on the Employee Card", () => {
-  const line = () =>
-    screen
-      .getAllByTestId("line-node")
-      .map((n) => n.querySelector("a")?.textContent ?? n.textContent);
-
-  it("runs from the top of the company down to you, then your team, and no peers", async () => {
-    getOrgChart.mockResolvedValue(CHAIN);
-    getUserId.mockResolvedValue("priya");
-    render(<MyOrgChart />);
-    await screen.findAllByTestId("line-node");
-    expect(line()).toEqual(["ceo", "dan", "mark", "priya"]);
-    expect(screen.getByTestId("line-you")).toHaveTextContent("priya");
-    expect(
-      screen.getAllByTestId("line-report").map((n) => n.querySelector("a")?.textContent),
-    ).toEqual(["lead"]);
-    // Ravi reports to Mark too, but he is not in Priya's line.
-    expect(screen.queryByText("ravi")).toBeNull();
-    // Nor is the lead's own report.
-    expect(screen.queryByText("junior")).toBeNull();
-  });
-
-  it("is only you and your team when you report to nobody", async () => {
-    getOrgChart.mockResolvedValue(CHAIN);
-    getUserId.mockResolvedValue("ceo");
-    render(<MyOrgChart />);
-    await screen.findAllByTestId("line-node");
-    expect(line()).toEqual(["ceo"]);
-    expect(screen.getAllByTestId("line-report")).toHaveLength(1);
-  });
-
-  it("says so when you have no team", async () => {
-    getOrgChart.mockResolvedValue(CHAIN);
-    getUserId.mockResolvedValue("ravi");
-    render(<MyOrgChart />);
-    await screen.findAllByTestId("line-node");
-    expect(line()).toEqual(["ceo", "dan", "mark", "ravi"]);
-    expect(screen.getByText("Nobody reports to you.")).toBeInTheDocument();
-  });
-
-  it("says so when you are not on the chart yet", async () => {
-    getOrgChart.mockResolvedValue(CHAIN);
-    getUserId.mockResolvedValue("somebody-new");
-    render(<MyOrgChart />);
-    expect(await screen.findByText(/not on the org chart yet/)).toBeInTheDocument();
   });
 });

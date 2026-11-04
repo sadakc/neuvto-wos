@@ -2,8 +2,7 @@
  * The company's org chart, under Organisation (bundle §7.5; Sada, 14 Oct
  * 2026): everybody, from the top, four levels at a time, with you marked.
  * Deeper levels are one press away ("Start here") rather than drawn all at
- * once, and the chart scrolls inside its own box, never the page. Your own
- * line alone is MyOrgChart, on the Employee Card.
+ * once, and the chart scrolls inside its own box, never the page.
  *
  * Anybody with reports has a − beside them that folds their team away and a
  * + that opens it again (D106), and the whole chart folds or opens at once.

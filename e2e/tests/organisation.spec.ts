@@ -21,14 +21,6 @@ test.describe("an employee", () => {
     await expect(page.getByTestId("org-node").first()).toBeVisible();
   });
 
-  test("sees only their own line on the Employee Card", async ({ page }) => {
-    await page.goto("/app/employee/my-org-chart");
-    await expect(page.getByTestId("line-you")).toContainText("Priya Employee");
-    await expect(page.getByTestId("line-node").filter({ hasText: "Mark Manager" })).toBeVisible();
-    // Ravi reports to Mark too: a peer, not in Priya's line.
-    await expect(page.getByTestId("my-org-chart")).not.toContainText("Ravi Employee");
-  });
-
   test("is told the directory is the admins', even by typing its address", async ({ page }) => {
     await page.goto("/app/employee/directory");
     await expect(page.getByRole("alert")).toContainText("The directory is for administrators.");

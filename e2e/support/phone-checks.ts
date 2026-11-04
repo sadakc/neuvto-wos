@@ -94,6 +94,25 @@ export function dialogCheck(where: string): string[] {
       out.push(
         `${where} › ${name}: off the screen (top ${Math.round(r.top)}, bottom ${Math.round(r.bottom)}; visible ${Math.round(top)}–${Math.round(top + h)}, width ${w})`,
       );
+    // A sheet's header stays at its very top while the fields scroll under it
+    // (D120). Stuck lower, what scrolls under it shows above it (Sada's phone,
+    // 4 Nov 2026). Measured scrolled to the bottom, then put back.
+    const header = d.querySelector<HTMLElement>("[data-sheet-header]");
+    const scroller = d as HTMLElement;
+    if (
+      header &&
+      getComputedStyle(header).position === "sticky" &&
+      scroller.scrollHeight > scroller.clientHeight
+    ) {
+      const before = scroller.scrollTop;
+      scroller.scrollTop = scroller.scrollHeight;
+      const gap = header.getBoundingClientRect().top - (r.top + scroller.clientTop);
+      scroller.scrollTop = before;
+      if (Math.abs(gap) > 1)
+        out.push(
+          `${where} › ${name}: its header sticks ${Math.round(gap)}px from the top of the sheet; what scrolls under it shows above it`,
+        );
+    }
   }
   // iOS Safari zooms the whole page in when a field under 16px is tapped, and
   // leaves it zoomed: the screen is then cut off on the right.

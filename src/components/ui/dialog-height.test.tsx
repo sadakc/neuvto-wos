@@ -9,10 +9,10 @@
  * remember to.
  */
 
-import { act, render, screen } from "@testing-library/react";
+import { act, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { AlertDialog, AlertDialogContent, AlertDialogTitle } from "./alert-dialog";
-import { Dialog, DialogContent, DialogTitle } from "./dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "./dialog";
 
 describe("shared dialogs", () => {
   it("cap their height to the screen and scroll inside", () => {
@@ -93,5 +93,51 @@ describe("a sheet with the iPhone keyboard up", () => {
       vv.dispatchEvent(new Event("resize"));
     });
     expect(sheet.style.getPropertyValue("--sheet-room")).toBe("451px");
+  });
+});
+
+/**
+ * Sada's phone, 4 Nov 2026: the sheet's header stuck 28px below the top of the
+ * sheet, the sheet's own top padding, so fields showed above it and two
+ * handles were drawn; and opening a sheet put the focus on the header's ×.
+ */
+describe("a sheet with a header", () => {
+  it("opens on its first field, not on the header's close button", async () => {
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Add family</DialogTitle>
+          </DialogHeader>
+          <label>
+            Name
+            <input />
+          </label>
+        </DialogContent>
+      </Dialog>,
+    );
+    await waitFor(() => expect(screen.getByLabelText("Name")).toHaveFocus());
+  });
+
+  it("is topped by its header: no padding above it, and only the header's handle", () => {
+    render(
+      <Dialog open>
+        <DialogContent data-testid="d">
+          <DialogHeader>
+            <DialogTitle>Add family</DialogTitle>
+          </DialogHeader>
+        </DialogContent>
+      </Dialog>,
+    );
+    const c = screen.getByTestId("d").className;
+    expect(c).toContain("max-[599px]:has-[[data-sheet-header]]:pt-0");
+    expect(c).toContain("max-[599px]:has-[[data-sheet-header]]:before:hidden");
+    const header = screen
+      .getByRole("heading", { name: "Add family" })
+      .closest("[data-sheet-header]")!;
+    expect(header.className).toContain("max-[599px]:sticky");
+    expect(header.className).toContain("max-[599px]:top-0");
+    // Pulled up into padding that is no longer there, it would cover the title.
+    expect(header.className).not.toContain("-mt-7");
   });
 });

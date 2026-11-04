@@ -171,7 +171,6 @@ describe("a module's tabs placed under Organisation (Sada, 14 Oct 2026)", () => 
     section: "People",
     navigation: () => [
       { label: "My Card", to: "/app/employee" },
-      { label: "Org Chart", to: "/app/employee/my-org-chart" },
       {
         label: "Directory",
         to: "/app/employee/directory",
@@ -188,7 +187,7 @@ describe("a module's tabs placed under Organisation (Sada, 14 Oct 2026)", () => 
   it("gives everybody Organisation with the whole org chart, and no more", () => {
     const shell = buildShell(user(["employee"]), [withCompanyViews]);
     expect(labels(shell, "organisation")).toEqual(["Org Chart"]);
-    expect(labels(shell, "employee")).toEqual(["My Card", "Org Chart"]);
+    expect(labels(shell, "employee")).toEqual(["My Card"]);
     // The directory, People and Settings.
     expect(shell.find((m) => m.key === "organisation")!.hiddenForRole).toBe(3);
   });
@@ -199,13 +198,13 @@ describe("a module's tabs placed under Organisation (Sada, 14 Oct 2026)", () => 
     expect(labels(shell, "employee")).not.toContain("Directory");
   });
 
-  it("lights Organisation for the company's chart and the module for the person's own", () => {
+  it("lights Organisation for the company's chart and the module for the person's card", () => {
     const shell = buildShell(user(["employee", "hr_admin"]), [withCompanyViews]);
     expect(locate(shell, { pathname: "/app/employee/org-chart" }).module.key).toBe("organisation");
     expect(locate(shell, { pathname: "/app/employee/directory/person" }).module.key).toBe(
       "organisation",
     );
-    expect(locate(shell, { pathname: "/app/employee/my-org-chart" }).module.key).toBe("employee");
+    expect(locate(shell, { pathname: "/app/employee" }).module.key).toBe("employee");
   });
 });
 

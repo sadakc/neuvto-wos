@@ -47,16 +47,38 @@ function useVisibleHeight() {
   return height;
 }
 
+const FOCUSABLE =
+  'input:not([type="hidden"]), select, textarea, button, [href], [tabindex]:not([tabindex="-1"])';
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, style, ...props }, ref) => {
+>(({ className, children, style, onOpenAutoFocus, ...props }, ref) => {
   const visible = useVisibleHeight();
+  const local = React.useRef<HTMLDivElement | null>(null);
   return (
     <DialogPortal>
       <DialogOverlay />
       <DialogPrimitive.Content
-        ref={ref}
+        ref={(node) => {
+          local.current = node;
+          if (typeof ref === "function") ref(node);
+          else if (ref) ref.current = node;
+        }}
+        // The first field, as before the header had its own close button: the
+        // header comes first, and on a phone opening a sheet put the focus
+        // ring on its × (Sada, 4 Nov 2026).
+        onOpenAutoFocus={(e) => {
+          onOpenAutoFocus?.(e);
+          if (e.defaultPrevented || !local.current) return;
+          const first = [...local.current.querySelectorAll<HTMLElement>(FOCUSABLE)].find(
+            (el) => !el.closest("[data-sheet-close]") && !el.hasAttribute("disabled"),
+          );
+          if (first) {
+            e.preventDefault();
+            first.focus();
+          }
+        }}
         style={
           { ...style, "--sheet-room": visible ? `${visible}px` : undefined } as React.CSSProperties
         }
@@ -69,6 +91,10 @@ const DialogContent = React.forwardRef<
           // An iPhone does not shrink the page at all: --sheet-room is what is
           // left above its keyboard.
           "max-[599px]:inset-x-0 max-[599px]:top-auto max-[599px]:bottom-0 max-[599px]:left-0 max-[599px]:max-w-none max-[599px]:translate-x-0 max-[599px]:translate-y-0 max-[599px]:max-h-[min(calc(100%-1rem),calc(var(--sheet-room,100vh)-1rem))] max-[599px]:overscroll-contain max-[599px]:rounded-t-[18px] max-[599px]:rounded-b-none max-[599px]:border-x-0 max-[599px]:border-b-0 max-[599px]:px-4 max-[599px]:pt-7 max-[599px]:pb-[max(1rem,env(safe-area-inset-bottom))] max-[599px]:data-[state=open]:slide-in-from-bottom max-[599px]:data-[state=closed]:slide-out-to-bottom max-[599px]:data-[state=open]:zoom-in-100 max-[599px]:data-[state=closed]:zoom-out-100 max-[599px]:before:absolute max-[599px]:before:top-2 max-[599px]:before:left-1/2 max-[599px]:before:h-1 max-[599px]:before:w-10 max-[599px]:before:-translate-x-1/2 max-[599px]:before:rounded-full max-[599px]:before:bg-border",
+          // With a header, the header is the top of the sheet, handle and all.
+          // Padding above it would be space it sticks below (Sada's phone: the
+          // fields showed over it, and two handles).
+          "max-[599px]:has-[[data-sheet-header]]:pt-0 max-[599px]:has-[[data-sheet-header]]:before:hidden",
           className,
         )}
         {...props}
@@ -95,13 +121,16 @@ const DialogHeader = ({ className, children, ...props }: React.HTMLAttributes<HT
     data-sheet-header=""
     className={cn(
       "flex flex-col space-y-1.5 text-center sm:text-left",
-      "max-[599px]:sticky max-[599px]:top-0 max-[599px]:z-10 max-[599px]:-mx-4 max-[599px]:-mt-7 max-[599px]:border-b max-[599px]:bg-background max-[599px]:px-14 max-[599px]:pt-7 max-[599px]:pb-3 max-[599px]:before:absolute max-[599px]:before:top-2 max-[599px]:before:left-1/2 max-[599px]:before:h-1 max-[599px]:before:w-10 max-[599px]:before:-translate-x-1/2 max-[599px]:before:rounded-full max-[599px]:before:bg-border",
+      "max-[599px]:sticky max-[599px]:top-0 max-[599px]:z-10 max-[599px]:-mx-4 max-[599px]:border-b max-[599px]:bg-background max-[599px]:px-14 max-[599px]:pt-7 max-[599px]:pb-3 max-[599px]:before:absolute max-[599px]:before:top-2 max-[599px]:before:left-1/2 max-[599px]:before:h-1 max-[599px]:before:w-10 max-[599px]:before:-translate-x-1/2 max-[599px]:before:rounded-full max-[599px]:before:bg-border",
       className,
     )}
     {...props}
   >
     {children}
-    <DialogPrimitive.Close className="absolute right-1 top-1 hidden size-12 place-items-center rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 max-[599px]:grid">
+    <DialogPrimitive.Close
+      data-sheet-close=""
+      className="absolute right-1 top-1 hidden size-12 place-items-center rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 max-[599px]:grid"
+    >
       <X className="h-4 w-4" />
       <span className="sr-only">Close</span>
     </DialogPrimitive.Close>
