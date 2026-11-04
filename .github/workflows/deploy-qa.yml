@@ -75,6 +75,10 @@ jobs:
           VITE_SUPABASE_PUBLISHABLE_KEY: ${{ secrets.QA_VITE_SUPABASE_PUBLISHABLE_KEY }}
           SUPABASE_URL: ${{ secrets.QA_VITE_SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.QA_VITE_SUPABASE_PUBLISHABLE_KEY }}
+          # The tracked .env (Lovable's) names production's project; every
+          # VITE_SUPABASE_* it sets must be overridden here, or production's
+          # ref is built into QA. verify-deploy caught it on the first run.
+          VITE_SUPABASE_PROJECT_ID: apwnhyjgwukwyjnmcjeg
           NITRO_COMPATIBILITY_DATE: "2026-08-17"
         run: bun run build
 
