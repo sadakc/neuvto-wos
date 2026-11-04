@@ -303,7 +303,9 @@ export function EmployeeCardView({
           </div>
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="text-page-title font-semibold tracking-page-title break-words">
+              {/* A name with no spaces breaks anywhere rather than running under the
+                  buttons (Sada, 4 Nov 2026): break-words alone cannot shrink a flex item. */}
+              <h1 className="min-w-0 max-w-full text-page-title font-semibold tracking-page-title [overflow-wrap:anywhere]">
                 {card.fullName ?? card.workEmail ?? "Unnamed"}
               </h1>
               <StatusBadge tone={STATUS_TONE[card.status]}>
@@ -380,7 +382,7 @@ export function EmployeeCardView({
                 {c.label}
               </dt>
               {/* Wrapped, not cut: "Security from 17 Oct 2026" was "Security from 17 Oc…" on a phone. */}
-              <dd className="mt-0.5 text-sm break-words">{c.value || "—"}</dd>
+              <dd className="mt-0.5 text-sm [overflow-wrap:anywhere]">{c.value || "—"}</dd>
             </div>
           ))}
         </dl>

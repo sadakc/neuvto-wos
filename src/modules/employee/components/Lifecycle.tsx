@@ -53,7 +53,7 @@ import {
 } from "../handlers";
 import { formatDate, todayIso } from "../format";
 import { AddInline, FieldEditor, type AddChoice } from "./FieldEditor";
-import { checkField, type FieldRule } from "../fieldRules";
+import { checkField, LIMITS, type FieldRule } from "../fieldRules";
 import { addDepartmentChoice, addDesignationChoice, addManagerChoice } from "../positionLists";
 import { PersonLink } from "./PersonLink";
 
@@ -98,7 +98,7 @@ export default function AddEmployee() {
 
   // D103: each typed field against its rule, said under the field.
   const RULES: [keyof typeof blank, FieldRule][] = [
-    ["fullName", "name"],
+    ["fullName", "fullName"],
     ["email", "email"],
     ["phone", "phone"],
     ["employeeCode", "employeeCode"],
@@ -297,7 +297,7 @@ export default function AddEmployee() {
             <input
               required
               data-testid="add-name"
-              maxLength={100}
+              maxLength={LIMITS.fullName}
               value={v.fullName}
               onChange={(e) => change("fullName", e.target.value)}
               {...invalid("fullName")}
@@ -570,8 +570,8 @@ export function DraftEditor({
           label: "Full name",
           current: card.fullName,
           required: true,
-          rule: "name",
-          maxLength: 100,
+          rule: "fullName",
+          maxLength: LIMITS.fullName,
         },
         {
           key: "email",

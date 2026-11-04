@@ -34,6 +34,7 @@ import {
   type RevealField,
   type Revealed,
 } from "../contracts";
+import { LIMITS } from "../fieldRules";
 import {
   getRestrictedReads,
   listDocuments,
@@ -789,15 +790,15 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
               key: "bankName",
               label: "Bank",
               current: bank?.bankName,
-              rule: "text100",
-              maxLength: 100,
+              rule: "text30",
+              maxLength: LIMITS.short,
             },
             {
               key: "branch",
               label: "Branch",
               current: bank?.branch,
-              rule: "text100",
-              maxLength: 100,
+              rule: "text30",
+              maxLength: LIMITS.short,
             },
             {
               key: "account",
@@ -811,8 +812,11 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
               key: "accountHolder",
               label: "Account holder",
               current: bank?.accountHolder,
-              rule: "name",
-              maxLength: 100,
+              // D123: a bank opens the account in the name on the ID; it
+              // starts there, and the admin changes it if the bank's differs.
+              defaultValue: card.nameAsPerId || card.fullName || undefined,
+              rule: "fullName",
+              maxLength: LIMITS.fullName,
             },
             {
               key: "pennyDropStatus",
@@ -836,7 +840,7 @@ function useEditors(card: EmployeeCard, onChanged: () => Promise<void> | void) {
               label: "Religion",
               placeholder: "Leave blank to keep what is on record",
               rule: "words",
-              maxLength: 60,
+              maxLength: LIMITS.words,
             },
             {
               key: "casteCategory",

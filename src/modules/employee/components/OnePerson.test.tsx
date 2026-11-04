@@ -132,7 +132,7 @@ describe("a nominee is a family member", () => {
 });
 
 describe("Family", () => {
-  it("will not take a second father", async () => {
+  it("will not offer a second father (D123: Sada added three)", async () => {
     const u = user();
     render(<EmployeeCardView card={withFamily} />);
     await openTab("Family");
@@ -140,11 +140,47 @@ describe("Family", () => {
     await u.click(screen.getByTestId("family-add-row"));
     const rows = screen.getAllByTestId("family-editor-row");
     const last = rows[rows.length - 1];
-    await u.selectOptions(within(last).getByRole("combobox"), "father");
-    await u.type(within(last).getByRole("textbox", { name: /name/i }), "Suresh Rao");
+    const father = within(last).getByRole("option", { name: /^Father/ }) as HTMLOptionElement;
+    expect(father.disabled).toBe(true);
+    expect(father).toHaveTextContent("Father (already added)");
+    // The mother is still theirs to add, until one is.
+    const mother = within(last).getByRole("option", { name: /^Mother/ }) as HTMLOptionElement;
+    expect(mother.disabled).toBe(false);
+    await u.selectOptions(within(last).getByRole("combobox"), "mother");
+    await u.click(screen.getByTestId("family-add-row"));
+    const again = screen.getAllByTestId("family-editor-row").pop()!;
+    expect(
+      (within(again).getByRole("option", { name: /^Mother/ }) as HTMLOptionElement).disabled,
+    ).toBe(true);
+  });
+
+  it("will not take two people with the same name (D123)", async () => {
+    const u = user();
+    render(<EmployeeCardView card={withFamily} />);
+    await openTab("Family");
+    await u.click(screen.getByTestId("edit-family"));
+    const named = screen
+      .getAllByTestId("family-editor-row")
+      .map((r) => (within(r).getByRole("textbox", { name: /name/i }) as HTMLInputElement).value)
+      .find(Boolean)!;
+    await u.click(screen.getByTestId("family-add-row"));
+    const last = screen.getAllByTestId("family-editor-row").pop()!;
+    await u.selectOptions(within(last).getByRole("combobox"), "brother");
+    await u.type(within(last).getByRole("textbox", { name: /name/i }), ` ${named.toUpperCase()} `);
     await u.click(screen.getByTestId("family-save"));
-    expect(screen.getByRole("alert")).toHaveTextContent("There can be only one father.");
+    expect(screen.getByRole("alert")).toHaveTextContent("is listed twice");
     expect(api.saveFamily).not.toHaveBeenCalled();
+  });
+
+  it("stops a name at 30 letters (D123)", async () => {
+    const u = user();
+    render(<EmployeeCardView card={withFamily} />);
+    await openTab("Family");
+    await u.click(screen.getByTestId("edit-family"));
+    const name = within(screen.getAllByTestId("family-editor-row")[0]).getByRole("textbox", {
+      name: /name/i,
+    });
+    expect(name).toHaveAttribute("maxlength", "30");
   });
 });
 

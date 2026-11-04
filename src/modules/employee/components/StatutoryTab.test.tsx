@@ -295,3 +295,43 @@ describe("editing", () => {
     expect(api.setStatutory).not.toHaveBeenCalled();
   });
 });
+
+/**
+ * A bank opens the account in the name on the ID, so the account holder starts
+ * there and the admin changes it if the bank's record differs (Sada, 4 Nov
+ * 2026, D123).
+ */
+describe("the account holder", () => {
+  const admin = as("admin");
+  const noHolder = { ...admin, bank: { ...admin.bank!, accountHolder: null } } as EmployeeCard;
+
+  it("starts from the name as printed on ID, and is saved as it is", async () => {
+    const u = userEvent.setup();
+    api.setBank.mockResolvedValue(undefined);
+    render(<StatutoryTab card={noHolder} onChanged={() => {}} />);
+    await u.click(screen.getByTestId("edit-bank"));
+    const holder = within(screen.getByTestId("editor-bank")).getByLabelText("Account holder");
+    expect(holder).toHaveValue("PRIYA E");
+    expect(holder).toHaveAttribute("maxlength", "50");
+    await u.click(screen.getByTestId("save-bank"));
+    expect(api.setBank).toHaveBeenCalledWith(admin.id, { accountHolder: "PRIYA E" });
+  });
+
+  it("from the full name when there is no name as per ID", async () => {
+    const u = userEvent.setup();
+    render(<StatutoryTab card={{ ...noHolder, nameAsPerId: null }} onChanged={() => {}} />);
+    await u.click(screen.getByTestId("edit-bank"));
+    expect(within(screen.getByTestId("editor-bank")).getByLabelText("Account holder")).toHaveValue(
+      "Priya Employee",
+    );
+  });
+
+  it("is left as the bank has it, once recorded", async () => {
+    const u = userEvent.setup();
+    render(<StatutoryTab card={{ ...admin, nameAsPerId: "SOMEONE ELSE" }} onChanged={() => {}} />);
+    await u.click(screen.getByTestId("edit-bank"));
+    expect(within(screen.getByTestId("editor-bank")).getByLabelText("Account holder")).toHaveValue(
+      "PRIYA E",
+    );
+  });
+});

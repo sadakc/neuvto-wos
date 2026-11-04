@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.29 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.30 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -928,6 +928,21 @@ one place, both need to sync."
   linked to them.
 - Proved by `verify_linked_fields.sql` (12 database guards broken on purpose, each caught)
   and `RecordEditors.test.tsx` (7 screen guards, each caught).
+
+### Fields as long as they need to be (D123, 4 Nov 2026)
+
+- **Limits.** Full name, name as printed on ID and account holder 50; every
+  other name and every short field 30; a deployment order reference 15.
+  Address 300, qualification 200 and reasons 500 unchanged. `LIMITS` in
+  `fieldRules.ts`, the same numbers in the database's field checks.
+- **Too long is said as too long:** "Up to 30 characters; this has 120."
+- **Family:** one father and one mother (the option is unavailable once a row
+  has it); two members with the same name are refused, form and database.
+- **Aadhaar** is optional by default; a company can still require it.
+- **Account holder** starts from the name as printed on ID, else the full name.
+- Proved by `verify_shorter_fields.sql` (7 database guards broken on purpose,
+  each caught) and render tests in `OnePerson`, `StatutoryTab`,
+  `EmployeeCardView`, `Lifecycle` and `fieldRules` (7 screen guards, each caught).
 
 ## 8. Acceptance criteria, module level
 

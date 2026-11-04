@@ -63,7 +63,7 @@ import {
   shareTotal,
   todayIso,
 } from "../format";
-import { checkField } from "../fieldRules";
+import { checkField, LIMITS } from "../fieldRules";
 import { canWrite, fieldsFor, isRequired, relationField } from "../fieldSettings";
 import { FieldEditor, type FieldSpec } from "./FieldEditor";
 import {
@@ -265,7 +265,7 @@ export function EmergencyEditor({ card, onChanged }: { card: EmployeeCard; onCha
           label: "Name",
           current: ec?.name,
           rule: "name",
-          maxLength: 100,
+          maxLength: LIMITS.name,
           when: own,
         },
         {
@@ -311,16 +311,16 @@ export function IdentityEditor({ card, onChanged }: { card: EmployeeCard; onChan
           key: "fullName",
           label: "Full name",
           current: card.fullName,
-          rule: "name",
+          rule: "fullName",
           required: true,
-          maxLength: 100,
+          maxLength: LIMITS.fullName,
         },
         {
           key: "nameAsPerId",
           label: "Name as printed on ID",
           current: card.nameAsPerId,
-          rule: "name",
-          maxLength: 100,
+          rule: "fullName",
+          maxLength: LIMITS.fullName,
         },
         { key: "sex", label: "Sex", kind: "select", options: SEXES, current: card.sex },
         {
@@ -470,8 +470,8 @@ export function PhysicalEditor({ card, onChanged }: { card: EmployeeCard; onChan
           key: "nearestPoliceStation",
           label: "Nearest police station",
           current: card.nearestPoliceStation,
-          rule: "text100",
-          maxLength: 100,
+          rule: "text30",
+          maxLength: LIMITS.short,
           hint: policeStationHint(card),
         },
       ]}
@@ -655,6 +655,22 @@ function relativeProblem(name: string, dateOfBirth: string, relation: string): s
   return null;
 }
 
+/** A name as a person is told apart by: spaces and case do not make two people (D123). */
+const nameKey = (name: string) => name.trim().replace(/\s+/g, " ").toLowerCase();
+
+/** Two family members with the same name are one person listed twice (Sada, 4 Nov 2026). */
+function sameName(rows: { name: string }[]): string | null {
+  const seen = new Set<string>();
+  for (const r of rows) {
+    const k = nameKey(r.name);
+    if (!k) continue;
+    if (seen.has(k))
+      return `${r.name.trim()} is listed twice. Each family member is listed once, with their own name.`;
+    seen.add(k);
+  }
+  return null;
+}
+
 export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const fromCard = (): FamilyRow[] =>
     (card.familyMembers ?? []).map((f) => ({
@@ -685,7 +701,8 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
     const twice = ["father", "mother"].find((p) => rows.filter((r) => r.relation === p).length > 1);
     const wrong =
       (twice ? `There can be only one ${twice}. Change the one on record instead.` : null) ??
-      rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean);
+      rows.map((r) => relativeProblem(r.name, r.dateOfBirth, r.relation)).find(Boolean) ??
+      sameName(rows);
     if (wrong) {
       setError(wrong);
       return;
@@ -760,17 +777,26 @@ export function FamilyEditor({ card, onChanged }: { card: EmployeeCard; onChange
                       <option value="" disabled>
                         Select
                       </option>
-                      {(locked(r) ? [r.relation] : relations).map((rel) => (
-                        <option key={rel} value={rel}>
-                          {humanise(rel)}
-                        </option>
-                      ))}
+                      {(locked(r) ? [r.relation] : relations).map((rel) => {
+                        // D117, D123: one father and one mother; once a row
+                        // has one, no other row can choose it.
+                        const taken =
+                          (rel === "father" || rel === "mother") &&
+                          rows.some((o) => o.key !== r.key && o.relation === rel);
+                        return (
+                          <option key={rel} value={rel} disabled={taken}>
+                            {humanise(rel)}
+                            {taken ? " (already added)" : ""}
+                          </option>
+                        );
+                      })}
                     </select>
                   </label>
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Name</span>
                     <input
                       aria-label={`Name, row ${i + 1}`}
+                      maxLength={LIMITS.name}
                       value={r.name}
                       disabled={locked(r)}
                       onChange={(e) => set(r.key, { name: e.target.value })}
@@ -993,6 +1019,7 @@ export function PreviousOrgsEditor({
                     <span className={eyebrow}>Organisation</span>
                     <input
                       aria-label={`Organisation, row ${i + 1}`}
+                      maxLength={LIMITS.short}
                       value={r.organisationName}
                       onChange={(e) => set(r.key, { organisationName: e.target.value })}
                       className={`mt-1 ${input}`}
@@ -1001,6 +1028,7 @@ export function PreviousOrgsEditor({
                   <label className="min-w-0 text-sm">
                     <span className={eyebrow}>Designation</span>
                     <input
+                      maxLength={LIMITS.short}
                       value={r.designation}
                       onChange={(e) => set(r.key, { designation: e.target.value })}
                       className={`mt-1 ${input}`}
@@ -1237,6 +1265,7 @@ export function NominationEditor({ card, onChanged }: { card: EmployeeCard; onCh
                     </span>
                     <input
                       aria-label={`Nominee name, row ${i + 1}`}
+                      maxLength={LIMITS.name}
                       aria-required
                       value={r.name}
                       onChange={(e) => set(r.key, { name: e.target.value })}
@@ -1673,6 +1702,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
               <Field label="District, as written">
                 <input
                   data-testid="address-district-other"
+                  maxLength={LIMITS.words}
                   value={v.district}
                   onChange={(e) => setV({ ...v, district: e.target.value })}
                   className={input}
@@ -1694,6 +1724,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 <input
                   required
                   data-testid="address-city"
+                  maxLength={LIMITS.words}
                   value={v.city}
                   onChange={(e) => setV({ ...v, city: e.target.value })}
                   className={input}
@@ -1713,6 +1744,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
             </div>
             <Field label="Nearest police station">
               <input
+                maxLength={LIMITS.short}
                 value={v.nearestPoliceStation}
                 onChange={(e) => setV({ ...v, nearestPoliceStation: e.target.value })}
                 className={input}
@@ -2019,6 +2051,7 @@ export function MoveUnitDialog({ card, onChanged }: { card: EmployeeCard; onChan
                 required
                 data-testid="move-order-ref"
                 value={v.orderRef}
+                maxLength={LIMITS.orderRef}
                 aria-invalid={refError ? true : undefined}
                 onChange={(e) => {
                   setV({ ...v, orderRef: e.target.value });

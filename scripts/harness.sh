@@ -175,6 +175,7 @@ run "verifying the bell (D111)" "$HARNESS_DIR/tests/verify_the_bell.sql"
 run "verifying one person, one record (D117)" "$HARNESS_DIR/tests/verify_one_person_one_record.sql"
 run "verifying withdraw or resend an invitation (D118)" "$HARNESS_DIR/tests/verify_withdraw_or_resend.sql"
 run "verifying what is typed once (D121)" "$HARNESS_DIR/tests/verify_linked_fields.sql"
+run "verifying fields as long as they need to be (D123)" "$HARNESS_DIR/tests/verify_shorter_fields.sql"
 
 # Deliberately NOT seeded. Everything above runs against two organisations the
 # seed has already configured — leave types, balances, approval chains — which

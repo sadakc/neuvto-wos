@@ -220,7 +220,7 @@ describe("a field that breaks a rule says so under itself", () => {
         .getAllByRole("alert")
         .map((a) => a.textContent),
     ).toEqual([
-      "Letters only: no digits or symbols other than . ' and -.",
+      "Letters only, up to 30: no digits or symbols other than . ' and -.",
       "A mobile number has 10 digits; this has 5.",
     ]);
     expect(api.updateEmployee).not.toHaveBeenCalled();
@@ -377,7 +377,7 @@ describe("rows and addresses are checked before they are sent", () => {
     await u.type(within(editor).getByLabelText("Name, row 1"), "Son 1");
     await u.click(screen.getByTestId("family-save"));
     expect(screen.getByTestId("family-editor-error")).toHaveTextContent(
-      "Son 1: Letters only: no digits or symbols other than . ' and -.",
+      "Son 1: Letters only, up to 30: no digits or symbols other than . ' and -.",
     );
     await u.clear(within(editor).getByLabelText("Name, row 1"));
     await u.type(within(editor).getByLabelText("Name, row 1"), "Arjun");
@@ -424,7 +424,7 @@ describe("rows and addresses are checked before they are sent", () => {
     await u.type(screen.getByTestId("address-pincode"), "635109");
     await u.click(screen.getByTestId("address-save"));
     expect(screen.getByTestId("address-error")).toHaveTextContent(
-      "City/Town: Letters only, up to 60",
+      "City/Town: Letters only, up to 30",
     );
     await u.clear(screen.getByTestId("address-city"));
     await u.type(screen.getByTestId("address-city"), "Hosur");

@@ -10,6 +10,7 @@
 export type FieldRule =
   | "phone"
   | "name"
+  | "fullName"
   | "words"
   | "employeeCode"
   | "email"
@@ -19,6 +20,8 @@ export type FieldRule =
   | "weightKg"
   | "dateOfBirth"
   | "pastDate"
+  | "text30"
+  | "orderRef"
   | "text100"
   | "text200"
   | "text500"
@@ -71,6 +74,20 @@ function phoneProblem(v: string): string {
 function words(v: string, max: number) {
   return v.length <= max && !WORD_SYMBOLS.test(v) && SOMETHING_BUT_PUNCTUATION.test(v);
 }
+
+/**
+ * How long a field may be (Sada, 4 Nov 2026, D123): a person's full name, the
+ * name on their ID and a bank account's holder 50; every other name, and every
+ * short field of letters or of letters and digits, 30; a deployment order
+ * reference 15. Addresses, qualifications and reasons keep their longer limits.
+ * The database refuses the same lengths.
+ */
+export const LIMITS = { fullName: 50, name: 30, words: 30, short: 30, orderRef: 15 } as const;
+
+/** Too long is said as too long, never as "letters only" (Sada, 4 Nov 2026). */
+const tooLong = (v: string, max: number) => `Up to ${max} characters; this has ${v.length}.`;
+const lettersOr = (max: number, letters: string) => (v: string) =>
+  v.length > max ? tooLong(v, max) : letters;
 
 /** As statutory_normalise: letters and digits only, upper-cased. */
 const norm = (v: string) => v.replace(/[^0-9A-Za-z]/g, "").toUpperCase();
@@ -185,12 +202,28 @@ export const FIELD_RULES: Record<
       "Enter a 10-digit mobile number, or + and the country code. Digits only, with spaces if you like.",
   },
   name: {
-    check: (v) => words(v, 100),
-    message: "Letters only: no digits or symbols other than . ' and -.",
+    check: (v) => words(v, LIMITS.name),
+    explain: lettersOr(
+      LIMITS.name,
+      `Letters only, up to ${LIMITS.name}: no digits or symbols other than . ' and -.`,
+    ),
+    message: `Letters only, up to ${LIMITS.name}: no digits or symbols other than . ' and -.`,
+  },
+  fullName: {
+    check: (v) => words(v, LIMITS.fullName),
+    explain: lettersOr(
+      LIMITS.fullName,
+      `Letters only, up to ${LIMITS.fullName}: no digits or symbols other than . ' and -.`,
+    ),
+    message: `Letters only, up to ${LIMITS.fullName}: no digits or symbols other than . ' and -.`,
   },
   words: {
-    check: (v) => words(v, 60),
-    message: "Letters only, up to 60: no digits or symbols other than . ' and -.",
+    check: (v) => words(v, LIMITS.words),
+    explain: lettersOr(
+      LIMITS.words,
+      `Letters only, up to ${LIMITS.words}: no digits or symbols other than . ' and -.`,
+    ),
+    message: `Letters only, up to ${LIMITS.words}: no digits or symbols other than . ' and -.`,
   },
   employeeCode: {
     check: (v) => /^[A-Za-z0-9][A-Za-z0-9/._-]{0,29}$/.test(v),
@@ -223,6 +256,16 @@ export const FIELD_RULES: Record<
   pastDate: {
     check: (v) => v <= isoYearsAgo(0),
     message: "That date is in the future.",
+  },
+  text30: {
+    check: (v) => v.length <= LIMITS.short,
+    explain: (v) => tooLong(v, LIMITS.short),
+    message: `Keep it to ${LIMITS.short} characters.`,
+  },
+  orderRef: {
+    check: (v) => v.length <= LIMITS.orderRef,
+    explain: (v) => tooLong(v, LIMITS.orderRef),
+    message: `A deployment order reference is up to ${LIMITS.orderRef} characters.`,
   },
   text100: { check: (v) => v.length <= 100, message: "Keep it to 100 characters." },
   text200: { check: (v) => v.length <= 200, message: "Keep it to 200 characters." },
@@ -285,33 +328,35 @@ export const RULE_MESSAGES: Record<string, string> = {
   alternate_mobile_format: `Alternate mobile: ${FIELD_RULES.phone.message}`,
   emergency_contact_phone_format: `Emergency contact phone: ${FIELD_RULES.phone.message}`,
   mobile_format: `Mobile: ${FIELD_RULES.phone.message}`,
-  full_name_format: `Full name: ${FIELD_RULES.name.message}`,
-  name_as_per_id_format: `Name as printed on ID: ${FIELD_RULES.name.message}`,
+  full_name_format: `Full name: ${FIELD_RULES.fullName.message}`,
+  name_as_per_id_format: `Name as printed on ID: ${FIELD_RULES.fullName.message}`,
   emergency_contact_name_format: `Emergency contact name: ${FIELD_RULES.name.message}`,
   emergency_contact_relation_format: `Relation: ${FIELD_RULES.words.message}`,
   nationality_format: `Nationality: ${FIELD_RULES.words.message}`,
   native_state_format: `Native state: ${FIELD_RULES.words.message}`,
   employee_code_format: `Employee code: ${FIELD_RULES.employeeCode.message}`,
   education_qualification_length: `Qualification: ${FIELD_RULES.text200.message}`,
-  nearest_police_station_length: `Nearest police station: ${FIELD_RULES.text100.message}`,
+  nearest_police_station_length: `Nearest police station: ${FIELD_RULES.text30.message}`,
   termination_reason_length: `Termination reason: ${FIELD_RULES.text500.message}`,
   reason_for_leaving_length: `Reason for leaving: ${FIELD_RULES.text500.message}`,
   date_of_birth_age: `Date of birth: ${FIELD_RULES.dateOfBirth.message}`,
   confirmed_on_after_birth: "Confirmed: the date can't be before their date of birth.",
   relative_name_format: `Name: ${FIELD_RULES.name.message}`,
   relative_date_of_birth_future: `Date of birth: ${FIELD_RULES.pastDate.message}`,
-  organisation_name_length: `Organisation: ${FIELD_RULES.text200.message}`,
-  previous_designation_length: `Designation: ${FIELD_RULES.text100.message}`,
+  organisation_name_length: `Organisation: ${FIELD_RULES.text30.message}`,
+  previous_designation_length: `Designation: ${FIELD_RULES.text30.message}`,
   previous_org_dates_future: "Previous organisation: the dates can't be in the future.",
   previous_org_dates_order: "Previous organisation: To can't be before From.",
   address_line_length: "Address: keep it to 300 characters.",
   city_format: `City: ${FIELD_RULES.words.message}`,
   district_format: `District: ${FIELD_RULES.words.message}`,
-  state_format: `State: ${FIELD_RULES.words.message}`,
-  account_holder_format: `Account holder: ${FIELD_RULES.name.message}`,
-  bank_name_length: `Bank: ${FIELD_RULES.text100.message}`,
-  branch_length: `Branch: ${FIELD_RULES.text100.message}`,
-  department_name_length: `Department: ${FIELD_RULES.text100.message}`,
+  state_format: "State: choose it from the list.",
+  account_holder_format: `Account holder: ${FIELD_RULES.fullName.message}`,
+  bank_name_length: `Bank: ${FIELD_RULES.text30.message}`,
+  branch_length: `Branch: ${FIELD_RULES.text30.message}`,
+  department_name_length: `Department: ${FIELD_RULES.text30.message}`,
+  order_ref_length: FIELD_RULES.orderRef.message,
+  family_name_twice: "Two family members have the same name. Each person is listed once.",
   employees_height_cm_check: FIELD_RULES.heightCm.message,
   employees_chest_cm_check: FIELD_RULES.chestCm.message,
   employees_weight_kg_check: FIELD_RULES.weightKg.message,

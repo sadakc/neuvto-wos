@@ -213,3 +213,13 @@ describe("the strip at the top of the card", () => {
     ).toBeNull();
   });
 });
+
+/** Sada, 4 Nov 2026: a 100-letter name ran under Export record and the buttons beside it. */
+describe("a long name on the card", () => {
+  it("breaks anywhere rather than running under the buttons", () => {
+    render(<EmployeeCardView card={{ ...as("self"), fullName: "d".repeat(50) }} />);
+    const h1 = screen.getByRole("heading", { level: 1 });
+    expect(h1.className).toContain("[overflow-wrap:anywhere]");
+    expect(h1.className).toContain("min-w-0");
+  });
+});

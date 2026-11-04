@@ -33,7 +33,7 @@ import {
 import { DateField } from "@/components/shared/date-field";
 import { DATE_FORMAT_MESSAGE, isIsoDate } from "@/components/shared/date-rules";
 import { isAppError } from "@/platform/errors";
-import { checkField, type FieldRule } from "../fieldRules";
+import { checkField, LIMITS, type FieldRule } from "../fieldRules";
 import { humanise } from "../format";
 
 /**
@@ -604,7 +604,7 @@ export function AddInline({
         <input
           id={inputId}
           value={name}
-          maxLength={100}
+          maxLength={LIMITS.short}
           autoFocus
           onChange={(e) => setName(e.target.value)}
           className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
@@ -618,7 +618,7 @@ export function AddInline({
           <input
             id={secondId}
             value={second}
-            maxLength={choice.second.maxLength ?? 100}
+            maxLength={choice.second.maxLength ?? LIMITS.short}
             onChange={(e) => setSecond(e.target.value)}
             className="mt-1 h-11 w-full rounded-md border border-input bg-background px-3"
           />

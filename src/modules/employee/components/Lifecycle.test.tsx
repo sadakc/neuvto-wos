@@ -176,7 +176,8 @@ describe("Add Employee, Sada's first round (D103)", () => {
     await user.click(screen.getByTestId("add-save-draft"));
     expect(screen.getByTestId("add-name")).toHaveAttribute("aria-invalid", "true");
     expect(screen.getAllByRole("alert").map((a) => a.textContent)).toEqual([
-      "Letters only: no digits or symbols other than . ' and -.",
+      // A full name may be 50 (D123): the box and the rule agree.
+      "Letters only, up to 50: no digits or symbols other than . ' and -.",
       "Enter an email address, like name@example.com.",
       "A mobile number has 10 digits; this has 11.",
       "Letters and digits, up to 30, with / . _ or - between them. No spaces.",

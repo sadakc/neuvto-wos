@@ -47,12 +47,12 @@ describe("each rule, the right way and the wrong ways", () => {
 
   it("a name: letters in any script, spaces and . ' -", () => {
     ok("name", "Priya", "D'Souza", "Anne-Marie", "K. S. Rao", "प्रिया शर्मा", "தமிழ்செல்வி");
-    bad("name", "Priya2", "Ravi@home", "...", "R_avi", "Rao, K", "a".repeat(101));
+    bad("name", "Priya2", "Ravi@home", "...", "R_avi", "Rao, K");
   });
 
-  it("words are names of things, up to 60", () => {
+  it("words are names of things, up to 30", () => {
     ok("words", "Tamil Nadu", "Indian", "Sister");
-    bad("words", "Kerala!", "Brother1", "x".repeat(61));
+    bad("words", "Kerala!", "Brother1");
   });
 
   it("an employee code", () => {
@@ -129,8 +129,26 @@ describe("the exact edges (found unpinned by mutation testing)", () => {
     bad("text200", "x".repeat(201));
     ok("text500", "x".repeat(500));
     bad("text500", "x".repeat(501));
-    ok("words", "a".repeat(60));
-    ok("name", "a".repeat(100));
+    // D123 (Sada, 4 Nov 2026).
+    ok("words", "a".repeat(30));
+    expect(checkField("words", "a".repeat(31))).not.toBeNull();
+    ok("name", "a".repeat(30));
+    expect(checkField("name", "a".repeat(31))).not.toBeNull();
+    ok("fullName", "a".repeat(50));
+    expect(checkField("fullName", "a".repeat(51))).not.toBeNull();
+    ok("text30", "x".repeat(30));
+    expect(checkField("text30", "x".repeat(31))).not.toBeNull();
+    ok("orderRef", "x".repeat(15));
+    expect(checkField("orderRef", "x".repeat(16))).not.toBeNull();
+  });
+
+  it("says a name is too long as too long, not as letters only (D123)", () => {
+    // Sada typed 120 letters into a family member's name and was told
+    // "Letters only", which was not what was wrong.
+    expect(checkField("name", "k".repeat(120))).toBe("Up to 30 characters; this has 120.");
+    expect(checkField("fullName", "k".repeat(51))).toBe("Up to 50 characters; this has 51.");
+    expect(checkField("orderRef", "DO-2026-0001-ABCD")).toBe("Up to 15 characters; this has 17.");
+    expect(checkField("name", "Priya2")).toBe(FIELD_RULES.name.message);
   });
 
   it("is anchored at both ends: nothing before or after the pattern", () => {
