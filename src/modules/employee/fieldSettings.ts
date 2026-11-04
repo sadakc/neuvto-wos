@@ -114,8 +114,16 @@ type Spec = { key: string; kind?: string; required?: boolean };
 
 /** The company's Required, on a form's fields. */
 export function withRequired<T extends Spec>(card: EmployeeCard, fields: T[]): T[] {
-  return fields.map((f) => (isRequired(card, f.key) ? { ...f, required: true } : f));
+  return fields.map((f) =>
+    isRequired(card, f.key) && !NEVER_REQUIRED.has(f.key) ? { ...f, required: true } : f,
+  );
 }
+
+/**
+ * Covered by a required field's setting, but a choice rather than a value:
+ * "somebody not in Family" is an answer (D121).
+ */
+const NEVER_REQUIRED = new Set(["emergencyContactFamilyMemberId"]);
 
 /**
  * The fields of a form this card's viewer may write, with the company's

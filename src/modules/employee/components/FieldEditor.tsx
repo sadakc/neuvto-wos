@@ -101,6 +101,8 @@ export type FieldSpec = {
   derive?: (vals: Record<string, string>) => ReactNode;
   /** A line under the field. */
   hint?: string;
+  /** Shown, checked and saved only while this holds of the form's values (D121). */
+  when?: (vals: Record<string, string>) => boolean;
 };
 
 const ADD = "__add__";
@@ -188,7 +190,7 @@ export function FieldEditor({
     const changed: Record<string, string | null> = {};
     const found: Record<string, string> = {};
     for (const f of fields) {
-      if (f.kind === "derived") continue;
+      if (f.kind === "derived" || (f.when && !f.when(vals))) continue;
       const now = vals[f.key].trim();
       const before = (f.current ?? "").trim();
       // Required and empty stops the save even untouched. A number on record
@@ -277,6 +279,7 @@ export function FieldEditor({
             className="grid gap-3 sm:grid-cols-2"
           >
             {fields.map((f) => {
+              if (f.when && !f.when(vals)) return null;
               const errId = `${formId}-${f.key}-error`;
               const bad = errors[f.key];
               const options: (readonly [string, string])[] = [

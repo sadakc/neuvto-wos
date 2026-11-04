@@ -178,7 +178,13 @@ export interface EmployeeCard {
   previousOrganisations?: PreviousOrganisation[];
 
   // ── self, admin, approver
-  emergencyContact?: { name: string | null; relation: string | null; phone: string | null };
+  emergencyContact?: {
+    name: string | null;
+    relation: string | null;
+    phone: string | null;
+    /** D121: the family member who is the contact, whose name and relation follow Family. */
+    familyMemberId?: string | null;
+  };
 
   // ── self, admin, statutory
   nearestPoliceStation?: string | null;

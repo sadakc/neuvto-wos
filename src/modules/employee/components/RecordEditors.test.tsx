@@ -309,3 +309,126 @@ describe("on a phone, a sheet keeps its title and close in its header (D120)", (
     expect(within(header).queryByText(/Only what you change is saved/)).toBeNull();
   });
 });
+
+/**
+ * What is typed once is not typed again (D121). Each test names what the
+ * person would otherwise have typed twice, and what is sent instead.
+ */
+describe("what is typed once (D121)", () => {
+  const aarav = admin.familyMembers!.find((m) => m.name === "Aarav")!;
+  // As the card now says it: the emergency contact's setting covers the link.
+  const requiring = (card: EmployeeCard): EmployeeCard => ({
+    ...card,
+    capabilities: {
+      ...card.capabilities,
+      requiredFields: [
+        ...(card.capabilities.requiredFields ?? []),
+        "emergencyContactFamilyMemberId",
+      ],
+    },
+  });
+
+  it("with no contact yet, one picked from Family is saved: the name it hides is not asked for", async () => {
+    const user = userEvent.setup();
+    api.updateEmployee.mockResolvedValue(undefined);
+    render(
+      <EmployeeCardView
+        card={requiring({
+          ...admin,
+          emergencyContact: { name: null, relation: null, phone: "+91 98000 00000" },
+        })}
+      />,
+    );
+    await user.click(screen.getByTestId("edit-emergency"));
+    const editor = screen.getByTestId("editor-emergency");
+    await user.selectOptions(within(editor).getByLabelText("Who"), aarav.id);
+    await user.click(screen.getByTestId("save-emergency"));
+    expect(within(editor).queryByText(/can't be empty/)).toBeNull();
+    expect(api.updateEmployee).toHaveBeenCalledWith(admin.id, {
+      emergencyContactFamilyMemberId: aarav.id,
+    });
+  });
+
+  it("an emergency contact picked from Family sends who, and is shown with Family's name", async () => {
+    const user = userEvent.setup();
+    api.updateEmployee.mockResolvedValue(undefined);
+    render(<EmployeeCardView card={admin} />);
+    await user.click(screen.getByTestId("edit-emergency"));
+    const editor = screen.getByTestId("editor-emergency");
+    await user.selectOptions(within(editor).getByLabelText("Who"), aarav.id);
+    // Not typed again: the name and relation are Family's.
+    expect(within(editor).queryByLabelText("Name")).toBeNull();
+    expect(within(editor).queryByLabelText("Relation")).toBeNull();
+    expect(within(editor).getByTestId("derived-emergencyFromFamily")).toHaveTextContent(
+      "Aarav, son: from Family",
+    );
+    await user.click(screen.getByTestId("save-emergency"));
+    expect(api.updateEmployee).toHaveBeenCalledWith(admin.id, {
+      emergencyContactFamilyMemberId: aarav.id,
+    });
+  });
+
+  it("a contact from Family set to somebody not in Family is unlinked, and typed", async () => {
+    const user = userEvent.setup();
+    api.updateEmployee.mockResolvedValue(undefined);
+    const linked = {
+      ...admin,
+      emergencyContact: {
+        name: "Aarav",
+        relation: "son",
+        phone: "+91 98000 00000",
+        familyMemberId: aarav.id,
+      },
+    };
+    render(<EmployeeCardView card={requiring(linked)} />);
+    await user.click(screen.getByTestId("edit-emergency"));
+    const editor = screen.getByTestId("editor-emergency");
+    const who = within(editor).getByLabelText("Who") as HTMLSelectElement;
+    expect(who.selectedOptions[0].textContent).toBe("Aarav (Son)");
+    await user.selectOptions(who, "");
+    const name = within(editor).getByLabelText("Name");
+    await user.clear(name);
+    await user.type(name, "Ravi Menon");
+    await user.click(screen.getByTestId("save-emergency"));
+    expect(api.updateEmployee).toHaveBeenCalledWith(admin.id, {
+      emergencyContactFamilyMemberId: null,
+      emergencyContactName: "Ravi Menon",
+    });
+  });
+
+  it("a permanent address the same as the present one is filled in, not typed", async () => {
+    const user = userEvent.setup();
+    api.addAddress.mockResolvedValue([{ id: "new", addressType: "permanent" }]);
+    render(<EmployeeCardView card={admin} />);
+    await openTab("History");
+    await user.click(screen.getByTestId("add-address"));
+    await user.selectOptions(screen.getByTestId("address-type"), "permanent");
+    await user.click(screen.getByTestId("address-same-as-present"));
+    expect(screen.getByTestId("address-line")).toHaveValue("402 Brigade Meadows");
+    await user.click(screen.getByTestId("address-save"));
+    expect(api.addAddress).toHaveBeenCalledWith(
+      admin.id,
+      expect.objectContaining({ addressType: "permanent", line: "402 Brigade Meadows" }),
+    );
+  });
+
+  it("the police station says it is the present address's", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={admin} />);
+    await openTab("Personal");
+    await user.click(screen.getByTestId("edit-physical"));
+    expect(screen.getByTestId("editor-physical")).toHaveTextContent(
+      "The present address's (402 Brigade Meadows)",
+    );
+  });
+
+  it("the reason for leaving says it is the latest organisation's too", async () => {
+    const user = userEvent.setup();
+    render(<EmployeeCardView card={admin} />);
+    await openTab("Personal");
+    await user.click(screen.getByTestId("edit-education"));
+    expect(screen.getByTestId("editor-education")).toHaveTextContent(
+      "Also the reason on SIS Security, in Previous organisations.",
+    );
+  });
+});

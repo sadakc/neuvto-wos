@@ -42,6 +42,21 @@ function fail(msg: string): never {
 }
 const ok = (msg: string) => console.log(`ok: ${msg}`);
 
+// One stack, or nothing. This test signs people in through the API and
+// changes them in the database; pointed at two different stacks it signed
+// people in on the local stack Sada tests on while it changed the device lab
+// (4 Nov 2026). A stack's ports sit together: the database one above the API,
+// its mail catcher three above.
+{
+  const port = (u: string) => Number(new URL(u).port);
+  if (port(DB) !== port(API) + 1 || port(MAIL) !== port(API) + 3) {
+    fail(
+      `the database (${port(DB)}), the API (${port(API)}) and the mail catcher (${port(MAIL)}) ` +
+        "are not one stack. Set SUPABASE_API_URL and MAILPIT_URL for the stack DATABASE_URL names.",
+    );
+  }
+}
+
 async function auth(path: string, body: unknown, token?: string) {
   const res = await fetch(`${API}/auth/v1${path}`, {
     method: "POST",

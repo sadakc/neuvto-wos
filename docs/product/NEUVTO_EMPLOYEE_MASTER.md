@@ -1,6 +1,6 @@
 # NEUVTO WOS — Employee Master
 
-**Version:** 1.27 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
+**Version:** 1.28 · **Status:** Active, in build · **Applies to:** the `employee` module and the platform roles it depends on
 
 The record of a person. Every other module reads it: reporting line, department,
 deployment, the working calendar a deployment carries, bank and statutory numbers.
@@ -903,6 +903,31 @@ one place, both need to sync."
 - People › Waiting to join has **Send again** beside Withdraw.
 - Proved by `verify_withdraw_or_resend.sql` (8 database guards broken on purpose, each
   caught), `Lifecycle.test.tsx` and `members.test.tsx` (6 screen guards, each caught).
+
+### What is typed once is not typed again (D121, 4 Nov 2026)
+
+- **An emergency contact from Family.** The emergency contact sheet asks **Who**: somebody
+  in Family, or **Somebody not in Family**. Picked from Family, their name and relation are
+  Family's (`employees.emergency_contact_family_member_id`) and follow Family when it is
+  saved; only the phone is typed. A name or relation typed unlinks them. A family member
+  removed leaves the contact as last known. "Somebody not in Family" is never refused as an
+  empty required field.
+- **A permanent address the same as the present one** is filled in from it by a tick in the
+  address sheet, to change if it differs. It is a copy: a permanent address does not move
+  when the person does.
+- **The nearest police station is the present address's.** Physical record edits it there,
+  in place: the one change an open address row takes without a successor, and only while
+  the save names that row (`neuvto.police_station`); a closed address is never corrected.
+  Before there is a present address it waits on the record, and the first present address
+  takes it. The card's police station is the present address's.
+- **The reason for leaving the last organisation** is the reason on the latest row of
+  Previous organisations (the latest end, then the latest start): typed in either place,
+  both say it. Emptied in Previous organisations, the one on record stands.
+- What was on record moved once, in the migration: police stations to present addresses,
+  latest reasons to the record, emergency contacts already in Family by name and relation
+  linked to them.
+- Proved by `verify_linked_fields.sql` (12 database guards broken on purpose, each caught)
+  and `RecordEditors.test.tsx` (7 screen guards, each caught).
 
 ## 8. Acceptance criteria, module level
 

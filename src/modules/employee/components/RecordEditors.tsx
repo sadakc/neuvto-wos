@@ -38,6 +38,7 @@ import {
   RELATIONS,
   SEXES,
   type EmployeeCard,
+  type PreviousOrganisation,
 } from "../contracts";
 import {
   addAddress,
@@ -151,6 +152,33 @@ function RecordFieldEditor({
 
 const any = (...values: unknown[]) => values.some((v) => v !== null && v !== undefined && v !== "");
 
+/**
+ * D121: the police station is the present address's. Said where it is edited,
+ * so a correction here is not a surprise on the address.
+ */
+function policeStationHint(card: EmployeeCard): string | undefined {
+  if (!card.addresses) return undefined;
+  const present = card.addresses.find((a) => a.addressType === "present" && !a.effectiveTo);
+  return present
+    ? `The present address's (${present.line}): a correction here is a correction there.`
+    : "Kept here until a present address is added, which then takes it.";
+}
+
+/** The last organisation left: the latest end, then the latest start (D121). */
+function latestPreviousOrg(card: EmployeeCard): PreviousOrganisation | undefined {
+  return [...(card.previousOrganisations ?? [])].sort(
+    (a, b) => b.toDate.localeCompare(a.toDate) || b.fromDate.localeCompare(a.fromDate),
+  )[0];
+}
+
+/** D121: the reason is the latest organisation's too; said where it is typed. */
+function reasonHint(card: EmployeeCard): string | undefined {
+  const last = latestPreviousOrg(card);
+  return last
+    ? `Also the reason on ${last.organisationName}, in Previous organisations.`
+    : undefined;
+}
+
 export function ContactEditor({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   return (
     <RecordFieldEditor
@@ -193,8 +221,15 @@ export function ContactEditor({ card, onChanged }: { card: EmployeeCard; onChang
   );
 }
 
+const FROM_FAMILY = "emergencyContactFamilyMemberId";
+
 export function EmergencyEditor({ card, onChanged }: { card: EmployeeCard; onChanged: Changed }) {
   const ec = card.emergencyContact;
+  // D121: somebody already in Family is picked, not typed again; their name
+  // and relation then follow Family. Only the phone is typed: Family keeps none.
+  const family = card.familyMembers ?? [];
+  const member = (id: string) => family.find((m) => m.id === id);
+  const own = (vals: Record<string, string>) => !vals[FROM_FAMILY];
   return (
     <RecordFieldEditor
       card={card}
@@ -203,12 +238,35 @@ export function EmergencyEditor({ card, onChanged }: { card: EmployeeCard; onCha
       filled={any(ec?.name, ec?.relation, ec?.phone)}
       onChanged={onChanged}
       fields={[
+        ...(family.length > 0
+          ? [
+              {
+                key: FROM_FAMILY,
+                label: "Who",
+                kind: "select" as const,
+                labelled: family.map((m) => [m.id, `${m.name} (${humanise(m.relation)})`] as const),
+                current: ec?.familyMemberId,
+                emptyLabel: "Somebody not in Family",
+              },
+              {
+                key: "emergencyFromFamily",
+                label: "Name and relation",
+                kind: "derived" as const,
+                when: (vals: Record<string, string>) => !own(vals),
+                derive: (vals: Record<string, string>) => {
+                  const m = member(vals[FROM_FAMILY]);
+                  return m ? `${m.name}, ${humanise(m.relation).toLowerCase()}: from Family` : "—";
+                },
+              },
+            ]
+          : []),
         {
           key: "emergencyContactName",
           label: "Name",
           current: ec?.name,
           rule: "name",
           maxLength: 100,
+          when: own,
         },
         {
           key: "emergencyContactRelation",
@@ -217,6 +275,7 @@ export function EmergencyEditor({ card, onChanged }: { card: EmployeeCard; onCha
           options: RELATIONS,
           current: asRelation(ec?.relation),
           emptyLabel: "Select",
+          when: own,
         },
         {
           key: "emergencyContactPhone",
@@ -349,6 +408,7 @@ export function EducationEditor({ card, onChanged }: { card: EmployeeCard; onCha
             current: card.reasonForLeavingLastOrg,
             rule: "text500",
             maxLength: 500,
+            hint: reasonHint(card),
           },
           {
             key: "totalExperience",
@@ -412,6 +472,7 @@ export function PhysicalEditor({ card, onChanged }: { card: EmployeeCard; onChan
           current: card.nearestPoliceStation,
           rule: "text100",
           maxLength: 100,
+          hint: policeStationHint(card),
         },
       ]}
     />
@@ -1412,6 +1473,36 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
   const openPermanent = card.addresses?.find(
     (a) => a.addressType === "permanent" && !a.effectiveTo,
   );
+  // D121: a permanent address the same as the present one is not typed again.
+  const openPresent = card.addresses?.find((a) => a.addressType === "present" && !a.effectiveTo);
+  const [samePresent, setSamePresent] = useState(false);
+  function copyPresent(on: boolean) {
+    setSamePresent(on);
+    if (!on || !openPresent) {
+      setV({
+        ...v,
+        line: "",
+        city: "",
+        district: "",
+        state: HOME_STATE,
+        pincode: "",
+        nearestPoliceStation: "",
+      });
+      setOtherDistrict(false);
+      return;
+    }
+    const district = openPresent.district ?? "";
+    setV({
+      ...v,
+      line: openPresent.line,
+      city: openPresent.city,
+      district,
+      state: openPresent.state,
+      pincode: openPresent.pincode,
+      nearestPoliceStation: openPresent.nearestPoliceStation ?? "",
+    });
+    setOtherDistrict(district !== "" && !districtsOf(openPresent.state).includes(district));
+  }
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -1463,6 +1554,7 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
         onClick={() => {
           setV(blank);
           setOtherDistrict(false);
+          setSamePresent(false);
           setError("");
           setDateError("");
           setProof(null);
@@ -1493,7 +1585,10 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
               <select
                 data-testid="address-type"
                 value={v.addressType}
-                onChange={(e) => setV({ ...v, addressType: e.target.value })}
+                onChange={(e) => {
+                  setV({ ...v, addressType: e.target.value });
+                  if (samePresent) copyPresent(false);
+                }}
                 className={input}
               >
                 {types.map((t) => (
@@ -1503,6 +1598,24 @@ export function AddAddressDialog({ card, onChanged }: { card: EmployeeCard; onCh
                 ))}
               </select>
             </Field>
+            {v.addressType === "permanent" && openPresent && (
+              <label className="flex items-start gap-2 text-sm">
+                <input
+                  type="checkbox"
+                  data-testid="address-same-as-present"
+                  checked={samePresent}
+                  onChange={(e) => copyPresent(e.target.checked)}
+                  className="mt-0.5 size-4"
+                />
+                <span>
+                  The same as the present address
+                  <span className="block text-caption text-muted-foreground">
+                    {openPresent.line}, {openPresent.city}: filled in below, to change if it
+                    differs.
+                  </span>
+                </span>
+              </label>
+            )}
             <Field label="Effective from" error={dateError}>
               <DateField
                 label="Effective from"
