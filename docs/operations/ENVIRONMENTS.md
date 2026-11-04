@@ -18,13 +18,13 @@ this triggered.
 
 ## The five environments, not four
 
-| Environment        | Reached by                       | Backing database                                         | Status                                                          |
-| ------------------ | -------------------------------- | -------------------------------------------------------- | --------------------------------------------------------------- |
-| **Local**          | `supabase start` on your machine | local Docker Postgres                                    | already exists, unchanged                                       |
-| **QA**             | `qa` branch → `qa.neuvto.com`    | `neuvto-wos-qa` (`apwnhyjgwukwyjnmcjeg`), org **Neuvto** | **database ready 4 Nov 2026**; site waits on two GitHub secrets |
-| **UAT**            | `uat` branch → `uat.neuvto.com`  | would need a second free organisation                    | **later** (Sada, 4 Nov 2026): not in the same free tier         |
-| **Pre-production** | Lovable's own preview            | Lovable Cloud (`vkyvzhgigncranprhidn`)                   | already exists, **unchanged by this plan**                      |
-| **Production**     | `main` branch → `neuvto.com`     | `neuvto-wos-prod` (`udrzhfgwqgolvyimbwto`)               | already exists, unchanged                                       |
+| Environment        | Reached by                       | Backing database                                         | Status                                                                 |
+| ------------------ | -------------------------------- | -------------------------------------------------------- | ---------------------------------------------------------------------- |
+| **Local**          | `supabase start` on your machine | local Docker Postgres                                    | already exists, unchanged                                              |
+| **QA**             | `qa` branch → `qa.neuvto.com`    | `neuvto-wos-qa` (`apwnhyjgwukwyjnmcjeg`), org **Neuvto** | **live 4 Nov 2026**; sign-in by Resend, test accounts on Gmail aliases |
+| **UAT**            | `uat` branch → `uat.neuvto.com`  | would need a second free organisation                    | **later** (Sada, 4 Nov 2026): not in the same free tier                |
+| **Pre-production** | Lovable's own preview            | Lovable Cloud (`vkyvzhgigncranprhidn`)                   | already exists, **unchanged by this plan**                             |
+| **Production**     | `main` branch → `neuvto.com`     | `neuvto-wos-prod` (`udrzhfgwqgolvyimbwto`)               | already exists, unchanged                                              |
 
 **Do not call the UAT stack "pre-production."** That name is already
 [DEPLOYMENT.md](DEPLOYMENT.md)'s term for Lovable Cloud — the database Lovable's
@@ -67,10 +67,13 @@ record but no file, so QA has neither.
 
 **No email.** QA has no notification dispatcher configured (no Vault secrets),
 so invitations and notifications wait and are never sent (Sada, 4 Nov 2026).
-Sign-in codes are separate: on a free project Supabase's own mail only reaches
-members of the Supabase team and cannot carry the six-digit code template.
-Signing in to QA needs a custom SMTP sender (Resend, free) and deliverable
-addresses on the test accounts: an open decision.
+Sign-in codes are separate, and work: QA's Supabase sends them through Resend
+(custom SMTP, its own `neuvto-wos-qa sign-in` key, sender "Neuvto QA"), set by
+Sada in the dashboard; `scripts/apply-auth-email-config.sh apwnhyjgwukwyjnmcjeg`
+then set the six-digit template and 100 emails an hour. The test accounts sign
+in as Gmail aliases of Sada's, `anshvilla+<first name>@gmail.com` (Priya is
+`anshvilla+priya@gmail.com`), changed in QA only; the local stack keeps
+`@acme.test`. They share Resend's 100 a day with production.
 
 **Pausing.** A free project pauses after about a week unused. Restore it from
 the dashboard or ask for it; nothing is lost.
