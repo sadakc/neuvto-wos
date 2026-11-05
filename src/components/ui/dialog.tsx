@@ -29,32 +29,112 @@ const DialogOverlay = React.forwardRef<
 ));
 DialogOverlay.displayName = DialogPrimitive.Overlay.displayName;
 
+/**
+ * The height of what the person can see. An iPhone's keyboard covers the page
+ * rather than shrinking it, and no CSS unit knows it is there, so a sheet sized
+ * by CSS alone stays as tall as the screen and runs off the top (D120).
+ */
+function useVisibleHeight() {
+  const [height, setHeight] = React.useState<number>();
+  React.useEffect(() => {
+    const vv = window.visualViewport;
+    if (!vv) return;
+    const update = () => setHeight(vv.height);
+    update();
+    vv.addEventListener("resize", update);
+    return () => vv.removeEventListener("resize", update);
+  }, []);
+  return height;
+}
+
+const FOCUSABLE =
+  'input:not([type="hidden"]), select, textarea, button, [href], [tabindex]:not([tabindex="-1"])';
+
 const DialogContent = React.forwardRef<
   React.ElementRef<typeof DialogPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof DialogPrimitive.Content>
->(({ className, children, ...props }, ref) => (
-  <DialogPortal>
-    <DialogOverlay />
-    <DialogPrimitive.Content
-      ref={ref}
-      className={cn(
-        "fixed left-[50%] top-[50%] z-50 grid w-full max-w-lg translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
-        className,
-      )}
-      {...props}
-    >
-      {children}
-      <DialogPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
-        <X className="h-4 w-4" />
-        <span className="sr-only">Close</span>
-      </DialogPrimitive.Close>
-    </DialogPrimitive.Content>
-  </DialogPortal>
-));
+>(({ className, children, style, onOpenAutoFocus, ...props }, ref) => {
+  const visible = useVisibleHeight();
+  const local = React.useRef<HTMLDivElement | null>(null);
+  return (
+    <DialogPortal>
+      <DialogOverlay />
+      <DialogPrimitive.Content
+        ref={(node) => {
+          local.current = node;
+          if (typeof ref === "function") ref(node);
+          else if (ref) ref.current = node;
+        }}
+        // The first field, as before the header had its own close button: the
+        // header comes first, and on a phone opening a sheet put the focus
+        // ring on its × (Sada, 4 Nov 2026).
+        onOpenAutoFocus={(e) => {
+          onOpenAutoFocus?.(e);
+          if (e.defaultPrevented || !local.current) return;
+          const first = [...local.current.querySelectorAll<HTMLElement>(FOCUSABLE)].find(
+            (el) => !el.closest("[data-sheet-close]") && !el.hasAttribute("disabled"),
+          );
+          if (first) {
+            e.preventDefault();
+            first.focus();
+          }
+        }}
+        style={
+          { ...style, "--sheet-room": visible ? `${visible}px` : undefined } as React.CSSProperties
+        }
+        className={cn(
+          "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+          // Doc 11.5: under 600px a centred dialog is a bottom sheet, handle and all.
+          // Its height is a share of the page, not of the screen: Android shrinks
+          // the page to the room above the keyboard, and a sheet sized to the
+          // screen then runs off the top (D120). 100dvh does not shrink with it.
+          // An iPhone does not shrink the page at all: --sheet-room is what is
+          // left above its keyboard.
+          "max-[599px]:inset-x-0 max-[599px]:top-auto max-[599px]:bottom-0 max-[599px]:left-0 max-[599px]:max-w-none max-[599px]:translate-x-0 max-[599px]:translate-y-0 max-[599px]:max-h-[min(calc(100%-1rem),calc(var(--sheet-room,100vh)-1rem))] max-[599px]:overscroll-contain max-[599px]:rounded-t-[18px] max-[599px]:rounded-b-none max-[599px]:border-x-0 max-[599px]:border-b-0 max-[599px]:px-4 max-[599px]:pt-7 max-[599px]:pb-[max(1rem,env(safe-area-inset-bottom))] max-[599px]:data-[state=open]:slide-in-from-bottom max-[599px]:data-[state=closed]:slide-out-to-bottom max-[599px]:data-[state=open]:zoom-in-100 max-[599px]:data-[state=closed]:zoom-out-100 max-[599px]:before:absolute max-[599px]:before:top-2 max-[599px]:before:left-1/2 max-[599px]:before:h-1 max-[599px]:before:w-10 max-[599px]:before:-translate-x-1/2 max-[599px]:before:rounded-full max-[599px]:before:bg-border",
+          // With a header, the header is the top of the sheet, handle and all.
+          // Padding above it would be space it sticks below (Sada's phone: the
+          // fields showed over it, and two handles).
+          "max-[599px]:has-[[data-sheet-header]]:pt-0 max-[599px]:has-[[data-sheet-header]]:before:hidden",
+          className,
+        )}
+        {...props}
+      >
+        {children}
+        {/* On a phone a sheet with a header closes from the header, which stays in sight. */}
+        <DialogPrimitive.Close className="max-[599px]:[[role=dialog]:has([data-sheet-header])>&]:hidden absolute right-4 top-4 max-[599px]:right-1 max-[599px]:top-1 max-[599px]:grid max-[599px]:size-12 max-[599px]:place-items-center rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-accent data-[state=open]:text-muted-foreground">
+          <X className="h-4 w-4" />
+          <span className="sr-only">Close</span>
+        </DialogPrimitive.Close>
+      </DialogPrimitive.Content>
+    </DialogPortal>
+  );
+});
 DialogContent.displayName = DialogPrimitive.Content.displayName;
 
-const DialogHeader = ({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
-  <div className={cn("flex flex-col space-y-1.5 text-center sm:text-left", className)} {...props} />
+/**
+ * On a phone the header stays at the top of the sheet, handle, title and close
+ * button, while the fields scroll under it: with the keyboard up there is room
+ * for only a few fields, and the title said what was being edited (D120).
+ */
+const DialogHeader = ({ className, children, ...props }: React.HTMLAttributes<HTMLDivElement>) => (
+  <div
+    data-sheet-header=""
+    className={cn(
+      "flex flex-col space-y-1.5 text-center sm:text-left",
+      "max-[599px]:sticky max-[599px]:top-0 max-[599px]:z-10 max-[599px]:-mx-4 max-[599px]:border-b max-[599px]:bg-background max-[599px]:px-14 max-[599px]:pt-7 max-[599px]:pb-3 max-[599px]:before:absolute max-[599px]:before:top-2 max-[599px]:before:left-1/2 max-[599px]:before:h-1 max-[599px]:before:w-10 max-[599px]:before:-translate-x-1/2 max-[599px]:before:rounded-full max-[599px]:before:bg-border",
+      className,
+    )}
+    {...props}
+  >
+    {children}
+    <DialogPrimitive.Close
+      data-sheet-close=""
+      className="absolute right-1 top-1 hidden size-12 place-items-center rounded-sm opacity-70 ring-offset-background cursor-pointer transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 max-[599px]:grid"
+    >
+      <X className="h-4 w-4" />
+      <span className="sr-only">Close</span>
+    </DialogPrimitive.Close>
+  </div>
 );
 DialogHeader.displayName = "DialogHeader";
 

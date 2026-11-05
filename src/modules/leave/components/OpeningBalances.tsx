@@ -9,6 +9,9 @@
  * Contributed as an adminSection rather than routed, so it appears in Settings
  * without the platform naming Leave (D30) — the same arrangement as leave types.
  *
+ * People who have not joined yet (drafts and the invited) are beneath, in
+ * StagedOpeningBalances (D88): their numbers wait and apply when they accept.
+ *
  * It lists people whose balance row does not exist yet, showing the entitlement
  * they *would* get. Those are exactly the people an opening balance is for, and
  * a screen that only listed materialised rows would hide them.
@@ -17,6 +20,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { isAppError, toAppError } from "@/platform/errors";
+import StagedOpeningBalances from "./StagedOpeningBalances";
 
 interface Row {
   employeeId: string;
@@ -146,7 +150,7 @@ export default function OpeningBalances() {
         value={filter}
         onChange={(e) => setFilter(e.target.value)}
         placeholder="Find somebody"
-        className="h-12 w-full rounded-md border border-border bg-background px-3 text-sm sm:max-w-xs"
+        className="h-12 w-full rounded-md border border-border bg-background px-3 text-sm @min-[640px]/app:max-w-xs"
       />
 
       {error && (
@@ -164,7 +168,7 @@ export default function OpeningBalances() {
         </p>
       )}
 
-      <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
+      <ul className="mt-4 divide-y divide-border rounded-xl border border-border bg-card shadow-card">
         {visible.map((r) => (
           <li key={`${r.employeeId}:${r.leaveTypeId}`} data-testid="balance-row" className="p-4">
             <div className="flex items-baseline justify-between gap-3">
@@ -179,7 +183,7 @@ export default function OpeningBalances() {
 
             <form
               key={`${r.employeeId}:${r.leaveTypeId}:${version}`}
-              className="mt-3 flex flex-col gap-2 sm:flex-row sm:items-end"
+              className="mt-3 flex flex-col gap-2 @min-[640px]/app:flex-row @min-[640px]/app:items-end"
               onSubmit={(e) => {
                 e.preventDefault();
                 const f = new FormData(e.currentTarget);
@@ -224,7 +228,7 @@ export default function OpeningBalances() {
       </ul>
 
       {visible.length === 0 && (
-        <p className="mt-4 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+        <p className="mt-4 rounded-xl border border-dashed border-border p-6 text-sm text-muted-foreground">
           {rows.length === 0
             ? "Nobody has joined this workspace yet, or no leave types are configured."
             : "Nobody by that name."}
@@ -234,6 +238,8 @@ export default function OpeningBalances() {
       <p className="mt-3 text-xs text-muted-foreground">
         Every change is recorded with the previous value, so a balance that moves can be traced.
       </p>
+
+      <StagedOpeningBalances />
     </div>
   );
 }

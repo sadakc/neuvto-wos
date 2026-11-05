@@ -134,3 +134,16 @@ describe("msUntilIdle", () => {
     expect(msUntilIdle({ now: T, lastActivityAt: null, idleMinutes: 30 })).toBe(30 * MIN);
   });
 });
+
+describe("the exact edges, found unpinned by mutation testing (13 Oct 2026)", () => {
+  it("the absolute cap ends the session exactly ON 24 hours, not a millisecond later", () => {
+    expect(at({ sessionStartedAt: T - 24 * HOUR })).toBe("expired-absolute");
+    expect(at({ sessionStartedAt: T - 24 * HOUR + 1 })).toBe("active");
+  });
+
+  it("the warning starts exactly where its window starts", () => {
+    // 30 minutes idle, 60 seconds of warning: from 29:00.
+    expect(at({ lastActivityAt: T - 29 * MIN })).toBe("warn");
+    expect(at({ lastActivityAt: T - 29 * MIN + 1 })).toBe("active");
+  });
+});

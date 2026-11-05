@@ -1,0 +1,50 @@
+{
+  // Shared editor settings for this repository. Personal preferences (theme,
+  // font) belong in your own user settings, not here.
+
+  // Format on save, with the repository's own Prettier. The prettier extension
+  // honours .prettierignore, so generated and hand-formatted files are left alone.
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "[sql]": { "editor.formatOnSave": false },
+  "typescript.tsdk": "node_modules/typescript/lib",
+
+  // Files a person must never edit by hand. Each is written by a tool, and an
+  // edit is either reverted silently or breaks the tool that owns it.
+  "files.readonlyInclude": {
+    "src/styles.css": true, // bun run tokens, from src/platform/design/tokens.ts
+    "src/integrations/supabase/client.ts": true, // Lovable's Supabase integration
+    "src/integrations/supabase/types.ts": true, // supabase gen types
+    "src/routeTree.gen.ts": true, // TanStack Router
+    "bun.lock": true // bun add / bun install
+  },
+
+  // Out of sight: build output, test reports, the mutation-testing sandbox.
+  "files.exclude": {
+    "**/.DS_Store": true,
+    ".stryker-tmp": true,
+    ".output": true,
+    ".tanstack": true,
+    ".nitro": true,
+    "dist": true
+  },
+  "search.exclude": {
+    "bun.lock": true,
+    "reports": true,
+    "src/routeTree.gen.ts": true,
+    "src/integrations/supabase/types.ts": true
+  },
+
+  // A tidier root: each config file folds under the one it belongs with.
+  "explorer.fileNesting.enabled": true,
+  "explorer.fileNesting.patterns": {
+    "package.json": "bun.lock, bunfig.toml, .prettierrc, .prettierignore, eslint.config.js, components.json",
+    "tsconfig.json": "tsconfig.*.json",
+    "vite.config.ts": "vitest.config.ts, playwright.config.ts, stryker.config.mjs",
+    "README.md": "AGENTS.md, CLAUDE.md",
+    ".gitignore": ".env, .env.*"
+  },
+
+  "playwright.reuseBrowser": false,
+  "tailwindCSS.experimental.configFile": "src/styles.css"
+}

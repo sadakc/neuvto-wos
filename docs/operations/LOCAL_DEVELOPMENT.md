@@ -1,6 +1,6 @@
 # Local development
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 20 Aug 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 13 Oct 2026
 
 ## The one thing that will catch you
 
@@ -112,6 +112,13 @@ with the flag forced into every worker — `localStorage` present, repair skippe
 If a DOM global goes missing again, `src/test/setup.ts` fails the file once with
 a sentence naming it, rather than once per test with a `TypeError`. Check
 `node --version` first.
+
+## Statutory data locally
+
+Aadhaar, PAN, bank and restricted values are encrypted under a Vault key
+(`operations/STATUTORY_DATA.md`). Locally the harness seed makes a test key the first time
+it runs, so after `supabase db reset --local` run `bun run harness` (or the seed alone)
+before entering any statutory number, or every save says the key isn't set.
 
 ## Signing in locally
 

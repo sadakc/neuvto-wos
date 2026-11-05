@@ -70,6 +70,7 @@ import {
   signOut,
   verifyOtp,
 } from "@/platform/auth";
+import { leavingFor, rememberShellUser, returnFor } from "@/platform/auth/return-to";
 import { Route } from "./auth";
 
 const AuthPage = (Route as unknown as { component: () => React.ReactElement }).component;
@@ -536,5 +537,61 @@ describe("/auth — an address nobody invited", () => {
 
     await waitFor(() => expect(requestOtp).toHaveBeenCalled());
     expect(screen.queryByRole("alertdialog")).toBeNull();
+  });
+});
+
+describe("/auth — a page left behind belongs to whoever left it", () => {
+  // Sada was signed out for inactivity on Alice's Organisation › Settings, then
+  // signed in as Mark, and Mark landed on "Administrators only". The `next` the
+  // bounce wrote was Alice's; somebody else signing in starts at Home.
+  async function signInAs(person: typeof TENANT_USER) {
+    vi.mocked(getCurrentUser)
+      .mockResolvedValueOnce(null)
+      .mockResolvedValue(person as never);
+    vi.mocked(requestOtp).mockResolvedValue(undefined as never);
+    vi.mocked(verifyOtp).mockResolvedValue(undefined as never);
+    const user = userEvent.setup();
+    render(<AuthPage />);
+    await user.type(await screen.findByLabelText(/work email/i), person.email);
+    await user.click(screen.getByRole("button", { name: "Email me a code" }));
+    await user.type(await screen.findByLabelText(/6-digit code/i), "123456");
+    await user.click(screen.getByRole("button", { name: "Continue" }));
+    await waitFor(() => expect(navigate).toHaveBeenCalled());
+  }
+
+  const MARK = { ...TENANT_USER, id: "mark-id", email: "mark.manager@acme.test" };
+
+  beforeEach(() => localStorage.clear());
+
+  it("sends somebody else to Home, not the page the last person was on", async () => {
+    rememberShellUser("alice-id");
+    leavingFor("/app/settings");
+    h.search = { next: "/app/settings", reason: "idle" };
+    await signInAs(MARK);
+    expect(navigate).toHaveBeenCalledWith("/app");
+    expect(navigate).not.toHaveBeenCalledWith("/app/settings");
+  });
+
+  it("returns the same person to where they were", async () => {
+    rememberShellUser("mark-id");
+    leavingFor("/app/settings");
+    h.search = { next: "/app/settings", reason: "idle" };
+    await signInAs(MARK);
+    expect(navigate).toHaveBeenCalledWith("/app/settings");
+  });
+
+  it("still follows a deep link no bounce wrote", async () => {
+    rememberShellUser("alice-id");
+    leavingFor("/app/settings");
+    h.search = { next: "/app/leave" };
+    await signInAs(MARK);
+    expect(navigate).toHaveBeenCalledWith("/app/leave");
+  });
+
+  it("uses the note once", async () => {
+    rememberShellUser("alice-id");
+    leavingFor("/app/settings");
+    expect(returnFor("/app/settings", "mark-id")).toBe("/app");
+    expect(returnFor("/app/settings", "mark-id")).toBe("/app/settings");
   });
 });

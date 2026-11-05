@@ -27,6 +27,7 @@ vi.mock("./session-policy", () => ({
 }));
 vi.mock("sonner", () => ({ toast: { warning: vi.fn() } }));
 
+import { rememberShellUser, returnFor } from "./return-to";
 import { installIdleWatcher } from "./idle";
 import { hardNavigate } from "@/platform/navigate";
 import { signOut } from "./otp";
@@ -99,6 +100,13 @@ describe("signing somebody out after inactivity", () => {
     expect(url).toContain("next=");
     expect(url).toContain(encodeURIComponent("/app/leave/apply"));
     expect(url).not.toContain("live-secret");
+  });
+
+  it("notes whose page it was, so nobody else is returned to it", async () => {
+    rememberShellUser("alice-id");
+    await install();
+    await advance(31 * MIN);
+    expect(returnFor("/app/leave", "mark-id")).toBe("/app");
   });
 
   it("signs out on the absolute cap even while somebody is active", async () => {

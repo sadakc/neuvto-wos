@@ -17,11 +17,14 @@ import { z } from "zod";
  * enum value can be added but never removed, so it waits until it is wanted.
  */
 export const APP_ROLES = [
+  "super_admin",
   "org_admin",
   "hr_admin",
   "manager",
   "supervisor",
   "coordinator",
+  "payroll_officer",
+  "statutory_officer",
   "employee",
 ] as const;
 export type AppRole = (typeof APP_ROLES)[number];
@@ -40,12 +43,56 @@ export type AppRole = (typeof APP_ROLES)[number];
  * anywhere — the compiler names every screen that has to say something about it.
  */
 export const ROLE_LABELS: Record<AppRole, string> = {
+  super_admin: "Super Admin",
   org_admin: "Administrator",
   hr_admin: "HR administrator",
   manager: "Manager",
   supervisor: "Supervisor",
   coordinator: "Coordinator",
+  payroll_officer: "Payroll",
+  statutory_officer: "Statutory",
   employee: "Employee",
+};
+
+/**
+ * The roles only a Super Admin may grant or take away (D78). Mirrors
+ * `is_reserved_for_super_admin()` in the database, which is the copy that
+ * decides; this one only decides what a screen offers.
+ */
+export const SUPER_ADMIN_GRANTS: readonly AppRole[] = [
+  "super_admin",
+  "org_admin",
+  "hr_admin",
+  "payroll_officer",
+  "statutory_officer",
+];
+
+/**
+ * The roles that may hold an approval. Mirrors `is_approver_role()` (D57,
+ * D78). Payroll and Statutory are absent: they read data and approve nothing,
+ * and offering them in an approval rule would route somebody's leave to the
+ * person who looks after bank details.
+ */
+export const APPROVER_ROLES: readonly AppRole[] = [
+  "super_admin",
+  "org_admin",
+  "hr_admin",
+  "manager",
+  "supervisor",
+  "coordinator",
+];
+
+/** One line per role, shown where access is changed. */
+export const ROLE_DESCRIPTIONS: Record<AppRole, string> = {
+  super_admin: "Runs access for the company. The only role that can make administrators.",
+  org_admin: "Runs the workspace: people, settings, reports, every module's configuration.",
+  hr_admin: "The same as an administrator, for the People Ops team.",
+  manager: "Approves leave for the people who report to them.",
+  supervisor: "Approves for their reports. Administers nothing.",
+  coordinator: "Approves for their reports. Administers nothing.",
+  payroll_officer: "Sees bank details and salaries. Separate from Administrator on purpose.",
+  statutory_officer: "Can reveal Aadhaar, PAN and the restricted block. Every reveal is logged.",
+  employee: "Their own record, leave and requests.",
 };
 
 export const EmailInput = z.object({
@@ -189,44 +236,6 @@ export const ProvisionInput = SignupInput.extend({
 });
 export type ProvisionInput = z.infer<typeof ProvisionInput>;
 
-/**
- * Inviting somebody into the caller's own workspace.
- *
- * `fullName` is REQUIRED, from 7 Aug 2026 — Sada: "The name cannot be optional.
- * Make it a regular one."
- *
- * It was optional because an invitation needs only an address to be deliverable.
- * That is true and it is not the point: the name is what every other screen
- * identifies a person BY. `members.tsx` falls back to `m.fullName || m.email`,
- * so a workspace invited without names is a list of email addresses — in the
- * approval timeline, the reporting-line dropdown, the successor picker on
- * deactivation, and every report. The address is a login, not a person.
- *
- * `invitation_create` refuses a blank one too, so this is not the only guard.
- * Provisioning is unaffected: `provision_organization` writes to `invitations`
- * directly rather than through that function, deliberately, and a platform admin
- * naming a customer's first administrator is a different decision from a
- * customer naming their own colleague.
- */
-export const InviteInput = z.object({
-  email: z.string().trim().toLowerCase().email("Enter a valid email address").max(320),
-  phone: PhoneInput.optional().default(""),
-  role: z.enum(APP_ROLES),
-  fullName: z
-    .string()
-    .trim()
-    .min(1, "Enter their name — it is how they appear on every screen")
-    .max(200, "That name is too long"),
-  /**
-   * D58. Optional, and empty is the honest default — a workspace that has not
-   * configured any departments cannot place anybody, and requiring one would
-   * make the first invitation impossible. Carried on the invitation and applied
-   * to the profile at acceptance (D53), like the start date and reporting line.
-   */
-  departmentId: z.string().uuid().nullable().optional().default(null),
-});
-export type InviteInput = z.infer<typeof InviteInput>;
-
 /** The signed-in user as the app needs them: identity, tenant and roles in one object. */
 export interface CurrentUser {
   id: string;
@@ -235,6 +244,13 @@ export interface CurrentUser {
   organizationId: string;
   organizationName: string;
   roles: AppRole[];
+  /**
+   * D84. Modules this person administers by a grant from a Super Admin. A
+   * company-wide Admin administers every module without one, so ask
+   * `isModuleAdmin`, never this list directly. Optional so a user built in a
+   * test without it administers no module.
+   */
+  moduleAdmin?: readonly string[];
 }
 
 /** Derives a slug suggestion from a company name. Advisory only — the user can edit it. */

@@ -170,3 +170,21 @@ describe("limits agree with the database", () => {
     expect(MAX_STACK).toBe(4000);
   });
 });
+
+describe("messageOf, at its edges (found unpinned by mutation testing, 13 Oct 2026)", () => {
+  it("cuts an oversized thrown object to the stored length", () => {
+    const huge = { detail: "x".repeat(MAX_MESSAGE * 3) };
+    expect(messageOf(huge)).toHaveLength(MAX_MESSAGE);
+  });
+
+  it("names the route a failed response came from, without its ids", () => {
+    const r = new Response(null, { status: 503 });
+    Object.defineProperty(r, "url", { value: "https://neuvto.com/app/employee/12345?x=1" });
+    expect(messageOf(r)).toBe("Response 503 at /app/employee/:n");
+  });
+
+  it("groups messages that differ only in a number, and keeps the words apart", () => {
+    expect(fingerprint("Retry   in 30 seconds")).toBe(fingerprint("Retry in 5 seconds"));
+    expect(fingerprint("Retry in 30 seconds")).toBe("retry in # seconds");
+  });
+});

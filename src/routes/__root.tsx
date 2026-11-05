@@ -80,7 +80,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      // interactive-widget: on a phone the keyboard shrinks the page rather than
+      // covering it, so a bottom sheet sits above the keyboard and scrolls
+      // inside, instead of hiding its fields behind it (Sada, 27 Oct 2026).
+      {
+        name: "viewport",
+        content: "width=device-width, initial-scale=1, interactive-widget=resizes-content",
+      },
       { title: "Neuvto WOS — Workforce Operating System" },
       { property: "og:title", content: "Neuvto WOS — Workforce Operating System" },
       { name: "twitter:title", content: "Neuvto WOS — Workforce Operating System" },
@@ -150,7 +156,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Space+Grotesk:wght@500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600;700&display=swap",
       },
     ],
   }),

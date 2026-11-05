@@ -32,6 +32,36 @@ export interface ApprovalQueueItem {
   createdAt: string;
   /** Whole days since it was raised. What a queue is really sorted by in a manager's head. */
   daysWaiting: number;
+  /** When it reached the level it is at now. */
+  levelSince: string;
+  /** Whole days at this level. */
+  daysAtLevel: number;
+  /**
+   * The level's `escalate_after_days`, or null. Past it, the request moves to
+   * somebody above the approver (D87); with no target it never moves.
+   */
+  targetDays: number | null;
+  /** Who it moved up from, when it came to the caller that way (D87). */
+  escalatedFrom: string | null;
+  /** Whose approval this is, when it is the caller's by delegation (D92). */
+  onBehalfOf: string | null;
+}
+
+/**
+ * Why a request was rejected. The codes are the database's
+ * (`approval_reject_reasons()`); the words are the screen's.
+ */
+export const REJECT_REASONS = [
+  { code: "business_need", label: "Needed at work on those dates" },
+  { code: "insufficient_notice", label: "Not enough notice" },
+  { code: "policy", label: "Against company policy" },
+  { code: "documents_missing", label: "Documents missing" },
+  { code: "other", label: "Other" },
+] as const;
+export type RejectReason = (typeof REJECT_REASONS)[number]["code"];
+
+export function rejectReasonLabel(code: string | null | undefined): string | null {
+  return REJECT_REASONS.find((r) => r.code === code)?.label ?? null;
 }
 
 /**
@@ -51,6 +81,8 @@ export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
   if (error) throw toAppError(error, "listApprovalQueue");
 
   const now = Date.now();
+  const days = (iso: string) =>
+    Math.max(0, Math.floor((now - new Date(iso).getTime()) / (1000 * 60 * 60 * 24)));
   return (data ?? []).map((r) => ({
     approvalRequestId: r.approval_request_id,
     entityType: r.entity_type,
@@ -61,10 +93,12 @@ export async function listApprovalQueue(): Promise<ApprovalQueueItem[]> {
     requiredLevels: r.required_levels,
     context: (r.context ?? {}) as Record<string, unknown>,
     createdAt: r.created_at,
-    daysWaiting: Math.max(
-      0,
-      Math.floor((now - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24)),
-    ),
+    daysWaiting: days(r.created_at),
+    levelSince: r.level_since,
+    daysAtLevel: days(r.level_since),
+    targetDays: r.target_days,
+    escalatedFrom: r.escalated_from ?? null,
+    onBehalfOf: r.on_behalf_of ?? null,
   }));
 }
 
@@ -80,35 +114,85 @@ export async function decideApproval(
   approvalRequestId: string,
   decision: "approved" | "rejected",
   comments?: string,
+  reasonCode?: RejectReason,
 ): Promise<void> {
   const { error } = await supabase.rpc("approval_decide", {
     _request_id: approvalRequestId,
     _decision: decision,
     _comments: comments?.trim() || undefined,
+    _reason_code: reasonCode,
   });
   if (!error) return;
+  throw decideError(error);
+}
 
+/** One request's outcome from approveMany. */
+export interface BulkOutcome {
+  approvalRequestId: string;
+  approved: boolean;
+  /** Why it was not approved, as a sentence; null when it was. */
+  message: string | null;
+}
+
+/**
+ * Approves several at once. Each goes through the same rules as one at a time,
+ * and each outcome comes back separately: one refusal does not stop the rest.
+ * Approve only; a rejection needs its own reason.
+ */
+export async function approveMany(approvalRequestIds: string[]): Promise<BulkOutcome[]> {
+  const { data, error } = await supabase.rpc("approval_decide_many", {
+    _request_ids: approvalRequestIds,
+  });
+  if (error) throw toAppError(error, "approveMany");
+  return (data ?? []).map((r) => ({
+    approvalRequestId: r.approval_request_id,
+    approved: r.status !== null,
+    message: r.error ? decideError({ message: r.error }).message : null,
+  }));
+}
+
+function decideError(error: { message?: string }): AppError {
   // The database raises bare codes. Each of these is a thing a manager can
   // actually do something about, so each gets a sentence rather than a code.
   const raw = error.message ?? "";
+  if (raw.includes("REASON_CODE_REQUIRED")) {
+    return new AppError("VALIDATION_FAILED", "Choose why you're rejecting this.", 400);
+  }
+  if (raw.includes("NOTE_REQUIRED")) {
+    return new AppError(
+      "VALIDATION_FAILED",
+      "Add a short note for the person. They'll read it with the reason.",
+      400,
+    );
+  }
+  if (raw.includes("ALREADY_SIGNING")) {
+    return new AppError(
+      "FORBIDDEN",
+      "You already sign another level of this request, so you can't sign this one for somebody else too.",
+      403,
+    );
+  }
+  if (raw.includes("SELF_APPROVAL_FORBIDDEN")) {
+    return new AppError("FORBIDDEN", "You can't decide your own request.", 403);
+  }
   if (raw.includes("NOT_YOUR_APPROVAL")) {
-    throw new AppError(
+    return new AppError(
       "FORBIDDEN",
       "This is waiting on somebody else at the moment — an earlier level hasn't been decided yet.",
       403,
     );
   }
   if (raw.includes("ALREADY_DECIDED")) {
-    throw new AppError(
+    return new AppError(
       "ALREADY_DECIDED",
       "This has already been decided. Refresh to see where it ended up.",
       409,
     );
   }
   if (raw.includes("TENANT_MISMATCH") || raw.includes("NOT_FOUND")) {
-    throw new AppError("NOT_FOUND", "We couldn't find that request.", 404);
+    return new AppError("NOT_FOUND", "We couldn't find that request.", 404);
   }
-  throw toAppError(error, "decideApproval");
+  return toAppError(error as Parameters<typeof toAppError>[0], "decideApproval");
 }
 
 export const APPROVER_RULES = ["reporting_manager", "manager_of_manager", "role"] as const;
@@ -229,4 +313,207 @@ export async function removeApprovalLevel(id: string): Promise<void> {
     .update({ deleted_at: new Date().toISOString() })
     .eq("id", id);
   if (error) throw toAppError(error, "removeApprovalLevel");
+}
+
+// ═══════════════════════════════════════════════ handing approvals over (D92)
+
+/** One hand-over: given by the caller, received by them, or (for an admin) between others. */
+export interface Delegation {
+  id: string;
+  direction: "given" | "received" | "others";
+  delegatorName: string;
+  delegateName: string;
+  fromDate: string;
+  toDate: string;
+  /** Null: every module's approvals. */
+  moduleKey: string | null;
+  moduleName: string | null;
+  reason: string | null;
+  inForce: boolean;
+}
+
+const DELEGATION_MESSAGES: Record<string, string> = {
+  DELEGATE_TO_SELF: "Choose somebody other than the person whose approvals these are.",
+  DELEGATE_CANNOT_APPROVE:
+    "They can't approve anything: they need a role that approves, in this company.",
+  PAST_DATE: "A hand-over can't start in the past.",
+  INVALID_DATE_RANGE: "The last day can't be before the first.",
+  DELEGATION_TOO_LONG: "Hand approvals over for at most six months at a time.",
+  DELEGATION_OVERLAPS: "Your approvals are already handed over for some of those dates.",
+  MODULE_NOT_ENABLED: "That isn't switched on for this workspace.",
+  FORBIDDEN: "Only a company admin can hand over somebody else's approvals.",
+  NOT_FOUND: "That hand-over isn't yours to change.",
+};
+
+function delegationError(error: { message?: string }, where: string): AppError {
+  const code = Object.keys(DELEGATION_MESSAGES).find((k) => (error.message ?? "").includes(k));
+  return code
+    ? new AppError("VALIDATION_FAILED", DELEGATION_MESSAGES[code], 400, { code })
+    : toAppError(error, where);
+}
+
+export async function listMyDelegations(): Promise<Delegation[]> {
+  const { data, error } = await supabase.rpc("approval_my_delegations");
+  if (error) throw toAppError(error, "listMyDelegations");
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    direction: r.direction as Delegation["direction"],
+    delegatorName: r.delegator_name,
+    delegateName: r.delegate_name,
+    fromDate: r.from_date,
+    toDate: r.to_date,
+    moduleKey: r.module_key,
+    moduleName: r.module_name,
+    reason: r.reason,
+    inForce: r.in_force,
+  }));
+}
+
+/** Colleagues who can be handed approvals: active, able to approve, not the caller. */
+export async function listDelegateCandidates(): Promise<{ id: string; fullName: string }[]> {
+  const { data, error } = await supabase.rpc("approval_delegate_candidates");
+  if (error) throw toAppError(error, "listDelegateCandidates");
+  return (data ?? []).map((r) => ({ id: r.id, fullName: r.full_name }));
+}
+
+export async function delegateApprovals(input: {
+  delegateId: string;
+  fromDate: string;
+  toDate: string;
+  moduleKey: string | null;
+  reason: string;
+  /** A company admin handing over somebody else's; null for the caller's own. */
+  delegatorId: string | null;
+}): Promise<string> {
+  const { data, error } = await supabase.rpc("approval_delegate", {
+    _delegate_id: input.delegateId,
+    _from_date: input.fromDate,
+    _to_date: input.toDate,
+    _module_key: input.moduleKey ?? undefined,
+    _reason: input.reason || undefined,
+    _delegator_id: input.delegatorId ?? undefined,
+  });
+  if (error) throw delegationError(error, "delegateApprovals");
+  return data as string;
+}
+
+export async function cancelDelegation(id: string): Promise<void> {
+  const { error } = await supabase.rpc("approval_delegation_cancel", { _id: id });
+  if (error) throw delegationError(error, "cancelDelegation");
+}
+
+// ═══════════════════════════════════════════════ who is told of what (D93)
+
+export type NotificationEvent = "approval.submitted" | "approval.completed" | "approval.escalated";
+export type NotificationAudience = "approver" | "requester" | "requester_manager" | "module_admins";
+
+/** One event against one audience, for one entity type. */
+export interface NotificationCell {
+  entityType: string;
+  entityLabel: string;
+  eventKey: NotificationEvent;
+  audience: NotificationAudience;
+  enabled: boolean;
+  /** The engine's own rule: always sent, never switchable. */
+  mandatory: boolean;
+}
+
+export interface CustomRecipient {
+  id: string;
+  entityType: string;
+  entityLabel: string;
+  eventKey: NotificationEvent;
+  profileId: string;
+  personName: string;
+  /** Null: requests from every department. */
+  departmentId: string | null;
+  departmentName: string | null;
+}
+
+const NOTIFY_MESSAGES: Record<string, string> = {
+  FORBIDDEN: "Only this module's admin can change who is told.",
+  MANDATORY_NOTIFICATION: "That one is always sent, so it can't be switched off.",
+  ALREADY_TOLD: "They're already told of that.",
+  NOT_FOUND: "That person or department isn't in this company.",
+};
+
+function notifyError(error: { message?: string }, where: string): AppError {
+  const code = Object.keys(NOTIFY_MESSAGES).find((k) => (error.message ?? "").includes(k));
+  return code
+    ? new AppError("VALIDATION_FAILED", NOTIFY_MESSAGES[code], 400, { code })
+    : toAppError(error, where);
+}
+
+export async function getNotificationMatrix(moduleKey: string): Promise<NotificationCell[]> {
+  const { data, error } = await supabase.rpc("notification_matrix", { _module_key: moduleKey });
+  if (error) throw notifyError(error, "getNotificationMatrix");
+  return (data ?? []).map((r) => ({
+    entityType: r.entity_type,
+    entityLabel: r.entity_label,
+    eventKey: r.event_key as NotificationEvent,
+    audience: r.audience as NotificationAudience,
+    enabled: r.enabled,
+    mandatory: r.mandatory,
+  }));
+}
+
+export async function setNotificationRule(
+  entityType: string,
+  eventKey: NotificationEvent,
+  audience: NotificationAudience,
+  enabled: boolean,
+): Promise<void> {
+  const { error } = await supabase.rpc("notification_rule_set", {
+    _entity_type: entityType,
+    _event_key: eventKey,
+    _audience: audience,
+    _enabled: enabled,
+  });
+  if (error) throw notifyError(error, "setNotificationRule");
+}
+
+export async function listCustomRecipients(moduleKey: string): Promise<CustomRecipient[]> {
+  const { data, error } = await supabase.rpc("notification_custom_list", {
+    _module_key: moduleKey,
+  });
+  if (error) throw notifyError(error, "listCustomRecipients");
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    entityType: r.entity_type,
+    entityLabel: r.entity_label,
+    eventKey: r.event_key as NotificationEvent,
+    profileId: r.profile_id,
+    personName: r.person_name,
+    departmentId: r.department_id,
+    departmentName: r.department_name,
+  }));
+}
+
+export async function addCustomRecipient(
+  entityType: string,
+  eventKey: NotificationEvent,
+  profileId: string,
+  departmentId: string | null,
+): Promise<string> {
+  const { data, error } = await supabase.rpc("notification_custom_add", {
+    _entity_type: entityType,
+    _event_key: eventKey,
+    _profile_id: profileId,
+    _department_id: departmentId ?? undefined,
+  });
+  if (error) throw notifyError(error, "addCustomRecipient");
+  return data as string;
+}
+
+export async function removeCustomRecipient(id: string): Promise<void> {
+  const { error } = await supabase.rpc("notification_custom_remove", { _id: id });
+  if (error) throw notifyError(error, "removeCustomRecipient");
+}
+
+export async function listNotificationPeople(
+  moduleKey: string,
+): Promise<{ id: string; fullName: string }[]> {
+  const { data, error } = await supabase.rpc("notification_people", { _module_key: moduleKey });
+  if (error) throw notifyError(error, "listNotificationPeople");
+  return (data ?? []).map((r) => ({ id: r.id, fullName: r.full_name }));
 }

@@ -3,6 +3,7 @@
 // Neuvto WOS — finish the Worker config that Nitro generates, and refuse a bad one
 //
 //   bun scripts/cloudflare-worker-config.mjs            patch .output/server/wrangler.json
+//   bun scripts/cloudflare-worker-config.mjs --env=qa   the same, for the QA Worker (ENVIRONMENTS.md)
 //   bun scripts/cloudflare-worker-config.mjs --check    verify only, write nothing
 //
 // `bun`, not `node`: the deploy workflow sets up bun and nothing else, so a
@@ -86,7 +87,26 @@ import { readFileSync, writeFileSync } from "node:fs";
  * `www`. It is handled by a Cloudflare Redirect Rule instead — zone config, not
  * code, which is why ENVIRONMENTS.md records it under "The www redirect".
  */
-const CUSTOM_DOMAINS = ["neuvto.com", "wos.neuvto.com"];
+const PRODUCTION_DOMAINS = ["neuvto.com", "wos.neuvto.com"];
+
+/**
+ * QA is a second Worker, never the production one under another domain: a
+ * QA build talks to the QA database, and published under production's name it
+ * would replace neuvto.com with it (Sada, 4 Nov 2026). Its own name, its own
+ * hostname, and each refused with the other's.
+ */
+const ENVIRONMENTS = {
+  production: { name: null, domains: PRODUCTION_DOMAINS },
+  qa: { name: "neuvto-wos-qa", domains: ["qa.neuvto.com"] },
+};
+const envName =
+  process.argv.find((a) => a.startsWith("--env="))?.slice("--env=".length) ?? "production";
+const env = ENVIRONMENTS[envName];
+if (!env) {
+  console.error(`cloudflare-worker-config: no environment "${envName}"`);
+  process.exit(1);
+}
+const CUSTOM_DOMAINS = env.domains;
 
 const CONFIG = ".output/server/wrangler.json";
 
@@ -110,7 +130,22 @@ if (!date) {
   );
 }
 
+if (env.name) config.name = env.name;
 if (!config.name) problems.push("worker name is missing");
+if (envName !== "production") {
+  if (Object.values(ENVIRONMENTS).some((e) => e !== env && e.name === config.name))
+    problems.push(`a ${envName} build would publish under another environment's Worker name`);
+  if (!config.name.endsWith(`-${envName}`))
+    problems.push(`a ${envName} Worker's name must end in -${envName}: it is ${config.name}`);
+}
+if (envName === "production" && Object.values(ENVIRONMENTS).some((e) => e.name === config.name))
+  problems.push(`a production build would publish under the ${config.name} Worker`);
+if (
+  CUSTOM_DOMAINS.some((d) =>
+    Object.values(ENVIRONMENTS).some((e) => e !== env && e.domains.includes(d)),
+  )
+)
+  problems.push(`${envName} claims another environment's hostname`);
 if (!config.compatibility_flags?.includes("nodejs_compat")) {
   problems.push("nodejs_compat is not enabled — the Supabase client needs it");
 }
@@ -137,5 +172,5 @@ config.workers_dev = false;
 
 writeFileSync(CONFIG, JSON.stringify(config, null, 2));
 
-console.log(`cloudflare-worker-config: ${config.name} @ ${date}`);
+console.log(`cloudflare-worker-config: ${envName}: ${config.name} @ ${date}`);
 for (const d of CUSTOM_DOMAINS) console.log(`  custom domain  ${d}`);

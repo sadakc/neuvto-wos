@@ -1,0 +1,13 @@
+{
+  // VS Code offers these when the folder is opened. Each one reads a config
+  // this repository already has; none changes how the app is built.
+  "recommendations": [
+    "dbaeumer.vscode-eslint", // eslint.config.js
+    "esbenp.prettier-vscode", // .prettierrc and .prettierignore
+    "bradlc.vscode-tailwindcss", // class names in src/
+    "vitest.explorer", // unit tests: vitest.config.ts
+    "ms-playwright.playwright", // browser tests: playwright.config.ts
+    "oven.bun-vscode", // bun, the package manager and script runner
+    "bierner.markdown-mermaid" // the diagrams in docs/architecture
+  ]
+}

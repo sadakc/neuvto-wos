@@ -90,3 +90,10 @@ describe("root head — the social card", () => {
     expect(meta.length).toBeGreaterThanOrEqual(15);
   });
 });
+
+describe("root head — the phone keyboard (Sada, 27 Oct 2026)", () => {
+  it("shrinks the page for the keyboard, so a bottom sheet stays above it", () => {
+    const viewport = meta.find((m) => m.name === "viewport");
+    expect(viewport?.content).toContain("interactive-widget=resizes-content");
+  });
+});

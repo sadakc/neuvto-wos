@@ -44,7 +44,7 @@ function Dashboard() {
 
   return (
     <div className="mx-auto max-w-3xl">
-      <h1 className="font-display text-xl font-semibold tracking-tight">
+      <h1 className="text-page-title font-semibold tracking-page-title">
         {user?.fullName ? `Welcome, ${user.fullName.split(" ")[0]}` : "Welcome"}
       </h1>
       <p className="mt-1 text-sm text-muted-foreground">
@@ -72,7 +72,7 @@ function Dashboard() {
            This is also the state the application is in when every module has
            been removed, which the module-removal check exercises. */
         <section className="mt-8 rounded-lg border border-border bg-card p-6">
-          <h2 className="font-display text-base font-semibold">Nothing here yet</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">Nothing here yet</h2>
           <p className="mt-2 max-w-prose text-sm text-muted-foreground">
             No modules are switched on for {user?.organizationName ?? "your workspace"} yet. An
             administrator turns them on, and what you can do here appears.
