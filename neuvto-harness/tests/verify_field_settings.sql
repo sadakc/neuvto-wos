@@ -261,7 +261,11 @@ begin
     format($q$select public.employee_update(%L, '{"emergencyContactPhone":null}')$q$, e_ravi), 'Emergency contact');
   perform pg_temp.fs_refused('the person neither', ravi,
     format($q$select public.employee_update(%L, '{"mobile":null}')$q$, e_ravi), 'Mobile number');
-  perform pg_temp.fs_refused('nor a required number', hema,
+  -- D123: Aadhaar is optional until the company requires it.
+  perform pg_temp.fs_do('Aadhaar may be left empty by default (D123)', hema,
+    format($q$select public.employee_set_statutory(%L, '{"aadhaar":""}')$q$, e_ravi));
+  perform pg_temp.fs_set('aadhaar', 'required', true);
+  perform pg_temp.fs_refused('but not once the company requires it', hema,
     format($q$select public.employee_set_statutory(%L, '{"aadhaar":""}')$q$, e_ravi), 'Aadhaar number');
   perform pg_temp.fs_refused('nor a required bank account', hema,
     format($q$select public.employee_set_bank(%L, '{"account":null}')$q$, e_ravi), 'Bank account number');
