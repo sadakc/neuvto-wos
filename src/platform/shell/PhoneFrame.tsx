@@ -136,7 +136,7 @@ export function PhoneFrame({
         <div className="flex shrink-0 items-center">{trailing}</div>
       </header>
 
-      <main className="app-screen @container/screen w-full min-w-0 flex-1 px-4 pt-4 pb-[104px]">
+      <main className="app-screen @container/screen w-full min-w-0 flex-1 px-4 pt-4 pb-6">
         {showHub && (
           <Hub
             module={module}
@@ -318,11 +318,16 @@ function Hub({
 
 function BottomNav({ modules, activeKey }: { modules: readonly ShellModule[]; activeKey: string }) {
   const shown = modules.filter((m) => moduleHome(m)).slice(0, 5);
+  // Sticky, as the app bar is, not fixed: Android Chrome placed a fixed bar
+  // against the app's layout container (@container/app), so on any page taller
+  // than the phone it sat at the page's foot, out of sight, and nothing could
+  // be reached from it (Sada's phone, Add Employee, 12 Nov 2026). The last of
+  // the column, it is at the foot of a short page and of the screen on a long one.
   return (
     <nav
       aria-label="Modules"
       data-testid="bottom-nav"
-      className="fixed inset-x-0 bottom-0 z-30 flex h-20 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]"
+      className="sticky bottom-0 z-30 flex h-20 shrink-0 border-t border-border bg-card pb-[env(safe-area-inset-bottom)]"
     >
       {shown.map((m) => {
         const h = moduleHome(m)!;

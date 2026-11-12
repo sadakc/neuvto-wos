@@ -152,6 +152,19 @@ describe("under 600px the shell is replaced", () => {
     ).toEqual(["Home", "Leave"]);
     expect(within(bar).getByTestId("bottom-leave")).toHaveAttribute("aria-current", "page");
   });
+
+  // Android Chrome placed a fixed bar against the app's layout container, so
+  // on any page taller than the phone it sat at the page's foot, out of sight
+  // (Sada's phone, 12 Nov 2026). A sticky bar keeps to the screen in every
+  // browser; the device runs check where it is actually drawn.
+  it("the bottom bar keeps to the screen by sticking, not by being fixed", () => {
+    frame(["employee"]);
+    const bar = screen.getByTestId("bottom-nav");
+    expect(bar).toHaveClass("sticky", "bottom-0");
+    expect(bar).not.toHaveClass("fixed");
+    // The last of the page clears it by sitting above it, not under it.
+    expect(document.querySelector("main")).not.toHaveClass("pb-[104px]");
+  });
 });
 
 describe("a module's home", () => {

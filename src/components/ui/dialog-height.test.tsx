@@ -141,3 +141,56 @@ describe("a sheet with a header", () => {
     expect(header.className).not.toContain("-mt-7");
   });
 });
+
+/**
+ * Sada's iPhone, 12 Nov 2026: tapping "Change nominees" opened the sheet with
+ * its first field already focused, so the iPhone keyboard came up at once and
+ * covered the sheet, which stayed pinned to the foot of the page behind it.
+ * On a touch screen a sheet opens with no keyboard: it comes up when a field
+ * is tapped, and iOS then brings that field into view itself.
+ */
+describe("a sheet on a touch screen", () => {
+  afterEach(() => vi.unstubAllGlobals());
+  const touch = (coarse: boolean) =>
+    vi.stubGlobal("matchMedia", (q: string) => ({
+      matches: coarse && q.includes("coarse"),
+      media: q,
+      addEventListener() {},
+      removeEventListener() {},
+    }));
+
+  it("opens on the sheet itself: no field focused, so no keyboard, and no button ringed", async () => {
+    touch(true);
+    render(
+      <Dialog open>
+        <DialogContent data-testid="d">
+          <DialogHeader>
+            <DialogTitle>New nomination</DialogTitle>
+          </DialogHeader>
+          <label>
+            Effective from
+            <input />
+          </label>
+        </DialogContent>
+      </Dialog>,
+    );
+    await waitFor(() => expect(screen.getByTestId("d")).toHaveFocus());
+    expect(screen.getByLabelText("Effective from")).not.toHaveFocus();
+  });
+
+  it("but with a mouse it still opens on its first field", async () => {
+    touch(false);
+    render(
+      <Dialog open>
+        <DialogContent>
+          <DialogTitle>New nomination</DialogTitle>
+          <label>
+            Effective from
+            <input />
+          </label>
+        </DialogContent>
+      </Dialog>,
+    );
+    await waitFor(() => expect(screen.getByLabelText("Effective from")).toHaveFocus());
+  });
+});

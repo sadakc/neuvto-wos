@@ -95,6 +95,10 @@ case "${1:-}" in
     supabase stop --workdir "$LAB" >/dev/null 2>&1 || true
     build "$IP"
     supabase start --workdir "$LAB" -x studio,logflare,vector,imgproxy,supavisor,postgres-meta
+    # start applies migrations only to a new database: one already there kept
+    # the migrations it had, so the lab ran a day behind the code (D123's
+    # optional Aadhaar, found 12 Nov 2026). Whatever is new is applied here.
+    supabase migration up --workdir "$LAB" --local
     seed
     ;;
   seed) seed ;;

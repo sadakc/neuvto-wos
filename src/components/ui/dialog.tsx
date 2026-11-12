@@ -47,6 +47,10 @@ function useVisibleHeight() {
   return height;
 }
 
+/** A phone or tablet, where focusing a field raises the on-screen keyboard. */
+const touchScreen = () =>
+  typeof window !== "undefined" && !!window.matchMedia?.("(pointer: coarse)").matches;
+
 const FOCUSABLE =
   'input:not([type="hidden"]), select, textarea, button, [href], [tabindex]:not([tabindex="-1"])';
 
@@ -65,12 +69,19 @@ const DialogContent = React.forwardRef<
           if (typeof ref === "function") ref(node);
           else if (ref) ref.current = node;
         }}
-        // The first field, as before the header had its own close button: the
-        // header comes first, and on a phone opening a sheet put the focus
-        // ring on its × (Sada, 4 Nov 2026).
+        // With a mouse, the first field, as before the header had its own close
+        // button: the header comes first, and opening a sheet put the focus
+        // ring on its × (Sada, 4 Nov 2026). On a touch screen, the sheet
+        // itself: a focused field raises the keyboard before anything has been
+        // tapped, and it covered the sheet (Sada's iPhone, 12 Nov 2026).
         onOpenAutoFocus={(e) => {
           onOpenAutoFocus?.(e);
           if (e.defaultPrevented || !local.current) return;
+          if (touchScreen()) {
+            e.preventDefault();
+            local.current.focus({ preventScroll: true });
+            return;
+          }
           const first = [...local.current.querySelectorAll<HTMLElement>(FOCUSABLE)].find(
             (el) => !el.closest("[data-sheet-close]") && !el.hasAttribute("disabled"),
           );
@@ -83,7 +94,7 @@ const DialogContent = React.forwardRef<
           { ...style, "--sheet-room": visible ? `${visible}px` : undefined } as React.CSSProperties
         }
         className={cn(
-          "fixed left-[50%] top-[50%] z-50 grid max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
+          "fixed left-[50%] top-[50%] z-50 grid outline-none max-h-[calc(100dvh-2rem)] w-full max-w-lg overflow-y-auto translate-x-[-50%] translate-y-[-50%] gap-4 border bg-background p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=closed]:zoom-out-95 data-[state=open]:zoom-in-95 sm:rounded-lg",
           // Doc 11.5: under 600px a centred dialog is a bottom sheet, handle and all.
           // Its height is a share of the page, not of the screen: Android shrinks
           // the page to the room above the keyboard, and a sheet sized to the

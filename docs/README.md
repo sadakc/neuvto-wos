@@ -1,6 +1,6 @@
 # Documentation
 
-**Version:** 1.26 · **Status:** Active · **Updated:** 4 Nov 2026
+**Version:** 1.27 · **Status:** Active · **Updated:** 12 Nov 2026
 
 Everything written about Neuvto WOS lives here. The repository root holds only
 what a tool insists on finding there.
@@ -24,7 +24,7 @@ predates 31 Jul 2026 and is wrong.
 | The employee record, who may make whom an admin, and the build order                      | [product/NEUVTO_EMPLOYEE_MASTER.md](product/NEUVTO_EMPLOYEE_MASTER.md)                     |
 | What the Core HR bundle's Leave chapter adds, where it conflicts, and what needs deciding | [product/LEAVE_PHASE_2_SCOPE.md](product/LEAVE_PHASE_2_SCOPE.md)                           |
 | What a screen looks like (the Core HR design)                                             | [standards/NEUVTO_DESIGN_SYSTEM.md](standards/NEUVTO_DESIGN_SYSTEM.md)                     |
-| Why something was built differently from the PRD                                          | the **D1–D123** decision table in the same file                                            |
+| Why something was built differently from the PRD                                          | the **D1–D124** decision table in the same file                                            |
 | Whether the platform itself is finished                                                   | the **platform acceptance criteria** (PA1–PA10) in the same file                           |
 | How to run the thing on your own machine                                                  | [operations/LOCAL_DEVELOPMENT.md](operations/LOCAL_DEVELOPMENT.md)                         |
 | How the app is tested on phones, emulators and simulators                                 | [operations/DEVICE_TESTING.md](operations/DEVICE_TESTING.md)                               |

@@ -18,7 +18,7 @@
 import { lab } from "./lab-env";
 import { spawn } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import { codeFor, MAIL_URL } from "../support/local";
+import { codeFor, MAIL_URL, sql } from "../support/local";
 import { PEOPLE, type Role } from "../support/people";
 import { dialogCheck, layoutCheck, SHELL_TARGETS } from "../support/phone-checks";
 
@@ -303,7 +303,8 @@ async function main() {
     if (await s.run(() => window.isSecureContext))
       problems.push("The page is secure: these checks are not seeing what a phone sees");
 
-    for (const role of ROLES) {
+    // IOS_ONLY=keyboard runs the editors alone: minutes, not the whole walk.
+    for (const role of process.env.IOS_ONLY === "keyboard" ? [] : ROLES) {
       await signIn(s, PEOPLE[role].email);
       const file = `reports/devices/paths-${role}.json`;
       if (!existsSync(file))
@@ -340,6 +341,25 @@ async function main() {
         await sleep(800);
         if (!(await s.run(() => !!document.querySelector("[role=dialog]")))) continue;
         problems.push(...(await s.run(dialogCheck, name)));
+        // Opening a sheet raises no keyboard: on Sada's iPhone it came up at once
+        // and covered the sheet before he had touched a field (12 Nov 2026).
+        if ((await s.onScreen("", "")).keyboard)
+          problems.push(`${name}: opening it raised the keyboard before a field was tapped`);
+        // Its first field tapped where it is, not scrolled to first: the field at
+        // the top of the sheet is the one the keyboard covered.
+        const first = await s.run(() => {
+          const el = document.querySelector(
+            "[role=dialog] input:not([type=checkbox]):not([type=radio]):not([type=file]), [role=dialog] textarea",
+          );
+          el?.setAttribute("data-ios-first", "");
+          return !!el;
+        });
+        if (first) {
+          await s.click(await s.find("[data-ios-first]"));
+          await sleep(1200);
+          await s.screenshot(`${shots}/keyboard-first-${name}.png`);
+          problems.push(...(await keyboardOnScreen(s, `${name}, first field tapped`)));
+        }
         const last = await s.run(() => {
           const all = [
             ...document.querySelectorAll(
@@ -374,6 +394,64 @@ async function main() {
         await sleep(600);
       }
     }
+    // A field a button brings up and focuses: "Change" beside a number kept
+    // behind ••••. The keyboard rises from the code's focus, not from a tap on
+    // the field, as it rose when a sheet opened on its first field (12 Nov
+    // 2026); this one follows a tap, and the field must still be in sight. As
+    // HR, on Priya's identity numbers; a PAN is recorded first if she has none,
+    // so there is a number to change.
+    await signIn(s, PEOPLE.hr.email);
+    const [priya] = sql(
+      `select e.id from public.employees e join auth.users u on u.id = e.profile_id
+        where u.email = '${PEOPLE.employee.email}'`,
+    );
+    const openIds = async () => {
+      await s.go(`/app/employee/directory/person?id=${priya}#section-statutory`);
+      await s.settle();
+      await s.waitFor("[data-testid=edit-identity-docs]");
+      await s.click(await s.find("[data-testid=edit-identity-docs]"));
+      await s.waitFor("[role=dialog]");
+      await sleep(800);
+    };
+    await openIds();
+    if (!(await s.run(() => !!document.querySelector('[role=dialog] [aria-label="Change PAN"]')))) {
+      const pan = await s.run(() => {
+        const label = [...document.querySelectorAll("[role=dialog] label")].find((l) =>
+          l.textContent?.trim().startsWith("PAN"),
+        );
+        label?.querySelector("input")?.setAttribute("data-ios-pan", "");
+        return !!label?.querySelector("input");
+      });
+      if (!pan) problems.push("identity documents: no PAN field to record a number in");
+      else {
+        await s.type(await s.find("[data-ios-pan]"), "ABCPE1234F");
+        await s.run(() =>
+          [...document.querySelectorAll<HTMLButtonElement>("[role=dialog] button[type=submit]")]
+            .find((b) => b.textContent?.trim().startsWith("Save"))
+            ?.click(),
+        );
+        await sleep(2500);
+        const said = await s.run(() =>
+          [...document.querySelectorAll("[role=dialog] [role=alert]")]
+            .map((a) => a.textContent?.trim())
+            .join(" | "),
+        );
+        if (said) problems.push(`identity documents: recording a PAN was refused: ${said}`);
+        await s.screenshot(`${shots}/record-pan.png`);
+        await openIds();
+      }
+    }
+    if (!(await s.run(() => !!document.querySelector('[role=dialog] [aria-label="Change PAN"]'))))
+      problems.push(
+        "identity documents: no PAN kept behind •••• to change: the check proved nothing",
+      );
+    else {
+      await s.click(await s.find('[role=dialog] [aria-label="Change PAN"]'));
+      await sleep(1200);
+      await s.screenshot(`${shots}/keyboard-change-pan.png`);
+      problems.push(...(await keyboardOnScreen(s, "identity documents, Change PAN")));
+    }
+
     console.log(`  keyboard: ${typed} editors typed into`);
     if (typed < 3)
       problems.push(`Only ${typed} editors were typed into: the keyboard check proved little`);

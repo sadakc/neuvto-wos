@@ -1,6 +1,6 @@
 # Testing on phones
 
-**Version:** 1.1 · **Status:** Active · **Updated:** 4 Nov 2026
+**Version:** 1.2 · **Status:** Active · **Updated:** 12 Nov 2026
 
 How the app is tested the way a phone uses it (D119): every screen at three
 phone widths, Safari's engine, real Android Chrome on the Android Emulator and
@@ -46,6 +46,7 @@ bun run e2e:devices --project android -g keyboard
 bash scripts/android-emulator.sh stop
 bun run e2e:ios
 IOS_DEVICE="Neuvto small iPhone" bun run e2e:ios   # an iPhone SE, 375 by 667: the least room
+IOS_ONLY=keyboard bun run e2e:ios                  # the sheets and the keyboard alone: minutes, not the whole walk
 xcrun simctl shutdown all
 ```
 
@@ -74,17 +75,30 @@ Results, screenshots and traces land in `reports/devices/` (not committed).
 ## Which check catches which bug
 
 Each guard was proved by putting the bug back and watching the check fail
-(3 Nov 2026):
+(3 Nov 2026, and since):
 
-| Put back                                                    | Caught by                                         | Not caught by                                                                      |
-| ----------------------------------------------------------- | ------------------------------------------------- | ---------------------------------------------------------------------------------- |
-| A 56px app bar                                              | phone widths, every screen                        | —                                                                                  |
-| The keyboard covering the page (D116, `interactive-widget`) | Android, Pixel 7 and small phone                  | Chrome or WebKit at phone width                                                    |
-| The calendar as a popover in a sheet (D118)                 | Android, small phone                              | Chrome at 390; Android on the Pixel 7, which has room for it                       |
-| Uploads with `crypto.randomUUID` (D118)                     | flows, over the Wi-Fi address                     | any test on localhost                                                              |
-| Fields at 14px, which iOS zooms in on (D120, 4 Nov 2026)    | phone widths at 390; iOS Safari                   | Android, which does not zoom                                                       |
-| A sheet sized to the screen, not to what is visible (D120)  | Android, Pixel 7 (HR's sheets); iOS, small iPhone | iOS on the iPhone 17, where the sheets fit anyway                                  |
-| A sheet header that scrolls away with the fields (D120)     | Android, small phone                              | Android on the Pixel 7 and both iPhones, where those sheets fit above the keyboard |
+| Put back                                                                                                  | Caught by                                            | Not caught by                                                                      |
+| --------------------------------------------------------------------------------------------------------- | ---------------------------------------------------- | ---------------------------------------------------------------------------------- |
+| A 56px app bar                                                                                            | phone widths, every screen                           | —                                                                                  |
+| The keyboard covering the page (D116, `interactive-widget`)                                               | Android, Pixel 7 and small phone                     | Chrome or WebKit at phone width                                                    |
+| The calendar as a popover in a sheet (D118)                                                               | Android, small phone                                 | Chrome at 390; Android on the Pixel 7, which has room for it                       |
+| Uploads with `crypto.randomUUID` (D118)                                                                   | flows, over the Wi-Fi address                        | any test on localhost                                                              |
+| Fields at 14px, which iOS zooms in on (D120, 4 Nov 2026)                                                  | phone widths at 390; iOS Safari                      | Android, which does not zoom                                                       |
+| A sheet sized to the screen, not to what is visible (D120)                                                | Android, Pixel 7 (HR's sheets); iOS, small iPhone    | iOS on the iPhone 17, where the sheets fit anyway                                  |
+| A sheet header that scrolls away with the fields (D120)                                                   | Android, small phone                                 | Android on the Pixel 7 and both iPhones, where those sheets fit above the keyboard |
+| A fixed bottom bar, which Android Chrome put at the foot of a long page, out of sight (D124, 12 Nov 2026) | Android, Pixel 7: 15 of HR's 23 screens              | Chrome and WebKit at phone width, which keep a fixed bar on the screen             |
+| A sheet that opens on its first field, raising the keyboard over it (D124)                                | iOS, iPhone 17: contact, emergency contact, nominees | Android, whose keyboard shrinks the page; any check that taps a field first        |
+
+The bottom bar is checked where it is drawn, not merely that it is in the
+page: at the foot of the screen with the page at its top and scrolled to its
+end, on every screen of every run (D124). The iOS run also checks that opening
+each of Priya's editors raises no keyboard, taps each one's first field where it
+sits as well as its last, and as HR taps "Change" beside a PAN kept behind ••••
+(recording one first if Priya has none), the field then still in sight.
+
+`device-lab.sh up` applies any migration the lab has not had: `supabase start`
+applies them only to a new database, so a lab already built ran a migration
+behind the code until 12 Nov 2026 (it still held Aadhaar as required after D123).
 
 So the Chrome and WebKit runs are the broad sweep, fast and every screen;
 the emulator runs are the ones that catch what only a phone does. Both are

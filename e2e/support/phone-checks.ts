@@ -40,7 +40,31 @@ export function layoutCheck({ where, targets }: { where: string; targets: string
     const h = Math.round(bar.getBoundingClientRect().height);
     if (h !== 64) out.push(`${where}: app bar is ${h}px, not 64`);
   }
-  if (!document.querySelector("[data-testid=bottom-nav]")) out.push(`${where}: no bottom bar`);
+  const bottomBar = document.querySelector("[data-testid=bottom-nav]");
+  if (!bottomBar) out.push(`${where}: no bottom bar`);
+  else {
+    // On the screen, not merely in the page: Android Chrome once drew it at the
+    // foot of a long page, out of sight, so nothing could be reached from it
+    // (Sada's phone, Add Employee, 12 Nov 2026). Looked at with the page at its
+    // top and scrolled to its end, and put back where it was.
+    const y = window.scrollY;
+    const screenBottom = () =>
+      window.visualViewport
+        ? window.visualViewport.offsetTop + window.visualViewport.height
+        : window.innerHeight;
+    for (const [at, to] of [
+      ["at the top", 0],
+      ["scrolled to the end", doc.scrollHeight],
+    ] as const) {
+      window.scrollTo(0, to);
+      const b = bottomBar.getBoundingClientRect().bottom;
+      if (Math.abs(b - screenBottom()) > 2)
+        out.push(
+          `${where}: the bottom bar is not at the foot of the screen ${at} (its foot at ${Math.round(b)}, the screen's at ${Math.round(screenBottom())})`,
+        );
+    }
+    window.scrollTo(0, y);
+  }
   if (document.querySelector("nav[data-mode], [data-rail]"))
     out.push(`${where}: the laptop tab row or rail is on the phone`);
   // Something wider than the screen, outside a table's own scroller.
