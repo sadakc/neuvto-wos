@@ -122,6 +122,12 @@ begin
   perform pg_temp.as_postgres();
 
   delete from public.invitations   where email = 'founder@first-run.test';
+  if to_regclass('public.employees') is not null then
+    perform set_config('neuvto.purge', 'on', true);
+    delete from public.employees where organization_id in
+      (select id from public.organizations where slug = 'first-run-test');
+    perform set_config('neuvto.purge', '', true);
+  end if;
   delete from public.organizations where slug = 'first-run-test';
   delete from public.platform_admins where user_id = v_staff;
   delete from auth.users where id in (v_founder, v_staff);
@@ -160,6 +166,31 @@ begin
   perform pg_temp.as_user(v_founder);
   perform public.invitation_accept(v_token);
   raise notice 'ok: provisioning invites an administrator who accepts their way in';
+
+  -- D78. The administrator Neuvto names runs the company's access from then on,
+  -- which means they are its Super Admin. Nothing here grants it: provisioning
+  -- invites an org_admin, acceptance inserts that role, and the trigger must do
+  -- the rest. If this fails, a new customer has nobody who can make an admin.
+  perform pg_temp.as_postgres();
+  if not exists (select 1 from public.user_roles
+                  where user_id = v_founder and organization_id = v_org
+                    and role = 'super_admin' and deleted_at is null) then
+    perform pg_temp.fail(
+      'the provisioned administrator is not the Super Admin',
+      'D78: the first administrator of an organisation with no Super Admin must become one on acceptance');
+  end if;
+  raise notice 'ok: the administrator Neuvto names becomes the Super Admin (D78)';
+
+  -- D82. They also have an employee record, made by the profile trigger and not
+  -- by any fixture: provisioning and acceptance never mention employees.
+  if to_regclass('public.employees') is not null and not exists (
+    select 1 from public.employees where profile_id = v_founder and organization_id = v_org
+  ) then
+    perform pg_temp.fail(
+      'the provisioned administrator has no employee record',
+      'D82: every profile gets an employees row when it is created, so a card always exists');
+  end if;
+  raise notice 'ok: the first person in a new workspace has an employee record (D82)';
 
   v_today := public.org_today(v_org);
   v_fy    := public.get_financial_year(v_org, v_today);
@@ -321,6 +352,13 @@ begin
   delete from public.audit_logs        where organization_id = v_org;
   delete from public.analytics_events  where organization_id = v_org;
   delete from public.user_roles        where organization_id = v_org;
+  -- D82: employee records are history and refuse deletion unless this is a
+  -- declared purge, which removing a whole workspace is.
+  if to_regclass('public.employees') is not null then
+    perform set_config('neuvto.purge', 'on', true);
+    delete from public.employees       where organization_id = v_org;
+    perform set_config('neuvto.purge', '', true);
+  end if;
   delete from public.profiles          where organization_id = v_org;
   delete from public.organizations     where id = v_org;
   delete from public.platform_admins   where user_id = v_staff;

@@ -40,9 +40,15 @@ vi.mock("@tanstack/react-router", () => ({
 const getCurrentUser = vi.fn<() => Promise<CurrentUser>>();
 
 vi.mock("@/platform/auth", async () => {
-  const { APP_ROLES, ROLE_LABELS } = await import("@/platform/auth/contracts");
+  const { APP_ROLES, APPROVER_ROLES, ROLE_LABELS } = await import("@/platform/auth/contracts");
   const { isAdmin } = await import("@/platform/auth/session");
-  return { APP_ROLES, ROLE_LABELS, isAdmin, getCurrentUser: () => getCurrentUser() };
+  return {
+    APP_ROLES,
+    APPROVER_ROLES,
+    ROLE_LABELS,
+    isAdmin,
+    getCurrentUser: () => getCurrentUser(),
+  };
 });
 
 const listApprovalLevels = vi.fn<() => Promise<ApprovalLevel[]>>();
@@ -132,12 +138,20 @@ describe("Approval rules — which roles may approve", () => {
     await renderRules();
 
     expect(roleOptions()).toEqual([
+      ["super_admin", "Super Admin"],
       ["org_admin", "Administrator"],
       ["hr_admin", "HR administrator"],
       ["manager", "Manager"],
       ["supervisor", "Supervisor"],
       ["coordinator", "Coordinator"],
     ]);
+  });
+
+  it("never offers Payroll or Statutory, which approve nothing (D78)", async () => {
+    await renderRules();
+    const values = roleOptions().map(([value]) => value);
+    expect(values).not.toContain("payroll_officer");
+    expect(values).not.toContain("statutory_officer");
   });
 
   it("never offers Employee", async () => {
@@ -186,6 +200,7 @@ describe("Approval rules — which roles may approve", () => {
       (o) => o.textContent,
     );
     expect(labels).toEqual([
+      "Super Admin",
       "Administrator",
       "HR administrator",
       "Manager",
@@ -194,5 +209,33 @@ describe("Approval rules — which roles may approve", () => {
     ]);
     // It defaults to HR administrator, and says so rather than opening blank.
     expect(box.selectedOptions[0].textContent).toBe("HR administrator");
+  });
+});
+
+describe("Approval rules — a level that applies only to longer requests", () => {
+  it("names the threshold box, so it can be found without seeing the words around it", async () => {
+    await renderRules();
+    const level2 = screen.getAllByTestId("approval-level")[1];
+    // Found by its name alone, as a screen reader or a browser test finds it.
+    expect(
+      within(level2).getByRole("spinbutton", {
+        name: "Level 2 applies when the request is longer than this many working days",
+      }),
+    ).toBe(within(level2).getByTestId("threshold"));
+    // Level 1 always applies, so it has no such box.
+    expect(
+      within(screen.getAllByTestId("approval-level")[0]).queryByTestId("threshold"),
+    ).toBeNull();
+  });
+});
+
+describe("Approval rules — moving up (D87)", () => {
+  it("names the target as the point a request moves up, and says to whom", async () => {
+    await renderRules();
+    const levelOne = screen.getAllByTestId("approval-level")[0];
+    expect(within(levelOne).getByLabelText("Move up after")).toBeInTheDocument();
+    expect(within(levelOne).getByTestId("move-up-hint")).toHaveTextContent(
+      "A request still waiting then goes to the approver's manager, else the module's admin, else a company admin. Nothing is approved by waiting. Leave it empty and it never moves.",
+    );
   });
 });

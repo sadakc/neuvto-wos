@@ -1,0 +1,1146 @@
+{
+  "superAdmin": [
+    {
+      "label": "Employee ID",
+      "required": true,
+      "field_key": "employeeCode",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Employee name",
+      "required": true,
+      "field_key": "fullName",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "always",
+      "employee_can_update": false
+    },
+    {
+      "label": "Name as printed on ID",
+      "required": true,
+      "field_key": "nameAsPerId",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Sex",
+      "required": true,
+      "field_key": "sex",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Date of birth",
+      "required": true,
+      "field_key": "dateOfBirth",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Age",
+      "required": false,
+      "field_key": "age",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Marital status",
+      "required": true,
+      "field_key": "maritalStatus",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Nationality",
+      "required": true,
+      "field_key": "nationality",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Native state",
+      "required": false,
+      "field_key": "nativeState",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Blood group",
+      "required": false,
+      "field_key": "bloodGroup",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Education qualification",
+      "required": true,
+      "field_key": "educationQualification",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Mobile number",
+      "required": true,
+      "field_key": "mobile",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Alternate mobile number",
+      "required": false,
+      "field_key": "alternateMobile",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Work email",
+      "required": true,
+      "field_key": "workEmail",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "invite",
+      "required_lock": "invite",
+      "employee_can_update": false
+    },
+    {
+      "label": "Personal email",
+      "required": false,
+      "field_key": "personalEmail",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Emergency contact",
+      "required": true,
+      "field_key": "emergencyContact",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Nearest police station",
+      "required": false,
+      "field_key": "nearestPoliceStation",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Present address",
+      "required": true,
+      "field_key": "presentAddress",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "record",
+      "employee_can_update": true
+    },
+    {
+      "label": "Permanent address",
+      "required": true,
+      "field_key": "permanentAddress",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "record",
+      "employee_can_update": true
+    },
+    {
+      "label": "Address history",
+      "required": false,
+      "field_key": "addressHistory",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Designation",
+      "required": true,
+      "field_key": "designation",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Date of joining",
+      "required": true,
+      "field_key": "dateOfJoining",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "always",
+      "employee_can_update": false
+    },
+    {
+      "label": "Re-joining date",
+      "required": false,
+      "field_key": "reJoiningDate",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Status",
+      "required": true,
+      "field_key": "status",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "always",
+      "employee_can_update": false
+    },
+    {
+      "label": "Employment termination",
+      "required": false,
+      "field_key": "termination",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "some",
+      "employee_can_update": false
+    },
+    {
+      "label": "Total experience",
+      "required": false,
+      "field_key": "totalExperience",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Reason for leaving last org",
+      "required": false,
+      "field_key": "reasonForLeavingLastOrg",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Reports to",
+      "required": true,
+      "field_key": "reportsTo",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Deployed unit",
+      "required": true,
+      "field_key": "deployedUnit",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "record",
+      "employee_can_update": false
+    },
+    {
+      "label": "Deployment history",
+      "required": false,
+      "field_key": "deploymentHistory",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Father name and DOB",
+      "required": false,
+      "field_key": "father",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Mother name and DOB",
+      "required": false,
+      "field_key": "mother",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Husband name and DOB",
+      "required": false,
+      "field_key": "husband",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Wife name and DOB",
+      "required": false,
+      "field_key": "wife",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Sons",
+      "required": false,
+      "field_key": "sons",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Daughters",
+      "required": false,
+      "field_key": "daughters",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Other relatives",
+      "required": false,
+      "field_key": "otherRelatives",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Nominee name and relation",
+      "required": true,
+      "field_key": "nomineeName",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "always",
+      "employee_can_update": true
+    },
+    {
+      "label": "Nominee date of birth",
+      "required": false,
+      "field_key": "nomineeDob",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "together",
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Nominee share percentage",
+      "required": true,
+      "field_key": "nomineeShare",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "together",
+      "required_lock": "always",
+      "employee_can_update": true
+    },
+    {
+      "label": "UAN",
+      "required": true,
+      "field_key": "uan",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "EPF number",
+      "required": true,
+      "field_key": "epfNumber",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "ESIC number",
+      "required": true,
+      "field_key": "esicNumber",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Old EPF UAN",
+      "required": false,
+      "field_key": "oldUan",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Old ESIC number",
+      "required": false,
+      "field_key": "oldEsicNumber",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Driving licence number",
+      "required": false,
+      "field_key": "drivingLicence",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Aadhaar number",
+      "required": true,
+      "field_key": "aadhaar",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "PAN",
+      "required": false,
+      "field_key": "pan",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Bank account number",
+      "required": true,
+      "field_key": "bankAccount",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "IFSC code",
+      "required": true,
+      "field_key": "ifsc",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Bank name",
+      "required": false,
+      "field_key": "bankName",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Branch name",
+      "required": false,
+      "field_key": "branch",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Height, chest, weight",
+      "required": false,
+      "field_key": "physical",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Religion",
+      "required": false,
+      "field_key": "religion",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "apart",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Caste category",
+      "required": false,
+      "field_key": "casteCategory",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "apart",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Physically handicapped",
+      "required": false,
+      "field_key": "disability",
+      "can_change": true,
+      "customised": false,
+      "update_lock": "apart",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Previous organisations",
+      "required": false,
+      "field_key": "previousOrganisations",
+      "can_change": true,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": false
+    }
+  ],
+  "employeeAdmin": [
+    {
+      "label": "Employee ID",
+      "required": true,
+      "field_key": "employeeCode",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Employee name",
+      "required": true,
+      "field_key": "fullName",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "always",
+      "employee_can_update": false
+    },
+    {
+      "label": "Name as printed on ID",
+      "required": true,
+      "field_key": "nameAsPerId",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Sex",
+      "required": true,
+      "field_key": "sex",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Date of birth",
+      "required": true,
+      "field_key": "dateOfBirth",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Age",
+      "required": false,
+      "field_key": "age",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Marital status",
+      "required": true,
+      "field_key": "maritalStatus",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Nationality",
+      "required": true,
+      "field_key": "nationality",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Native state",
+      "required": false,
+      "field_key": "nativeState",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Blood group",
+      "required": false,
+      "field_key": "bloodGroup",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Education qualification",
+      "required": true,
+      "field_key": "educationQualification",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Mobile number",
+      "required": true,
+      "field_key": "mobile",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Alternate mobile number",
+      "required": false,
+      "field_key": "alternateMobile",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Work email",
+      "required": true,
+      "field_key": "workEmail",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "invite",
+      "required_lock": "invite",
+      "employee_can_update": false
+    },
+    {
+      "label": "Personal email",
+      "required": false,
+      "field_key": "personalEmail",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Emergency contact",
+      "required": true,
+      "field_key": "emergencyContact",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Nearest police station",
+      "required": false,
+      "field_key": "nearestPoliceStation",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Present address",
+      "required": true,
+      "field_key": "presentAddress",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "record",
+      "employee_can_update": true
+    },
+    {
+      "label": "Permanent address",
+      "required": true,
+      "field_key": "permanentAddress",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "record",
+      "employee_can_update": true
+    },
+    {
+      "label": "Address history",
+      "required": false,
+      "field_key": "addressHistory",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Designation",
+      "required": true,
+      "field_key": "designation",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Date of joining",
+      "required": true,
+      "field_key": "dateOfJoining",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "always",
+      "employee_can_update": false
+    },
+    {
+      "label": "Re-joining date",
+      "required": false,
+      "field_key": "reJoiningDate",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Status",
+      "required": true,
+      "field_key": "status",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "always",
+      "employee_can_update": false
+    },
+    {
+      "label": "Employment termination",
+      "required": false,
+      "field_key": "termination",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "some",
+      "employee_can_update": false
+    },
+    {
+      "label": "Total experience",
+      "required": false,
+      "field_key": "totalExperience",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Reason for leaving last org",
+      "required": false,
+      "field_key": "reasonForLeavingLastOrg",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Reports to",
+      "required": true,
+      "field_key": "reportsTo",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Deployed unit",
+      "required": true,
+      "field_key": "deployedUnit",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "company",
+      "required_lock": "record",
+      "employee_can_update": false
+    },
+    {
+      "label": "Deployment history",
+      "required": false,
+      "field_key": "deploymentHistory",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Father name and DOB",
+      "required": false,
+      "field_key": "father",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Mother name and DOB",
+      "required": false,
+      "field_key": "mother",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Husband name and DOB",
+      "required": false,
+      "field_key": "husband",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Wife name and DOB",
+      "required": false,
+      "field_key": "wife",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Sons",
+      "required": false,
+      "field_key": "sons",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Daughters",
+      "required": false,
+      "field_key": "daughters",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Other relatives",
+      "required": false,
+      "field_key": "otherRelatives",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": true
+    },
+    {
+      "label": "Nominee name and relation",
+      "required": true,
+      "field_key": "nomineeName",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "always",
+      "employee_can_update": true
+    },
+    {
+      "label": "Nominee date of birth",
+      "required": false,
+      "field_key": "nomineeDob",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "together",
+      "required_lock": null,
+      "employee_can_update": true
+    },
+    {
+      "label": "Nominee share percentage",
+      "required": true,
+      "field_key": "nomineeShare",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "together",
+      "required_lock": "always",
+      "employee_can_update": true
+    },
+    {
+      "label": "UAN",
+      "required": true,
+      "field_key": "uan",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "EPF number",
+      "required": true,
+      "field_key": "epfNumber",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "ESIC number",
+      "required": true,
+      "field_key": "esicNumber",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Old EPF UAN",
+      "required": false,
+      "field_key": "oldUan",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Old ESIC number",
+      "required": false,
+      "field_key": "oldEsicNumber",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Driving licence number",
+      "required": false,
+      "field_key": "drivingLicence",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Aadhaar number",
+      "required": true,
+      "field_key": "aadhaar",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "PAN",
+      "required": false,
+      "field_key": "pan",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Bank account number",
+      "required": true,
+      "field_key": "bankAccount",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "IFSC code",
+      "required": true,
+      "field_key": "ifsc",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "numbers",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Bank name",
+      "required": false,
+      "field_key": "bankName",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Branch name",
+      "required": false,
+      "field_key": "branch",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "derived",
+      "required_lock": "derived",
+      "employee_can_update": false
+    },
+    {
+      "label": "Height, chest, weight",
+      "required": false,
+      "field_key": "physical",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Religion",
+      "required": false,
+      "field_key": "religion",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "apart",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Caste category",
+      "required": false,
+      "field_key": "casteCategory",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "apart",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Physically handicapped",
+      "required": false,
+      "field_key": "disability",
+      "can_change": false,
+      "customised": false,
+      "update_lock": "apart",
+      "required_lock": null,
+      "employee_can_update": false
+    },
+    {
+      "label": "Previous organisations",
+      "required": false,
+      "field_key": "previousOrganisations",
+      "can_change": false,
+      "customised": false,
+      "update_lock": null,
+      "required_lock": "some",
+      "employee_can_update": false
+    }
+  ]
+}

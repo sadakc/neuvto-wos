@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import {
   getCurrentUser,
   isAdmin,
-  APP_ROLES,
+  APPROVER_ROLES,
   ROLE_LABELS,
   type AppRole,
   type CurrentUser,
@@ -139,7 +139,7 @@ function ApprovalRulesPage() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Administrators only</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your administrator decides who approves leave.
         </p>
@@ -150,7 +150,7 @@ function ApprovalRulesPage() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load your approval rules. Try refreshing.
         </p>
@@ -159,29 +159,31 @@ function ApprovalRulesPage() {
   }
 
   return (
-    <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">Approval rules</h1>
-      <p className="mt-1 max-w-prose text-sm text-muted-foreground">
-        Who signs off leave. Level 1 always applies; later levels apply only when their condition
-        matches. Requests already in flight keep the rules they were submitted under.
-      </p>
+    <div className="flex min-w-0 flex-col gap-4 pb-16">
+      <div>
+        <h1 className="text-page-title font-semibold tracking-page-title">Approval rules</h1>
+        <p className="mt-1 max-w-prose text-sm text-foreground-secondary">
+          Who signs off leave. Level 1 always applies; later levels apply only when their condition
+          matches. Requests already in flight keep the rules they were submitted under.
+        </p>
+      </div>
 
       {levels.length === 0 && (
-        <p className="mt-6 rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
+        <p className="rounded-lg border border-dashed border-border p-6 text-sm text-muted-foreground">
           No approval levels. Nobody can submit leave that needs approval until there is at least
           one — requests would be refused rather than approved.
         </p>
       )}
 
-      <ul className="mt-6 space-y-4">
+      <ul className="grid gap-4 @min-[1000px]/app:grid-cols-2 @min-[1000px]/app:items-start">
         {levels.map((l) => (
           <li
             key={l.id}
             data-testid="approval-level"
-            className="rounded-lg border border-border p-4"
+            className="min-w-0 rounded-xl border border-border bg-card shadow-card"
           >
-            <div className="flex items-baseline justify-between gap-4">
-              <h2 className="font-display text-base font-semibold">Level {l.level}</h2>
+            <div className="flex items-baseline justify-between gap-4 border-b border-border px-4 py-3">
+              <h2 className="text-card-title font-semibold tracking-card-title">Level {l.level}</h2>
               {l.level > 1 && (
                 <button
                   onClick={() => onRemove(l.id)}
@@ -192,120 +194,130 @@ function ApprovalRulesPage() {
               )}
             </div>
 
-            <div className="mt-4 grid gap-4 sm:grid-cols-2">
-              <div>
-                <label htmlFor={`rule-${l.id}`} className="block text-sm font-medium">
-                  Who approves
-                </label>
-                <select
-                  id={`rule-${l.id}`}
-                  value={l.approverRule}
-                  onChange={(e) => {
-                    const rule = e.target.value as ApproverRule;
-                    // Clearing the role alongside the rule keeps
-                    // chain_role_present satisfiable without a second step.
-                    edit(l.id, {
-                      approverRule: rule,
-                      approverRole: rule === "role" ? (l.approverRole ?? "hr_admin") : null,
-                    });
-                  }}
-                  className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
-                >
-                  {APPROVER_RULES.map((r) => (
-                    <option key={r} value={r}>
-                      {RULE_LABELS[r]}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {l.approverRule === "role" && (
+            <div className="px-4 pb-4">
+              <div className="mt-4 grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label htmlFor={`role-${l.id}`} className="block text-sm font-medium">
-                    Which role
+                  <label htmlFor={`rule-${l.id}`} className="block text-sm font-medium">
+                    Who approves
                   </label>
                   <select
-                    id={`role-${l.id}`}
-                    value={l.approverRole ?? "hr_admin"}
-                    onChange={(e) => edit(l.id, { approverRole: e.target.value as AppRole })}
+                    id={`rule-${l.id}`}
+                    value={l.approverRule}
+                    onChange={(e) => {
+                      const rule = e.target.value as ApproverRule;
+                      // Clearing the role alongside the rule keeps
+                      // chain_role_present satisfiable without a second step.
+                      edit(l.id, {
+                        approverRule: rule,
+                        approverRole: rule === "role" ? (l.approverRole ?? "hr_admin") : null,
+                      });
+                    }}
                     className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
                   >
-                    {/* Employee is excluded, and until D57 this filter was the
+                    {APPROVER_RULES.map((r) => (
+                      <option key={r} value={r}>
+                        {RULE_LABELS[r]}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {l.approverRule === "role" && (
+                  <div>
+                    <label htmlFor={`role-${l.id}`} className="block text-sm font-medium">
+                      Which role
+                    </label>
+                    <select
+                      id={`role-${l.id}`}
+                      value={l.approverRole ?? "hr_admin"}
+                      onChange={(e) => edit(l.id, { approverRole: e.target.value as AppRole })}
+                      className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                    >
+                      {/* Employee is excluded, and until D57 this filter was the
                         ONLY thing excluding it — `chain_role_present` required
                         an approver_role alongside a 'role' rule and had no
                         opinion on which. `chain_role_can_approve` now refuses it
                         in the database, so this list is presentation again
                         rather than the rule. */}
-                    {APP_ROLES.filter((r) => r !== "employee").map((r) => (
-                      <option key={r} value={r}>
-                        {ROLE_LABELS[r]}
-                      </option>
-                    ))}
-                  </select>
+                      {APPROVER_ROLES.map((r) => (
+                        <option key={r} value={r}>
+                          {ROLE_LABELS[r]}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+              </div>
+
+              {/* Level 1 always applies, so a condition on it would be a level that
+                sometimes leaves a request with no approver at all. */}
+              {l.level > 1 && (
+                <div className="mt-4">
+                  <span className="block text-sm font-medium">Only when</span>
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-sm text-muted-foreground">
+                      the request is longer than
+                    </span>
+                    <input
+                      type="number"
+                      min={0}
+                      max={365}
+                      value={l.conditionValue ?? ""}
+                      onChange={(e) =>
+                        edit(l.id, {
+                          conditionField: "working_days",
+                          conditionOp: ">",
+                          conditionValue: e.target.value === "" ? null : Number(e.target.value),
+                        })
+                      }
+                      aria-label={`Level ${l.level} applies when the request is longer than this many working days`}
+                      data-testid="threshold"
+                      className="h-12 w-20 rounded-md border border-border bg-background px-3 text-sm tabular-nums"
+                    />
+                    <span className="text-sm text-muted-foreground">working days</span>
+                  </div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Leave blank to make this level always apply
+                  </p>
                 </div>
               )}
-            </div>
 
-            {/* Level 1 always applies, so a condition on it would be a level that
-                sometimes leaves a request with no approver at all. */}
-            {l.level > 1 && (
               <div className="mt-4">
-                <span className="block text-sm font-medium">Only when</span>
-                <div className="mt-2 flex flex-wrap items-center gap-2">
-                  <span className="text-sm text-muted-foreground">the request is longer than</span>
+                <label htmlFor={`esc-${l.id}`} className="block text-sm font-medium">
+                  Move up after
+                </label>
+                <div className="mt-2 flex items-center gap-2">
                   <input
+                    id={`esc-${l.id}`}
                     type="number"
-                    min={0}
-                    max={365}
-                    value={l.conditionValue ?? ""}
+                    min={1}
+                    max={30}
+                    value={l.escalateAfterDays ?? ""}
                     onChange={(e) =>
                       edit(l.id, {
-                        conditionField: "working_days",
-                        conditionOp: ">",
-                        conditionValue: e.target.value === "" ? null : Number(e.target.value),
+                        escalateAfterDays: e.target.value === "" ? null : Number(e.target.value),
                       })
                     }
-                    data-testid="threshold"
                     className="h-12 w-20 rounded-md border border-border bg-background px-3 text-sm tabular-nums"
                   />
-                  <span className="text-sm text-muted-foreground">working days</span>
+                  <span className="text-sm text-muted-foreground">days without a decision</span>
                 </div>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Leave blank to make this level always apply
+                <p data-testid="move-up-hint" className="mt-1 text-xs text-muted-foreground">
+                  A request still waiting then goes to the approver&apos;s manager, else the
+                  module&apos;s admin, else a company admin. Nothing is approved by waiting. Leave
+                  it empty and it never moves.
                 </p>
               </div>
-            )}
 
-            <div className="mt-4">
-              <label htmlFor={`esc-${l.id}`} className="block text-sm font-medium">
-                Chase after
-              </label>
-              <div className="mt-2 flex items-center gap-2">
-                <input
-                  id={`esc-${l.id}`}
-                  type="number"
-                  min={0}
-                  max={30}
-                  value={l.escalateAfterDays ?? ""}
-                  onChange={(e) =>
-                    edit(l.id, {
-                      escalateAfterDays: e.target.value === "" ? null : Number(e.target.value),
-                    })
-                  }
-                  className="h-12 w-20 rounded-md border border-border bg-background px-3 text-sm tabular-nums"
-                />
-                <span className="text-sm text-muted-foreground">days without a decision</span>
-              </div>
+              <button
+                onClick={() => onSave(l)}
+                disabled={savingId === l.id}
+                data-testid="save-level"
+                className="mt-4 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
+              >
+                {savingId === l.id ? "Saving…" : "Save this level"}
+              </button>
             </div>
-
-            <button
-              onClick={() => onSave(l)}
-              disabled={savingId === l.id}
-              data-testid="save-level"
-              className="mt-4 inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
-            >
-              {savingId === l.id ? "Saving…" : "Save this level"}
-            </button>
           </li>
         ))}
       </ul>

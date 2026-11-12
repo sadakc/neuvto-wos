@@ -1,24 +1,34 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useState } from "react";
 import {
   deactivateMember,
   deactivationImpact,
   getCurrentUser,
   isAdmin,
+  isSuperAdmin,
   listInvitations,
   listMembers,
   reactivateMember,
   revokeInvitation,
+  resendInvitation,
   ROLE_LABELS,
   setJoinedDate,
+  setMemberModuleAdmins,
+  setMemberRoles,
   setReportingLine,
+  type AppRole,
   type CurrentUser,
   type DeactivationImpact,
   type Invitation,
   type Member,
 } from "@/platform/auth";
 import { isAppError } from "@/platform/errors";
-import { InviteTeam } from "@/platform/auth/InviteTeam";
+import { DateField } from "@/components/shared/date-field";
+import { isIsoDate } from "@/components/shared/date-rules";
+import { AccessEditor, type AdministrableModule } from "@/platform/auth/AccessEditor";
+import { getEnabledModules } from "@/platform/modules";
 import { listDepartments, setDepartment, type Department } from "@/platform/organization";
 
 export const Route = createFileRoute("/app/members")({
@@ -30,15 +40,10 @@ export const Route = createFileRoute("/app/members")({
 /**
  * The people in this workspace, and the ones who have been asked to join.
  *
- * Inviting is the only way in (D39). The form asks for email, role and phone —
- * phone because Sada wants one human rather than one email address, though it
- * is not verified and so is not an identity key yet (D41); the uniqueness it
- * buys is real but only within this organisation.
- *
- * What this screen deliberately never says: whether an address is already in
- * use in somebody else's workspace. That answer would make the box below a
- * staff-directory oracle (D40). Such an invitation is simply created and never
- * accepted; the person is told when they arrive, about their own address.
+ * Inviting is the only way in (D39), and since 14 Oct 2026 it is done from
+ * the person's record (Add Employee), not here: one way in, so every module
+ * sees the same person. This screen keeps who is waiting to join (copy the
+ * link, withdraw), who is in, their access, and who reports to whom.
  */
 /** Exported for the render tests in members.test.tsx. Not used elsewhere. */
 export function MembersPage() {
@@ -55,11 +60,17 @@ export function MembersPage() {
   const [leaving, setLeaving] = useState<Member | null>(null);
   const [impact, setImpact] = useState<DeactivationImpact | null>(null);
   const [successor, setSuccessor] = useState("");
+  const [successorError, setSuccessorError] = useState("");
   const [busy, setBusy] = useState(false);
   const [notice, setNotice] = useState("");
   const [query, setQuery] = useState("");
+  // Whose access panel is open. One at a time: two open panels on a phone
+  // push the second person's Save below everything.
+  const [editingAccess, setEditingAccess] = useState<string | null>(null);
   /** D58. Empty is ordinary — a workspace that has configured none. */
   const [departments, setDepartments] = useState<Department[]>([]);
+  /** D84. What a Super Admin can make somebody admin of. */
+  const [modules, setModules] = useState<AdministrableModule[]>([]);
 
   const baseUrl = typeof window === "undefined" ? "" : window.location.origin;
 
@@ -72,6 +83,10 @@ export function MembersPage() {
     // department", which is what an unconfigured workspace shows anyway.
     await listDepartments()
       .then(setDepartments)
+      .catch(() => {});
+    // Forgiving for the same reason: without it the panel shows roles only.
+    await getEnabledModules()
+      .then((ms) => setModules(ms.map((m) => ({ key: m.key, name: m.name }))))
       .catch(() => {});
   }
 
@@ -97,6 +112,20 @@ export function MembersPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // D118: a fresh link, for somebody who never got the email.
+  const [resent, setResent] = useState<string | null>(null);
+  async function onResend(id: string) {
+    setError("");
+    setResent(null);
+    try {
+      await resendInvitation(id);
+      await load();
+      setResent("A fresh invitation was sent. The old link no longer works.");
+    } catch (err) {
+      setError(isAppError(err) ? err.message : "That invitation couldn't be sent again.");
+    }
+  }
 
   async function onRevoke(id: string) {
     setError("");
@@ -136,6 +165,23 @@ export function MembersPage() {
     }
   }
 
+  // D78. The panel shows its own refusals inline, where the person is looking,
+  // so this throws rather than writing to the page-level error.
+  async function onSetRoles(member: Member, roles: AppRole[], adminOf: string[]) {
+    setError("");
+    setNotice("");
+    const rolesChanged =
+      roles.length !== member.roles.length || roles.some((r) => !member.roles.includes(r));
+    if (rolesChanged) await setMemberRoles(member.id, roles);
+    const modulesChanged =
+      adminOf.length !== member.moduleAdmin.length ||
+      adminOf.some((m) => !member.moduleAdmin.includes(m));
+    if (modulesChanged) await setMemberModuleAdmins(member.id, adminOf);
+    setEditingAccess(null);
+    setNotice(`Access for ${member.fullName || member.email} updated.`);
+    await load();
+  }
+
   async function onSetJoinedDate(employeeId: string, joinedDate: string) {
     setError("");
     setNotice("");
@@ -169,6 +215,7 @@ export function MembersPage() {
     setNotice("");
     setLeaving(m);
     setSuccessor("");
+    setSuccessorError("");
     setImpact(null);
     try {
       setImpact(await deactivationImpact(m.id));
@@ -181,6 +228,12 @@ export function MembersPage() {
 
   async function onDeactivate(employeeId: string) {
     setError("");
+    // D113: said under the field on pressing it, never by greying it out.
+    if (!successor) {
+      setSuccessorError(emptyMessage("Hand their work to"));
+      return;
+    }
+    setSuccessorError("");
     setBusy(true);
     try {
       const moved = await deactivateMember(employeeId, successor);
@@ -211,7 +264,7 @@ export function MembersPage() {
   if (state === "denied") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">Administrators only</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Administrators only</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           Your administrator manages who is in this workspace.
         </p>
@@ -222,7 +275,7 @@ export function MembersPage() {
   if (state === "error") {
     return (
       <div className="mx-auto max-w-md text-center">
-        <h1 className="font-display text-lg font-semibold">This didn&apos;t load</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">This didn&apos;t load</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           We couldn&apos;t load the people in this workspace. Try refreshing.
         </p>
@@ -280,32 +333,18 @@ export function MembersPage() {
 
   return (
     <div className="mx-auto max-w-3xl pb-16">
-      <h1 className="font-display text-xl font-semibold tracking-tight">People</h1>
+      <h1 className="text-page-title font-semibold tracking-page-title">People</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         Everyone in {user?.organizationName ?? "this workspace"}, and anyone waiting to join.
       </p>
 
-      {/* ─────────────────────────────────────────────── invite */}
-      <section className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="font-display text-base font-semibold">Invite somebody</h2>
-        <p className="mt-1 text-sm text-muted-foreground">
-          They&apos;ll get an email with a link. Following it, they confirm their address with a
-          six-digit code and land straight in this workspace.
-        </p>
-
-        <div className="mt-4">
-          <InviteTeam onInvited={() => void load()} />
-        </div>
-
-        <p className="mt-4 border-t border-border pt-4 text-sm text-muted-foreground">
-          Bringing a whole team across?{" "}
-          <a href="/app/import" className="text-foreground underline underline-offset-4">
-            Import them from a spreadsheet
-          </a>{" "}
-          — with the start dates they actually joined on, which is what their leave for the year is
-          worked out from.
-        </p>
-      </section>
+      {/* Inviting is done from the person's record in the Employee module, so
+          every module sees one person (Sada, 14 Oct 2026). People keeps who is
+          waiting to join, who is in, and who reports to whom. */}
+      <p className="mt-4 max-w-prose text-sm text-muted-foreground" data-testid="people-how-to-add">
+        To bring somebody in, start their record and invite them from it. Once they accept, they are
+        here and in every module.
+      </p>
 
       {error && (
         <p role="alert" data-testid="members-error" className="mt-4 text-sm text-destructive">
@@ -350,15 +389,19 @@ export function MembersPage() {
           data-testid="people-no-match"
           className="mt-6 rounded-lg border border-dashed border-border p-8 text-center text-sm text-muted-foreground"
         >
-          Nobody here matches “{query.trim()}”. Somebody who has never been invited will not appear
-          — invite them above.
+          Nobody here matches “{query.trim()}”. Somebody who has never been invited will not appear.
         </p>
       )}
 
       {/* ─────────────────────────────────────────────── pending */}
       {pending.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-display text-base font-semibold">Waiting to join</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">Waiting to join</h2>
+          {resent && (
+            <p role="status" data-testid="resent-notice" className="mt-1 text-sm text-success">
+              {resent}
+            </p>
+          )}
           <ul className="mt-4 divide-y divide-border rounded-lg border border-border">
             {pending.map((i) => (
               <li
@@ -393,6 +436,13 @@ export function MembersPage() {
                     </button>
                   )}
                   <button
+                    onClick={() => onResend(i.id)}
+                    data-testid="resend-invitation"
+                    className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
+                  >
+                    Send again
+                  </button>
+                  <button
                     onClick={() => onRevoke(i.id)}
                     data-testid="revoke-invitation"
                     className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm text-muted-foreground"
@@ -412,7 +462,7 @@ export function MembersPage() {
           contradictory answer to the same question. */}
       {(active.length > 0 || !searching) && (
         <section className="mt-10">
-          <h2 className="font-display text-base font-semibold">In this workspace</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">In this workspace</h2>
           <p className="mt-1 max-w-prose text-sm text-muted-foreground">
             Who reports to whom decides who approves what — the approval chain resolves the
             reporting manager, so a person with nobody above them has nowhere to send a request.
@@ -433,10 +483,40 @@ export function MembersPage() {
                       {m.phone ? ` · ${m.phone}` : ""}
                     </span>
                   </span>
-                  <span className="shrink-0 text-xs text-muted-foreground">
-                    {m.roles.map((r) => ROLE_LABELS[r]).join(", ") || "Employee"}
+                  <span className="flex shrink-0 flex-col items-end gap-1">
+                    <span className="text-xs text-muted-foreground">
+                      {[
+                        ...m.roles.map((r) => ROLE_LABELS[r]),
+                        ...m.moduleAdmin.map(
+                          (k) => `${modules.find((x) => x.key === k)?.name ?? k} Admin`,
+                        ),
+                      ].join(", ") || "Employee"}
+                    </span>
+                    {m.id !== user?.id && (
+                      <button
+                        type="button"
+                        data-testid="change-access"
+                        aria-expanded={editingAccess === m.id}
+                        onClick={() => setEditingAccess(editingAccess === m.id ? null : m.id)}
+                        className="text-xs font-medium text-primary underline-offset-4 hover:underline"
+                      >
+                        Change access
+                      </button>
+                    )}
                   </span>
                 </div>
+
+                {editingAccess === m.id && (
+                  <AccessEditor
+                    personName={m.fullName || m.email}
+                    roles={m.roles}
+                    callerIsSuperAdmin={isSuperAdmin(user)}
+                    modules={modules}
+                    moduleAdmin={m.moduleAdmin}
+                    onSave={(roles, adminOf) => onSetRoles(m, roles, adminOf)}
+                    onCancel={() => setEditingAccess(null)}
+                  />
+                )}
 
                 {/* The start date drives pro-rated entitlement (D3), so changing
                   it changes how much leave this person gets for the year. Kept
@@ -449,17 +529,10 @@ export function MembersPage() {
                   >
                     Started
                   </label>
-                  <input
+                  <JoinedDate
                     id={`joined-${m.id}`}
-                    type="date"
-                    data-testid="joined-date"
-                    defaultValue={m.joinedDate}
-                    onBlur={(e) => {
-                      if (e.target.value && e.target.value !== m.joinedDate) {
-                        void onSetJoinedDate(m.id, e.target.value);
-                      }
-                    }}
-                    className="h-12 flex-1 rounded-md border border-border bg-background px-3 text-sm"
+                    saved={m.joinedDate}
+                    onSave={(d) => void onSetJoinedDate(m.id, d)}
                   />
                 </div>
 
@@ -547,14 +620,19 @@ export function MembersPage() {
                     </p>
 
                     <label htmlFor={`succ-${m.id}`} className="mt-3 block text-sm font-medium">
-                      Hand their work to
+                      <LabelText required>Hand their work to</LabelText>
                     </label>
                     <select
                       id={`succ-${m.id}`}
                       data-testid="successor"
                       value={successor}
-                      onChange={(e) => setSuccessor(e.target.value)}
-                      className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+                      aria-required
+                      aria-invalid={successorError ? true : undefined}
+                      onChange={(e) => {
+                        setSuccessor(e.target.value);
+                        setSuccessorError("");
+                      }}
+                      className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
                     >
                       <option value="">Choose somebody…</option>
                       {/* allActive too. Handing somebody's reports and approvals
@@ -569,6 +647,7 @@ export function MembersPage() {
                           </option>
                         ))}
                     </select>
+                    <FieldError>{successorError}</FieldError>
 
                     <div className="mt-3 flex gap-2">
                       {/* min-h rather than h: at 280px this label wraps to three
@@ -579,7 +658,7 @@ export function MembersPage() {
                         system asks for is preserved. */}
                       <button
                         onClick={() => onDeactivate(m.id)}
-                        disabled={!successor || busy}
+                        disabled={busy}
                         data-testid="confirm-deactivate"
                         className="inline-flex min-h-12 items-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground disabled:opacity-50"
                       >
@@ -606,7 +685,7 @@ export function MembersPage() {
           like data going missing. */}
       {inactive.length > 0 && (
         <section className="mt-10">
-          <h2 className="font-display text-base font-semibold">No longer active</h2>
+          <h2 className="text-card-title font-semibold tracking-card-title">No longer active</h2>
           <ul className="mt-4 divide-y divide-border rounded-lg border border-dashed border-border">
             {inactive.map((m) => (
               <li
@@ -639,5 +718,38 @@ export function MembersPage() {
         </section>
       )}
     </div>
+  );
+}
+
+/**
+ * A start date, typed DD/MM/YYYY or picked (the shared date picker). Saved
+ * once it is a whole date different from the one on record, as the old box
+ * saved when it lost focus; half a date is never sent.
+ */
+function JoinedDate({
+  id,
+  saved,
+  onSave,
+}: {
+  id: string;
+  saved: string;
+  onSave: (date: string) => void;
+}) {
+  const [value, setValue] = useState(saved);
+  useEffect(() => setValue(saved), [saved]);
+  return (
+    <DateField
+      id={id}
+      testId="joined-date"
+      value={value}
+      max={`${new Date().getFullYear() + 1}-12-31`}
+      openAt={saved || undefined}
+      invalid={value !== "" && !isIsoDate(value)}
+      onChange={(v) => {
+        setValue(v);
+        if (isIsoDate(v) && v !== saved) onSave(v);
+      }}
+      className="flex-1"
+    />
   );
 }

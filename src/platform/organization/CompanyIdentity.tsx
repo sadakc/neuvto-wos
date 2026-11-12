@@ -6,6 +6,8 @@
  * ten, and two copies of a form is two places for the validation to drift.
  */
 
+import { emptyMessage } from "@/lib/required";
+import { LabelText, FieldError } from "@/components/shared/required";
 import { useEffect, useRef, useState } from "react";
 import { isAppError } from "@/platform/errors";
 import {
@@ -45,6 +47,7 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [error, setError] = useState("");
+  const [nameError, setNameError] = useState("");
   const fileInput = useRef<HTMLInputElement>(null);
 
   /**
@@ -82,6 +85,12 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
   async function onSave() {
     if (!org) return;
     setError("");
+    // D113: said on pressing Save, never by greying it out.
+    if (!name.trim()) {
+      setNameError(emptyMessage("Registered company name"));
+      return;
+    }
+    setNameError("");
     setSaving(true);
     try {
       await updateOrganization(org.id, { name, displayName, industryType: industry });
@@ -152,7 +161,7 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
                 className="h-full w-full object-contain"
               />
             ) : (
-              <span className="font-display text-2xl font-semibold text-muted-foreground">
+              <span className="text-stat font-semibold tracking-stat text-muted-foreground">
                 {companyName(org).slice(0, 1).toUpperCase() || "?"}
               </span>
             )}
@@ -194,7 +203,7 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
       <div className="grid gap-4 sm:grid-cols-2">
         <div>
           <label htmlFor="org-legal-name" className="block text-sm font-medium">
-            Registered company name
+            <LabelText required>Registered company name</LabelText>
           </label>
           <input
             id="org-legal-name"
@@ -202,10 +211,14 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
             onChange={(e) => {
               setName(e.target.value);
               setSaved(false);
+              setNameError("");
             }}
             maxLength={200}
-            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm"
+            required
+            aria-invalid={nameError ? true : undefined}
+            className="mt-2 h-12 w-full rounded-md border border-border bg-background px-3 text-sm aria-invalid:border-destructive"
           />
+          <FieldError>{nameError}</FieldError>
           <p className="mt-1 text-xs text-muted-foreground">As it appears on a contract</p>
         </div>
 
@@ -262,7 +275,7 @@ export function CompanyIdentity({ onSaved }: { onSaved?: (org: Organization) => 
       <div className="flex items-center gap-4">
         <button
           onClick={onSave}
-          disabled={saving || !name.trim()}
+          disabled={saving}
           data-testid="save-identity"
           className="inline-flex h-12 items-center justify-center rounded-md bg-primary px-4 text-sm font-medium text-primary-foreground disabled:opacity-50"
         >

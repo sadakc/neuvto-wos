@@ -35,10 +35,6 @@ vi.mock("@tanstack/react-router", () => ({
   Link: ({ children }: { children?: React.ReactNode }) => children,
 }));
 
-vi.mock("@/platform/auth/InviteTeam", () => ({
-  InviteTeam: () => null,
-}));
-
 const MARK = "mark-id";
 const RAVI = "ravi-id";
 const PRIYA = "priya-id";
@@ -74,6 +70,7 @@ const MEMBERS = [
     // rather than as the first one in the list.
     departmentId: null,
     roles: ["org_admin"],
+    moduleAdmin: [],
   },
   {
     id: MARK,
@@ -86,6 +83,7 @@ const MEMBERS = [
     // The LAST option, not the first — see the note on SALES.
     departmentId: SALES.id,
     roles: ["manager"],
+    moduleAdmin: [],
   },
   {
     id: SUNITA,
@@ -100,6 +98,7 @@ const MEMBERS = [
     managerId: null,
     departmentId: null,
     roles: ["supervisor"],
+    moduleAdmin: [],
   },
   {
     id: RAVI,
@@ -113,6 +112,7 @@ const MEMBERS = [
     managerId: MARK,
     departmentId: OPERATIONS.id,
     roles: ["employee"],
+    moduleAdmin: [],
   },
   {
     id: PRIYA,
@@ -126,6 +126,7 @@ const MEMBERS = [
     managerId: SUNITA,
     departmentId: null,
     roles: ["employee"],
+    moduleAdmin: [],
   },
 ];
 
@@ -136,6 +137,7 @@ vi.mock("@/platform/auth", async () => ({
   // themselves and with nothing else. Pulled from `contracts`, which imports
   // only zod, rather than from the barrel, which would drag in the Supabase
   // client this mock exists to avoid.
+  setMemberModuleAdmins: vi.fn(),
   ROLE_LABELS: (await import("@/platform/auth/contracts")).ROLE_LABELS,
   getCurrentUser: async () => ({
     id: "alice-id",
@@ -144,14 +146,18 @@ vi.mock("@/platform/auth", async () => ({
     organizationId: "org",
     organizationName: "Acme",
     roles: ["org_admin"],
+    moduleAdmin: [],
   }),
   isAdmin: () => true,
+  isSuperAdmin: (u: { roles?: string[] } | null) => !!u?.roles?.includes("super_admin"),
+  setMemberRoles: vi.fn(),
   listMembers: async () => MEMBERS,
-  listInvitations: async () => [],
+  listInvitations: vi.fn(async () => []),
   deactivateMember: vi.fn(),
   deactivationImpact: vi.fn(),
   reactivateMember: vi.fn(),
   revokeInvitation: vi.fn(),
+  resendInvitation: vi.fn(),
   setJoinedDate: vi.fn(),
   setReportingLine: vi.fn(),
 }));
@@ -168,6 +174,8 @@ vi.mock("@/platform/auth", async () => ({
 const listDepartments = vi.fn<() => Promise<{ id: string; name: string }[]>>();
 const setDepartment = vi.fn<(employeeId: string, departmentId: string | null) => Promise<void>>();
 
+// D84: the module list the access panel offers. None here; members.access proves it.
+vi.mock("@/platform/modules", () => ({ getEnabledModules: async () => [] }));
 vi.mock("@/platform/organization", () => ({
   listDepartments: () => listDepartments(),
   setDepartment: (employeeId: string, departmentId: string | null) =>
@@ -177,7 +185,13 @@ vi.mock("@/platform/organization", () => ({
 import { MembersPage } from "./members";
 // The same mocked functions the component imports, so a test can decide what
 // the database says back.
-import { deactivateMember, deactivationImpact, setReportingLine } from "@/platform/auth";
+import {
+  deactivateMember,
+  deactivationImpact,
+  listInvitations,
+  resendInvitation,
+  setReportingLine,
+} from "@/platform/auth";
 
 async function renderPeople() {
   render(<MembersPage />);
@@ -587,5 +601,49 @@ describe("People — the Department dropdown", () => {
     // And no half-built control: the dropdown is absent rather than present and
     // empty, which is the same rule as the no-departments case above.
     expect(screen.queryAllByTestId("department")).toHaveLength(0);
+  });
+});
+
+describe("People — handing over to nobody (D113)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("says who is missing on pressing it, not by greying it out, and does nothing", async () => {
+    vi.mocked(deactivationImpact).mockResolvedValue({ reports: 1, approvals: 0 });
+    const user = userEvent.setup();
+    await renderPeople();
+    await user.click(within(rowFor("Sunita Kapoor")).getByTestId("deactivate"));
+    const confirm = await within(rowFor("Sunita Kapoor")).findByTestId("deactivate-confirm");
+    const go = within(confirm).getByTestId("confirm-deactivate");
+    expect(go).toBeEnabled();
+    await user.click(go);
+    expect(within(confirm).getByText("Hand their work to can't be empty.")).toBeInTheDocument();
+    expect(deactivateMember).not.toHaveBeenCalled();
+  });
+});
+
+describe("People — somebody waiting to join (D118)", () => {
+  beforeEach(() => vi.clearAllMocks());
+
+  it("can be sent a fresh invitation, and says the old link is dead", async () => {
+    vi.mocked(listInvitations).mockResolvedValue([
+      {
+        id: "inv-1",
+        email: "kavya@acme.test",
+        fullName: "Kavya Rao",
+        role: "employee",
+        expiresAt: "2026-11-17T00:00:00Z",
+        inviteUrl: null,
+      },
+    ] as never);
+    vi.mocked(resendInvitation).mockResolvedValue(undefined);
+    const user = userEvent.setup();
+    await renderPeople();
+    const row = await screen.findByTestId("pending-invitation");
+    await user.click(within(row).getByTestId("resend-invitation"));
+    expect(resendInvitation).toHaveBeenCalledWith("inv-1");
+    expect(await screen.findByTestId("resent-notice")).toHaveTextContent(
+      "The old link no longer works",
+    );
+    expect(within(row).getByTestId("revoke-invitation")).toBeInTheDocument();
   });
 });

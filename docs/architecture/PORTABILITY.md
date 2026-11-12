@@ -180,3 +180,11 @@ customer who requires it in writing — not a milestone, and not a preference.
 
 `docs/operations/PRODUCTION_HOSTING.md` covers where the _site_ is served, which
 is a separate question and currently mid-move to Cloudflare.
+
+## Passkeys (D79, 11 Oct 2026)
+
+Face and fingerprint sign-in uses Supabase Auth's own passkey support, which stores each
+person's WebAuthn public key in Supabase Auth's tables. The credentials are a W3C standard
+bound to `neuvto.com`, not to Supabase, but on a move to another auth provider they would not
+come across: everybody would set their device up again once. Not a lockout, because the email
+code remains for everyone. No other part of the product depends on it.

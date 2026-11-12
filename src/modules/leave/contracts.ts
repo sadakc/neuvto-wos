@@ -80,8 +80,70 @@ export const LeaveTypeInput = z.object({
    * nobody who can approve anything, because D13 forbids self-approval.
    */
   approvalRequired: z.boolean(),
+  /**
+   * Leave phase 2. Unpaid (loss of pay) has no allowance and no balance; the
+   * database insists on max_days_per_year = 0 and refuses changing a saved
+   * type's kind.
+   */
+  kind: z.enum(["paid", "unpaid", "earned"]).default("paid"),
+  /**
+   * D89, an earned type (compensatory off) only. Days after approval a credit
+   * expires; null never. How far back a day worked can be claimed; null any
+   * time. Whether every claim must carry proof.
+   */
+  earnedExpiresAfterDays: z
+    .number()
+    .int("Whole days")
+    .min(1, "At least one day, or leave it blank for never")
+    .max(730, "At most two years")
+    .nullable()
+    .default(null),
+  earnedClaimWithinDays: z
+    .number()
+    .int("Whole days")
+    .min(1, "At least one day, or leave it blank for any time")
+    .max(365, "At most a year")
+    .nullable()
+    .default(null),
+  earnedProofRequired: z.boolean().default(false),
+  /** D90, a paid type only: the year at once, or a twelfth each month. */
+  accrual: z.enum(["upfront", "monthly"]).default("upfront"),
+  /** D91, a paid type only: the most days carried into next year. Null: none. */
+  carryForwardMax: z
+    .number()
+    .min(0, "Carry-over cannot be negative")
+    .max(365)
+    .multipleOf(0.5, "Use whole days or halves")
+    .nullable()
+    .default(null),
 });
-export type LeaveTypeInput = z.infer<typeof LeaveTypeInput>;
+export type LeaveTypeInput = z.input<typeof LeaveTypeInput>;
+
+/** D89 adds earned: compensatory off, credited for days worked. */
+export type LeaveKind = "paid" | "unpaid" | "earned";
+
+/** Leave phase 2: what has been taken and asked for, of one unpaid type, this year. */
+export interface UnpaidSummary {
+  leaveTypeId: string;
+  leaveTypeName: string;
+  takenDays: number;
+  pendingDays: number;
+}
+
+/** Leave phase 2: a date range when no leave can be applied for. */
+export interface Blackout {
+  id: string;
+  name: string;
+  fromDate: string;
+  toDate: string;
+}
+
+/** What archiving a leave type leaves behind. */
+export interface LeaveTypeImpact {
+  pendingRequests: number;
+  upcomingApproved: number;
+  peopleWithDaysLeft: number;
+}
 
 export interface LeaveType {
   id: string;
@@ -92,6 +154,15 @@ export interface LeaveType {
   maxPerRequest: number | null;
   approvalRequired: boolean;
   status: "active" | "archived";
+  kind: LeaveKind;
+  /** D90: how a paid type's allowance is credited. */
+  accrual?: "upfront" | "monthly";
+  /** D91: the most days carried into next year; null none. */
+  carryForwardMax?: number | null;
+  /** D89, earned types only. */
+  earnedExpiresAfterDays?: number | null;
+  earnedClaimWithinDays?: number | null;
+  earnedProofRequired?: boolean;
 }
 
 /**
@@ -123,6 +194,13 @@ export interface ApprovalStep {
   decision: "pending" | "approved" | "rejected";
   comments: string | null;
   decidedAt: string | null;
+  /** Leave phase 2: why it was rejected, as a code. */
+  reasonCode?: string | null;
+  /** D87: who this level moved up from, and when, if it did. */
+  escalatedFrom?: string | null;
+  escalatedAt?: string | null;
+  /** D92: who decided it, when it was somebody acting for the approver. */
+  decidedBy?: string | null;
 }
 
 export interface LeaveRequest {
@@ -266,17 +344,52 @@ export const LEAVE_ERROR_MESSAGES: Record<string, string> = {
   // it. This message is what makes that distinction visible.
   FORBIDDEN: "Reports cover everybody in the workspace, so they're limited to administrators.",
   LEAVE_TYPE_NAME_TAKEN: "There's already a leave type with that name.",
+  UNPAID_HAS_NO_BALANCE: "Unpaid leave has no balance, so there's no opening balance to set.",
+  LEAVE_TYPE_KIND_FIXED:
+    "A leave type can't switch between paid and unpaid. Archive it and add a new one instead.",
   // Leave is counted in whole days and halves, so an opening balance has to be
   // one too. The screen's step="0.5" is a browser attribute; this is the rule.
   NOT_A_HALF_DAY: "Use whole days or halves — 2 or 2.5, not 2.7.",
   OPENING_BALANCE_OVERDRAWN:
     "That's more days than this person was ever entitled to. Check the figure, or set their entitlement first.",
+  // D89, compensatory off.
+  NOT_AN_EARNED_TYPE: "That leave type isn't compensatory off.",
+  REASON_REQUIRED: "Say why you're owed this: what you worked, and for whom.",
+  NO_DAYS_CLAIMED: "Add the days you worked.",
+  TOO_MANY_DAYS: "Claim at most 31 days at a time.",
+  INVALID_DAY: "Each day is a full day or a half, on a date.",
+  WORKED_DATE_IN_FUTURE: "You can only claim a day you've already worked.",
+  SAME_DAY_TWICE: "The same day is listed twice.",
+  ALREADY_CLAIMED: "You've already claimed one of those days.",
+  PROOF_REQUIRED: "This kind of compensatory off needs proof. Attach it and send again.",
+  PROOF_NOT_YOURS: "That attachment couldn't be used. Attach it again.",
+  // D91, the carry-forward review.
+  INVALID_YEAR: "That leave year can't be reviewed: it hasn't begun.",
+  MORE_THAN_LEFT: "That's more than they have left this year.",
+  REVIEW_LOCKED: "This review is locked. Nothing in it can change.",
+  REVIEW_STALE:
+    "Somebody's balance has moved since this review was prepared. Prepare it again, check it, then lock it.",
+  // D94, the reports.
+  RANGE_TOO_LONG: "Choose a window of a year or less.",
+  CARRY_WOULD_OVERDRAW:
+    "Somebody has already booked next year's leave against more carried-over days than this gives them. Raise their line, then lock.",
+  // D88. Staging is for somebody not yet joined; once they have, their own
+  // balance is set in the list above.
+  ALREADY_JOINED:
+    "They've joined since this page loaded. Set their balance in the list of people who have joined.",
   LEAVE_TYPE_IN_USE:
     "This leave type has leave booked against it, so it can't be removed. Archive it instead — the history stays and nobody can book new leave.",
 };
 
 /** INSUFFICIENT_BALANCE and INSUFFICIENT_NOTICE carry numbers, so both match by prefix. */
 export function leaveErrorMessage(code: string): string {
+  // D89. The window comes back with the refusal, as notice does.
+  if (code.startsWith("CLAIM_TOO_LATE")) {
+    const m = code.match(/(\d+)\s*days?/i);
+    return m
+      ? `Days worked can be claimed for up to ${m[1]} days afterwards. One of these is older than that.`
+      : "One of those days is too long ago to claim.";
+  }
   // The required notice comes back from leave_submit rather than being read off
   // the form, because the form's copy of min_notice_days is as old as the page.
   // An administrator who changes a leave type from 1 day to 5 while somebody has
@@ -288,6 +401,12 @@ export function leaveErrorMessage(code: string): string {
     const days = Number(m[1]);
     return `This leave type needs at least ${days} ${days === 1 ? "day" : "days"} of notice before you apply.`;
   }
+  if (code.startsWith("BLACKOUT_PERIOD")) {
+    const name = code.split(":").slice(1).join(":").trim();
+    return name
+      ? `Those dates fall in a blackout period (${name}), when leave can't be applied for.`
+      : "Those dates fall in a blackout period, when leave can't be applied for.";
+  }
   if (code.startsWith("INSUFFICIENT_BALANCE")) {
     const m = code.match(/requested\s+([\d.]+),\s+available\s+([\d.]+)/);
     return m
@@ -295,4 +414,164 @@ export function leaveErrorMessage(code: string): string {
       : "You don't have enough days available.";
   }
   return LEAVE_ERROR_MESSAGES[code] ?? "That didn't work. Please try again.";
+}
+
+/** D88 — somebody not yet joined, against one paid leave type. */
+export interface StagedOpeningBalance {
+  employeeRecordId: string;
+  employeeName: string;
+  employeeCode: string | null;
+  stage: "draft" | "invited";
+  /** Their expected joining date; null when nobody has said yet (priced as a full year). */
+  joinedDate: string | null;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  /** What their joining date entitles them to this year. */
+  entitledDays: number;
+  usedDays: number;
+  carryforwardDays: number;
+  /** Whether anything is waiting for them for this type. */
+  staged: boolean;
+}
+
+/** D88 — a staged number that could not be applied when the person joined. */
+export interface StagedOpeningProblem {
+  employeeId: string;
+  employeeName: string;
+  leaveTypeName: string;
+  usedDays: number;
+  carryforwardDays: number;
+  problem: "OPENING_BALANCE_OVERDRAWN" | "MODULE_NOT_ENABLED";
+}
+
+/** D89 — one day listed on a compensatory off claim. */
+export interface CompOffDay {
+  date: string;
+  /** 1 or 0.5. */
+  days: number;
+  note: string | null;
+}
+
+/** D89 — a claim for compensatory off, as its owner sees it. */
+export interface CompOffClaim {
+  claimId: string;
+  leaveTypeId: string;
+  leaveTypeName: string;
+  reason: string;
+  totalDays: number;
+  status: "pending_approval" | "approved" | "rejected" | "cancelled";
+  hasProof: boolean;
+  submittedAt: string;
+  decidedAt: string | null;
+  /** Approved only; null when the type never expires. */
+  expiresOn: string | null;
+  expiredDays: number;
+  days: CompOffDay[];
+}
+
+/** D89 — what an approver sees of a claim. */
+export interface CompOffApprovalDetail {
+  claimId: string;
+  employeeName: string;
+  leaveTypeName: string;
+  reason: string;
+  totalDays: number;
+  status: CompOffClaim["status"];
+  proofPath: string | null;
+  days: CompOffDay[];
+}
+
+/** An earned type as the claim form needs it. */
+export interface EarnedTypeRules {
+  id: string;
+  name: string;
+  kind: LeaveKind;
+  earnedExpiresAfterDays?: number | null;
+  earnedClaimWithinDays?: number | null;
+  earnedProofRequired?: boolean;
+  /** D90. */
+  accrual?: "upfront" | "monthly";
+}
+
+/** D91 — one person and type in a carry-forward review. */
+export interface CarryLine {
+  id: string;
+  employeeName: string;
+  leaveTypeName: string;
+  availableDays: number;
+  proposedDays: number;
+  /** The Leave Admin's number, when they changed it. */
+  adjustedDays: number | null;
+  carryForwardMax: number;
+}
+
+/** D91 — a leave year's carry-forward review. */
+export interface CarryReview {
+  id: string;
+  fromFy: string;
+  toFy: string;
+  status: "draft" | "locked";
+  preparedAt: string;
+  lockedAt: string | null;
+  lockedBy: string | null;
+  /** Whether the year being carried into is open yet (D34): lockable only then. */
+  nextYearOpen: boolean;
+  lines: CarryLine[];
+}
+
+/** D94 — leave still owed this year, in days. */
+export interface LeaveLiabilityRow {
+  employeeId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeName: string;
+  kind: LeaveKind;
+  fyLabel: string;
+  notTakenDays: number;
+  bookedDays: number;
+  freeDays: number;
+}
+
+/** D94 — one compensatory off claim in the register. */
+export interface CompOffRegisterRow {
+  claimId: string;
+  employeeName: string;
+  departmentName: string | null;
+  leaveTypeName: string;
+  daysWorked: string;
+  totalDays: number;
+  reason: string;
+  status: CompOffClaim["status"];
+  submittedOn: string;
+  decidedOn: string | null;
+  expiresOn: string | null;
+  expiredDays: number;
+  hasProof: boolean;
+}
+
+/** D94 — one Leave approval decision and how long it took. */
+export interface ApprovalTurnaroundRow {
+  stepId: string;
+  what: string;
+  employeeName: string;
+  level: number;
+  approverName: string;
+  /** Who decided, when it was somebody acting for the approver (D92). */
+  decidedByName: string | null;
+  decision: "approved" | "rejected";
+  reachedAt: string;
+  decidedAt: string;
+  daysTaken: number;
+  movedUp: boolean;
+}
+
+/** D94 — approved leave in a window, per person. */
+export interface AbsenteeismRow {
+  employeeId: string;
+  employeeName: string;
+  departmentName: string | null;
+  spells: number;
+  days: number;
+  unpaidDays: number;
+  bradfordFactor: number;
 }

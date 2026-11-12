@@ -68,6 +68,7 @@ export default function LeavePendingReport() {
   return (
     <ReportView
       slug="leave-pending"
+      title="Pending approvals"
       columns={COLUMNS}
       rows={rows}
       rowKey={(r) => r.leaveRequestId}

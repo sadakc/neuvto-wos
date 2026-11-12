@@ -6,6 +6,7 @@ import { getSessionStartedAt } from "./session";
 import { getSessionPolicy } from "./session-policy";
 import { decide } from "./idle-policy";
 import { sanitizeRoute } from "@/platform/observability/scrub";
+import { leavingFor } from "./return-to";
 
 /**
  * Signs somebody out after a period of inactivity.
@@ -142,6 +143,8 @@ export function installIdleWatcher(): () => void {
     // is good manners; carrying a credential through a security event is not.
     const back = sanitizeRoute(window.location.pathname);
     const next = back && back !== "/" ? `&next=${encodeURIComponent(back)}` : "";
+    // Theirs to come back to, nobody else's.
+    if (next) leavingFor(back);
     hardNavigate(`/auth?reason=${reason}${next}`);
   };
 

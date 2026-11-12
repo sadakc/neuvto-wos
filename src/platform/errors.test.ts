@@ -119,3 +119,27 @@ describe("a genuine fault is still a fault", () => {
     expect(reportError).not.toHaveBeenCalled();
   });
 });
+
+describe("the edges, found unpinned by mutation testing (13 Oct 2026)", () => {
+  it("knows a discarded refresh by its name alone, whatever its message says", () => {
+    expect(toAppError(authError("AuthRefreshDiscardedError", "reworded"), "x").code).toBe(
+      "UNAUTHENTICATED",
+    );
+  });
+
+  it("does not take an unrelated message for an ended session", () => {
+    expect(toAppError(new Error("Refresh button broke"), "x").code).toBe("INTERNAL_ERROR");
+    expect(toAppError({ message: 42 }, "x").code).toBe("INTERNAL_ERROR");
+  });
+
+  it("tells the person something they can act on, and reports where it happened", async () => {
+    const app = toAppError(new Error("socket hang up"), "leave.submit");
+    expect(app.message).toBe("Something went wrong on our end. Please try again.");
+    expect(app.name).toBe("AppError");
+    await settle();
+    expect(reportError).toHaveBeenCalledWith(expect.any(Error), "write_failed", {
+      context: "leave.submit",
+    });
+    expect(console.error).toHaveBeenCalledWith("[leave.submit]", expect.any(Error));
+  });
+});

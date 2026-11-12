@@ -14,6 +14,9 @@ export {
   getSessionStartedAt,
   hasRole,
   isAdmin,
+  isSuperAdmin,
+  isModuleAdmin,
+  administersAnyModule,
   canApprove,
 } from "./session";
 
@@ -33,18 +36,25 @@ export {
   provisionOrganization,
   markTestOrganization,
   unmarkTestOrganization,
+  listSuperAdmins,
+  addSuperAdmin,
+  removeSuperAdmin,
+  withdrawSuperAdminInvite,
+  type CompanySuperAdmin,
   type CustomerWorkspace,
   type MailHealth,
   type ClientErrorGroup,
   type CustomerModule,
 } from "./platform";
 export {
-  inviteMember,
   revokeInvitation,
+  resendInvitation,
   listInvitations,
   listMembers,
   listDirectReports,
   setReportingLine,
+  setMemberRoles,
+  setMemberModuleAdmins,
   setJoinedDate,
   accountStatus,
   reactivateMember,
@@ -58,11 +68,13 @@ export {
 export {
   APP_ROLES,
   ROLE_LABELS,
+  ROLE_DESCRIPTIONS,
+  APPROVER_ROLES,
+  SUPER_ADMIN_GRANTS,
   EmailInput,
   VerifyOtpInput,
   SignupInput,
   ProvisionInput,
-  InviteInput,
   PhoneInput,
   suggestSlug,
   type AppRole,
@@ -72,3 +84,6 @@ export {
 export { installIdleWatcher } from "./idle";
 export { getSessionPolicy, type SessionPolicy } from "./session-policy";
 export { decide as decideIdle, type IdleVerdict } from "./idle-policy";
+
+// The CSV reader, shared so a module importing its own records reads a file
+// exactly as the People import does: quotes, commas and line endings alike.

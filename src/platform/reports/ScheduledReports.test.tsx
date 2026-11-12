@@ -343,11 +343,16 @@ describe("Scheduled reports — saving", () => {
     const user = await renderReady();
     await user.click(screen.getByTestId("add-schedule"));
 
-    expect(screen.getByTestId("save-schedule")).toBeDisabled();
+    // D113: never greyed out; pressing it says what is missing, under the field.
+    await user.click(screen.getByTestId("save-schedule"));
+    const box = screen.getByTestId("schedule-recipients").closest("label")!.parentElement!;
+    expect(within(box).getByRole("alert")).toHaveTextContent(
+      "Add at least one email address to send it to.",
+    );
+    expect(saveSchedule).not.toHaveBeenCalled();
 
     await user.type(screen.getByTestId("schedule-recipients"), "ceo@acme.test");
-
-    expect(screen.getByTestId("save-schedule")).toBeEnabled();
+    expect(within(box).queryByRole("alert")).toBeNull();
   });
 
   it("sends the day that belongs to the cadence, and confirms what will arrive", async () => {

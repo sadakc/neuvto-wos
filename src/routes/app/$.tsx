@@ -66,7 +66,7 @@ function ModulePage() {
   if (state === "missing" || !Component) {
     return (
       <div className="max-w-md">
-        <h1 className="font-display text-lg font-semibold">Page not found</h1>
+        <h1 className="text-page-title font-semibold tracking-page-title">Page not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This page either doesn&apos;t exist or belongs to something your organisation hasn&apos;t
           switched on.

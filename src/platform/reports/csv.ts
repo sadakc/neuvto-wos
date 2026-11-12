@@ -77,6 +77,10 @@ export function downloadCsv(filename: string, headers: string[], rows: CsvValue[
  * Takes the date rather than reading the clock, so the caller can pass the
  * organisation's own day (D9) instead of the browser's.
  */
-export function reportFilename(slug: string, isoDate: string): string {
-  return `${slug}-${isoDate}.csv`;
+export function reportFilename(
+  slug: string,
+  isoDate: string,
+  extension: "csv" | "xlsx" | "pdf" = "csv",
+): string {
+  return `${slug}-${isoDate}.${extension}`;
 }

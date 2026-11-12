@@ -22,6 +22,7 @@ import {
 import { isAppError } from "@/platform/errors";
 import { MailHealthBanner } from "@/platform/auth/MailHealthBanner";
 import { ClientErrorsPanel } from "@/platform/auth/ClientErrorsPanel";
+import { SuperAdminsPanel } from "@/platform/auth/SuperAdminsPanel";
 import { NeuvtoLockup } from "@/components/shared/neuvto-mark";
 import { CONSOLE_PATH } from "@/platform/console-path";
 import { hardNavigate } from "@/platform/navigate";
@@ -113,6 +114,8 @@ function AdminConsole() {
   // information almost nobody is looking at.
   const [modulesFor, setModulesFor] = useState<string | null>(null);
   const [modules, setModules] = useState<CustomerModule[] | null>(null);
+  // Which customer's Super Admins are open (D83). The panel loads its own list.
+  const [adminsFor, setAdminsFor] = useState<string | null>(null);
 
   async function load() {
     setOrgs(await listOrganizations());
@@ -371,7 +374,7 @@ function AdminConsole() {
       <h1 className="font-display text-xl font-semibold tracking-tight">Customers</h1>
       <p className="mt-1 max-w-prose text-sm text-muted-foreground">
         Every Neuvto workspace. Creating one invites the administrator you name; they set the
-        company up from there.
+        company up from there. You can add or remove a company&apos;s Super Admins at any time.
       </p>
 
       {/* Before the customer list, because it changes what the list means: a
@@ -587,6 +590,13 @@ function AdminConsole() {
                 >
                   {modulesFor === o.id ? "Hide modules" : "Modules"}
                 </button>
+                <button
+                  onClick={() => setAdminsFor((current) => (current === o.id ? null : o.id))}
+                  data-testid="manage-super-admins"
+                  className="inline-flex h-12 items-center rounded-md border border-border px-3 text-sm"
+                >
+                  {adminsFor === o.id ? "Hide Super Admins" : "Super Admins"}
+                </button>
 
                 {/* THE TWO DIRECTIONS ARE DELIBERATELY NOT SYMMETRICAL.
 
@@ -683,6 +693,10 @@ function AdminConsole() {
                 What they CAN do is switch off something they hold, and that
                 switch lives in their Settings, not here.
               */}
+              {adminsFor === o.id && (
+                <SuperAdminsPanel organizationId={o.id} organizationName={o.name} />
+              )}
+
               {modulesFor === o.id && (
                 <div className="mt-3 rounded-md border border-border bg-secondary/30 p-3">
                   {modules === null ? (

@@ -183,14 +183,23 @@ describe("Departments — adding one", () => {
     const user = userEvent.setup();
     await renderSettled();
 
-    expect(addButton()).toBeDisabled();
+    // D113: never greyed out; pressing it says what is wrong and sends nothing.
+    expect(addButton()).toBeEnabled();
+    await user.click(addButton());
+    expect(screen.getByTestId("departments-error")).toHaveTextContent(
+      "Department name can't be empty.",
+    );
 
     await user.type(nameField(), "   ");
     expect(nameField()).toHaveValue("   ");
-    expect(addButton()).toBeDisabled();
+    await user.click(addButton());
+    expect(screen.getByTestId("departments-error")).toHaveTextContent(
+      "Department name can't be empty.",
+    );
+    expect(saveDepartment).not.toHaveBeenCalled();
 
     await user.type(nameField(), "Marketing");
-    expect(addButton()).toBeEnabled();
+    expect(screen.queryByTestId("departments-error")).toBeNull();
   });
 
   it("sends the trimmed name and this workspace's id, and clears the box", async () => {
@@ -208,10 +217,8 @@ describe("Departments — adding one", () => {
     // Not the untrimmed string, stated separately so the failure names it.
     expect(saveDepartment.mock.calls[0][0].name).not.toMatch(/^\s|\s$/);
 
-    // The box is empty again, so the button is back to disabled rather than
-    // sitting enabled over a name that has already been added.
+    // The box is empty again, with nothing said about it until Add is pressed.
     await waitFor(() => expect(nameField()).toHaveValue(""));
-    expect(addButton()).toBeDisabled();
     expect(screen.queryByTestId("departments-error")).toBeNull();
   });
 
@@ -396,5 +403,21 @@ describe("Departments — when the list cannot be read", () => {
     expect(await screen.findByText(/couldn't load your departments/i)).toBeInTheDocument();
     expect(screen.queryByText(/No departments yet/)).toBeNull();
     expect(screen.queryAllByTestId("department-row")).toHaveLength(0);
+  });
+});
+
+describe("Departments — renaming to nothing (D113)", () => {
+  it("is said on pressing Save, not by greying it out, and nothing is sent", async () => {
+    const user = userEvent.setup();
+    await renderSettled();
+    await user.click(within(rowFor("Sales")).getByRole("button", { name: "Rename" }));
+    await user.clear(within(rowFor("Sales")).getByLabelText("Rename Sales"));
+    const save = within(rowFor("Sales")).getByTestId("save-department");
+    expect(save).toBeEnabled();
+    await user.click(save);
+    expect(screen.getByTestId("departments-error")).toHaveTextContent(
+      "Department name can't be empty.",
+    );
+    expect(saveDepartment).not.toHaveBeenCalled();
   });
 });

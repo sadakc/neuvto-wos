@@ -1,6 +1,6 @@
 # Backups
 
-**Version:** 1.2 · **Status:** Active · **Updated:** 1 Sep 2026
+**Version:** 1.3 · **Status:** Active · **Updated:** 13 Oct 2026
 
 **Supabase's Free plan has no automatic backups.** Not short retention — none at
 all. Daily backups with 7-day retention begin on Pro (~$25/month). Until Neuvto
@@ -283,11 +283,11 @@ The schedule went in on 20 Aug 2026. Between then and 31 Aug it ran eleven
 times and produced **three** backups. That is worth writing down precisely,
 because none of it was the failure everybody had prepared for.
 
-| what the log said | times | what it actually was |
-| --- | --- | --- |
-| `psql: could not translate host name … nodename nor servname provided` | 5 | DNS not up. Not a database problem at all |
-| `pg_dump: SSL SYSCALL error: EOF detected` | 3 | The connection dropped mid-dump |
-| `error running container: exit 1` | 1 | Docker not running yet |
+| what the log said                                                      | times | what it actually was                      |
+| ---------------------------------------------------------------------- | ----- | ----------------------------------------- |
+| `psql: could not translate host name … nodename nor servname provided` | 5     | DNS not up. Not a database problem at all |
+| `pg_dump: SSL SYSCALL error: EOF detected`                             | 3     | The connection dropped mid-dump           |
+| `error running container: exit 1`                                      | 1     | Docker not running yet                    |
 
 The first group is the interesting one. `launchd` runs a missed
 `StartCalendarInterval` job **once on wake** — so a lid opened at 09:00 fires
@@ -340,7 +340,7 @@ Both are discovered on the same bad day.
 
 Failures now count only inside a **7-day window** (`--partial-window`). Older
 ones stay on disk as evidence and are reported in the "on disk in total" note;
-they simply stop being treated as evidence of a problem happening *now*. A
+they simply stop being treated as evidence of a problem happening _now_. A
 `.partial` whose name cannot be read as a date is counted rather than skipped —
 an uncountable failure is exactly what this alarm exists to notice.
 

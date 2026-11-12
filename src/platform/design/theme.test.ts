@@ -41,30 +41,32 @@ describe("the console is always light", () => {
   });
 });
 
-describe("the employee app is Nocturne by default", () => {
-  it.each(["/app", "/app/", "/app/reports", "/app/members"])("%s is dark", (path) => {
-    expect(resolve(path)).toBe("dark");
-  });
+describe("the employee app follows the device (D77)", () => {
+  it.each(["/app", "/app/", "/app/reports", "/app/employee/card"])(
+    "%s follows a dark OS",
+    (path) => {
+      expect(resolve(path, null, true)).toBe("dark");
+    },
+  );
 
-  it("is dark even when the OS asks for light", () => {
-    // The whole point of a default: most people never change the system
-    // setting they were shipped.
-    expect(resolve("/app", null, false)).toBe("dark");
-  });
+  it.each(["/app", "/app/", "/app/reports", "/app/employee/card"])(
+    "%s follows a light OS",
+    (path) => {
+      // Under Nocturne this was dark. D77 removed the forced default; a test
+      // that still expected dark here would be asserting the old decision.
+      expect(resolve(path, null, false)).toBe("light");
+    },
+  );
 
-  it("yields to an explicit choice", () => {
-    expect(resolve("/app", "light", false)).toBe("light");
-    expect(resolve("/app", "dark", true)).toBe("dark");
+  it("yields to an explicit choice in both directions", () => {
+    expect(resolve("/app", "light", true)).toBe("light");
+    expect(resolve("/app", "dark", false)).toBe("dark");
   });
 
   it("ignores a stored value that is neither theme", () => {
     // localStorage is user-writable and survives a rename of the values.
-    expect(resolve("/app", "midnight")).toBe("dark");
-    expect(resolve("/app", "")).toBe("dark");
-  });
-
-  it("does not capture a path that merely starts with /app", () => {
-    expect(resolve("/apply", null, false)).toBe("light");
+    expect(resolve("/app", "midnight", true)).toBe("dark");
+    expect(resolve("/app", "", false)).toBe("light");
   });
 });
 

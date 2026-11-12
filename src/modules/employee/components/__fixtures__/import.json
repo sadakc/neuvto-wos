@@ -1,0 +1,117 @@
+{
+  "clean": {
+    "check": {
+      "ready": 2,
+      "people": 2,
+      "created": 0,
+      "skipped": 0,
+      "problems": []
+    },
+    "import": {
+      "ready": 0,
+      "people": 2,
+      "created": 2,
+      "skipped": 0,
+      "problems": []
+    },
+    "workbook": {
+      "family": [
+        {
+          "name": "Arun",
+          "relation": "son",
+          "employeeCode": "E-1"
+        }
+      ],
+      "people": [
+        {
+          "aadhaar": "234567890124",
+          "fullName": "Mallappa",
+          "joinedDate": "2026-11-02",
+          "employeeCode": "E-1"
+        },
+        {
+          "aadhaar": "345678901238",
+          "fullName": "Lakshmi",
+          "employeeCode": "E-2"
+        }
+      ],
+      "nominees": [],
+      "previous": []
+    }
+  },
+  "problems": {
+    "check": {
+      "ready": 1,
+      "people": 2,
+      "created": 0,
+      "skipped": 1,
+      "problems": [
+        {
+          "row": 2,
+          "tab": "family",
+          "code": "NOT_ON_PEOPLE",
+          "column": "employeeCode"
+        },
+        {
+          "row": 2,
+          "tab": "people",
+          "code": "INVALID_AADHAAR",
+          "column": null,
+          "section": "statutory",
+          "employeeCode": "E-2"
+        }
+      ]
+    },
+    "workbook": {
+      "family": [
+        {
+          "name": "Arun",
+          "relation": "son",
+          "employeeCode": "E-1"
+        },
+        {
+          "name": "Kavya",
+          "relation": "daughter",
+          "employeeCode": "E-9"
+        }
+      ],
+      "people": [
+        {
+          "aadhaar": "234567890124",
+          "fullName": "Mallappa",
+          "joinedDate": "2026-11-02",
+          "employeeCode": "E-1"
+        },
+        {
+          "aadhaar": "123",
+          "fullName": "Lakshmi",
+          "employeeCode": "E-2"
+        }
+      ],
+      "nominees": [],
+      "previous": []
+    },
+    "importClean": {
+      "ready": 0,
+      "people": 2,
+      "created": 1,
+      "skipped": 1,
+      "problems": [
+        {
+          "row": 2,
+          "tab": "family",
+          "code": "NOT_ON_PEOPLE",
+          "column": "employeeCode"
+        },
+        {
+          "row": 2,
+          "tab": "people",
+          "code": "INVALID_AADHAAR",
+          "column": null,
+          "section": "statutory",
+          "employeeCode": "E-2"
+        }
+      ]
+    }
+  }
+}

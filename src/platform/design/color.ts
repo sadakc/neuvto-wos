@@ -72,6 +72,41 @@ export function oklchToRgb({ l, c, h }: Oklch): [number, number, number] {
   return [encodeSrgb(r), encodeSrgb(g), encodeSrgb(bl)];
 }
 
+/**
+ * `#RRGGBB` → OKLCH. The exact inverse of `oklchToRgb`, using the same
+ * published matrices run backwards.
+ *
+ * Exists because a design arrives in hex. The Core HR palette (11 Oct 2026) is
+ * specified as hex values copied from its prototype, and retyping each one as a
+ * hand-rounded OKLCH coordinate is how `--primary` once became a colour nobody
+ * chose. Converting in code means the token IS the published value, and the
+ * round-trip assertion in color.test.ts proves it.
+ */
+export function hexToOklch(hex: string): Oklch {
+  const m = /^#?([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(hex.trim());
+  if (!m) throw new Error(`hexToOklch: "${hex}" is not #RRGGBB`);
+  const [r, g, b] = [m[1], m[2], m[3]].map((x) => decodeSrgb(parseInt(x, 16) / 255));
+
+  // Linear sRGB → LMS → cube roots → OKLab.
+  const lLin = 0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * b;
+  const mLin = 0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * b;
+  const sLin = 0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * b;
+  const [l_, m_, s_] = [lLin, mLin, sLin].map(Math.cbrt);
+
+  const L = 0.2104542553 * l_ + 0.793617785 * m_ - 0.0040720468 * s_;
+  const A = 1.9779984951 * l_ - 2.428592205 * m_ + 0.4505937099 * s_;
+  const B = 0.0259040371 * l_ + 0.7827717662 * m_ - 0.808675766 * s_;
+
+  const c = Math.sqrt(A * A + B * B);
+  // An achromatic colour has no meaningful hue; 0 keeps the value stable.
+  const h = c < 1e-6 ? 0 : ((Math.atan2(B, A) * 180) / Math.PI + 360) % 360;
+  return { l: L, c, h };
+}
+
+function decodeSrgb(channel: number): number {
+  return channel <= 0.04045 ? channel / 12.92 : ((channel + 0.055) / 1.055) ** 2.4;
+}
+
 /** `#RRGGBB`. What React Native, Android `colors.xml` and iOS colour sets want. */
 export function oklchToHex(value: Oklch): string {
   const [r, g, b] = oklchToRgb(value);
